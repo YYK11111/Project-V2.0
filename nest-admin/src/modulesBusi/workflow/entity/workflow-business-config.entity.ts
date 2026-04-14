@@ -12,7 +12,7 @@ export interface FieldDefinition {
 export interface TriggerConfig {
   triggerEvent: string;
   name?: string;
-  workflowCode?: string;
+  businessScene?: string;
   statusTriggerValues?: string[];
   condition?: string;
 }

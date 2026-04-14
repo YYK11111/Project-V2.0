@@ -3,9 +3,11 @@ import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as api from './api'
 import { checkPermi } from '@/utils/permission'
+import { useRouter } from 'vue-router'
 
 const params = ref({})
 const rctRef = ref()
+const router = useRouter()
 const approvalDialogVisible = ref(false)
 const approvalTitle = ref('审批')
 const currentTask = ref<any>(null)
@@ -63,7 +65,24 @@ const submitTransfer = async () => {
   } catch (error: any) { ElMessage.error(error.response?.data?.message || '转交失败') }
 }
 
-const viewInstanceDetail = (row: any) => { currentTask.value = row }
+const getBusinessRoute = (row: any) => {
+  const businessId = String(row.businessKey || '').split('_').pop()
+  const query = { id: businessId, taskId: row.id, instanceId: row.instanceId, fromWorkflow: '1' }
+  if (row.businessType === 'project') return { path: '/projectManage/detail', query }
+  if (row.businessType === 'change') return { path: '/changeManage/form', query }
+  if (row.businessType === 'ticket') return { path: '/ticketManage/form', query }
+  if (row.businessType === 'task') return { path: '/taskManage/form', query }
+  if (row.businessType === 'customer') return { path: '/crm/customer/form', query }
+  return null
+}
+
+const viewInstanceDetail = (row: any) => {
+  const target = getBusinessRoute(row)
+  if (!target) {
+    return ElMessage.warning('未识别的业务对象，无法跳转')
+  }
+  router.push(target)
+}
 </script>
 
 <template>
@@ -71,9 +90,11 @@ const viewInstanceDetail = (row: any) => { currentTask.value = row }
     <RequestChartTable ref="rctRef" :params="params" :request="api.getMyTasks">
       <template #table>
         <el-table-column prop="nodeName" label="任务名称" width="150" />
-        <el-table-column prop="instanceId" label="流程实例ID" width="180" show-overflow-tooltip>
-          <template #default="{ row }"><el-button link type="primary" @click="viewInstanceDetail(row)">{{ row.instanceId }}</el-button></template>
+        <el-table-column prop="businessType" label="业务对象" width="100" />
+        <el-table-column prop="businessTitle" label="业务标题" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }"><el-button link type="primary" @click="viewInstanceDetail(row)">{{ row.businessTitle }}</el-button></template>
         </el-table-column>
+        <el-table-column prop="businessCode" label="业务编号" width="160" show-overflow-tooltip />
         <el-table-column prop="starterId" label="发起人" width="120" />
         <el-table-column prop="startTime" label="创建时间" width="180" />
       </template>

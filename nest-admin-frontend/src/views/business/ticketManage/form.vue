@@ -1,10 +1,11 @@
 <script setup>
-import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory } from './api'
+import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory, submitApproval } from './api'
 import { getList as getProjectList } from '@/views/business/projectManage/api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import Editor from '@/components/Editor/index.vue'
 import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
+import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -70,10 +71,24 @@ const loadTaskList = () => {
 }
 
 const isEdit = computed(() => !!route.query.id)
+const workflowTaskId = computed(() => String(route.query.taskId || ''))
+const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
+const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
 const canTicketUpdate = computed(() => checkPermi(['business/tickets/update']))
 
 if (isEdit.value) {
+  getOne(route.query.id).then(({ data }) => {
+    form.value = {
+      ...data,
+      severity: data.severity || '3',
+      rootCauseCategory: data.rootCauseCategory || '',
+    }
+  })
+}
+
+function reloadCurrent() {
+  if (!route.query.id) return
   getOne(route.query.id).then(({ data }) => {
     form.value = {
       ...data,
@@ -101,6 +116,13 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+async function handleSubmitApproval() {
+  if (!canTicketUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  await submitApproval(route.query.id)
+  $sdk.msgSuccess('提交审批成功')
+  router.back()
+}
 </script>
 
 <template>
@@ -110,6 +132,13 @@ function cancel() {
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px">
+      <WorkflowApprovalPanel
+        v-if="fromWorkflow && workflowTaskId"
+        :task-id="workflowTaskId"
+        :instance-id="workflowInstanceId"
+        :node-name="form.currentNodeName"
+        @approved="reloadCurrent"
+      />
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="工单标题" prop="title">
@@ -178,6 +207,16 @@ function cancel() {
           </el-form-item>
         </el-col>
       </el-row>
+
+      <el-form-item label="审批状态" v-if="isEdit">
+        <el-tag :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'">
+          {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[form.approvalStatus] || '无需审批' }}
+        </el-tag>
+      </el-form-item>
+
+      <el-form-item label="当前审批节点" v-if="isEdit && form.currentNodeName">
+        <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
+      </el-form-item>
 
       <el-row :gutter="20">
         <el-col :span="12">
@@ -249,6 +288,7 @@ function cancel() {
       <el-form-item>
         <el-button v-if="isEdit ? canTicketUpdate : canTicketAdd" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
+        <el-button v-if="isEdit && canTicketUpdate && form.status === '1' && form.approvalStatus !== '1'" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       </el-form-item>
     </el-form>
   </div>

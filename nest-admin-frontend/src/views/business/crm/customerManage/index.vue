@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { getList, getCustomerTypes, getCustomerLevels, getCustomerStatuses, del } from './api'
+import { getList, getCustomerTypes, getCustomerLevels, getCustomerStatuses, del, submitApproval } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
@@ -20,8 +20,18 @@ const rctRef = ref()
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
 const canCustomerDelete = computed(() => checkPermi(['business/crm/customers/delete']))
+const canCustomerSubmitApproval = computed(() => checkPermi(['business/crm/customers/update']))
+
+async function handleSubmitApproval(row) {
+  if (!canCustomerSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确定提交该客户审批吗？')
+  await submitApproval(row.id)
+  $sdk.msgSuccess('提交审批成功')
+  rctRef.value?.getList()
+}
 
 const getButtons = (row) => [
+  { key: 'submit', label: '提交审批', type: 'warning', disabled: !canCustomerSubmitApproval.value || row.status !== '1' || row.approvalStatus === '1', onClick: () => handleSubmitApproval(row) },
   { key: 'edit', label: '修改', type: 'primary', disabled: !canCustomerUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/customer/form') },
   { key: 'delete', label: '删除', danger: true, disabled: !canCustomerDelete.value, onClick: () => rctRef.value.del(del, row.id) },
 ]
@@ -75,6 +85,14 @@ const getButtons = (row) => [
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="审批状态" prop="approvalStatus" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
+              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前节点" prop="currentNodeName" min-width="140" :show-overflow-tooltip="true" />
         <el-table-column label="所属行业" prop="industry" width="120" :show-overflow-tooltip="true" />
         <el-table-column label="客户价值(万元)" prop="customerValue" width="120" />
       </template>

@@ -1,7 +1,8 @@
 <script setup>
-import { getOne, save, update, getCustomerTypes, getCustomerLevels, getCustomerStatuses } from './api'
+import { getOne, save, update, getCustomerTypes, getCustomerLevels, getCustomerStatuses, submitApproval } from './api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import UserSelect from '@/components/UserSelect.vue'
+import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -63,10 +64,20 @@ getDeptTrees().then((res) => {
 })
 
 const isEdit = computed(() => !!route.query.id)
+const workflowTaskId = computed(() => String(route.query.taskId || ''))
+const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
+const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
 
 if (isEdit.value) {
+  getOne(route.query.id).then(({ data }) => {
+    form.value = { ...data }
+  })
+}
+
+function reloadCurrent() {
+  if (!route.query.id) return
   getOne(route.query.id).then(({ data }) => {
     form.value = { ...data }
   })
@@ -90,6 +101,13 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+async function handleSubmitApproval() {
+  if (!canCustomerUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  await submitApproval(route.query.id)
+  $sdk.msgSuccess('提交审批成功')
+  router.back()
+}
 </script>
 
 <template>
@@ -99,6 +117,13 @@ function cancel() {
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" style="max-width: 1000px">
+      <WorkflowApprovalPanel
+        v-if="fromWorkflow && workflowTaskId"
+        :task-id="workflowTaskId"
+        :instance-id="workflowInstanceId"
+        :node-name="form.currentNodeName"
+        @approved="reloadCurrent"
+      />
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="客户名称" prop="name">
@@ -184,6 +209,16 @@ function cancel() {
         </el-col>
       </el-row>
 
+      <el-form-item label="审批状态" v-if="isEdit">
+        <el-tag :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'">
+          {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[form.approvalStatus] || '无需审批' }}
+        </el-tag>
+      </el-form-item>
+
+      <el-form-item label="当前审批节点" v-if="isEdit && form.currentNodeName">
+        <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
+      </el-form-item>
+
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="销售负责人" prop="salesId">
@@ -212,6 +247,7 @@ function cancel() {
       <el-form-item>
         <el-button v-if="isEdit ? canCustomerUpdate : canCustomerAdd" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
+        <el-button v-if="isEdit && canCustomerUpdate && form.status === '1' && form.approvalStatus !== '1'" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       </el-form-item>
     </el-form>
   </div>

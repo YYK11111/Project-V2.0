@@ -133,6 +133,8 @@ declare module 'vue' {
     TextareaExtend: typeof import('./src/components/TextareaExtend.vue')['default']
     Upload: typeof import('./src/components/Upload.vue')['default']
     UserSelect: typeof import('./src/components/UserSelect.vue')['default']
+    WorkflowApprovalPanel: typeof import('./src/components/workflow/WorkflowApprovalPanel.vue')['default']
+    WorkflowPreviewCanvas: typeof import('./src/components/workflow/WorkflowPreviewCanvas.vue')['default']
   }
   export interface GlobalDirectives {
     vInfiniteScroll: typeof import('element-plus/es')['ElInfiniteScroll']
@@ -263,4 +265,6 @@ declare global {
   const TextareaExtend: typeof import('./src/components/TextareaExtend.vue')['default']
   const Upload: typeof import('./src/components/Upload.vue')['default']
   const UserSelect: typeof import('./src/components/UserSelect.vue')['default']
+  const WorkflowApprovalPanel: typeof import('./src/components/workflow/WorkflowApprovalPanel.vue')['default']
+  const WorkflowPreviewCanvas: typeof import('./src/components/workflow/WorkflowPreviewCanvas.vue')['default']
 }

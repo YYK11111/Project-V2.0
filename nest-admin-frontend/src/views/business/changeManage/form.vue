@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, save, update, getStatus, getType, getImpact, approve, reject } from './api'
+import { getOne, save, update, getStatus, getType, getImpact, approve, reject, submitApproval } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
+import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -43,10 +44,20 @@ getImpact().then(({ data }) => (impactMap.value = data || {}))
 
 const isView = computed(() => route.query.action === 'view')
 const isEdit = computed(() => !!route.query.id && !isView.value)
+const workflowTaskId = computed(() => String(route.query.taskId || ''))
+const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
+const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
 
 if (isEdit.value || isView.value) {
+  getOne(route.query.id).then(({ data }) => {
+    form.value = data || {}
+  })
+}
+
+function reloadCurrent() {
+  if (!route.query.id) return
   getOne(route.query.id).then(({ data }) => {
     form.value = data || {}
   })
@@ -65,6 +76,13 @@ async function handleReject() {
   const approverId = $store.user?.id || ''
   await reject(route.query.id, { approverId, comment: form.value.approvalComment || '不同意' })
   $sdk.msgSuccess('已驳回')
+  router.back()
+}
+
+async function handleSubmitApproval() {
+  if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  await submitApproval(route.query.id)
+  $sdk.msgSuccess('提交审批成功')
   router.back()
 }
 
@@ -95,6 +113,13 @@ function cancel() {
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+      <WorkflowApprovalPanel
+        v-if="fromWorkflow && workflowTaskId"
+        :task-id="workflowTaskId"
+        :instance-id="workflowInstanceId"
+        :node-name="form.currentNodeName"
+        @approved="reloadCurrent"
+      />
       <el-form-item label="变更标题" prop="title">
         <el-input v-model="form.title" placeholder="请输入变更标题" maxlength="200" show-word-limit :disabled="isView" />
       </el-form-item>
@@ -125,7 +150,18 @@ function cancel() {
             </el-select>
           </el-form-item>
         </el-col>
+        <el-col :span="8" v-if="isEdit.value || isView.value">
+          <el-form-item label="审批状态">
+            <el-tag :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'">
+              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[form.approvalStatus] || '无需审批' }}
+            </el-tag>
+          </el-form-item>
+        </el-col>
       </el-row>
+
+      <el-form-item label="当前审批节点" v-if="(isEdit.value || isView.value) && form.currentNodeName">
+        <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
+      </el-form-item>
 
       <el-form-item label="变更原因">
         <el-input v-model="form.reason" type="textarea" :rows="2" placeholder="请输入变更原因" :disabled="isView" />
@@ -171,6 +207,7 @@ function cancel() {
       <el-form-item v-if="!isView">
         <el-button v-if="!isView && (isEdit ? canChangeUpdate : canChangeAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
+        <el-button v-if="isEdit.value && canChangeUpdate && form.status === '1' && form.approvalStatus !== '1'" type="warning" @click="handleSubmitApproval">提交审批</el-button>
         <el-button v-if="isEdit.value && canChangeUpdate && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
         <el-button v-if="isEdit.value && canChangeUpdate && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
       </el-form-item>

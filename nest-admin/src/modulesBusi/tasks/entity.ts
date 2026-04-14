@@ -142,6 +142,15 @@ export class Task extends BaseEntity {
   @BaseColumn({ type: 'int', nullable: true, comment: '故事点' })
   storyPoints: number
 
+  @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '工作流实例ID' })
+  workflowInstanceId: string
+
+  @BaseColumn({ type: 'char', length: 1, default: '0', comment: '审批状态: 0无需审批 1审批中 2已通过 3已拒绝' })
+  approvalStatus: string
+
+  @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '当前审批节点名称' })
+  currentNodeName: string
+
   // 工时记录
   @OneToMany(() => TaskTimeLog, (timelog) => timelog.task)
   timeLogs: TaskTimeLog[]

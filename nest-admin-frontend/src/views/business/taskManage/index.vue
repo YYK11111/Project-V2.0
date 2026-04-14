@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { getList, getStatus, getPriority, del, updateProgress } from './api'
+import { getList, getStatus, getPriority, del, updateProgress, submitApproval } from './api'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref({})
@@ -17,12 +17,21 @@ const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
 const canTaskDelete = computed(() => checkPermi(['business/tasks/delete']))
 const canTaskUpdateProgress = computed(() => checkPermi(['business/tasks/updateProgress']))
+const canTaskSubmitApproval = computed(() => checkPermi(['business/tasks/update']))
 
 function handleProgressChange(row) {
   if (!canTaskUpdateProgress.value) return $sdk.msgWarning('当前操作没有权限')
   updateProgress(row.id, row.progress).then(() => {
     $sdk.msgSuccess('进度更新成功')
   })
+}
+
+async function handleSubmitApproval(row) {
+  if (!canTaskSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确定提交该任务审批吗？')
+  await submitApproval(row.id)
+  $sdk.msgSuccess('提交审批成功')
+  rctRef.value?.getList()
 }
 </script>
 
@@ -62,6 +71,14 @@ function handleProgressChange(row) {
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="审批状态" prop="approvalStatus" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
+              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前节点" prop="currentNodeName" min-width="140" :show-overflow-tooltip="true" />
         <el-table-column label="优先级" prop="priority" width="100">
           <template #default="{ row }">
             <el-tag 
@@ -96,6 +113,16 @@ function handleProgressChange(row) {
               :disabled="!canTaskUpdate"
               @click="canTaskUpdate && $refs.rctRef.goRoute(row.id, '/taskManage/form')"
             />
+          </el-tooltip>
+          <el-tooltip content="提交审批" placement="top">
+            <el-button
+              link
+              type="warning"
+              size="small"
+              circle
+              :disabled="!canTaskSubmitApproval || row.status !== '1' || row.approvalStatus === '1'"
+              @click="canTaskSubmitApproval && handleSubmitApproval(row)"
+            >审</el-button>
           </el-tooltip>
           <el-tooltip content="删除" placement="top">
             <el-button 

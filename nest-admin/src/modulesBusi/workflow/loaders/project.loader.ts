@@ -53,12 +53,6 @@ export class ProjectLoader implements BusinessDataLoader {
       return acc
     }, {} as Record<string, string[]>)
 
-    const firstMemberByRole = (role: ProjectMemberRole) => {
-      const userId = memberGroups[role]?.[0]
-      const member = normalizedMembers.find((item) => item.role === role && item.user?.id === userId)
-      return member?.user || null
-    }
-
     return {
       id: project.id,
       type: 'project',
@@ -87,16 +81,6 @@ export class ProjectLoader implements BusinessDataLoader {
         } : null,
         members: normalizedMembers,
         memberGroups,
-        // 兼容已落库的旧流程定义，待数据清理后可删除
-        coreMembers: {
-          projectManager: firstMemberByRole(ProjectMemberRole.manager),
-          deliveryManager: firstMemberByRole(ProjectMemberRole.deliveryManager),
-          techLead: firstMemberByRole(ProjectMemberRole.techLead),
-          implementationLead: firstMemberByRole(ProjectMemberRole.implementationLead),
-          testLead: firstMemberByRole(ProjectMemberRole.testLead),
-          customerContact: firstMemberByRole(ProjectMemberRole.customerContact),
-          businessContact: firstMemberByRole(ProjectMemberRole.businessContact),
-        },
       },
     };
   }

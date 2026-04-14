@@ -66,3 +66,7 @@ export function getTaskList(projectId) {
   const params = projectId ? { projectId, pageNum: 1, pageSize: 100 } : { pageNum: 1, pageSize: 100 }
   return request({ url: '/business/tasks/list', method: 'get', params }).then(normalizePageData)
 }
+
+export function submitApproval(id) {
+  return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}

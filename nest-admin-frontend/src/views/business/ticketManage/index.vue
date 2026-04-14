@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { getList, getType, getStatus, del } from './api'
+import { getList, getType, getStatus, del, submitApproval } from './api'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref({})
@@ -16,6 +16,15 @@ const rctRef = ref()
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
 const canTicketUpdate = computed(() => checkPermi(['business/tickets/update']))
 const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
+const canTicketSubmitApproval = computed(() => checkPermi(['business/tickets/update']))
+
+async function handleSubmitApproval(row) {
+  if (!canTicketSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确定提交该工单审批吗？')
+  await submitApproval(row.id)
+  $sdk.msgSuccess('提交审批成功')
+  rctRef.value?.getList()
+}
 </script>
 
 <template>
@@ -59,6 +68,14 @@ const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="审批状态" prop="approvalStatus" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
+              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前节点" prop="currentNodeName" min-width="140" :show-overflow-tooltip="true" />
         <el-table-column label="创建时间" prop="createTime" width="160" />
       </template>
 
@@ -74,6 +91,16 @@ const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
               :disabled="!canTicketUpdate"
               @click="canTicketUpdate && $refs.rctRef.goRoute(row.id, '/ticketManage/form')"
             />
+          </el-tooltip>
+          <el-tooltip content="提交审批" placement="top">
+            <el-button
+              link
+              type="warning"
+              size="small"
+              circle
+              :disabled="!canTicketSubmitApproval || row.status !== '1' || row.approvalStatus === '1'"
+              @click="canTicketSubmitApproval && handleSubmitApproval(row)"
+            >审</el-button>
           </el-tooltip>
           <el-tooltip content="删除" placement="top">
             <el-button 

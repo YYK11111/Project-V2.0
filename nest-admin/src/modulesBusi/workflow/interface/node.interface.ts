@@ -115,12 +115,6 @@ export interface NotificationNodeProperties extends BaseNodeProperties {
 export interface CcNodeProperties extends BaseNodeProperties {
   /** 统一抄送配置 */
   ccConfig?: ApprovalNodeProperties;
-  /** 过渡字段：旧抄送类型，待清理 */
-  ccType?: 'user' | 'role' | 'dynamic';
-  /** 过渡字段：旧抄送人ID，待清理 */
-  ccValue?: string;
-  /** 过渡字段：旧动态抄送表达式，待清理 */
-  ccExpr?: string;
 }
 
 /**

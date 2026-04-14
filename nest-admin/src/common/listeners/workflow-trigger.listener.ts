@@ -39,12 +39,17 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
     console.log(`[WorkflowTrigger] Entity inserted: ${entityName}, ID: ${entity.id}`);
 
     try {
-      const triggerConfig = await this.dataLoader.getTriggerConfig(businessType, 'onCreate');
-      if (triggerConfig) {
-        const businessKey = `${businessType}_${entity.id}`;
-        console.log(`[WorkflowTrigger] Triggering workflow for ${businessKey}`);
-        await this.workflowService.startWorkflow({ code: triggerConfig.workflowCode, businessKey }, 'system');
-      }
+        const triggerConfig = await this.dataLoader.getTriggerConfig(businessType, 'onCreate');
+        if (triggerConfig) {
+          const businessKey = `${businessType}_${entity.id}`;
+          console.log(`[WorkflowTrigger] Triggering workflow for ${businessKey}`);
+          await this.workflowService.startBusinessWorkflow({
+            businessType,
+            businessScene: triggerConfig.businessScene,
+            businessKey,
+            variables: { triggerEvent: 'onCreate', businessType },
+          }, 'system');
+        }
     } catch (error) {
       console.error(`[WorkflowTrigger] Failed to check trigger config: ${error.message}`);
     }
@@ -68,7 +73,12 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
         if (triggerConfig && this.matchStatusTrigger(entity, triggerConfig)) {
           const businessKey = `${businessType}_${entity.id}`;
           console.log(`[WorkflowTrigger] Status change triggers workflow for ${businessKey}`);
-          await this.workflowService.startWorkflow({ code: triggerConfig.workflowCode, businessKey }, 'system');
+          await this.workflowService.startBusinessWorkflow({
+            businessType,
+            businessScene: triggerConfig.businessScene,
+            businessKey,
+            variables: { triggerEvent: 'onStatusChange', businessType },
+          }, 'system');
         }
       } catch (error) {
         console.error(`[WorkflowTrigger] Failed to check status change trigger: ${error.message}`);

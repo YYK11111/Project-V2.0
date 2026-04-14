@@ -9,9 +9,13 @@ import { getList as getRiskList } from '../riskManage/api'
 import { getList as getChangeList } from '../changeManage/api'
 import { getList as getSprintList } from '../sprintManage/api'
 import { checkPermi } from '@/utils/permission'
+import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 
 const route = useRoute()
 const projectId = route.query.id
+const workflowTaskId = computed(() => String(route.query.taskId || ''))
+const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
+const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 
 const project = ref({})
 const statusMap = ref({})
@@ -27,6 +31,10 @@ const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/s
 const canProjectSubmitClose = computed(() => checkPermi(['business/projects/submitClose']))
 
 onMounted(async () => {
+  await reloadCurrent()
+})
+
+async function reloadCurrent() {
   const [statusRes, priorityRes, oneRes] = await Promise.all([
     getStatus(),
     getPriority(),
@@ -50,7 +58,7 @@ onMounted(async () => {
   risks.value = riskRes.list || []
   changes.value = changeRes.list || []
   sprints.value = sprintRes.list || []
-})
+}
 
 const getStatusType = (s) => {
   const types = { '1': 'info', '2': 'warning', '3': 'primary', '4': 'warning', '5': 'warning', '6': 'success', '7': 'danger' }
@@ -102,6 +110,13 @@ function handleSubmitClose() {
 
     <el-tabs v-model="activeTab" class="mt20">
       <el-tab-pane label="概览" name="overview">
+        <WorkflowApprovalPanel
+          v-if="fromWorkflow && workflowTaskId"
+          :task-id="workflowTaskId"
+          :instance-id="workflowInstanceId"
+          :node-name="project.currentNodeName"
+          @approved="reloadCurrent"
+        />
         <el-row :gutter="20">
           <el-col :span="8">
             <el-card shadow="hover">

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getList, getStatus, getType, approve, reject, del } from './api'
+import { getList, getStatus, getType, approve, reject, del, submitApproval } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
 import { checkPermi } from '@/utils/permission'
@@ -23,6 +23,7 @@ const rctRef = ref()
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
 const canChangeDelete = computed(() => checkPermi(['business/changes/delete']))
+const canChangeSubmitApproval = computed(() => checkPermi(['business/changes/approve']))
 
 const columns = [
   { prop: 'title', label: '变更标题', minWidth: 150 },
@@ -53,6 +54,14 @@ const handleDel = async (row) => {
   await $sdk.confirm('确定要删除该变更吗？')
   await del(row.id)
   $sdk.msgSuccess('删除成功')
+  rctRef.value?.getList()
+}
+
+const handleSubmitApproval = async (row) => {
+  if (!canChangeSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确定提交该变更审批吗？')
+  await submitApproval(row.id)
+  $sdk.msgSuccess('提交审批成功')
   rctRef.value?.getList()
 }
 
@@ -104,6 +113,14 @@ onMounted(async () => {
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template>
       </el-table-column>
+      <el-table-column prop="approvalStatus" label="审批状态" width="110">
+        <template #default="{ row }">
+          <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
+            {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="currentNodeName" label="当前节点" min-width="140" :show-overflow-tooltip="true" />
       <el-table-column prop="costImpact" label="成本影响" width="100">
         <template #default="{ row }">¥{{ (row.costImpact || 0).toLocaleString() }}</template>
       </el-table-column>
@@ -113,6 +130,7 @@ onMounted(async () => {
     <template #tableOperation="{ row }">
       <TableOperation :buttons="[
         { key: 'view', label: '查看', onClick: () => handleView(row) },
+        { key: 'submit', label: '提交审批', type: 'warning', disabled: !canChangeSubmitApproval.value || row.status !== '1' || row.approvalStatus === '1', onClick: () => handleSubmitApproval(row) },
         { key: 'edit', label: '修改', disabled: !canChangeUpdate.value, onClick: () => handleEdit(row) },
         { key: 'delete', label: '删除', danger: true, disabled: !canChangeDelete.value, onClick: () => handleDel(row) },
       ]" :row="row" />

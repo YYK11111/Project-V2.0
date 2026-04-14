@@ -81,3 +81,7 @@ export function removeDependency(taskId, dependencyId) {
 export function checkCircularDependency(taskId, dependencyId) {
   return request({ url: `${baseUrl}/${taskId}/check-circular`, method: 'post', data: { dependencyId } })
 }
+
+export function submitApproval(id) {
+  return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}

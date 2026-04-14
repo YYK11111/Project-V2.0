@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as api from './api'
 import { useUserStore } from '@/stores/user'
@@ -9,8 +10,9 @@ import { checkPermi } from '@/utils/permission'
 
 const userStore = useUserStore()
 const currentUserId = userStore.id
-const params = ref({ status: '' })
+const params = ref({ status: '', mode: 'participant' })
 const rctRef = ref()
+const route = useRoute()
 const canWorkflowInstanceGetOne = computed(() => checkPermi(['business/workflow/instances/getOne']))
 const canWorkflowInstanceCancel = computed(() => checkPermi(['business/workflow/instances/cancel']))
 const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflow/instances/withdraw']))
@@ -61,18 +63,40 @@ const submitCancel = () => api.cancelWorkflowInstance(currentCancelInstance.valu
 
 const handleWithdraw = (row: any) => { currentWithdrawInstance.value = row; withdrawForm.comment = ''; withdrawVisible.value = true }
 const submitWithdraw = () => api.withdrawWorkflow(currentWithdrawInstance.value.id, { comment: withdrawForm.comment }).then(() => { ElMessage.success('流程已撤回'); withdrawVisible.value = false; rctRef.value.getList() })
+
+onMounted(async () => {
+  const highlightId = route.query.highlight
+  if (!highlightId) return
+  try {
+    const res = await api.getWorkflowInstance(String(highlightId))
+    currentInstance.value = res.data
+    detailTab.value = 'info'
+    detailVisible.value = true
+    const historyRes = await api.getWorkflowHistory(String(highlightId))
+    historyList.value = historyRes.data || []
+  } catch (error) {
+    console.warn('打开流程实例详情失败', error)
+  }
+})
 </script>
 
 <template>
   <div>
     <RequestChartTable ref="rctRef" :params="params" :request="api.getWorkflowInstances">
       <template #query="{ query }">
+        <BaSelect v-model="query.mode" label="查看范围" prop="mode">
+          <el-option label="我参与的" value="participant" />
+          <el-option label="我发起的" value="starter" />
+        </BaSelect>
         <BaSelect v-model="query.status" label="状态" prop="status" isAll>
           <el-option label="进行中" value="1" /><el-option label="已完成" value="2" /><el-option label="已取消" value="3" />
         </BaSelect>
       </template>
       <template #table>
         <el-table-column prop="definitionCode" label="流程编码" width="120" />
+        <el-table-column prop="businessType" label="业务对象" width="100" />
+        <el-table-column prop="businessTitle" label="业务标题" min-width="180" :show-overflow-tooltip="true" />
+        <el-table-column prop="businessCode" label="业务编号" width="160" :show-overflow-tooltip="true" />
         <el-table-column prop="businessKey" label="业务单号" width="180" />
         <el-table-column prop="starterId" label="发起人ID" width="120" />
         <el-table-column prop="status" label="状态" width="100">
@@ -96,7 +120,10 @@ const submitWithdraw = () => api.withdrawWorkflow(currentWithdrawInstance.value.
           <el-descriptions :column="2" border v-if="currentInstance">
             <el-descriptions-item label="实例ID">{{ currentInstance.id }}</el-descriptions-item>
             <el-descriptions-item label="流程编码">{{ currentInstance.definitionCode }}</el-descriptions-item>
+            <el-descriptions-item label="业务对象">{{ currentInstance.businessType }}</el-descriptions-item>
+            <el-descriptions-item label="业务标题">{{ currentInstance.businessTitle || '-' }}</el-descriptions-item>
             <el-descriptions-item label="业务单号">{{ currentInstance.businessKey }}</el-descriptions-item>
+            <el-descriptions-item label="业务编号">{{ currentInstance.businessCode || '-' }}</el-descriptions-item>
             <el-descriptions-item label="发起人ID">{{ currentInstance.starterId }}</el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="currentInstance.status === '1' ? 'warning' : currentInstance.status === '2' ? 'success' : 'info'">

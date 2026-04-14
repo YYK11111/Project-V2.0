@@ -940,12 +940,21 @@ export class WorkflowService {
     const instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } })
     if (!instance) return task as any
     const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
-    return { ...task, ...summary }
+    return {
+      ...task,
+      ...summary,
+      assigneeName: await this.getUserDisplayName(task.assigneeId),
+      starterName: await this.getUserDisplayName(instance.starterId),
+    }
   }
 
   private async attachBusinessSummaryToInstance(instance: WorkflowInstance): Promise<any> {
     const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
-    return { ...instance, ...summary }
+    return {
+      ...instance,
+      ...summary,
+      starterName: await this.getUserDisplayName(instance.starterId),
+    }
   }
 
   private async getBusinessSummary(businessKey: string, variables?: any) {
@@ -974,6 +983,12 @@ export class WorkflowService {
       businessTitle: titleFieldMap[businessType] || businessKey,
       businessCode: codeFieldMap[businessType] || '',
     }
+  }
+
+  private async getUserDisplayName(userId?: string) {
+    if (!userId) return ''
+    const user = await this.usersService.getOne({ id: userId }, false)
+    return user?.nickname || user?.name || userId
   }
 
   /**
@@ -1145,20 +1160,28 @@ export class WorkflowService {
    * 获取流程实例历史记录
    */
   async getInstanceHistory(instanceId: string): Promise<WorkflowHistory[]> {
-    return this.historyRepo.find({
+    const historyList = await this.historyRepo.find({
       where: { instanceId },
       order: { createTime: 'ASC' },
     });
+    return Promise.all(historyList.map(async (item) => ({
+      ...item,
+      operatorName: await this.getUserDisplayName(item.operatorId),
+    } as any))) as any
   }
 
   /**
    * 获取流程实例的所有任务
    */
   async getInstanceTasks(instanceId: string): Promise<WorkflowTask[]> {
-    return this.taskRepo.find({
+    const tasks = await this.taskRepo.find({
       where: { instanceId },
       order: { createTime: 'DESC' },
     });
+    return Promise.all(tasks.map(async (task) => ({
+      ...task,
+      assigneeName: await this.getUserDisplayName(task.assigneeId),
+    } as any))) as any
   }
 
   // ==================== 业务对象配置管理 ====================

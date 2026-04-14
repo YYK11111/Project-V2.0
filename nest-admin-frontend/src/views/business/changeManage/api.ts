@@ -52,3 +52,7 @@ export function approve(id, data) {
 export function reject(id, data) {
   return request.post(`/business/changes/reject/${id}`, data)
 }
+
+export function submitApproval(id) {
+  return request.post(`/business/changes/${id}/submit-approval`)
+}

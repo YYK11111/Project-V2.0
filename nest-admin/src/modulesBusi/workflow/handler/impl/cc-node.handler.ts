@@ -54,39 +54,12 @@ export class CcNodeHandler implements INodeHandler {
     };
   }
 
-  /**
-   * 解析抄送接收人
-   */
-  private parseCcReceivers(props: CcNodeProperties, variables: Record<string, any>): string[] {
-    const ccConfig = props.ccConfig
-    if (ccConfig?.assigneeType) {
-      // 兼容新抄送配置模型
+  private async getCcReceivers(props: CcNodeProperties, variables: Record<string, any>): Promise<string[]> {
+    if (!props.ccConfig?.assigneeType) {
       return []
     }
 
-    if (!props.ccValue && !props.ccExpr) return [];
-
-    let expr = props.ccExpr || props.ccValue;
-    if (expr.startsWith('${') && expr.endsWith('}')) {
-      const varName = expr.slice(2, -1);
-      const value = variables[varName];
-      if (Array.isArray(value)) return value;
-      if (value) return [value];
-    }
-
-    // 直接是用户ID列表（逗号分隔）
-    if (typeof props.ccValue === 'string' && props.ccValue.includes(',')) {
-      return props.ccValue.split(',').map(v => v.trim());
-    }
-
-    return [props.ccValue as string];
-  }
-
-  async onEnter(context: NodeExecutionContext): Promise<void> {
-    const props = context.variables._nodeProperties as CcNodeProperties;
-    if (!props?.ccConfig?.assigneeType) return
-
-    const receivers = await this.assigneeResolver.resolve(
+    return this.assigneeResolver.resolve(
       {
         type: props.ccConfig.assigneeType as 'user' | 'department' | 'business_field',
         userId: props.ccConfig.assigneeValue,
@@ -95,16 +68,7 @@ export class CcNodeHandler implements INodeHandler {
         fieldPath: props.ccConfig.fieldPath,
         businessType: props.ccConfig.businessType,
       },
-      context.variables._businessData,
+      variables._businessData,
     )
-
-    context.variables._ccReceivers = receivers
-  }
-
-  private async getCcReceivers(props: CcNodeProperties, variables: Record<string, any>): Promise<string[]> {
-    if (props.ccConfig?.assigneeType) {
-      return variables._ccReceivers || []
-    }
-    return this.parseCcReceivers(props, variables)
   }
 }

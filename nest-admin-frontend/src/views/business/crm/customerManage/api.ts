@@ -47,3 +47,7 @@ export function getCustomerLevels() {
 export function getCustomerStatuses() {
   return request({ url: `${baseUrl}/getStatuses`, method: 'get' })
 }
+
+export function submitApproval(id) {
+  return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}
