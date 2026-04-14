@@ -186,7 +186,7 @@
       <div class="designer-properties">
         <div v-if="showIssuePanel && validationIssues.length" class="issue-panel">
           <div class="issue-panel-title">发布前检查</div>
-          <div v-for="(issue, index) in validationIssues" :key="`${issue.type}-${index}`" class="issue-item">
+            <div v-for="(issue, index) in validationIssues" :key="`${issue.type}-${index}`" class="issue-item" @click="focusIssue(issue)">
             <div class="issue-item-title">{{ index + 1 }}. {{ issue.message }}</div>
             <div v-if="issue.nodeName" class="issue-item-meta">节点：{{ issue.nodeName }}</div>
           </div>
@@ -259,10 +259,19 @@
                 <template v-if="selectedNode.type === 'condition'">
                   <el-divider>条件配置</el-divider>
                   <div class="condition-list">
-                    <div v-for="(cond, idx) in selectedNode.properties.conditions" :key="idx" class="condition-item">
+                    <div v-for="(cond, idx) in selectedNode.properties.conditions" :key="cond.id" class="condition-item">
                       <div class="condition-header">
-                        <span class="condition-label">条件 {{ idx + 1 }}</span>
+                        <span class="condition-label">分支 {{ idx + 1 }}</span>
                         <div class="condition-actions">
+                          <el-radio
+                            size="small"
+                            :model-value="getDefaultFlow(selectedNode.id)?.conditionId || ''"
+                            :label="getConditionFlow(selectedNode.id, cond.id)?.conditionId"
+                            :disabled="!getConditionFlow(selectedNode.id, cond.id)?.targetNodeId"
+                            @change="() => setDefaultConditionFlow(getConditionFlow(selectedNode.id, cond.id)?.id)"
+                          >
+                            设为默认分支
+                          </el-radio>
                           <el-button size="small" text :disabled="idx === 0" @click="moveCondition(idx, -1)">上移</el-button>
                           <el-button size="small" text :disabled="idx === selectedNode.properties.conditions.length - 1" @click="moveCondition(idx, 1)">下移</el-button>
                           <el-button size="small" type="danger" text @click="removeCondition(idx)">删除</el-button>
@@ -271,9 +280,10 @@
                       <ConditionBuilder
                         v-model="selectedNode.properties.conditions[idx]"
                         :business-type="businessType"
+                        :disabled="getConditionFlow(selectedNode.id, cond.id)?.flowType === 'default'"
                       />
                     </div>
-                    <el-button size="small" type="primary" @click="addCondition">添加条件</el-button>
+                    <div class="condition-hint">从条件节点拖出分支连线，将自动生成对应条件配置</div>
                   </div>
                   
                   <el-divider>默认分支</el-divider>
@@ -407,35 +417,22 @@
     <el-dialog v-model="previewVisible" title="流程预览" width="80%">
       <el-tabs v-model="previewActiveTab">
         <el-tab-pane label="可视化预览" name="visual">
-          <div class="flow-preview" :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px' }">
-            <!-- SVG 连线层 -->
-            <svg class="preview-lines" :width="canvasWidth" :height="canvasHeight">
-              <defs>
-                <marker id="preview-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                  <path d="M0,0 L0,6 L9,3 z" fill="#409eff"/>
-                </marker>
-              </defs>
-              <path
-                v-for="flow in flows"
-                :key="flow.id"
-                :d="getBezierPath(flow)"
-                :stroke="getFlowColor(flow)"
-                stroke-width="2"
-                fill="none"
-                :stroke-dasharray="flow.flowType === 'default' ? '5,5' : (flow.flowType === 'condition' ? '5,5' : 'none')"
-                marker-end="url(#preview-arrow)"
-              />
-            </svg>
-            
-            <!-- 节点层 -->
-            <div v-for="node in nodes" :key="node.id" class="flow-node" :style="{ left: node.x + 'px', top: node.y + 'px' }">
-              <div class="node-box" :class="['node-' + node.type, { 'node-incomplete': isNodeIncomplete(node) }]">
-                <div class="node-icon">{{ getNodeIcon(node.type) }}</div>
-                <div class="node-name">{{ node.name }}</div>
-                <div class="node-preview-summary">{{ getPreviewNodeSummary(node) }}</div>
-                <div v-if="isNodeIncomplete(node)" class="node-warning">配置未完成</div>
-              </div>
-            </div>
+          <div class="flow-preview">
+            <WorkflowPreviewCanvas
+              :nodes="nodes"
+              :flows="flows"
+              :canvas-width="canvasWidth"
+              :canvas-height="canvasHeight"
+              :get-bezier-path="getBezierPath"
+              :get-flow-color="getFlowColor"
+              :get-arrow-marker="getArrowMarker"
+              :get-flow-label="getFlowLabel"
+              :get-flow-label-position="getFlowLabelPosition"
+              :get-node-icon="getNodeIcon"
+              :get-node-type-name="getNodeTypeName"
+              :get-preview-node-summary="getPreviewNodeSummary"
+              :is-node-incomplete="isNodeIncomplete"
+            />
           </div>
         </el-tab-pane>
         <el-tab-pane label="JSON数据" name="json">
@@ -463,6 +460,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as api from './api'
 import ApproverSelector from '@/components/workflow/ApproverSelector.vue'
 import ConditionBuilder from '@/components/workflow/ConditionBuilder.vue'
+import WorkflowPreviewCanvas from '@/components/workflow/WorkflowPreviewCanvas.vue'
 import { checkPermi } from '@/utils/permission'
 
 const saving = ref(false)
@@ -758,15 +756,15 @@ const getInvalidConnectionReason = (source, target, flowType = 'normal') => {
   if (!source || !target) return '连接信息无效'
   if (source.nodeId === target.nodeId) return '节点不能连接到自身'
 
-  if (flowType === 'normal') {
+  if (flowType === 'normal' || flowType === 'condition') {
     const exists = flows.value.some(f =>
       f.sourceNodeId === source.nodeId &&
       f.targetNodeId === target.nodeId &&
       f.sourceAnchor === source.position &&
       f.targetAnchor === target.position &&
-      (f.flowType || 'normal') === 'normal'
+      (f.flowType || 'normal') === flowType
     )
-    if (exists) return '普通连线已存在'
+    if (exists) return flowType === 'condition' ? '条件分支已存在' : '普通连线已存在'
   }
 
   return ''
@@ -870,12 +868,11 @@ const getConditionSummaryByFlow = (flow) => {
   const conditionNode = nodes.value.find((node) => node.type === 'condition' && (node.properties?.conditions || []).some((item) => item.id === flow.conditionId))
   const condition = conditionNode?.properties?.conditions?.find((item) => item.id === flow.conditionId)
   if (!condition) return '未绑定条件'
-  const fieldText = Array.isArray(condition.field) ? condition.field.join('.') : (condition.field || '未选字段')
-  return `${fieldText} ${condition.operator || ''} ${condition.value || ''}`.trim()
+  return getConditionText(condition)
 }
 
 const getConditionFlow = (nodeId, conditionId) => {
-  return flows.value.find((flow) => flow.sourceNodeId === nodeId && flow.flowType === 'condition' && flow.conditionId === conditionId)
+  return flows.value.find((flow) => flow.sourceNodeId === nodeId && (flow.flowType === 'condition' || flow.flowType === 'default') && flow.conditionId === conditionId)
 }
 
 const getDefaultFlow = (nodeId) => {
@@ -884,7 +881,7 @@ const getDefaultFlow = (nodeId) => {
 
 const getDefaultFlowSummary = (node) => {
   const defaultFlow = getDefaultFlow(node?.id)
-  if (!defaultFlow?.targetNodeId) return '请在画布上为该节点连接一条默认分支连线'
+  if (!defaultFlow?.targetNodeId) return '未设置默认分支'
   return `条件都不满足时，连至：${getNodeDisplayName(defaultFlow.targetNodeId)}`
 }
 
@@ -936,6 +933,10 @@ const getConditionText = (condition) => {
     lt: '小于',
     lte: '小于等于',
     contains: '包含',
+    memberOf: '属于部门',
+    memberOfOrSubDept: '属于部门或子部门',
+    containsUser: '包含人员',
+    containsDept: '包含部门',
     isNull: '为空',
     isNotNull: '不为空',
   }
@@ -950,91 +951,109 @@ const validationIssues = computed(() => {
   const issues = []
 
   if (!workflowName.value) {
-    issues.push({ type: 'process', message: '流程名称未填写' })
+    issues.push({ type: 'process', level: 'error', message: '流程名称未填写' })
   }
   if (!businessType.value) {
-    issues.push({ type: 'process', message: '业务对象未选择' })
+    issues.push({ type: 'process', level: 'error', message: '业务对象未选择' })
   }
   if (!businessScene.value) {
-    issues.push({ type: 'process', message: '业务场景未选择' })
+    issues.push({ type: 'process', level: 'error', message: '业务场景未选择' })
   }
   if (!triggerEvent.value) {
-    issues.push({ type: 'process', message: '触发时机未选择' })
+    issues.push({ type: 'process', level: 'error', message: '触发时机未选择' })
   }
 
   const startNodes = nodes.value.filter((node) => node.type === 'start')
   const endNodes = nodes.value.filter((node) => node.type === 'end')
   if (startNodes.length !== 1) {
-    issues.push({ type: 'structure', message: '流程必须且只能包含一个开始节点' })
+    issues.push({ type: 'structure', level: 'error', message: '流程必须且只能包含一个开始节点' })
   }
   if (endNodes.length !== 1) {
-    issues.push({ type: 'structure', message: '流程必须且只能包含一个结束节点' })
+    issues.push({ type: 'structure', level: 'error', message: '流程必须且只能包含一个结束节点' })
   }
 
   nodes.value.forEach((node) => {
     if (node.type === 'approval') {
       const config = node.properties?.approverConfig || {}
       if (!config.assigneeType) {
-        issues.push({ type: 'approval', message: '审批人来源未配置', nodeName: node.name })
+          issues.push({ type: 'approval', level: 'error', message: '审批人来源未配置', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'user' && !config.assigneeValue) {
-        issues.push({ type: 'approval', message: '固定人员未选择', nodeName: node.name })
+          issues.push({ type: 'approval', level: 'error', message: '固定人员未选择', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) {
-        issues.push({ type: 'approval', message: '固定部门配置不完整', nodeName: node.name })
+          issues.push({ type: 'approval', level: 'error', message: '固定部门配置不完整', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
-        issues.push({ type: 'approval', message: '业务字段未选择', nodeName: node.name })
+          issues.push({ type: 'approval', level: 'error', message: '业务字段未选择', nodeName: node.name, nodeId: node.id })
       }
     }
 
     if (node.type === 'condition') {
       const conditions = node.properties?.conditions || []
       if (!conditions.length) {
-        issues.push({ type: 'condition', message: '条件节点未配置任何条件', nodeName: node.name })
+        issues.push({ type: 'condition', level: 'error', message: '条件节点未配置任何条件', nodeName: node.name, nodeId: node.id })
       }
       conditions.forEach((condition, index) => {
         const flow = getConditionFlow(node.id, condition.id)
         if (!flow?.targetNodeId) {
-          issues.push({ type: 'condition', message: `条件 ${index + 1} 未连接目标节点`, nodeName: node.name })
+          issues.push({ type: 'condition', level: 'error', message: `条件 ${index + 1} 未连接目标节点`, nodeName: node.name, nodeId: node.id })
         }
       })
       const defaultFlow = getDefaultFlow(node.id)
       if (!defaultFlow?.targetNodeId) {
-        issues.push({ type: 'condition', message: '默认分支未连接目标节点', nodeName: node.name })
+        issues.push({ type: 'condition', level: 'warning', message: '未配置默认分支（运行时可能报错）', nodeName: node.name, nodeId: node.id })
       }
     }
 
     if (node.type === 'cc') {
       const config = node.properties?.ccConfig || {}
       if (!config.assigneeType) {
-        issues.push({ type: 'cc', message: '抄送对象来源未配置', nodeName: node.name })
+        issues.push({ type: 'cc', level: 'error', message: '抄送对象来源未配置', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'user' && !config.assigneeValue) {
-        issues.push({ type: 'cc', message: '固定人员未选择', nodeName: node.name })
+        issues.push({ type: 'cc', level: 'error', message: '固定人员未选择', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) {
-        issues.push({ type: 'cc', message: '固定部门配置不完整', nodeName: node.name })
+        issues.push({ type: 'cc', level: 'error', message: '固定部门配置不完整', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
-        issues.push({ type: 'cc', message: '业务字段未选择', nodeName: node.name })
+        issues.push({ type: 'cc', level: 'error', message: '业务字段未选择', nodeName: node.name, nodeId: node.id })
       }
     }
 
     if (node.type === 'form' && !node.properties?.formId) {
-      issues.push({ type: 'form', message: '表单节点未配置表单标识', nodeName: node.name })
+      issues.push({ type: 'form', level: 'error', message: '表单节点未配置表单标识', nodeName: node.name, nodeId: node.id })
     }
   })
 
   flows.value.forEach((flow) => {
     if (!flow.sourceNodeId || !flow.targetNodeId) {
-      issues.push({ type: 'flow', message: '存在未完成的连线' })
+        issues.push({ type: 'flow', level: 'error', message: '存在未完成的连线', flowId: flow.id })
     }
   })
 
   if (hasCycle()) {
-    issues.push({ type: 'structure', message: '流程存在环路' })
+    issues.push({ type: 'structure', level: 'error', message: '流程存在环路' })
   }
   if (hasOrphanNodes()) {
-    issues.push({ type: 'structure', message: '存在孤立节点，开始节点必须有出线，结束节点必须有入线' })
+    issues.push({ type: 'structure', level: 'error', message: '存在孤立节点，开始节点必须有出线，结束节点必须有入线' })
   }
 
   return issues
 })
+
+const focusIssue = (issue) => {
+  if (issue.nodeId) {
+    selectedNodeId.value = issue.nodeId
+    selectedFlowId.value = ''
+    activeTab.value = 'node'
+    return
+  }
+
+  if (issue.flowId) {
+    selectedFlowId.value = issue.flowId
+    selectedNodeId.value = ''
+    activeTab.value = 'flow'
+    return
+  }
+
+  activeTab.value = 'process'
+}
 
 const isNodeIncomplete = (node) => {
   if (node.type === 'approval') {
@@ -1049,7 +1068,7 @@ const isNodeIncomplete = (node) => {
     const conditions = node.properties?.conditions || []
     if (!conditions.length) return true
     if (conditions.some((condition) => !getConditionFlow(node.id, condition.id)?.targetNodeId)) return true
-    if (!getDefaultFlow(node.id)?.targetNodeId) return true
+    if (!getDefaultFlow(node.id)?.targetNodeId) return false
   }
 
     if (node.type === 'cc') {
@@ -1411,20 +1430,40 @@ const findNearestAnchor = (x, y, excludeFlowId) => {
 
 // 创建连线
 const createFlow = (source, target) => {
-  const error = getInvalidConnectionReason(source, target, 'normal')
+  const sourceNode = nodes.value.find((node) => node.id === source.nodeId)
+  const isConditionSource = sourceNode?.type === 'condition'
+  const flowType = isConditionSource ? 'condition' : 'normal'
+  const error = getInvalidConnectionReason(source, target, flowType)
   if (error) {
     ElMessage.warning(error)
     return
   }
-  
-  flows.value.push({
+
+  const flow = {
     id: `flow_${source.nodeId}_${target.nodeId}_${Date.now()}`,
     sourceNodeId: source.nodeId,
     targetNodeId: target.nodeId,
     sourceAnchor: source.position,
     targetAnchor: target.position,
-    flowType: 'normal',
-  })
+    flowType,
+  }
+
+  if (isConditionSource) {
+    if (!sourceNode.properties.conditions) {
+      sourceNode.properties.conditions = []
+    }
+    const conditionId = generateConditionId()
+    sourceNode.properties.conditions.push({
+      id: conditionId,
+      fieldSource: 'field',
+      field: [],
+      operator: 'eq',
+      value: '',
+    })
+    flow.conditionId = conditionId
+  }
+
+  flows.value.push(flow)
 }
 
 // 删除连线
@@ -1445,6 +1484,12 @@ const deleteFlow = async (flowId) => {
   if (!confirmed) return
 
   flows.value = flows.value.filter(f => f.id !== flowId)
+  if (flow.conditionId) {
+    const ownerNode = nodes.value.find((node) => node.type === 'condition' && (node.properties?.conditions || []).some((item) => item.id === flow.conditionId))
+    if (ownerNode) {
+      ownerNode.properties.conditions = ownerNode.properties.conditions.filter((item) => item.id !== flow.conditionId)
+    }
+  }
   if (selectedFlowId.value === flowId) {
     selectedFlowId.value = ''
   }
@@ -1621,52 +1666,14 @@ const removeNode = async () => {
   selectedNodeId.value = ''
 }
 
-const addCondition = () => {
-  if (!selectedNode.value) return
-  if (!selectedNode.value.properties.conditions) {
-    selectedNode.value.properties.conditions = []
-  }
-  const conditionId = generateConditionId()
-  selectedNode.value.properties.conditions.push({
-    id: conditionId,
-    fieldSource: 'field',
-    field: [],
-    operator: 'eq',
-    value: '',
-  })
-  
-  // 为新条件添加一条连线
-  flows.value.push({
-    id: `flow_${selectedNode.value.id}_${conditionId}`,
-    sourceNodeId: selectedNode.value.id,
-    targetNodeId: '',
-    sourceAnchor: 'bottom',
-    targetAnchor: 'top',
-    flowType: 'condition',
-    conditionId,
-  })
-  
-  // 确保默认分支 flow 存在
-  const hasDefaultFlow = flows.value.some(f => f.sourceNodeId === selectedNode.value.id && f.flowType === 'default')
-  if (!hasDefaultFlow) {
-    flows.value.push({
-      id: `flow_${selectedNode.value.id}_default`,
-      sourceNodeId: selectedNode.value.id,
-      targetNodeId: '',
-      sourceAnchor: 'bottom',
-      targetAnchor: 'top',
-      flowType: 'default',
-    })
-  }
-}
-
 const removeCondition = (index) => {
   if (!selectedNode.value) return
 
   const [removed] = selectedNode.value.properties.conditions.splice(index, 1)
   if (!removed) return
 
-  flows.value = flows.value.filter(f => !(f.flowType === 'condition' && f.conditionId === removed.id))
+  const removedFlow = flows.value.find(f => (f.flowType === 'condition' || f.flowType === 'default') && f.conditionId === removed.id)
+  flows.value = flows.value.filter(f => f.id !== removedFlow?.id)
 }
 
 const moveCondition = (index, direction) => {
@@ -1676,6 +1683,21 @@ const moveCondition = (index, direction) => {
   if (targetIndex < 0 || targetIndex >= conditions.length) return
   const [current] = conditions.splice(index, 1)
   conditions.splice(targetIndex, 0, current)
+}
+
+const setDefaultConditionFlow = (flowId) => {
+  if (!selectedNode.value || !flowId) return
+  const currentNodeId = selectedNode.value.id
+  flows.value = flows.value.map((flow) => {
+    if (flow.sourceNodeId !== currentNodeId) return flow
+    if (flow.id === flowId) {
+      return { ...flow, flowType: 'default' }
+    }
+    if (flow.flowType === 'default') {
+      return { ...flow, flowType: 'condition' }
+    }
+    return flow
+  })
 }
 
 const normalizeLoadedData = (data) => {
@@ -1732,29 +1754,16 @@ const normalizeLoadedData = (data) => {
         },
         ...node.properties,
       }
-
-      if (!node.properties.ccConfig.assigneeType && node.properties.ccType) {
-        if (node.properties.ccType === 'user') {
-          node.properties.ccConfig.assigneeType = 'user'
-          node.properties.ccConfig.assigneeValue = node.properties.ccValue || ''
-        } else if (node.properties.ccType === 'dynamic') {
-          node.properties.ccConfig.assigneeType = 'business_field'
-          node.properties.ccConfig.fieldPath = node.properties.ccExpr || node.properties.ccValue || ''
-        }
-      }
     }
 
     return node
   })
 
-  flows.value = (data.flows || []).map((flow) => {
-    if (flow.flowType) return flow
-    return {
-      ...flow,
-      flowType: flow.isDefault ? 'default' : (flow.conditionId ? 'condition' : 'normal'),
-      conditionId: flow.conditionId || '',
-    }
-  })
+  flows.value = (data.flows || []).map((flow) => ({
+    ...flow,
+    flowType: flow.flowType,
+    conditionId: flow.conditionId || '',
+  }))
 
   nodes.value.forEach((node) => {
     if (node.type !== 'condition') return
@@ -1819,7 +1828,7 @@ const buildSubmitNodes = () => {
     }
 
     if (node.type === 'cc') {
-      const { ccType, ccValue, ccExpr, ccRoleId, ...restProperties } = node.properties || {}
+      const restProperties = node.properties || {}
       return {
         ...node,
         properties: {
@@ -2401,6 +2410,15 @@ const onCanvasClick = () => {
   margin-bottom: 8px;
 }
 
+.condition-hint {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f5f7fa;
+  color: #909399;
+  font-size: 12px;
+}
+
 .condition-actions {
   display: flex;
   align-items: center;
@@ -2466,46 +2484,11 @@ const onCanvasClick = () => {
 
 /* 流程预览样式 */
 .flow-preview {
-  position: relative;
   min-height: 400px;
   background: #f5f7fa;
   border-radius: 4px;
   padding: 20px;
   overflow: auto;
-}
-
-.preview-lines {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  pointer-events: none;
-  z-index: 0;
-  overflow: visible;
-}
-
-.flow-node {
-  position: absolute;
-  z-index: 1;
-}
-
-.node-box {
-  padding: 12px 16px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
-  min-width: 100px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.node-box .node-icon {
-  font-size: 20px;
-  margin-bottom: 4px;
-}
-
-.node-box .node-name {
-  font-weight: bold;
-  font-size: 13px;
 }
 
 .node-preview-summary {

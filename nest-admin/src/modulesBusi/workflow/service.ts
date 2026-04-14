@@ -15,6 +15,7 @@ import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflow
 import { NoticesService } from '../../modules/notices/service';
 import { BoolNum } from '../../common/type/base';
 import { UsersService } from '../../modules/users/users.service';
+import { DeptService } from '../../modules/depts/depts.service';
 import { WorkflowDataLoaderService } from './workflow-data-loader.service';
 import { WorkflowAssigneeResolverService } from '../../common/services/workflow-assignee-resolver.service';
 import { WorkflowIntegrationService } from '../../common/services/workflow-integration.service';
@@ -37,6 +38,7 @@ export class WorkflowService {
     private noticesService: NoticesService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
+    private deptService: DeptService,
     private dataLoader: WorkflowDataLoaderService,
     private assigneeResolver: WorkflowAssigneeResolverService,
     @Inject(forwardRef(() => WorkflowIntegrationService))
@@ -72,7 +74,7 @@ export class WorkflowService {
     const definition = this.definitionRepo.create({
       ...dto,
       version,
-      isActive: '1',
+      isActive: '0',
     });
 
     return this.definitionRepo.save(definition);
@@ -109,6 +111,7 @@ export class WorkflowService {
    * 保存工作流定义（框架标准save接口）
    */
   async saveDefinition(dto: any): Promise<any> {
+    dto.isActive = dto.id ? undefined : '0'
     await this.ensureUniquePublishedScene(dto)
 
     if (dto.id) {
@@ -117,6 +120,7 @@ export class WorkflowService {
       if (!definition) {
         throw new BadRequestException('工作流定义不存在');
       }
+      delete dto.isActive
       Object.assign(definition, dto);
       return this.definitionRepo.save(definition);
     } else {
@@ -380,11 +384,14 @@ export class WorkflowService {
       if (node.type === NodeType.APPROVAL) {
         // 审批节点需要创建任务
         await this.createApprovalTask(instance, node, context);
+        // 审批节点创建待办后立即暂停，等待人工审批后再继续推进
+        await handler.onExit?.(context);
+        return;
       }
 
       // 5. 根据结果推进流程
       if (result.success) {
-        const nextNodeIds = this.findNextNodes(definition, node, instance, result.nextNodeIds);
+        const nextNodeIds = await this.findNextNodes(definition, node, instance, result.nextNodeIds);
         if (nextNodeIds.length > 0) {
           for (const nextNodeId of nextNodeIds) {
             const nextNodeIndex = definition.nodes.findIndex(n => n.id === nextNodeId);
@@ -411,12 +418,12 @@ export class WorkflowService {
   /**
    * 查找下一个节点
    */
-  private findNextNodes(
+  private async findNextNodes(
     definition: WorkflowDefinition,
     currentNode: NodeConfig,
     instance: WorkflowInstance,
     handlerNextNodes: string[] = []
-  ): string[] {
+  ): Promise<string[]> {
     // 如果处理器返回了明确的下一个节点，使用处理器返回的结果
     if (handlerNextNodes.length > 0) {
       return handlerNextNodes;
@@ -428,13 +435,13 @@ export class WorkflowService {
       return [];
     }
 
-    // 条件节点：按条件配置 + 连接线决定走向
+    // 条件节点：以条件节点自身配置为真源，连接线仅表达目标和分支类型
     if (currentNode.type === NodeType.CONDITION) {
       const conditions = (currentNode.properties as any)?.conditions || [];
       if (conditions.length) {
         for (const condition of conditions) {
           if (!condition) continue;
-          if (!this.evaluateCondition(condition, instance.variables || {})) continue;
+          if (!(await this.evaluateCondition(condition, instance.variables || {}))) continue;
           const flow = outgoingFlows.find(f => f.flowType === 'condition' && f.conditionId === condition.id);
           if (flow?.targetNodeId) {
             return [flow.targetNodeId];
@@ -446,7 +453,7 @@ export class WorkflowService {
           return [defaultFlow.targetNodeId];
         }
 
-        return [];
+        throw new BadRequestException(`条件节点「${currentNode.name}」未命中任何分支，且未配置默认分支`);
       }
 
     }
@@ -463,7 +470,7 @@ export class WorkflowService {
   /**
    * 评估条件
    */
-  private evaluateCondition(condition: Condition, variables: Record<string, any>): boolean {
+  private async evaluateCondition(condition: Condition, variables: Record<string, any>): Promise<boolean> {
     const fieldValue = this.getFieldValue(condition.field, variables);
     const { operator, value } = condition;
 
@@ -484,9 +491,121 @@ export class WorkflowService {
         return Array.isArray(value) && value.includes(fieldValue);
       case ConditionOperator.CONTAINS:
         return String(fieldValue).includes(String(value));
+      case ConditionOperator.IS_NULL:
+        return fieldValue == null || fieldValue === '';
+      case ConditionOperator.IS_NOT_NULL:
+        return fieldValue != null && fieldValue !== '';
+      case ConditionOperator.CONTAINS_USER:
+      case ConditionOperator.CONTAINS_DEPT:
+        return this.arrayContainsValue(fieldValue, value);
+      case ConditionOperator.MEMBER_OF:
+        return await this.checkUserInDept(fieldValue, value, variables, false);
+      case ConditionOperator.MEMBER_OF_OR_SUB:
+        return await this.checkUserInDept(fieldValue, value, variables, true);
       default:
         return false;
     }
+  }
+
+  private async checkUserInDept(userValue: any, deptValue: any, variables: Record<string, any>, includeChildren: boolean): Promise<boolean> {
+    const userId = this.resolveIdValue(userValue);
+    const deptId = this.resolveIdValue(deptValue);
+    if (!userId || !deptId) return false;
+
+    const businessData = variables?._businessData?.data
+    const inlineDeptId = this.findDeptIdInBusinessData(businessData, userId)
+    if (inlineDeptId) {
+      if (!includeChildren) return String(inlineDeptId) === String(deptId)
+      return await this.checkDeptContains(inlineDeptId, deptId, variables)
+    }
+
+    if (!this.deptService || !this.usersService) return false
+
+    return await this.checkUserDeptFromService(userId, deptId, includeChildren)
+  }
+
+  private resolveIdValue(value: any): string | null {
+    if (!value) return null
+    if (Array.isArray(value)) return value[0] ? String(value[0]) : null
+    if (typeof value === 'object') {
+      if (value.id) return String(value.id)
+      if (value.value) return String(value.value)
+    }
+    return String(value)
+  }
+
+  private arrayContainsValue(fieldValue: any, expected: any): boolean {
+    if (!Array.isArray(fieldValue)) return false
+    if (fieldValue.includes(expected)) return true
+    const expectedId = this.resolveIdValue(expected)
+    if (!expectedId) return false
+    return fieldValue.some((item) => this.resolveIdValue(item) === expectedId)
+  }
+
+  private findDeptIdInBusinessData(data: any, userId: string): string | null {
+    if (!data || !userId) return null
+    const entries = Object.values(data) as any[]
+    for (const item of entries) {
+      if (item?.id && String(item.id) === String(userId) && item.deptId) {
+        return String(item.deptId)
+      }
+      if (Array.isArray(item)) {
+        for (const member of item) {
+          if (member?.user?.id && String(member.user.id) === String(userId) && member.user.deptId) {
+            return String(member.user.deptId)
+          }
+        }
+      }
+      if (item && typeof item === 'object') {
+        const nested = this.findDeptIdInBusinessData(item, userId)
+        if (nested) return nested
+      }
+    }
+    return null
+  }
+
+  private async checkDeptContains(userDeptId: string, targetDeptId: string, variables: Record<string, any>): Promise<boolean> {
+    if (String(userDeptId) === String(targetDeptId)) return true
+    const deptTree = variables?._businessData?.data?.deptTree
+    if (deptTree) {
+      return this.isDeptInTree(deptTree, targetDeptId, userDeptId)
+    }
+    if (!this.deptService) return false
+    const depts = await this.deptService.getChildren({ id: targetDeptId })
+    const deptIds = depts?.map((item) => String(item.id)) || []
+    return deptIds.includes(String(userDeptId))
+  }
+
+  private async checkUserDeptFromService(userId: string, deptId: string, includeChildren: boolean): Promise<boolean> {
+    if (!this.usersService || !this.deptService) return false
+    const user = await this.usersService.getOne({ id: userId }, false)
+    if (!user?.deptId) return false
+    if (!includeChildren) return String(user.deptId) === String(deptId)
+    const depts = await this.deptService.getChildren({ id: deptId })
+    const deptIds = depts?.map((item) => String(item.id)) || []
+    return deptIds.includes(String(user.deptId))
+  }
+
+  private isDeptInTree(tree: any, rootId: string, targetId: string): boolean {
+    const nodes = Array.isArray(tree) ? tree : [tree]
+    for (const node of nodes) {
+      if (!node) continue
+      if (String(node.id) === String(rootId)) {
+        return this.isDeptInSubtree(node, targetId)
+      }
+      if (node.children?.length) {
+        const found = this.isDeptInTree(node.children, rootId, targetId)
+        if (found) return true
+      }
+    }
+    return false
+  }
+
+  private isDeptInSubtree(node: any, targetId: string): boolean {
+    if (!node) return false
+    if (String(node.id) === String(targetId)) return true
+    const children = node.children || []
+    return children.some((child) => this.isDeptInSubtree(child, targetId))
   }
 
   /**
@@ -716,7 +835,7 @@ export class WorkflowService {
     if (dto.action === 'approve') {
       const currentNode = definition.nodes.find(n => n.id === task.nodeId);
       if (currentNode) {
-        const nextNodeIds = this.findNextNodes(definition, currentNode, instance);
+        const nextNodeIds = await this.findNextNodes(definition, currentNode, instance);
         if (nextNodeIds.length > 0) {
           for (const nextNodeId of nextNodeIds) {
             const nextNodeIndex = definition.nodes.findIndex(n => n.id === nextNodeId);
@@ -775,40 +894,86 @@ export class WorkflowService {
   /**
    * 获取用户待办任务
    */
-  async getPendingTasks(userId: string): Promise<WorkflowTask[]> {
-    return this.taskRepo.find({
+  async getPendingTasks(userId: string): Promise<any[]> {
+    const tasks = await this.taskRepo.find({
       where: { assigneeId: userId, status: '1' },
       order: { createTime: 'DESC' },
     });
+    return Promise.all(tasks.map((task) => this.attachBusinessSummaryToTask(task)))
   }
 
   /**
    * 获取流程实例详情
    */
-  async getInstance(id: string): Promise<WorkflowInstance> {
-    return this.instanceRepo.findOne({ where: { id } });
+  async getInstance(id: string): Promise<any> {
+    const instance = await this.instanceRepo.findOne({ where: { id } });
+    return instance ? this.attachBusinessSummaryToInstance(instance) : null;
   }
 
   /**
    * 获取流程实例列表（支持筛选）
    */
-  async listInstances(userId?: string, status?: string): Promise<WorkflowInstance[]> {
+  async listInstances(userId?: string, status?: string, mode: 'starter' | 'participant' = 'starter'): Promise<any[]> {
     const where: any = {};
-    
-    if (userId) {
-      // 查询该用户发起的或参与的实例
-      where.starterId = userId;
-    }
-    
+
     if (status) {
       where.status = status;
     }
-    
-    return this.instanceRepo.find({ 
-      where,
-      order: { startTime: 'DESC' },
-      take: 100 // 限制返回数量
-    });
+
+    let instances: WorkflowInstance[] = []
+    if (mode === 'participant' && userId) {
+      const tasks = await this.taskRepo.find({ where: { assigneeId: userId }, order: { createTime: 'DESC' } })
+      const instanceIds = Array.from(new Set(tasks.map((task) => task.instanceId))).filter(Boolean)
+      if (!instanceIds.length) return []
+      instances = await this.instanceRepo.find({ where: instanceIds.map((id) => ({ ...where, id })) as any, order: { startTime: 'DESC' }, take: 100 })
+    } else {
+      if (userId) {
+        where.starterId = userId;
+      }
+      instances = await this.instanceRepo.find({ where, order: { startTime: 'DESC' }, take: 100 })
+    }
+
+    return Promise.all(instances.map((instance) => this.attachBusinessSummaryToInstance(instance)))
+  }
+
+  private async attachBusinessSummaryToTask(task: WorkflowTask): Promise<any> {
+    const instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } })
+    if (!instance) return task as any
+    const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
+    return { ...task, ...summary }
+  }
+
+  private async attachBusinessSummaryToInstance(instance: WorkflowInstance): Promise<any> {
+    const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
+    return { ...instance, ...summary }
+  }
+
+  private async getBusinessSummary(businessKey: string, variables?: any) {
+    const businessData = variables?._businessData?.data || null
+    if (!businessKey) return { businessType: '', businessTitle: '', businessCode: '' }
+    const businessType = businessKey.split('_')[0]
+
+    const titleFieldMap: Record<string, string> = {
+      project: businessData?.name,
+      task: businessData?.name,
+      ticket: businessData?.title,
+      change: businessData?.title,
+      customer: businessData?.name,
+    }
+
+    const codeFieldMap: Record<string, string> = {
+      project: businessData?.code,
+      task: businessData?.code,
+      ticket: businessData?.id,
+      change: businessData?.id,
+      customer: businessData?.code,
+    }
+
+    return {
+      businessType,
+      businessTitle: titleFieldMap[businessType] || businessKey,
+      businessCode: codeFieldMap[businessType] || '',
+    }
   }
 
   /**
@@ -1006,7 +1171,7 @@ export class WorkflowService {
     if (businessType) {
       where.businessType = businessType;
     }
-    return this.configRepo.find({ where });
+    return this.configRepo.find({ where, order: { businessType: 'ASC' as any } });
   }
 
   /**
@@ -1020,7 +1185,16 @@ export class WorkflowService {
    * 创建业务对象配置
    */
   async createBusinessConfig(dto: any): Promise<WorkflowBusinessConfig> {
-    const config = this.configRepo.create(dto) as any;
+    const config = this.configRepo.create({
+      name: dto.name,
+      businessType: dto.businessType,
+      tableName: dto.tableName || dto.businessType,
+      idField: dto.idField || 'id',
+      fieldDefinitions: dto.fieldDefinitions || null,
+      dataLoaderClass: dto.dataLoaderClass || null,
+      triggerConfig: dto.triggerConfig || '{}',
+      isActive: dto.isActive || '1',
+    }) as any;
     return await this.configRepo.save(config) as any as WorkflowBusinessConfig;
   }
 
@@ -1032,7 +1206,7 @@ export class WorkflowService {
       // 更新
       const config = await this.configRepo.findOne({ where: { businessType: dto.businessType } });
       if (!config) {
-        throw new BadRequestException('业务配置不存在');
+        return this.createBusinessConfig(dto)
       }
       Object.assign(config, dto);
       return this.configRepo.save(config);

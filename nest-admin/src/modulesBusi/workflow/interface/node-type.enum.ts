@@ -92,6 +92,12 @@ export enum ConditionOperator {
   LTE = 'lte',         // 小于等于
   IN = 'in',           // 包含
   CONTAINS = 'contains', // 包含字符串
+  IS_NULL = 'isNull', // 为空
+  IS_NOT_NULL = 'isNotNull', // 不为空
+  MEMBER_OF = 'memberOf', // 属于部门
+  MEMBER_OF_OR_SUB = 'memberOfOrSubDept', // 属于部门或子部门
+  CONTAINS_USER = 'containsUser', // 包含人员
+  CONTAINS_DEPT = 'containsDept', // 包含部门
 }
 
 /**
