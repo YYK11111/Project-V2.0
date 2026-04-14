@@ -284,6 +284,9 @@
                       />
                     </div>
                     <div class="condition-hint">从条件节点拖出分支连线，将自动生成对应条件配置</div>
+                    <div class="condition-runtime-warning">
+                      未设置默认分支时，如果运行时所有条件都不满足，流程会直接报错终止。
+                    </div>
                   </div>
                   
                   <el-divider>默认分支</el-divider>
@@ -455,12 +458,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as api from './api'
 import ApproverSelector from '@/components/workflow/ApproverSelector.vue'
 import ConditionBuilder from '@/components/workflow/ConditionBuilder.vue'
 import WorkflowPreviewCanvas from '@/components/workflow/WorkflowPreviewCanvas.vue'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { checkPermi } from '@/utils/permission'
 
 const saving = ref(false)
@@ -492,6 +496,8 @@ const workflowDescription = ref('')
 const businessType = ref('')
 const businessScene = ref('')
 const triggerEvent = ref('')
+const businessFieldMappings = ref([])
+const deptTreeData = ref([])
 
 // 节点配置
 const nodes = ref([])
@@ -542,6 +548,28 @@ const businessSceneOptions = {
 }
 
 const currentBusinessSceneOptions = computed(() => businessSceneOptions[businessType.value] || [])
+const businessFieldLabelMap = computed(() => {
+  const map = new Map()
+  for (const field of businessFieldMappings.value) {
+    if (!field?.fieldName) continue
+    map.set(field.fieldName, field.fieldLabel || field.fieldName)
+  }
+  return map
+})
+const deptLabelMap = computed(() => {
+  const map = new Map()
+  const walk = (nodes = []) => {
+    nodes.forEach((node) => {
+      if (!node?.id) return
+      map.set(String(node.id), node.name || String(node.id))
+      if (node.children?.length) {
+        walk(node.children)
+      }
+    })
+  }
+  walk(deptTreeData.value)
+  return map
+})
 
 // Canvas 尺寸
 const canvasWidth = computed(() => {
@@ -885,41 +913,49 @@ const getDefaultFlowSummary = (node) => {
   return `条件都不满足时，连至：${getNodeDisplayName(defaultFlow.targetNodeId)}`
 }
 
-const memberRoleLabelMap = {
-  '1': '项目成员-项目经理',
-  '2': '项目成员-交付经理',
-  '3': '项目成员-技术负责人',
-  '4': '项目成员-实施负责人',
-  '5': '项目成员-测试负责人',
-  '6': '项目成员-客户联系人',
-  '7': '项目成员-商务接口人',
-  '8': '项目成员-开发工程师',
-  '9': '项目成员-实施顾问',
-  A: '项目成员-测试工程师',
-  B: '项目成员-运维工程师',
-  C: '项目成员-培训顾问',
-  D: '项目成员-数据迁移工程师',
-  E: '项目成员-驻场支持',
-  F: '项目成员-普通成员',
-}
-
 const getBusinessFieldLabel = (fieldPath) => {
   if (!fieldPath) return '未配置'
-  const labelMap = {
-    'leader.id': '项目负责人',
-    submitterId: '工单提交人',
-    handlerId: '工单处理人',
-    requesterId: '变更申请人',
-    approverId: '变更审批人',
-    salesId: '销售负责人',
-    'project.leaderId': '关联项目负责人',
-    executorIds: '任务经办人',
+  const normalizedPath = Array.isArray(fieldPath) ? fieldPath.join('.') : fieldPath
+  if (businessFieldLabelMap.value.has(normalizedPath)) {
+    return businessFieldLabelMap.value.get(normalizedPath)
   }
-  if (labelMap[fieldPath]) return labelMap[fieldPath]
-  if (fieldPath.startsWith('memberGroups.')) {
-    return memberRoleLabelMap[fieldPath.replace('memberGroups.', '')] || fieldPath
+  const field = businessFieldMappings.value.find((item) => item.fieldName === normalizedPath)
+  if (field?.fieldLabel) return field.fieldLabel
+  return normalizedPath
+}
+
+const getDeptDisplayName = (deptId) => {
+  if (!deptId) return '未配置'
+  return deptLabelMap.value.get(String(deptId)) || String(deptId)
+}
+
+const getDepartmentModeLabel = (departmentMode) => {
+  return departmentMode === 'members' ? '部门成员' : '部门负责人'
+}
+
+const getFallbackFieldSuffix = (fieldPath) => {
+  return fieldPath ? `，取空回退：${getBusinessFieldLabel(fieldPath)}` : ''
+}
+
+const getUserDisplayName = (userValue) => {
+  if (!userValue) return '未配置'
+  if (Array.isArray(userValue)) {
+    return userValue.length ? userValue.join('、') : '未配置'
   }
-  return fieldPath
+  return String(userValue)
+}
+
+const getAssigneeSourceSummary = (config, prefix = '来源') => {
+  if (config.assigneeType === 'business_field') {
+    return `${prefix}：业务字段 ${getBusinessFieldLabel(config.fieldPath)}${getFallbackFieldSuffix(config.assigneeEmptyFallbackFieldPath)}`
+  }
+  if (config.assigneeType === 'department') {
+    return `${prefix}：固定部门 ${getDeptDisplayName(config.departmentId)}（${getDepartmentModeLabel(config.departmentMode)}）${getFallbackFieldSuffix(config.assigneeEmptyFallbackFieldPath)}`
+  }
+  if (config.assigneeType === 'user') {
+    return `${prefix}：固定人员 ${getUserDisplayName(config.assigneeValue)}`
+  }
+  return `${prefix}未配置`
 }
 
 const getConditionText = (condition) => {
@@ -999,7 +1035,7 @@ const validationIssues = computed(() => {
       })
       const defaultFlow = getDefaultFlow(node.id)
       if (!defaultFlow?.targetNodeId) {
-        issues.push({ type: 'condition', level: 'warning', message: '未配置默认分支（运行时可能报错）', nodeName: node.name, nodeId: node.id })
+        issues.push({ type: 'condition', level: 'warning', message: '未设置默认分支时，如果运行时所有条件都不满足，流程会直接报错终止。', nodeName: node.name, nodeId: node.id })
       }
     }
 
@@ -1089,17 +1125,7 @@ const isNodeIncomplete = (node) => {
 const getPreviewNodeSummary = (node) => {
   if (node.type === 'approval') {
     const config = node.properties?.approverConfig || {}
-    if (config.assigneeType === 'business_field') {
-      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
-      return `业务字段：${getBusinessFieldLabel(config.fieldPath)}${fallback}`
-    }
-    if (config.assigneeType === 'department') {
-      return `固定部门：${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}${config.departmentId ? ` (${config.departmentId})` : ''}`
-    }
-    if (config.assigneeType === 'user') {
-      return `固定人员${config.assigneeValue ? `：${config.assigneeValue}` : ''}`
-    }
-    return '审批人未配置'
+    return getAssigneeSourceSummary(config, '审批人来源')
   }
 
   if (node.type === 'condition') {
@@ -1117,17 +1143,7 @@ const getPreviewNodeSummary = (node) => {
 
   if (node.type === 'cc') {
     const config = node.properties?.ccConfig || {}
-    if (config.assigneeType === 'business_field') {
-      return `业务字段：${getBusinessFieldLabel(config.fieldPath)}`
-    }
-    if (config.assigneeType === 'department') {
-      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
-      return `固定部门：${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}${config.departmentId ? ` (${config.departmentId})` : ''}${fallback}`
-    }
-    if (config.assigneeType === 'user') {
-      return `固定人员${config.assigneeValue ? `：${config.assigneeValue}` : ''}`
-    }
-    return '抄送对象未配置'
+    return getAssigneeSourceSummary(config, '抄送来源')
   }
 
   if (node.type === 'delay') {
@@ -1144,16 +1160,7 @@ const getPreviewNodeSummary = (node) => {
 const getNodeSummary = (node) => {
   if (node.type === 'approval') {
     const config = node.properties?.approverConfig || {}
-    if (config.assigneeType === 'business_field') {
-      return `审批人来源：业务字段 ${getBusinessFieldLabel(config.fieldPath)}`
-    }
-    if (config.assigneeType === 'department') {
-      return `审批人来源：固定部门 ${config.departmentId || '未配置'}（${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}）`
-    }
-    if (config.assigneeType === 'user') {
-      return `审批人来源：固定人员 ${config.assigneeValue || '未配置'}`
-    }
-    return '审批人配置未完成'
+    return getAssigneeSourceSummary(config, '审批人来源')
   }
 
   if (node.type === 'condition') {
@@ -1167,20 +1174,9 @@ const getNodeSummary = (node) => {
     return `通知方式：${node.properties?.notificationType || 'system'}`
   }
 
-    if (node.type === 'cc') {
-      const config = node.properties?.ccConfig || {}
-      if (config.assigneeType === 'business_field') {
-      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
-      return `抄送来源：业务字段 ${getBusinessFieldLabel(config.fieldPath)}${fallback}`
-      }
-      if (config.assigneeType === 'department') {
-      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
-      return `抄送来源：固定部门 ${config.departmentId || '未配置'}（${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}）${fallback}`
-      }
-      if (config.assigneeType === 'user') {
-      return `抄送来源：固定人员 ${config.assigneeValue || '未配置'}`
-    }
-    return '抄送对象配置未完成'
+  if (node.type === 'cc') {
+    const config = node.properties?.ccConfig || {}
+    return getAssigneeSourceSummary(config, '抄送来源')
   }
 
   if (node.type === 'delay') {
@@ -2021,6 +2017,7 @@ const handleReset = () => {
     businessType.value = ''
     businessScene.value = ''
     triggerEvent.value = ''
+    businessFieldMappings.value = []
     nodes.value = []
     flows.value = []
     selectedDefinitionId.value = ''
@@ -2041,6 +2038,7 @@ const loadDefinition = async (id) => {
     businessType.value = data.businessType || ''
     businessScene.value = data.businessScene || ''
     triggerEvent.value = data.triggerEvent || ''
+    await loadBusinessFieldMappings(data.businessType || '')
     normalizeLoadedData(data)
     
     // 更新节点尺寸缓存
@@ -2059,8 +2057,34 @@ const loadDefinitions = async () => {
   }
 }
 
+const loadBusinessFieldMappings = async (type = businessType.value) => {
+  if (!type) {
+    businessFieldMappings.value = []
+    return
+  }
+  try {
+    const res = await api.getBusinessFields(type, { scope: 'all' })
+    const list = res.data?.data || res.data || []
+    businessFieldMappings.value = Array.isArray(list) ? list : []
+  } catch (error) {
+    console.error('加载业务字段映射失败', error)
+    businessFieldMappings.value = []
+  }
+}
+
+const loadDeptTree = async () => {
+  try {
+    const res = await getDeptTrees()
+    deptTreeData.value = res.data || []
+  } catch (error) {
+    console.error('加载部门树失败', error)
+    deptTreeData.value = []
+  }
+}
+
 onMounted(() => {
   loadDefinitions()
+  loadDeptTree()
 
   // 检查URL参数
   const urlParams = new URLSearchParams(window.location.search)
@@ -2072,6 +2096,11 @@ onMounted(() => {
   
   // 添加键盘事件监听
   document.addEventListener('keydown', onKeyDown)
+})
+
+watch(businessType, (newType, oldType) => {
+  if (newType === oldType) return
+  loadBusinessFieldMappings(newType)
 })
 
 onUnmounted(() => {
@@ -2417,6 +2446,17 @@ const onCanvasClick = () => {
   background: #f5f7fa;
   color: #909399;
   font-size: 12px;
+}
+
+.condition-runtime-warning {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  color: #d46b08;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .condition-actions {

@@ -13,12 +13,24 @@ type BusinessFieldOption = {
   order: number
 }
 
+type FieldSource = {
+  name: string
+  label: string
+  type: string
+  relationEntity?: string
+  enumValues?: { label: string; value: any }[]
+}
+
 @Injectable()
 export class BusinessFieldService {
   constructor(private readonly dataLoaderService: WorkflowDataLoaderService) {}
 
   async getFieldMappingsForBusinessType(businessType: string): Promise<BusinessFieldOption[]> {
     return this.getFieldOptions(businessType)
+  }
+
+  async getAllFieldOptionsForBusinessType(businessType: string): Promise<BusinessFieldOption[]> {
+    return this.getFieldOptions(businessType, { includeAll: true })
   }
 
   async getAllFieldMappings(): Promise<BusinessFieldOption[]> {
@@ -47,30 +59,36 @@ export class BusinessFieldService {
     return
   }
 
-  private async getFieldOptions(businessType: string): Promise<BusinessFieldOption[]> {
+  private async getFieldOptions(businessType: string, options: { includeAll?: boolean } = {}): Promise<BusinessFieldOption[]> {
     const fields = this.dataLoaderService.getFieldDefinitions(businessType) || []
     return fields
-      .filter((field) => this.isAssigneeField(field))
+      .filter((field) => options.includeAll ? true : this.isAssigneeField(field))
       .map((field, index) => ({
         id: `${businessType}:${field.name}:${index}`,
         businessType,
         fieldName: field.name,
-        fieldLabel: this.normalizeFieldLabel(field),
-        description: this.buildFieldDescription(field),
+        fieldLabel: this.normalizeFieldLabel(field, options.includeAll),
+        description: this.buildFieldDescription(field, options.includeAll),
         enabled: true,
-        type: field.type,
-        group: this.getFieldGroup(field),
+        type: this.normalizeFieldType(field),
+        group: this.getFieldGroup(field, options.includeAll),
         order: this.getFieldOrder(field, index),
       }))
       .sort((a, b) => a.order - b.order || a.fieldLabel.localeCompare(b.fieldLabel, 'zh-CN'))
   }
 
-  private buildFieldDescription(field: { type: string; relationEntity?: string }) {
+  private buildFieldDescription(field: FieldSource, includeAll = false) {
+    if (includeAll && field.enumValues?.length) {
+      return `枚举字段，可选 ${field.enumValues.length} 项`
+    }
     if (field.type === 'array') {
-      return '多值人员字段，可用于多人审批'
+      return includeAll ? '多值字段，可用于包含判断' : '多值人员字段，可用于多人审批'
     }
     if (field.type === 'string') {
-      return '单值人员字段，可用于单人审批'
+      return includeAll ? '单值字段，可用于等值或包含判断' : '单值人员字段，可用于单人审批'
+    }
+    if (includeAll && ['number', 'date', 'boolean', 'enum'].includes(field.type)) {
+      return `${field.type} 类型字段`
     }
     return ''
   }
@@ -88,7 +106,10 @@ export class BusinessFieldService {
     return field.name.endsWith('.id') || field.name.endsWith('Id')
   }
 
-  private normalizeFieldLabel(field: { name: string; label: string; type: string }) {
+  private normalizeFieldLabel(field: FieldSource, includeAll = false) {
+    if (includeAll) {
+      return field.label || field.name
+    }
     if (field.type === 'array') {
       return field.label
     }
@@ -116,7 +137,19 @@ export class BusinessFieldService {
     return field.label.replace(/ID$/, '').replace(/Id$/, '')
   }
 
-  private getFieldGroup(field: { name: string; type: string }) {
+  private getFieldGroup(field: FieldSource, includeAll = false) {
+    if (includeAll) {
+      if (field.type === 'enum') return '枚举字段'
+      if (field.type === 'number') return '数值字段'
+      if (field.type === 'date') return '时间字段'
+      if (field.type === 'boolean') return '布尔字段'
+      if (this.normalizeFieldType(field) === 'department') return '部门字段'
+      if (this.normalizeFieldType(field) === 'departmentArray') return '部门集合字段'
+      if (this.normalizeFieldType(field) === 'user') return '人员字段'
+      if (this.normalizeFieldType(field) === 'userArray') return '人员集合字段'
+      if (field.name.includes('.')) return '关联字段'
+      return '基础字段'
+    }
     if (field.name === 'leader.id' || field.name === 'project.leaderId') {
       return '负责人'
     }
@@ -165,5 +198,19 @@ export class BusinessFieldService {
       'executorIds': 70,
     }
     return orderMap[field.name] ?? (1000 + fallbackOrder)
+  }
+
+  private normalizeFieldType(field: FieldSource) {
+    if (field.type === 'array') {
+      if (field.label?.includes('部门') || /dept|department/i.test(field.name)) return 'departmentArray'
+      return 'userArray'
+    }
+    if (field.type === 'string') {
+      if (field.label?.includes('部门') || /dept|department/i.test(field.name)) return 'department'
+      if (field.label?.includes('负责人') || field.label?.includes('申请人') || field.label?.includes('审批人') || field.label?.includes('提交人') || field.label?.includes('处理人') || field.label?.includes('经办人')) {
+        return 'user'
+      }
+    }
+    return field.type
   }
 }

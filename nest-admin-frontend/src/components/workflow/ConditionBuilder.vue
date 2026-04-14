@@ -8,16 +8,27 @@
 
       <!-- 字段选择 -->
       <template v-if="condition.fieldSource === 'field'">
-        <el-cascader
+        <el-select
           v-model="condition.field"
-          :options="fieldOptions"
-          :props="{ label: 'label', value: 'name', checkStrictly: true }"
           placeholder="选择字段"
           @change="emitUpdate"
           clearable
+          filterable
           :disabled="disabled"
-          style="width: 200px;"
-        />
+          style="width: 240px;"
+        >
+          <el-option-group v-for="group in fieldGroups" :key="group.label" :label="group.label">
+            <el-option
+              v-for="opt in group.fields"
+              :key="opt.fieldName"
+              :label="opt.fieldLabel"
+              :value="opt.fieldName"
+            >
+              <span>{{ opt.fieldLabel }}</span>
+              <span v-if="opt.description" class="field-desc"> - {{ opt.description }}</span>
+            </el-option>
+          </el-option-group>
+        </el-select>
       </template>
       <el-input
         v-else
@@ -139,7 +150,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { getBusinessConfig } from '@/views/business/workflow/api'
+import { getBusinessFields } from '@/views/business/workflow/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import UserSelect from '@/components/UserSelect.vue'
 
@@ -160,120 +171,18 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'remove'])
 
-// 默认字段定义（备用）
-const defaultFieldDefinitions = {
-  project: [
-    { name: 'name', label: '项目名称', type: 'string' },
-    { name: 'budget', label: '预算', type: 'number' },
-    { name: 'actualCost', label: '实际成本', type: 'number' },
-    { name: 'status', label: '状态', type: 'enum', enumValues: [
-      { label: '草稿', value: '1' },
-      { label: '立项审批中', value: '2' },
-      { label: '执行中', value: '3' },
-      { label: '暂停中', value: '4' },
-      { label: '结项审批中', value: '5' },
-      { label: '已结项', value: '6' },
-      { label: '已取消', value: '7' },
-    ]},
-    { name: 'leaderId', label: '项目负责人', type: 'user' },
-    { name: 'memberIds', label: '项目成员', type: 'userArray' },
-    { name: 'priority', label: '优先级', type: 'enum', enumValues: [
-      { label: '低', value: '1' },
-      { label: '中', value: '2' },
-      { label: '高', value: '3' },
-    ]},
-    { name: 'progress', label: '进度(%)', type: 'number' },
-  ],
-  customer: [
-    { name: 'name', label: '客户名称', type: 'string' },
-    { name: 'type', label: '客户类型', type: 'enum', enumValues: [
-      { label: '企业客户', value: '1' },
-      { label: '个人客户', value: '2' },
-    ]},
-    { name: 'salesId', label: '销售负责人', type: 'user' },
-    { name: 'deptId', label: '所属部门', type: 'department' },
-    { name: 'level', label: '客户等级', type: 'enum', enumValues: [
-      { label: 'VIP', value: '1' },
-      { label: '重要', value: '2' },
-      { label: '普通', value: '3' },
-    ]},
-    { name: 'status', label: '客户状态', type: 'enum', enumValues: [
-      { label: '潜在', value: '1' },
-      { label: '意向', value: '2' },
-      { label: '成交', value: '3' },
-      { label: '流失', value: '4' },
-    ]},
-    { name: 'customerValue', label: '客户价值(万元)', type: 'number' },
-  ],
-  ticket: [
-    { name: 'title', label: '标题', type: 'string' },
-    { name: 'type', label: '类型', type: 'enum', enumValues: [
-      { label: '缺陷', value: '1' },
-      { label: '需求', value: '2' },
-      { label: '反馈', value: '3' },
-    ]},
-    { name: 'submitterId', label: '提交人', type: 'user' },
-    { name: 'handlerId', label: '处理人', type: 'user' },
-    { name: 'projectId', label: '所属项目', type: 'string' },
-    { name: 'severity', label: '严重程度', type: 'enum', enumValues: [
-      { label: '致命', value: '1' },
-      { label: '高', value: '2' },
-      { label: '中', value: '3' },
-      { label: '低', value: '4' },
-    ]},
-    { name: 'status', label: '状态', type: 'enum', enumValues: [
-      { label: '待处理', value: '1' },
-      { label: '处理中', value: '2' },
-      { label: '已解决', value: '3' },
-      { label: '已关闭', value: '4' },
-    ]},
-  ],
-  change: [
-    { name: 'title', label: '变更标题', type: 'string' },
-    { name: 'type', label: '变更类型', type: 'enum', enumValues: [
-      { label: '范围变更', value: '1' },
-      { label: '进度变更', value: '2' },
-      { label: '预算变更', value: '3' },
-      { label: '资源变更', value: '4' },
-      { label: '需求变更', value: '5' },
-      { label: '其他变更', value: '6' },
-    ]},
-    { name: 'requesterId', label: '申请人', type: 'user' },
-    { name: 'approverId', label: '审批人', type: 'user' },
-    { name: 'impact', label: '影响程度', type: 'enum', enumValues: [
-      { label: '低', value: '1' },
-      { label: '中', value: '2' },
-      { label: '高', value: '3' },
-    ]},
-    { name: 'status', label: '状态', type: 'enum', enumValues: [
-      { label: '草稿', value: '1' },
-      { label: '待审批', value: '2' },
-      { label: '已批准', value: '3' },
-      { label: '已驳回', value: '4' },
-      { label: '已实施', value: '5' },
-    ]},
-    { name: 'costImpact', label: '成本影响', type: 'number' },
-    { name: 'scheduleImpact', label: '进度影响(天)', type: 'number' },
-  ]
-}
-
-const fieldDefinitions = ref(defaultFieldDefinitions)
+const fieldMappings = ref([])
 const deptTreeData = ref([])
 
-// 从API加载字段定义
-const loadFieldDefinitions = async (businessType) => {
+const loadFieldMappings = async (businessType) => {
   if (!businessType) return
   try {
-    const res = await getBusinessConfig(businessType)
-    if (res.data?.fieldDefinitions) {
-      const parsed = JSON.parse(res.data.fieldDefinitions)
-      if (parsed && parsed.length > 0) {
-        const fallback = defaultFieldDefinitions[businessType] || []
-        fieldDefinitions.value = { ...defaultFieldDefinitions, [businessType]: [...parsed, ...fallback] }
-      }
-    }
+    const res = await getBusinessFields(businessType, { scope: 'all' })
+    const list = res.data?.data || res.data || []
+    fieldMappings.value = Array.isArray(list) ? list : []
   } catch (error) {
-    console.warn('Failed to load field definitions, using defaults:', error)
+    console.warn('Failed to load business fields:', error)
+    fieldMappings.value = []
   }
 }
 
@@ -288,7 +197,7 @@ const loadDeptTrees = async () => {
 
 watch(() => props.businessType, (newType) => {
   if (newType) {
-    loadFieldDefinitions(newType)
+    loadFieldMappings(newType)
   }
 }, { immediate: true })
 
@@ -302,21 +211,31 @@ const condition = ref({
 })
 
 const fieldOptions = computed(() => {
-  if (!props.businessType) return []
-  return fieldDefinitions.value[props.businessType] || []
+  return fieldMappings.value
+})
+
+const fieldGroups = computed(() => {
+  const groups = new Map()
+  for (const field of fieldOptions.value) {
+    const label = field.group || '业务字段'
+    if (!groups.has(label)) {
+      groups.set(label, [])
+    }
+    groups.get(label).push(field)
+  }
+  return Array.from(groups.entries()).map(([label, fields]) => ({ label, fields }))
 })
 
 const selectedFieldDef = computed(() => {
-  if (!condition.value.field?.length) return null
-  const fieldName = condition.value.field[condition.value.field.length - 1]
-  return fieldOptions.value.find(f => f.name === fieldName)
+  if (!condition.value.field) return null
+  return fieldOptions.value.find(f => f.fieldName === condition.value.field)
 })
 
 const normalizedFieldType = computed(() => {
   const def = selectedFieldDef.value
   const type = def?.type || 'string'
-  const label = def?.label || ''
-  const name = def?.name || ''
+  const label = def?.fieldLabel || ''
+  const name = def?.fieldName || ''
   if (type === 'array') {
     if (label.includes('部门') || /dept|department/i.test(name)) return 'departmentArray'
     return 'userArray'
@@ -388,8 +307,8 @@ const operatorOptions = computed(() => {
 
 const expressionPreview = computed(() => {
   let fieldExpr = ''
-  if (condition.value.fieldSource === 'field' && condition.value.field?.length) {
-    fieldExpr = '${' + condition.value.field.join('.') + '}'
+  if (condition.value.fieldSource === 'field' && condition.value.field) {
+    fieldExpr = '${' + condition.value.field + '}'
   } else {
     fieldExpr = condition.value.field || '...'
   }
@@ -413,6 +332,9 @@ watch(() => props.modelValue, (val) => {
       condition.value.fieldSource = 'expression'
       condition.value.field = val.field.replace(/\$\{([^}]+)\}/, '$1')
     } else if (Array.isArray(val.field)) {
+      condition.value.fieldSource = 'field'
+      condition.value.field = val.field.join('.')
+    } else if (typeof val.field === 'string') {
       condition.value.fieldSource = 'field'
       condition.value.field = val.field
     }

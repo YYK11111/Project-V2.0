@@ -85,8 +85,9 @@ export class WorkflowController {
   async listInstances(
     @Query('userId') userId?: string,
     @Query('status') status?: string,
+    @Query('mode') mode?: 'starter' | 'participant',
   ) {
-    return this.workflowService.listInstances(userId, status);
+    return this.workflowService.listInstances(userId, status, mode || 'starter');
   }
 
   // ==================== 任务接口 ====================
@@ -199,7 +200,10 @@ export class WorkflowController {
   }
 
   @Get('business-fields/:businessType')
-  async getFieldMappings(@Param('businessType') businessType: string) {
+  async getFieldMappings(@Param('businessType') businessType: string, @Query('scope') scope?: string) {
+    if (scope === 'all') {
+      return this.businessFieldService.getAllFieldOptionsForBusinessType(businessType)
+    }
     return this.businessFieldService.getFieldMappingsForBusinessType(businessType);
   }
 

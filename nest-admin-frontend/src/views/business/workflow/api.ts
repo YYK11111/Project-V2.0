@@ -98,12 +98,12 @@ export function getWorkflowInstances(params: any = {}) {
 }
 
 // 工作流任务 API
-export function getMyTasks() {
+export function getMyTasks(params: any = {}) {
   const userId = getUserId()
   return request({
     url: '/workflow/tasks/my',
     method: 'get',
-    params: { userId },
+    params: { userId, ...params },
   }).then(normalizeTableData)
 }
 
@@ -217,10 +217,11 @@ export function deleteBusinessConfig(id: string) {
   })
 }
 
-export function getBusinessFields(businessType: string) {
+export function getBusinessFields(businessType: string, params: any = {}) {
   return request({
     url: `/workflow/business-fields/${businessType}`,
     method: 'get',
+    params,
   })
 }
 
