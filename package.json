@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "check:api-contract": "bash scripts/check-api-contract.sh"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-local": "^1.0.38"
+  },
+  "dependencies": {
+    "@nestjs/jwt": "^11.0.2"
+  }
+}

@@ -1,0 +1,144 @@
+<script setup>
+import { ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getOne, save, update, getStatus, getLevel, getCategory } from './api'
+import ProjectSelect from '@/components/ProjectSelect.vue'
+import UserSelect from '@/components/UserSelect.vue'
+import { checkPermi } from '@/utils/permission'
+
+const route = useRoute()
+const router = useRouter()
+
+const formRef = ref()
+const form = ref({
+  name: '',
+  projectId: '',
+  category: '8',
+  level: '2',
+  status: '1',
+  description: '',
+  mitigation: '',
+  impactEstimate: 0,
+  ownerId: '',
+  identifiedDate: '',
+  dueDate: '',
+  resolvedDate: '',
+  sort: 0,
+})
+
+const rules = {
+  name: [{ required: true, message: '请输入风险名称', trigger: 'blur' }],
+  projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
+}
+
+const statusMap = ref({})
+const levelMap = ref({})
+const categoryMap = ref({})
+
+getStatus().then(({ data }) => (statusMap.value = data || {}))
+getLevel().then(({ data }) => (levelMap.value = data || {}))
+getCategory().then(({ data }) => (categoryMap.value = data || {}))
+
+const isView = computed(() => route.query.action === 'view')
+const isEdit = computed(() => !!route.query.id && !isView.value)
+const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
+const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
+
+if (isEdit.value || isView.value) {
+  getOne(route.query.id).then(({ data }) => {
+    form.value = data || {}
+  })
+}
+
+function submit() {
+  if ((isEdit.value && !canRiskUpdate.value) || (!isEdit.value && !canRiskAdd.value)) {
+    return $sdk.msgWarning('当前操作没有权限')
+  }
+  formRef.value.validate((valid) => {
+    if (valid) {
+      const api = isEdit.value ? update : save
+      api(form.value).then(() => {
+        $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
+        router.back()
+      })
+    }
+  })
+}
+
+function cancel() {
+  router.back()
+}
+</script>
+
+<template>
+  <div class="Gcard">
+    <div class="mb20">
+      <el-page-header @back="$router.back()" :title="isView ? '查看风险' : isEdit ? '编辑风险' : '新增风险'" />
+    </div>
+
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+      <el-form-item label="风险名称" prop="name">
+        <el-input v-model="form.name" placeholder="请输入风险名称" maxlength="200" show-word-limit :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item label="所属项目" prop="projectId">
+        <ProjectSelect v-model="form.projectId" placeholder="请选择项目" :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item label="风险分类">
+        <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%" :disabled="isView">
+          <el-option v-for="(v, k) in categoryMap" :key="k" :label="v" :value="k" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="风险等级">
+        <el-select v-model="form.level" placeholder="请选择等级" style="width: 100%" :disabled="isView">
+          <el-option v-for="(v, k) in levelMap" :key="k" :label="v" :value="k" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="风险状态" v-if="isEdit.value || isView.value">
+        <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%" :disabled="isView">
+          <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="风险描述">
+        <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入风险描述" :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item label="应对措施">
+        <el-input v-model="form.mitigation" type="textarea" :rows="3" placeholder="请输入应对措施" :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item label="影响程度(%)">
+        <el-input-number v-model="form.impactEstimate" :min="0" :max="100" :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item label="责任人">
+        <UserSelect v-model="form.ownerId" placeholder="请选择责任人" :disabled="isView" clearable />
+      </el-form-item>
+
+      <el-form-item label="识别日期">
+        <el-date-picker v-model="form.identifiedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
+      </el-form-item>
+
+      <el-form-item label="计划解决日期">
+        <el-date-picker v-model="form.dueDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
+      </el-form-item>
+
+      <el-form-item label="实际解决日期" v-if="isEdit.value">
+        <el-date-picker v-model="form.resolvedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
+      </el-form-item>
+
+      <el-form-item label="排序">
+        <el-input-number v-model="form.sort" :min="0" :disabled="isView" />
+      </el-form-item>
+
+      <el-form-item v-if="!isView">
+        <el-button v-if="!isView && (isEdit ? canRiskUpdate : canRiskAdd)" type="primary" @click="submit">提交</el-button>
+        <el-button @click="cancel">取消</el-button>
+      </el-form-item>
+    </el-form>
+  </div>
+</template>

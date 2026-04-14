@@ -1,0 +1,22 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "include": ["env.d.ts", "auto-imports.d.ts", "components.d.ts", "src/**/*", "src/**/*.vue", "src/types/**/*.d.ts"],
+  "exclude": ["src/**/__tests__/*", "src/**/*.sync-conflict-*"],
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "ignoreDeprecations": "5.0",
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "checkJs": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "vueCompilerOptions": {
+    "strictTemplates": false
+  }
+}

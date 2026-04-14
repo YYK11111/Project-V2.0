@@ -1,0 +1,231 @@
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req } from '@nestjs/common';
+import { WorkflowService } from './service';
+import { BusinessFieldService } from '../../common/services/business-field.service';
+import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflowDto, CompleteTaskDto, TransferTaskDto, AddSignTaskDto, WithdrawWorkflowDto, CancelWorkflowDto } from './dto';
+
+@Controller('workflow')
+export class WorkflowController {
+  constructor(
+    private readonly workflowService: WorkflowService,
+    private readonly businessFieldService: BusinessFieldService,
+  ) {}
+
+  // ==================== 流程定义接口 ====================
+
+  @Post('definitions/save')
+  async saveDefinition(@Body() body, @Req() req) {
+    console.log('>>> saveDefinition req.body:', JSON.stringify(req.body))
+    console.log('>>> saveDefinition body param:', JSON.stringify(body))
+    console.log('>>> saveDefinition raw body:', req.rawBody)
+    if (body.id) {
+      delete body.createUser
+      body.updateUser = req.user?.name
+    } else {
+      delete body.updateUser
+      body.createUser = req.user?.name
+    }
+    return this.workflowService.saveDefinition(body);
+  }
+
+  @Get('definitions')
+  async listDefinitions() {
+    return this.workflowService.listDefinitions();
+  }
+
+  @Get('definitions/:id')
+  async getDefinition(@Param('id') id: string) {
+    return this.workflowService.getDefinition(id);
+  }
+
+  @Put('definitions/:id')
+  async updateDefinition(
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkflowDefinitionDto,
+  ) {
+    return this.workflowService.updateDefinition(id, dto);
+  }
+
+  @Post('definitions/:id/publish')
+  async publishDefinition(@Param('id') id: string) {
+    return this.workflowService.publishDefinition(id);
+  }
+
+  @Post('definitions/:id/unpublish')
+  async unpublishDefinition(@Param('id') id: string) {
+    return this.workflowService.unpublishDefinition(id);
+  }
+
+  @Delete('definitions/:id')
+  async deleteDefinition(@Param('id') id: string) {
+    await this.workflowService.deleteDefinition(id);
+    return { success: true };
+  }
+
+  @Post('definitions/:id/copy')
+  async copyDefinition(@Param('id') id: string) {
+    return this.workflowService.copyDefinition(id);
+  }
+
+  // ==================== 流程实例接口 ====================
+
+  @Post('instances/start')
+  async startWorkflow(
+    @Body() dto: StartWorkflowDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.startWorkflow(dto, userId);
+  }
+
+  @Get('instances/:id')
+  async getInstance(@Param('id') id: string) {
+    return this.workflowService.getInstance(id);
+  }
+
+  @Get('instances')
+  async listInstances(
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.workflowService.listInstances(userId, status);
+  }
+
+  // ==================== 任务接口 ====================
+
+  @Get('tasks/my')
+  async getMyTasks(@Query('userId') userId: string) {
+    return this.workflowService.getPendingTasks(userId);
+  }
+
+  @Post('tasks/:id/complete')
+  async completeTask(
+    @Param('id') id: string,
+    @Body() dto: CompleteTaskDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.completeTask(id, userId, dto);
+  }
+
+  @Post('tasks/:id/transfer')
+  async transferTask(
+    @Param('id') id: string,
+    @Body() dto: TransferTaskDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.transferTask(id, userId, dto);
+  }
+
+  @Post('tasks/:id/add-sign')
+  async addSignTask(
+    @Param('id') id: string,
+    @Body() dto: AddSignTaskDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.addSignTask(id, userId, dto);
+  }
+
+  // ==================== 流程实例操作接口 ====================
+
+  @Post('instances/:id/withdraw')
+  async withdrawWorkflow(
+    @Param('id') id: string,
+    @Body() dto: WithdrawWorkflowDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.withdrawWorkflow(id, userId, dto);
+  }
+
+  @Post('instances/:id/cancel')
+  async cancelInstance(
+    @Param('id') id: string,
+    @Body() dto: CancelWorkflowDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.cancelInstance(id, userId, dto);
+  }
+
+  @Get('instances/:id/history')
+  async getInstanceHistory(@Param('id') id: string) {
+    return this.workflowService.getInstanceHistory(id);
+  }
+
+  @Get('instances/:id/tasks')
+  async getInstanceTasks(@Param('id') id: string) {
+    return this.workflowService.getInstanceTasks(id);
+  }
+
+  // ==================== 业务对象配置接口 ====================
+
+  @Get('business-configs')
+  async listBusinessConfigs(@Query('businessType') businessType?: string) {
+    return this.workflowService.listBusinessConfigs(businessType);
+  }
+
+  @Get('business-configs/:businessType')
+  async getBusinessConfig(@Param('businessType') businessType: string) {
+    return this.workflowService.getBusinessConfig(businessType);
+  }
+
+  @Post('business-configs/save')
+  async saveBusinessConfig(@Body() body, @Req() req) {
+    if (body.id) {
+      delete body.createUser
+      body.updateUser = req.user?.name
+    } else {
+      delete body.updateUser
+      body.createUser = req.user?.name
+    }
+    return this.workflowService.saveBusinessConfig(body);
+  }
+
+  @Put('business-configs/:businessType')
+  async updateBusinessConfig(
+    @Param('businessType') businessType: string,
+    @Body() dto: any,
+  ) {
+    return this.workflowService.updateBusinessConfig(businessType, dto);
+  }
+
+  @Delete('business-configs/:businessType')
+  async deleteBusinessConfig(@Param('businessType') businessType: string) {
+    await this.workflowService.deleteBusinessConfig(businessType);
+    return { success: true };
+  }
+
+  // ==================== 业务字段配置接口 ====================
+
+  @Get('business-fields')
+  async getAllFieldMappings() {
+    return this.businessFieldService.getAllFieldMappings();
+  }
+
+  @Get('business-fields/:businessType')
+  async getFieldMappings(@Param('businessType') businessType: string) {
+    return this.businessFieldService.getFieldMappingsForBusinessType(businessType);
+  }
+
+  @Post('business-fields/generate')
+  async generateFieldMappings(@Body() body: { businessTypes?: string[] }) {
+    const businessTypes = body.businessTypes || ['project', 'ticket', 'customer', 'change']
+    const results = []
+    for (const businessType of businessTypes) {
+      const count = await this.businessFieldService.generateAndSaveFieldMappings(businessType)
+      results.push({ businessType, count })
+    }
+    return { success: true, results }
+  }
+
+  @Put('business-fields/:id')
+  async updateFieldMapping(
+    @Param('id') id: string,
+    @Body() body: { fieldLabel?: string; description?: string; enabled?: boolean },
+  ) {
+    await this.businessFieldService.updateFieldMapping(+id, body)
+    return { success: true }
+  }
+
+  @Delete('business-fields/:id')
+  async deleteFieldMapping(@Param('id') id: string) {
+    await this.businessFieldService.deleteFieldMapping(+id)
+    return { success: true }
+  }
+}

@@ -1,0 +1,295 @@
+@use './element-ui.scss';
+@use './base.css';
+@use './theme.css';
+
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: inline-block;
+}
+.container {
+  max-width: initial;
+}
+
+#app {
+  height: 100%;
+}
+
+// 全局公用业务样式
+$g: 'G';
+
+// 页面公用搜索
+.#{$g}topSearch {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  box-shadow: 0px 4px 20px 0px var(--BgBlack10);
+  padding: 20px 20px;
+  border-radius: var(--RadiusBig);
+  background: var(--cardBg);
+  // background: var(--BgWhite);
+  .el-form-item__content {
+    width: 240px;
+  }
+}
+
+// 标签选择框
+.#{$g}tagInput {
+  width: 240px;
+  display: flex;
+  border-radius: 4px;
+  border: 1px solid var(--BorderBlack9);
+  align-items: center;
+  padding: 0 15px;
+  overflow: hidden;
+  height: 32px;
+  background: var(--cardBg);
+  // background: var(--BgWhite);
+  .tag-place {
+    color: var(--FontBlack7);
+    font-size: 14px;
+  }
+}
+
+// 一级 页面标题
+.#{$g}title {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--FontBlack);
+  padding: 0 20px;
+  background: var(--BgWhite);
+  border-radius: var(--RadiusBig) var(--RadiusBig) 0 0;
+  line-height: 1;
+  .desc {
+    font-weight: 400;
+    margin: 0 5px;
+    font-size: 12px;
+    color: var(--FontBlack6);
+  }
+  // & + .#{$g}card {
+  //   border-radius: 0 0 var(--RadiusBig) var(--RadiusBig);
+  //   margin-top: 0;
+  // }
+}
+// 二级标题
+.#{$g}title-sub {
+  @extend .#{$g}title;
+  font-size: 16px;
+  &:not(:first-child) {
+    margin-top: var(--Margin);
+  }
+  // & + .#{$g}card {
+  //   border-radius: 0 0 var(--RadiusBig) var(--RadiusBig);
+  //   margin-top: 0;
+  //   padding-top: 0;
+  // }
+}
+
+// 卡片样式
+.#{$g}card {
+  border-radius: var(--RadiusBig);
+  background: var(--cardBg);
+  overflow: auto;
+  padding: 20px;
+  scroll-behavior: smooth;
+  border: 1px solid var(--ColorLight10);
+  &:not(:first-child) {
+    margin-top: var(--Margin);
+  }
+  // 卡片标题
+  .#{$g}cardTitle {
+    display: flex;
+    align-items: center;
+    padding-bottom: var(--Padding);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--FontBlack);
+    background: var(--cardBg);
+    line-height: 1;
+    .desc {
+      font-weight: 400;
+      margin: 0 5px;
+      font-size: 12px;
+      color: var(--FontBlack5);
+    }
+  }
+}
+
+.flex,
+.flexBetween {
+  > .#{$g}card {
+    margin-top: initial;
+  }
+}
+
+.#{$g}tipColor {
+  color: var(--FontBlack6);
+}
+.#{$g}tip {
+  color: var(--FontBlack6);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.#{$g}top-step {
+  border-radius: var(--RadiusBig);
+  background: var(--cardBg);
+  // background: var(--BgWhite);
+  padding: 20px 10%;
+}
+// 粘性底部
+.#{$g}footerSticky {
+  position: sticky;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  z-index: 1;
+  bottom: 0;
+  background: var(--cardBg);
+  // background: var(--BgWhite);
+  box-shadow: 0px -4px 20px 0px var(--BgBlack9);
+  border-radius: var(--RadiusBig);
+  margin-top: var(--Margin);
+}
+
+// 左右分类列表
+.#{$g}leftRight {
+  display: flex;
+  justify-content: space-between;
+  max-height: 100%;
+  .#{$g}leftRightL {
+    flex: auto;
+    display: flex;
+    flex-direction: column;
+    margin-right: var(--Margin);
+    border-radius: var(--RadiusBig);
+    .title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      .title-name {
+        color: var(--FontBlack);
+        font-size: 14px;
+        font-weight: 600;
+        // color: var(--FontBlack);
+        display: flex;
+        align-items: center;
+      }
+      .title-btn {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        font-weight: normal;
+        color: var(--Color);
+        &:hover {
+          opacity: 0.8;
+        }
+      }
+    }
+
+    .item-list {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      overflow-y: auto;
+      .item {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        color: var(--FontBlack5);
+        height: 40px;
+        line-height: 40px;
+        width: 100%;
+        padding-left: 20px;
+        .name {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+        .dropdown {
+          // display: none;
+          .dot {
+            cursor: pointer;
+            width: 15px;
+            height: 15px;
+            line-height: 15px;
+            font-size: 14px;
+            font-family: JMT-Font, JMT;
+            font-weight: normal;
+            color: var(--FontBlack5);
+            margin-right: 10px;
+            margin-left: 5px;
+            font-weight: 500;
+            .content-icon {
+              color: var(--FontBlack5);
+              font-size: 12px;
+              transform: rotate(90deg);
+            }
+          }
+        }
+        &:hover {
+          color: var(--FontBlack);
+          background: var(--BgBlack11);
+          opacity: 0.8;
+          border-radius: 2px;
+          .dropdown {
+            // display: block;
+          }
+        }
+      }
+
+      .active {
+        // border-left: 2px solid #3c88f0;
+        color: var(--FontBlack);
+        background: var(--BgBlack11);
+        border-radius: 2px;
+      }
+    }
+  }
+  .#{$g}leftRightR {
+    width: 78%;
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    border-radius: var(--RadiusBig);
+    overflow: auto !important;
+  }
+}
+
+/* 拖拽列样式 */
+.#{$g}sortableGhost {
+  opacity: 0.8;
+  color: var(--FontWhite, #fff) !important;
+  background: var(--Color, #42b983) !important;
+}
+
+.card-group-index + .#{$g}card {
+  margin-top: 0;
+}
+#page-container > .#{$g}card {
+  overflow: initial;
+  .pagination-container {
+    bottom: 0;
+  }
+}
+// .el-row > .#{$g}card {
+//   flex: 1;
+// }
+.el-dialog__body {
+  .pagination-container {
+    padding-bottom: 0 !important;
+  }
+}

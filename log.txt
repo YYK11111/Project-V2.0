@@ -1,0 +1,1664 @@
+[
+  {
+    "id": "18",
+    "createTime": "2024-08-15 00:41:15",
+    "createUser": "",
+    "updateTime": "2026-04-10 11:09:52",
+    "updateUser": "",
+    "name": "",
+    "desc": "首页",
+    "parentId": "0",
+    "icon": "dashboard",
+    "order": "1",
+    "path": "/index",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "186",
+        "createTime": "2026-04-10 11:11:47",
+        "createUser": null,
+        "updateTime": "2026-04-10 12:47:56",
+        "updateUser": null,
+        "name": "index-index",
+        "desc": null,
+        "parentId": "18",
+        "icon": null,
+        "order": "1",
+        "path": "/index/home",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "工作台",
+          "icon": null,
+          "isHidden": false
+        }
+      }
+    ],
+    "meta": {
+      "title": "首页",
+      "icon": "dashboard",
+      "isHidden": false
+    },
+    "redirect": "/index/home"
+  },
+  {
+    "id": "5",
+    "createTime": "2024-08-06 22:03:07",
+    "createUser": "",
+    "updateTime": "2024-10-27 17:43:22",
+    "updateUser": "admin",
+    "name": "",
+    "desc": "",
+    "parentId": "0",
+    "icon": "system",
+    "order": "1",
+    "path": "/system",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "6",
+        "createTime": "2024-08-06 22:20:45",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:40:42",
+        "updateUser": "admin",
+        "name": "system-users-index",
+        "desc": "用户管理",
+        "parentId": "5",
+        "icon": "user",
+        "order": "1",
+        "path": "/system/users",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "用户管理",
+          "icon": "user",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "7",
+        "createTime": "2024-08-06 22:22:56",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:43:12",
+        "updateUser": "admin",
+        "name": "system-roles-index",
+        "desc": "",
+        "parentId": "5",
+        "icon": "peoples",
+        "order": "2",
+        "path": "/system/roles",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "角色管理",
+          "icon": "peoples",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "8",
+        "createTime": "2024-08-06 22:30:06",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:44:03",
+        "updateUser": "admin",
+        "name": "system-menus-index",
+        "desc": "",
+        "parentId": "5",
+        "icon": "tree-table",
+        "order": "3",
+        "path": "/system/menus",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "菜单管理",
+          "icon": "tree-table",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "10",
+        "createTime": "2024-08-15 00:06:53",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:45:47",
+        "updateUser": "admin",
+        "name": "system-notices-index",
+        "desc": "通知管理",
+        "parentId": "5",
+        "icon": "message",
+        "order": "4",
+        "path": "/system/notices",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "通知管理",
+          "icon": "message",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "17",
+        "createTime": "2024-08-15 00:36:52",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:46:28",
+        "updateUser": "admin",
+        "name": "system-configs-index",
+        "desc": "配置管理",
+        "parentId": "5",
+        "icon": "swagger",
+        "order": "5",
+        "path": "/system/configs",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "配置管理",
+          "icon": "swagger",
+          "isHidden": false
+        }
+      }
+    ],
+    "meta": {
+      "title": "系统管理",
+      "icon": "system",
+      "isHidden": false
+    },
+    "redirect": "/system/users"
+  },
+  {
+    "id": "11",
+    "createTime": "2024-08-15 00:10:33",
+    "createUser": "",
+    "updateTime": "2024-10-27 17:47:14",
+    "updateUser": "admin",
+    "name": "",
+    "desc": "系统监控",
+    "parentId": "0",
+    "icon": "monitor",
+    "order": "2",
+    "path": "/systemMonitor",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "14",
+        "createTime": "2024-08-15 00:23:45",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:47:53",
+        "updateUser": "admin",
+        "name": "onlineUser",
+        "desc": "",
+        "parentId": "11",
+        "icon": "online",
+        "order": "1",
+        "path": "/systemMonitor/onlineUser",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "在线用户",
+          "icon": "online",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "12",
+        "createTime": "2024-08-15 00:22:13",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:48:21",
+        "updateUser": "admin",
+        "name": "loginLog",
+        "desc": "登录日志",
+        "parentId": "11",
+        "icon": "log",
+        "order": "1",
+        "path": "/systemMonitor/loginLog",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "登录日志",
+          "icon": "log",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "15",
+        "createTime": "2024-08-15 00:27:21",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:49:41",
+        "updateUser": "admin",
+        "name": "systemMonitor-osInfo-index",
+        "desc": "服务监控",
+        "parentId": "11",
+        "icon": "druid",
+        "order": "2",
+        "path": "/systemMonitor/osInfo",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "服务监控",
+          "icon": "druid",
+          "isHidden": false
+        }
+      }
+    ],
+    "meta": {
+      "title": "系统监控",
+      "icon": "monitor",
+      "isHidden": false
+    },
+    "redirect": "/systemMonitor/onlineUser"
+  },
+  {
+    "id": "9",
+    "createTime": "2024-08-15 00:04:06",
+    "createUser": "",
+    "updateTime": "2024-10-27 17:50:00",
+    "updateUser": "admin",
+    "name": "",
+    "desc": "",
+    "parentId": "0",
+    "icon": "dict",
+    "order": "2",
+    "path": "/content",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "16",
+        "createTime": "2024-08-15 00:33:54",
+        "createUser": "",
+        "updateTime": "2024-10-27 17:50:07",
+        "updateUser": "admin",
+        "name": "",
+        "desc": "文章管理",
+        "parentId": "9",
+        "icon": "clipboard",
+        "order": "1",
+        "path": "/content/articleManage",
+        "component": {},
+        "type": "catalog",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "children": [
+          {
+            "id": "23",
+            "createTime": "2024-10-19 00:24:43",
+            "createUser": "admin",
+            "updateTime": "2024-10-19 00:25:25",
+            "updateUser": "admin",
+            "name": "content-articleManage-index",
+            "desc": null,
+            "parentId": "16",
+            "icon": null,
+            "order": "1",
+            "path": "/content/articleManage/index",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "文章列表",
+              "icon": null,
+              "isHidden": true
+            }
+          },
+          {
+            "id": "24",
+            "createTime": "2024-10-19 00:26:05",
+            "createUser": "admin",
+            "updateTime": null,
+            "updateUser": null,
+            "name": "content-articleManage-aev",
+            "desc": null,
+            "parentId": "16",
+            "icon": null,
+            "order": "2",
+            "path": "/content/articleManage/aev",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "{新增}",
+              "icon": null,
+              "isHidden": true
+            }
+          }
+        ],
+        "meta": {
+          "title": "文章管理",
+          "icon": "clipboard",
+          "isHidden": false
+        },
+        "redirect": "/content/articleManage/index"
+      }
+    ],
+    "meta": {
+      "title": "内容管理",
+      "icon": "dict",
+      "isHidden": false
+    },
+    "redirect": "/content/articleManage"
+  },
+  {
+    "id": "25",
+    "createTime": "2026-04-06 21:08:04",
+    "createUser": "system",
+    "updateTime": "2026-04-09 20:02:17",
+    "updateUser": null,
+    "name": "",
+    "desc": null,
+    "parentId": "0",
+    "icon": "tree",
+    "order": "3",
+    "path": "/business",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": true,
+    "isActive": "1",
+    "meta": {
+      "title": "业务管理",
+      "icon": "tree",
+      "isHidden": true
+    },
+    "redirect": "/business"
+  },
+  {
+    "id": "26",
+    "createTime": "2026-04-06 21:08:04",
+    "createUser": "system",
+    "updateTime": "2026-04-10 10:33:41",
+    "updateUser": "NestAdmin",
+    "desc": null,
+    "parentId": "0",
+    "icon": "project",
+    "order": "4",
+    "path": "/projectManage",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "171",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 10:12:21",
+        "updateUser": null,
+        "name": "business-projectManage-index",
+        "desc": null,
+        "parentId": "26",
+        "icon": "list",
+        "order": "1",
+        "path": "/projectManage/index",
+        "type": "menu",
+        "permissionKey": "business:project:list",
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "项目列表",
+          "icon": "list",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "172",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 12:47:47",
+        "updateUser": null,
+        "name": "business-projectManage-form",
+        "desc": null,
+        "parentId": "26",
+        "icon": "",
+        "order": "2",
+        "path": "/projectManage/form",
+        "type": "menu",
+        "permissionKey": "business:project:edit",
+        "isHidden": true,
+        "isActive": "1",
+        "meta": {
+          "title": "项目表单",
+          "icon": "",
+          "isHidden": true
+        }
+      }
+    ],
+    "meta": {
+      "title": "项目管理",
+      "icon": "project",
+      "isHidden": false
+    },
+    "redirect": "/projectManage/index"
+  },
+  {
+    "id": "27",
+    "createTime": "2026-04-06 21:08:04",
+    "createUser": "system",
+    "updateTime": "2026-04-10 10:33:41",
+    "updateUser": null,
+    "desc": null,
+    "parentId": "0",
+    "icon": "task",
+    "order": "5",
+    "path": "/taskManage",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "173",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 10:12:21",
+        "updateUser": null,
+        "name": "business-taskManage-index",
+        "desc": null,
+        "parentId": "27",
+        "icon": "list",
+        "order": "1",
+        "path": "/taskManage/index",
+        "type": "menu",
+        "permissionKey": "business:task:list",
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "任务列表",
+          "icon": "list",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "174",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 12:47:47",
+        "updateUser": null,
+        "name": "business-taskManage-form",
+        "desc": null,
+        "parentId": "27",
+        "icon": "",
+        "order": "2",
+        "path": "/taskManage/form",
+        "type": "menu",
+        "permissionKey": "business:task:edit",
+        "isHidden": true,
+        "isActive": "1",
+        "meta": {
+          "title": "任务表单",
+          "icon": "",
+          "isHidden": true
+        }
+      }
+    ],
+    "meta": {
+      "title": "任务管理",
+      "icon": "task",
+      "isHidden": false
+    },
+    "redirect": "/taskManage/index"
+  },
+  {
+    "id": "28",
+    "createTime": "2026-04-06 21:08:04",
+    "createUser": "system",
+    "updateTime": "2026-04-10 10:33:41",
+    "updateUser": null,
+    "desc": null,
+    "parentId": "0",
+    "icon": "ticket",
+    "order": "6",
+    "path": "/ticketManage",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "175",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 10:12:21",
+        "updateUser": null,
+        "name": "business-ticketManage-index",
+        "desc": null,
+        "parentId": "28",
+        "icon": "list",
+        "order": "1",
+        "path": "/ticketManage/index",
+        "type": "menu",
+        "permissionKey": "business:ticket:list",
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "工单列表",
+          "icon": "list",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "176",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 12:47:47",
+        "updateUser": null,
+        "name": "business-ticketManage-form",
+        "desc": null,
+        "parentId": "28",
+        "icon": "",
+        "order": "2",
+        "path": "/ticketManage/form",
+        "type": "menu",
+        "permissionKey": "business:ticket:edit",
+        "isHidden": true,
+        "isActive": "1",
+        "meta": {
+          "title": "工单表单",
+          "icon": "",
+          "isHidden": true
+        }
+      }
+    ],
+    "meta": {
+      "title": "工单管理",
+      "icon": "ticket",
+      "isHidden": false
+    },
+    "redirect": "/ticketManage/index"
+  },
+  {
+    "id": "29",
+    "createTime": "2026-04-06 21:08:04",
+    "createUser": "system",
+    "updateTime": "2026-04-10 10:33:41",
+    "updateUser": null,
+    "desc": null,
+    "parentId": "0",
+    "icon": "document",
+    "order": "7",
+    "path": "/documentManage",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "177",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 10:12:21",
+        "updateUser": null,
+        "name": "business-documentManage-index",
+        "desc": null,
+        "parentId": "29",
+        "icon": "list",
+        "order": "1",
+        "path": "/documentManage/index",
+        "type": "menu",
+        "permissionKey": "business:document:list",
+        "isHidden": false,
+        "isActive": "1",
+        "meta": {
+          "title": "文档列表",
+          "icon": "list",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "178",
+        "createTime": "2026-04-10 09:50:52",
+        "createUser": "system",
+        "updateTime": "2026-04-10 12:47:47",
+        "updateUser": null,
+        "name": "business-documentManage-form",
+        "desc": null,
+        "parentId": "29",
+        "icon": "",
+        "order": "2",
+        "path": "/documentManage/form",
+        "type": "menu",
+        "permissionKey": "business:document:edit",
+        "isHidden": true,
+        "isActive": "1",
+        "meta": {
+          "title": "文档表单",
+          "icon": "",
+          "isHidden": true
+        }
+      }
+    ],
+    "meta": {
+      "title": "文档管理",
+      "icon": "document",
+      "isHidden": false
+    },
+    "redirect": "/documentManage/index"
+  },
+  {
+    "id": "150",
+    "createTime": "2026-04-09 19:05:08",
+    "createUser": null,
+    "updateTime": "2026-04-09 20:02:35",
+    "updateUser": null,
+    "name": "",
+    "desc": null,
+    "parentId": "0",
+    "icon": "peoples",
+    "order": "8",
+    "path": "/crm",
+    "component": {
+      "name": "Layout",
+      "components": {
+        "RouterPage": {
+          "name": "AppMain",
+          "computed": {},
+          "__hmrId": "778ff29a",
+          "__scopeId": "data-v-778ff29a",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/RouterPage.vue"
+        },
+        "TopBar": {
+          "__name": "index",
+          "__hmrId": "6d513ab8",
+          "__scopeId": "data-v-6d513ab8",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/TopBar/index.vue"
+        },
+        "Sidebar": {
+          "components": {
+            "SidebarItem": {
+              "components": {
+                "AppLink": {
+                  "props": {
+                    "to": {
+                      "required": true
+                    }
+                  },
+                  "computed": {},
+                  "methods": {},
+                  "__hmrId": "c6583bf0",
+                  "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/Link.vue"
+                }
+              },
+              "props": {
+                "route": {
+                  "required": true
+                },
+                "level": {
+                  "type": [
+                    null,
+                    null
+                  ],
+                  "default": 1
+                },
+                "isNest": {
+                  "default": false
+                },
+                "basePath": {
+                  "default": ""
+                }
+              },
+              "methods": {},
+              "__hmrId": "307eabd7",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/SidebarItem.vue"
+            },
+            "Logo": {
+              "name": "SidebarLogo",
+              "props": {
+                "collapse": {}
+              },
+              "components": {},
+              "__hmrId": "fae8e08c",
+              "__scopeId": "data-v-fae8e08c",
+              "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Logo.vue"
+            }
+          },
+          "computed": {},
+          "methods": {},
+          "__hmrId": "b4a86e30",
+          "__scopeId": "data-v-b4a86e30",
+          "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/components/Sidebar/index.vue"
+        }
+      },
+      "mixins": [],
+      "computed": {},
+      "methods": {},
+      "__hmrId": "051739fd",
+      "__scopeId": "data-v-051739fd",
+      "__file": "/Users/yyk/工作/代码开发/Project-V2.0/nest-admin-frontend/src/layout/index.vue"
+    },
+    "type": "catalog",
+    "permissionKey": null,
+    "isHidden": false,
+    "isActive": "1",
+    "children": [
+      {
+        "id": "187",
+        "createTime": "2026-04-10 13:54:16",
+        "createUser": null,
+        "updateTime": null,
+        "updateUser": null,
+        "name": "business-crm-customerManage-index",
+        "desc": null,
+        "parentId": "150",
+        "icon": "peoples",
+        "order": "1",
+        "path": "/crm/customer",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "children": [
+          {
+            "id": "188",
+            "createTime": "2026-04-10 13:54:32",
+            "createUser": null,
+            "updateTime": null,
+            "updateUser": null,
+            "name": "business-crm-customerManage-form",
+            "desc": null,
+            "parentId": "187",
+            "icon": "",
+            "order": "2",
+            "path": "/crm/customer/form",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "客户表单",
+              "icon": "",
+              "isHidden": true
+            }
+          }
+        ],
+        "meta": {
+          "title": "客户管理",
+          "icon": "peoples",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "192",
+        "createTime": "2026-04-10 13:54:32",
+        "createUser": null,
+        "updateTime": null,
+        "updateUser": null,
+        "name": "business-crm-interactionManage-index",
+        "desc": null,
+        "parentId": "150",
+        "icon": "phone",
+        "order": "2",
+        "path": "/crm/interaction",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "children": [
+          {
+            "id": "195",
+            "createTime": "2026-04-10 13:54:46",
+            "createUser": null,
+            "updateTime": null,
+            "updateUser": null,
+            "name": "business-crm-interactionManage-form",
+            "desc": null,
+            "parentId": "192",
+            "icon": "",
+            "order": "2",
+            "path": "/crm/interaction/form",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "互动表单",
+              "icon": "",
+              "isHidden": true
+            }
+          }
+        ],
+        "meta": {
+          "title": "互动记录",
+          "icon": "phone",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "193",
+        "createTime": "2026-04-10 13:54:32",
+        "createUser": null,
+        "updateTime": null,
+        "updateUser": null,
+        "name": "business-crm-opportunityManage-index",
+        "desc": null,
+        "parentId": "150",
+        "icon": "opportunity",
+        "order": "3",
+        "path": "/crm/opportunity",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "children": [
+          {
+            "id": "199",
+            "createTime": "2026-04-10 13:54:46",
+            "createUser": null,
+            "updateTime": null,
+            "updateUser": null,
+            "name": "business-crm-opportunityManage-form",
+            "desc": null,
+            "parentId": "193",
+            "icon": "",
+            "order": "2",
+            "path": "/crm/opportunity/form",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "机会表单",
+              "icon": "",
+              "isHidden": true
+            }
+          }
+        ],
+        "meta": {
+          "title": "销售机会",
+          "icon": "opportunity",
+          "isHidden": false
+        }
+      },
+      {
+        "id": "194",
+        "createTime": "2026-04-10 13:54:32",
+        "createUser": null,
+        "updateTime": null,
+        "updateUser": null,
+        "name": "business-crm-contractManage-index",
+        "desc": null,
+        "parentId": "150",
+        "icon": "document",
+        "order": "4",
+        "path": "/crm/contract",
+        "type": "menu",
+        "permissionKey": null,
+        "isHidden": false,
+        "isActive": "1",
+        "children": [
+          {
+            "id": "203",
+            "createTime": "2026-04-10 13:54:46",
+            "createUser": null,
+            "updateTime": null,
+            "updateUser": null,
+            "name": "business-crm-contractManage-form",
+            "desc": null,
+            "parentId": "194",
+            "icon": "",
+            "order": "2",
+            "path": "/crm/contract/form",
+            "type": "menu",
+            "permissionKey": null,
+            "isHidden": true,
+            "isActive": "1",
+            "meta": {
+              "title": "合同表单",
+              "icon": "",
+              "isHidden": true
+            }
+          }
+        ],
+        "meta": {
+          "title": "合同管理",
+          "icon": "document",
+          "isHidden": false
+        }
+      }
+    ],
+    "meta": {
+      "title": "CRM客户管理",
+      "icon": "peoples",
+      "isHidden": false
+    },
+    "redirect": "/crm/customer"
+  }
+]
