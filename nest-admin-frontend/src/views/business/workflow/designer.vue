@@ -780,9 +780,26 @@ const canConnectTo = (targetNodeId) => {
   return connecting.value && connectSource.value?.nodeId !== targetNodeId
 }
 
+const multiOutgoingNodeTypes = ['condition']
+
+const getOutgoingFlows = (nodeId) => {
+  return flows.value.filter((flow) => flow.sourceNodeId === nodeId && flow.targetNodeId)
+}
+
 const getInvalidConnectionReason = (source, target, flowType = 'normal') => {
   if (!source || !target) return '连接信息无效'
   if (source.nodeId === target.nodeId) return '节点不能连接到自身'
+
+  const sourceNode = nodes.value.find((node) => node.id === source.nodeId)
+  if (!sourceNode) return '源节点不存在'
+  if (sourceNode.type === 'end') return '结束节点不能创建流出连接线'
+
+  if (!multiOutgoingNodeTypes.includes(sourceNode.type)) {
+    const outgoingFlows = getOutgoingFlows(source.nodeId)
+    if (outgoingFlows.length > 0) {
+      return `${getNodeTypeName(sourceNode.type)}仅允许一条流出连接线`
+    }
+  }
 
   if (flowType === 'normal' || flowType === 'condition') {
     const exists = flows.value.some(f =>
@@ -1009,6 +1026,20 @@ const validationIssues = computed(() => {
   }
 
   nodes.value.forEach((node) => {
+    const outgoingFlows = getOutgoingFlows(node.id)
+
+    if (node.type === 'end' && outgoingFlows.length > 0) {
+      issues.push({ type: 'structure', level: 'error', message: '结束节点不能存在流出连接线', nodeName: node.name, nodeId: node.id })
+    }
+
+    if (node.type === 'start' && outgoingFlows.length === 0) {
+      issues.push({ type: 'structure', level: 'error', message: '开始节点至少需要一条流出连接线', nodeName: node.name, nodeId: node.id })
+    }
+
+    if (!multiOutgoingNodeTypes.includes(node.type) && node.type !== 'end' && outgoingFlows.length > 1) {
+      issues.push({ type: 'structure', level: 'error', message: `${getNodeTypeName(node.type)}仅允许一条流出连接线`, nodeName: node.name, nodeId: node.id })
+    }
+
     if (node.type === 'approval') {
       const config = node.properties?.approverConfig || {}
       if (!config.assigneeType) {

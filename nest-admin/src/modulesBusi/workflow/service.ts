@@ -458,9 +458,17 @@ export class WorkflowService {
 
     }
 
+    if (currentNode.type === NodeType.END && outgoingFlows.length > 0) {
+      throw new BadRequestException(`结束节点「${currentNode.name}」不能存在流出连接线`);
+    }
+
     // 如果只有一个输出，直接返回
     if (outgoingFlows.length === 1) {
       return [outgoingFlows[0].targetNodeId];
+    }
+
+    if (outgoingFlows.length > 1) {
+      throw new BadRequestException(`节点「${currentNode.name}」存在多条流出连接线，仅条件节点允许多分支`);
     }
 
     // 返回第一个输出（默认）

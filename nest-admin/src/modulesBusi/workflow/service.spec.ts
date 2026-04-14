@@ -295,4 +295,35 @@ describe('WorkflowService 条件路由', () => {
 
     await expect((service as any).findNextNodes(definition, currentNode, instance, [])).rejects.toThrow('条件节点')
   })
+
+  it('非条件节点存在多条流出连接线时抛错', async () => {
+    const service = createService()
+    const definition = {
+      flows: [
+        {
+          id: 'flow_1',
+          sourceNodeId: 'approval_1',
+          targetNodeId: 'node_a',
+          flowType: 'normal',
+        },
+        {
+          id: 'flow_2',
+          sourceNodeId: 'approval_1',
+          targetNodeId: 'node_b',
+          flowType: 'normal',
+        },
+      ],
+    } as any
+    const currentNode = {
+      id: 'approval_1',
+      name: '审批节点',
+      type: NodeType.APPROVAL,
+      properties: {},
+    } as any
+    const instance = {
+      variables: {},
+    } as any
+
+    await expect((service as any).findNextNodes(definition, currentNode, instance, [])).rejects.toThrow('多条流出连接线')
+  })
 })
