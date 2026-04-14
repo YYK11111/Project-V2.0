@@ -272,46 +272,13 @@
                         v-model="selectedNode.properties.conditions[idx]"
                         :business-type="businessType"
                       />
-                      <div class="condition-target">
-                        <span>连至：</span>
-                        <el-select
-                          :model-value="selectedNode.properties.conditions[idx].targetNodeId"
-                          @update:model-value="(val) => updateConditionTarget(idx, val)"
-                          placeholder="选择目标节点"
-                          clearable
-                          size="small"
-                          style="width: 150px"
-                        >
-                          <el-option
-                            v-for="node in availableTargetNodes"
-                            :key="node.id"
-                            :label="node.name"
-                            :value="node.id"
-                          />
-                        </el-select>
-                      </div>
                     </div>
                     <el-button size="small" type="primary" @click="addCondition">添加条件</el-button>
                   </div>
                   
                   <el-divider>默认分支</el-divider>
                   <div class="default-branch">
-                    <span>条件都不满足时，连至：</span>
-                    <el-select
-                      :model-value="selectedNode.properties.defaultTargetNodeId"
-                      @update:model-value="(val) => updateDefaultTarget(val)"
-                      placeholder="选择目标节点"
-                      clearable
-                      size="small"
-                      style="width: 150px"
-                    >
-                      <el-option
-                        v-for="node in availableTargetNodes"
-                        :key="node.id"
-                        :label="node.name"
-                        :value="node.id"
-                      />
-                    </el-select>
+                    <span>{{ getDefaultFlowSummary(selectedNode) }}</span>
                   </div>
                 </template>
 
@@ -414,9 +381,15 @@
                 </el-form-item>
                 <el-form-item v-if="selectedFlow.flowType === 'condition'" label="关联条件">
                   <span>{{ getConditionSummaryByFlow(selectedFlow) }}</span>
+                  <div v-if="getFlowStatusHint(selectedFlow)" class="flow-hint">
+                    {{ getFlowStatusHint(selectedFlow) }}
+                  </div>
                 </el-form-item>
                 <el-form-item v-if="selectedFlow.flowType === 'default'" label="说明">
                   <span>条件均不满足时走该默认分支</span>
+                  <div v-if="getFlowStatusHint(selectedFlow)" class="flow-hint">
+                    {{ getFlowStatusHint(selectedFlow) }}
+                  </div>
                 </el-form-item>
                 <el-form-item>
                   <el-button type="danger" @click="deleteFlow(selectedFlow.id)">删除连线</el-button>
@@ -863,6 +836,17 @@ const getFlowLabel = (flow) => {
   return ''
 }
 
+const getFlowStatusHint = (flow) => {
+  if (flow.flowType === 'condition') {
+    if (!flow.conditionId) return '未绑定条件'
+    if (!flow.targetNodeId) return '未连接目标节点'
+  }
+  if (flow.flowType === 'default') {
+    if (!flow.targetNodeId) return '未连接默认目标节点'
+  }
+  return ''
+}
+
 const getFlowLabelPosition = (flow) => {
   const start = getFlowStartPoint(flow)
   const end = getFlowEndPoint(flow)
@@ -888,6 +872,20 @@ const getConditionSummaryByFlow = (flow) => {
   if (!condition) return '未绑定条件'
   const fieldText = Array.isArray(condition.field) ? condition.field.join('.') : (condition.field || '未选字段')
   return `${fieldText} ${condition.operator || ''} ${condition.value || ''}`.trim()
+}
+
+const getConditionFlow = (nodeId, conditionId) => {
+  return flows.value.find((flow) => flow.sourceNodeId === nodeId && flow.flowType === 'condition' && flow.conditionId === conditionId)
+}
+
+const getDefaultFlow = (nodeId) => {
+  return flows.value.find((flow) => flow.sourceNodeId === nodeId && flow.flowType === 'default')
+}
+
+const getDefaultFlowSummary = (node) => {
+  const defaultFlow = getDefaultFlow(node?.id)
+  if (!defaultFlow?.targetNodeId) return '请在画布上为该节点连接一条默认分支连线'
+  return `条件都不满足时，连至：${getNodeDisplayName(defaultFlow.targetNodeId)}`
 }
 
 const memberRoleLabelMap = {
@@ -993,12 +991,27 @@ const validationIssues = computed(() => {
         issues.push({ type: 'condition', message: '条件节点未配置任何条件', nodeName: node.name })
       }
       conditions.forEach((condition, index) => {
-        if (!condition.targetNodeId) {
-          issues.push({ type: 'condition', message: `条件 ${index + 1} 未配置目标节点`, nodeName: node.name })
+        const flow = getConditionFlow(node.id, condition.id)
+        if (!flow?.targetNodeId) {
+          issues.push({ type: 'condition', message: `条件 ${index + 1} 未连接目标节点`, nodeName: node.name })
         }
       })
-      if (!node.properties?.defaultTargetNodeId) {
-        issues.push({ type: 'condition', message: '默认分支未配置目标节点', nodeName: node.name })
+      const defaultFlow = getDefaultFlow(node.id)
+      if (!defaultFlow?.targetNodeId) {
+        issues.push({ type: 'condition', message: '默认分支未连接目标节点', nodeName: node.name })
+      }
+    }
+
+    if (node.type === 'cc') {
+      const config = node.properties?.ccConfig || {}
+      if (!config.assigneeType) {
+        issues.push({ type: 'cc', message: '抄送对象来源未配置', nodeName: node.name })
+      } else if (config.assigneeType === 'user' && !config.assigneeValue) {
+        issues.push({ type: 'cc', message: '固定人员未选择', nodeName: node.name })
+      } else if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) {
+        issues.push({ type: 'cc', message: '固定部门配置不完整', nodeName: node.name })
+      } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
+        issues.push({ type: 'cc', message: '业务字段未选择', nodeName: node.name })
       }
     }
 
@@ -1035,8 +1048,16 @@ const isNodeIncomplete = (node) => {
   if (node.type === 'condition') {
     const conditions = node.properties?.conditions || []
     if (!conditions.length) return true
-    if (conditions.some((condition) => !condition.targetNodeId)) return true
-    if (!node.properties?.defaultTargetNodeId) return true
+    if (conditions.some((condition) => !getConditionFlow(node.id, condition.id)?.targetNodeId)) return true
+    if (!getDefaultFlow(node.id)?.targetNodeId) return true
+  }
+
+    if (node.type === 'cc') {
+      const config = node.properties?.ccConfig || {}
+      if (!config.assigneeType) return true
+    if (config.assigneeType === 'user' && !config.assigneeValue) return true
+    if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) return true
+    if (config.assigneeType === 'business_field' && !config.fieldPath) return true
   }
 
   if (node.type === 'form') {
@@ -1066,12 +1087,28 @@ const getPreviewNodeSummary = (node) => {
     const conditions = node.properties?.conditions || []
     if (!conditions.length) return '未配置条件'
     const conditionText = conditions.slice(0, 2).map(getConditionText).join('；')
-    const defaultTarget = node.properties?.defaultTargetNodeId ? getNodeDisplayName(node.properties.defaultTargetNodeId) : ''
+    const defaultFlow = getDefaultFlow(node.id)
+    const defaultTarget = defaultFlow?.targetNodeId ? getNodeDisplayName(defaultFlow.targetNodeId) : ''
     return `${conditionText}${defaultTarget ? `；默认分支 -> ${defaultTarget}` : '；默认分支未配置'}`
   }
 
   if (node.type === 'notification') {
     return `通知：${node.properties?.notificationType || 'system'}`
+  }
+
+  if (node.type === 'cc') {
+    const config = node.properties?.ccConfig || {}
+    if (config.assigneeType === 'business_field') {
+      return `业务字段：${getBusinessFieldLabel(config.fieldPath)}`
+    }
+    if (config.assigneeType === 'department') {
+      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
+      return `固定部门：${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}${config.departmentId ? ` (${config.departmentId})` : ''}${fallback}`
+    }
+    if (config.assigneeType === 'user') {
+      return `固定人员${config.assigneeValue ? `：${config.assigneeValue}` : ''}`
+    }
+    return '抄送对象未配置'
   }
 
   if (node.type === 'delay') {
@@ -1102,13 +1139,29 @@ const getNodeSummary = (node) => {
 
   if (node.type === 'condition') {
     const conditionCount = node.properties?.conditions?.length || 0
-    const hasDefault = !!node.properties?.defaultTargetNodeId
+    const hasDefault = !!getDefaultFlow(node.id)?.targetNodeId
     const conditions = (node.properties?.conditions || []).slice(0, 2).map(getConditionText).join('；')
     return `条件分支 ${conditionCount} 条，${hasDefault ? '已配置默认分支' : '未配置默认分支'}${conditions ? `：${conditions}` : ''}`
   }
 
   if (node.type === 'notification') {
     return `通知方式：${node.properties?.notificationType || 'system'}`
+  }
+
+    if (node.type === 'cc') {
+      const config = node.properties?.ccConfig || {}
+      if (config.assigneeType === 'business_field') {
+      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
+      return `抄送来源：业务字段 ${getBusinessFieldLabel(config.fieldPath)}${fallback}`
+      }
+      if (config.assigneeType === 'department') {
+      const fallback = config.assigneeEmptyFallbackFieldPath ? `，取空回退：${getBusinessFieldLabel(config.assigneeEmptyFallbackFieldPath)}` : ''
+      return `抄送来源：固定部门 ${config.departmentId || '未配置'}（${config.departmentMode === 'members' ? '部门成员' : '部门负责人'}）${fallback}`
+      }
+      if (config.assigneeType === 'user') {
+      return `抄送来源：固定人员 ${config.assigneeValue || '未配置'}`
+    }
+    return '抄送对象配置未完成'
   }
 
   if (node.type === 'delay') {
@@ -1190,7 +1243,6 @@ const getDefaultProperties = (type) => {
     },
     condition: {
       conditions: [],
-      defaultTargetNodeId: '',
     },
     notification: {
       notificationType: 'system',
@@ -1198,8 +1250,18 @@ const getDefaultProperties = (type) => {
       notificationTemplate: '',
     },
     cc: {
-      ccType: 'user',
-      ccValue: '',
+      ccConfig: {
+        assigneeType: 'business_field',
+        assigneeValue: '',
+        departmentId: '',
+        departmentMode: 'leader',
+        fieldPath: '',
+        businessType: businessType.value,
+        assigneeEmptyAction: 'error',
+        assigneeEmptyFallbackUserId: '',
+        assigneeEmptyFallbackFieldPath: '',
+        multiInstanceType: 'parallel',
+      },
     },
     delay: {
       delayType: 'fixed',
@@ -1387,16 +1449,6 @@ const deleteFlow = async (flowId) => {
     selectedFlowId.value = ''
   }
 
-  if (flow.flowType === 'condition' && selectedNode.value?.type === 'condition') {
-    const condition = selectedNode.value.properties?.conditions?.find((item) => item.id === flow.conditionId)
-    if (condition) {
-      condition.targetNodeId = ''
-    }
-  }
-
-  if (flow.flowType === 'default' && selectedNode.value?.id === flow.sourceNodeId) {
-    selectedNode.value.properties.defaultTargetNodeId = ''
-  }
 }
 
 // 选中连线
@@ -1412,21 +1464,6 @@ const updateSelectedFlowTarget = (targetNodeId) => {
   const flow = flows.value.find((item) => item.id === selectedFlow.value.id)
   if (!flow) return
   flow.targetNodeId = targetNodeId || ''
-
-  if (flow.flowType === 'condition') {
-    const ownerNode = nodes.value.find((node) => node.type === 'condition' && (node.properties?.conditions || []).some((item) => item.id === flow.conditionId))
-    const condition = ownerNode?.properties?.conditions?.find((item) => item.id === flow.conditionId)
-    if (condition) {
-      condition.targetNodeId = targetNodeId || ''
-    }
-  }
-
-  if (flow.flowType === 'default') {
-    const ownerNode = nodes.value.find((node) => node.id === flow.sourceNodeId)
-    if (ownerNode?.type === 'condition') {
-      ownerNode.properties.defaultTargetNodeId = targetNodeId || ''
-    }
-  }
 }
 
 // 开始拖动连接线端点 - 需要先选中该连接线
@@ -1596,7 +1633,6 @@ const addCondition = () => {
     field: [],
     operator: 'eq',
     value: '',
-    targetNodeId: '',
   })
   
   // 为新条件添加一条连线
@@ -1616,7 +1652,7 @@ const addCondition = () => {
     flows.value.push({
       id: `flow_${selectedNode.value.id}_default`,
       sourceNodeId: selectedNode.value.id,
-      targetNodeId: selectedNode.value.properties.defaultTargetNodeId || '',
+      targetNodeId: '',
       sourceAnchor: 'bottom',
       targetAnchor: 'top',
       flowType: 'default',
@@ -1640,42 +1676,6 @@ const moveCondition = (index, direction) => {
   if (targetIndex < 0 || targetIndex >= conditions.length) return
   const [current] = conditions.splice(index, 1)
   conditions.splice(targetIndex, 0, current)
-}
-
-// 更新条件的目标节点，同时更新对应的 flow
-const updateConditionTarget = (index, targetNodeId) => {
-  if (!selectedNode.value) return
-  const condition = selectedNode.value.properties.conditions[index]
-  condition.targetNodeId = targetNodeId
-
-  const flow = flows.value.find(f => f.flowType === 'condition' && f.conditionId === condition.id)
-  if (flow) {
-    flow.targetNodeId = targetNodeId
-  }
-}
-
-// 更新默认分支的目标节点
-const updateDefaultTarget = (targetNodeId) => {
-  if (!selectedNode.value) return
-  selectedNode.value.properties.defaultTargetNodeId = targetNodeId
-  
-  // 更新或创建默认分支的 flow
-  const sourceNodeId = selectedNode.value.id
-  let defaultFlow = flows.value.find(f => f.sourceNodeId === sourceNodeId && f.flowType === 'default')
-  
-  if (defaultFlow) {
-    defaultFlow.targetNodeId = targetNodeId
-  } else {
-    // 如果不存在，创建默认分支 flow
-    flows.value.push({
-      id: `flow_${sourceNodeId}_default`,
-      sourceNodeId,
-      targetNodeId: targetNodeId || '',
-      sourceAnchor: 'bottom',
-      targetAnchor: 'top',
-      flowType: 'default',
-    })
-  }
 }
 
 const normalizeLoadedData = (data) => {
@@ -1703,7 +1703,6 @@ const normalizeLoadedData = (data) => {
     if (node.type === 'condition') {
       node.properties = {
         conditions: [],
-        defaultTargetNodeId: '',
         ...node.properties,
       }
       node.properties.conditions = (node.properties.conditions || []).map((condition) => ({
@@ -1712,9 +1711,37 @@ const normalizeLoadedData = (data) => {
         field: [],
         operator: 'eq',
         value: '',
-        targetNodeId: '',
         ...condition,
       }))
+    }
+
+    if (node.type === 'cc') {
+      node.properties = {
+        ccConfig: {
+          assigneeType: 'business_field',
+          assigneeValue: '',
+          departmentId: '',
+          departmentMode: 'leader',
+          fieldPath: '',
+          businessType: businessType.value,
+          assigneeEmptyAction: 'error',
+          assigneeEmptyFallbackUserId: '',
+          assigneeEmptyFallbackFieldPath: '',
+          multiInstanceType: 'parallel',
+          ...(node.properties?.ccConfig || {}),
+        },
+        ...node.properties,
+      }
+
+      if (!node.properties.ccConfig.assigneeType && node.properties.ccType) {
+        if (node.properties.ccType === 'user') {
+          node.properties.ccConfig.assigneeType = 'user'
+          node.properties.ccConfig.assigneeValue = node.properties.ccValue || ''
+        } else if (node.properties.ccType === 'dynamic') {
+          node.properties.ccConfig.assigneeType = 'business_field'
+          node.properties.ccConfig.fieldPath = node.properties.ccExpr || node.properties.ccValue || ''
+        }
+      }
     }
 
     return node
@@ -1724,9 +1751,18 @@ const normalizeLoadedData = (data) => {
     if (flow.flowType) return flow
     return {
       ...flow,
-      flowType: flow.isDefault ? 'default' : (flow.condition || flow.conditionId ? 'condition' : 'normal'),
-      conditionId: flow.conditionId || flow.condition?.id || '',
+      flowType: flow.isDefault ? 'default' : (flow.conditionId ? 'condition' : 'normal'),
+      conditionId: flow.conditionId || '',
     }
+  })
+
+  nodes.value.forEach((node) => {
+    if (node.type !== 'condition') return
+
+    const conditions = node.properties?.conditions || []
+    conditions.forEach((condition) => {
+      if (getConditionFlow(node.id, condition.id)) return
+    })
   })
 }
 
@@ -1770,16 +1806,42 @@ const validateWorkflowDefinition = () => {
 
 const buildSubmitNodes = () => {
   return nodes.value.map((node) => {
-    if (node.type !== 'condition') return node
-    return {
-      ...node,
-      properties: {
-        ...node.properties,
-        conditions: (node.properties.conditions || []).map((condition) => ({
-          ...condition,
-        })),
-      },
+    if (node.type === 'condition') {
+      return {
+        ...node,
+        properties: {
+          ...node.properties,
+          conditions: (node.properties.conditions || []).map((condition) => ({
+            ...condition,
+          })),
+        },
+      }
     }
+
+    if (node.type === 'cc') {
+      const { ccType, ccValue, ccExpr, ccRoleId, ...restProperties } = node.properties || {}
+      return {
+        ...node,
+        properties: {
+          ...restProperties,
+          ccConfig: {
+            assigneeType: 'business_field',
+            assigneeValue: '',
+            departmentId: '',
+            departmentMode: 'leader',
+            fieldPath: '',
+            businessType: businessType.value,
+            assigneeEmptyAction: 'error',
+            assigneeEmptyFallbackUserId: '',
+            assigneeEmptyFallbackFieldPath: '',
+            multiInstanceType: 'parallel',
+            ...(restProperties.ccConfig || {}),
+          },
+        },
+      }
+    }
+
+    return node
   })
 }
 
@@ -2364,6 +2426,12 @@ const onCanvasClick = () => {
   align-items: center;
   gap: 8px;
   color: #666;
+  font-size: 12px;
+}
+
+.flow-hint {
+  margin-top: 6px;
+  color: #e67e22;
   font-size: 12px;
 }
 

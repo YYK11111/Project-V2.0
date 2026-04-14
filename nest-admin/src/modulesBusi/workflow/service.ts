@@ -428,18 +428,32 @@ export class WorkflowService {
       return [];
     }
 
+    // 条件节点：按条件配置 + 连接线决定走向
+    if (currentNode.type === NodeType.CONDITION) {
+      const conditions = (currentNode.properties as any)?.conditions || [];
+      if (conditions.length) {
+        for (const condition of conditions) {
+          if (!condition) continue;
+          if (!this.evaluateCondition(condition, instance.variables || {})) continue;
+          const flow = outgoingFlows.find(f => f.flowType === 'condition' && f.conditionId === condition.id);
+          if (flow?.targetNodeId) {
+            return [flow.targetNodeId];
+          }
+        }
+
+        const defaultFlow = outgoingFlows.find(f => f.flowType === 'default');
+        if (defaultFlow?.targetNodeId) {
+          return [defaultFlow.targetNodeId];
+        }
+
+        return [];
+      }
+
+    }
+
     // 如果只有一个输出，直接返回
     if (outgoingFlows.length === 1) {
       return [outgoingFlows[0].targetNodeId];
-    }
-
-    // 多个输出时，检查是否有条件
-    for (const flow of outgoingFlows) {
-      if (flow.condition) {
-        if (this.evaluateCondition(flow.condition, instance.variables || {})) {
-          return [flow.targetNodeId];
-        }
-      }
     }
 
     // 返回第一个输出（默认）
@@ -523,10 +537,9 @@ export class WorkflowService {
     const assigneeConfig = {
       type: props.assigneeType,
       userId: props.assigneeValue,
-      roleId: props.roleId,
-      deptPath: props.deptPath,
+      departmentId: props.departmentId,
+      departmentMode: props.departmentMode,
       fieldPath: props.fieldPath,
-      expression: props.expression,
       businessType: props.businessType,
     };
 

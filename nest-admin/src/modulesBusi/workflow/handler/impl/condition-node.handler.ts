@@ -68,16 +68,13 @@ export class ConditionNodeHandler implements INodeHandler {
   /**
    * 查找满足条件的目标节点
    */
-  findNextNode(conditions: Condition[], variables: Record<string, any>, defaultFlow?: string): string | null {
-    // 按优先级排序条件
-    const sortedConditions = [...conditions].sort((a, b) => (a.priority || 0) - (b.priority || 0));
-
+  findNextNode(conditions: Condition[], variables: Record<string, any>): string | null {
+    const sortedConditions = [...conditions].sort((a, b) => (a.priority || 0) - (b.priority || 0))
     for (const condition of sortedConditions) {
       if (this.evaluateCondition(condition, variables)) {
-        return condition.targetNodeId;
+        return condition.id
       }
     }
-
-    return defaultFlow || null;
+    return null
   }
 }

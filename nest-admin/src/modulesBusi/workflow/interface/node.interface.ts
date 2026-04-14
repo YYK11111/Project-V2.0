@@ -17,8 +17,6 @@ export interface Condition {
   operator: ConditionOperator;
   /** 比较值 */
   value: any;
-  /** 目标节点ID */
-  targetNodeId: string;
   /** 优先级，数字越小优先级越高 */
   priority?: number;
 }
@@ -33,10 +31,12 @@ export interface FlowConfig {
   sourceNodeId: string;
   /** 目标节点ID */
   targetNodeId: string;
+  /** 连线类型 */
+  flowType?: 'normal' | 'condition' | 'default';
+  /** 绑定条件ID */
+  conditionId?: string;
   /** 连接线标签 */
   label?: string;
-  /** 流转条件，满足则走此线 */
-  condition?: Condition;
 }
 
 /**
@@ -91,8 +91,6 @@ export interface ApprovalNodeProperties extends BaseNodeProperties {
 export interface ConditionNodeProperties extends BaseNodeProperties {
   /** 条件列表 */
   conditions?: Condition[];
-  /** 默认流转节点ID(无满足条件时) */
-  defaultFlow?: string;
 }
 
 /**
@@ -117,11 +115,11 @@ export interface NotificationNodeProperties extends BaseNodeProperties {
 export interface CcNodeProperties extends BaseNodeProperties {
   /** 统一抄送配置 */
   ccConfig?: ApprovalNodeProperties;
-  /** 抄送类型 */
+  /** 过渡字段：旧抄送类型，待清理 */
   ccType?: 'user' | 'role' | 'dynamic';
-  /** 抄送人ID */
+  /** 过渡字段：旧抄送人ID，待清理 */
   ccValue?: string;
-  /** 动态抄送表达式 */
+  /** 过渡字段：旧动态抄送表达式，待清理 */
   ccExpr?: string;
 }
 

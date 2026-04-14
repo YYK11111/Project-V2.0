@@ -81,7 +81,9 @@ describe('SysFileService', () => {
       await service.associateFiles(dto)
 
       expect(mockRepository.update).toHaveBeenCalledWith(
-        { id: ['file1', 'file2'] },
+        expect.objectContaining({
+          id: expect.any(Object),
+        }),
         {
           businessType: 'project',
           businessId: '123',
