@@ -8,9 +8,11 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { UsersModule } from 'src/modules/users/users.module'
 import { ProjectsModule } from '../projects/module'
 import { SysFileModule } from 'src/modules/sys/file/module'
+import { User } from 'src/modules/users/entities/user.entity'
+import { TaskComment } from '../task-comments/entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task, TaskDependency, TaskTimeLog]), UsersModule, ProjectsModule, SysFileModule],
+  imports: [TypeOrmModule.forFeature([Task, TaskDependency, TaskTimeLog, TaskComment, User]), UsersModule, ProjectsModule, SysFileModule],
   controllers: [TasksController],
   providers: [TasksService],
   exports: [TasksService],

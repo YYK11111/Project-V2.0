@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req } from '@nestjs/common'
 import { TaskCommentsService } from './service'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { TaskComment } from './entity'
@@ -14,8 +14,9 @@ export class TaskCommentsController extends BaseController<TaskComment, TaskComm
   @Post()
   addComment(
     @Body() data: TaskCommentDto,
-    @Body('userId') userId: string
+    @Req() req: any,
   ) {
+    const userId = req.user?.id || req.user?.name
     return this.service.addComment(data, userId)
   }
 
@@ -23,16 +24,18 @@ export class TaskCommentsController extends BaseController<TaskComment, TaskComm
   updateComment(
     @Param('id') id: string,
     @Body() data: UpdateTaskCommentDto,
-    @Body('userId') userId: string
+    @Req() req: any,
   ) {
+    const userId = req.user?.id || req.user?.name
     return this.service.updateComment(id, data, userId)
   }
 
   @Delete(':id')
   deleteComment(
     @Param('id') id: string,
-    @Query('userId') userId: string
+    @Req() req: any,
   ) {
+    const userId = req.user?.id || req.user?.name
     return this.service.deleteComment(id, userId)
   }
 

@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import dayjs from 'dayjs'
 import { getList, getStatus, getPriority, del, updateProgress, submitApproval } from './api'
+import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref({})
@@ -33,11 +34,31 @@ async function handleSubmitApproval(row) {
   $sdk.msgSuccess('提交审批成功')
   rctRef.value?.getList()
 }
+
+function goToTaskSection(row, tab) {
+  rctRef.value.goRoute({ id: row.id, action: 'view', tab }, '/taskManage/form')
+}
+
+function isReportStale(row) {
+  if (!row.latestReportTime) return true
+  return dayjs(row.latestReportTime).isBefore(dayjs().subtract(7, 'day'))
+}
+
+const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+
+const getButtons = (row) => [
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
+  { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
+  { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
+  { key: 'edit', label: '修改', disabled: !canTaskUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') },
+  { key: 'submitApproval', label: '提交审批', type: 'warning', disabled: !canTaskSubmitApproval.value || !canSubmitTaskApproval(row), onClick: () => handleSubmitApproval(row) },
+  { key: 'delete', label: '删除', danger: true, disabled: !canTaskDelete.value, onClick: () => rctRef.value.del(del, row.id) },
+]
 </script>
 
 <template>
   <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+    <RequestChartTable ref="rctRef" :params="params" :request="getList" :key="$route.fullPath">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="任务名称" prop="name"></BaInput>
         <BaSelect v-model="query.status" filterable label="状态" prop="status">
@@ -46,12 +67,23 @@ async function handleSubmitApproval(row) {
         <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
           <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
         </BaSelect>
+        <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
+          <el-option label="有评论" value="1"></el-option>
+          <el-option label="无评论" value="0"></el-option>
+        </BaSelect>
+        <BaSelect v-model="query.hasReport" filterable label="汇报情况" prop="hasReport" isAll>
+          <el-option label="有汇报" value="1"></el-option>
+          <el-option label="无汇报" value="0"></el-option>
+        </BaSelect>
+        <BaSelect v-model="query.reportFreshness" filterable label="汇报时效" prop="reportFreshness" isAll>
+          <el-option label="最近7天未汇报" value="stale7d"></el-option>
+        </BaSelect>
       </template>
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canTaskAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/taskManage/form')">新增任务</el-button>
-          <el-button v-if="canTaskDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canTaskAdd" type="primary" @click="rctRef.goRoute(null, '/taskManage/form')">新增任务</el-button>
+          <el-button v-if="canTaskDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
@@ -59,6 +91,11 @@ async function handleSubmitApproval(row) {
         <el-table-column label="任务名称" prop="name" :show-overflow-tooltip="true" min-width="200" />
         <el-table-column label="任务编号" prop="code" width="120" />
         <el-table-column label="负责人" prop="leader.nickname" width="100" />
+        <el-table-column label="经办人" min-width="140" :show-overflow-tooltip="true">
+          <template #default="{ row }">
+            {{ (row.executors || []).map(user => user?.nickname || user?.name).filter(Boolean).join('、') || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="所属项目" prop="project.name" width="150" :show-overflow-tooltip="true" />
         <el-table-column label="开始时间" prop="startDate" width="120" />
         <el-table-column label="截止时间" prop="endDate" width="120" />
@@ -74,7 +111,19 @@ async function handleSubmitApproval(row) {
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
             <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="评论数" prop="commentCount" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.commentCount ? 'primary' : 'info'" size="small">{{ row.commentCount || 0 }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最近汇报" prop="latestReportTime" width="170">
+          <template #default="{ row }">
+            <el-tag :type="isReportStale(row) ? 'danger' : 'success'" size="small">
+              {{ row.latestReportTime || '未汇报' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -102,68 +151,8 @@ async function handleSubmitApproval(row) {
       </template>
 
       <template #tableOperation="{ row }">
-        <div class="tableOperation">
-          <el-tooltip content="修改" placement="top">
-            <el-button 
-              link 
-              type="primary" 
-              :icon="Edit" 
-              size="small" 
-              circle
-              :disabled="!canTaskUpdate"
-              @click="canTaskUpdate && $refs.rctRef.goRoute(row.id, '/taskManage/form')"
-            />
-          </el-tooltip>
-          <el-tooltip content="提交审批" placement="top">
-            <el-button
-              link
-              type="warning"
-              size="small"
-              circle
-              :disabled="!canTaskSubmitApproval || row.status !== '1' || row.approvalStatus === '1'"
-              @click="canTaskSubmitApproval && handleSubmitApproval(row)"
-            >审</el-button>
-          </el-tooltip>
-          <el-tooltip content="删除" placement="top">
-            <el-button 
-              link 
-              type="danger" 
-              :icon="Delete" 
-              size="small" 
-              circle
-              :disabled="!canTaskDelete"
-              @click="canTaskDelete && $refs.rctRef.del(del, row.id)"
-            />
-          </el-tooltip>
-        </div>
+        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.tableOperation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
-  }
-}
-</style>

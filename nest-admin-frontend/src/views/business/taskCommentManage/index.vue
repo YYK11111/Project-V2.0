@@ -1,40 +1,53 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
-import { getList, addComment, updateComment, deleteComment, getTaskComments } from './api'
+import { reactive, ref } from 'vue'
+import { getList, addComment, updateComment, deleteComment } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref<Record<string, any>>({})
 
 const rctRef = ref()
+const formRef = ref()
+const dialogVisible = ref(false)
+const dialogTitle = ref('添加评论')
+const submitLoading = ref(false)
 const canTaskCommentAdd = computed(() => checkPermi(['business/taskComments/add']))
 const canTaskCommentUpdate = computed(() => checkPermi(['business/taskComments/update']))
 const canTaskCommentDelete = computed(() => checkPermi(['business/taskComments/delete']))
+const commentForm = reactive({
+  id: '',
+  taskId: '',
+  content: '',
+})
+const commentRules = {
+  taskId: [{ required: true, message: '请输入任务ID', trigger: 'blur' }],
+  content: [{ required: true, message: '请输入评论内容', trigger: 'blur' }],
+}
 
-// 添加评论
+function resetCommentForm() {
+  commentForm.id = ''
+  commentForm.taskId = ''
+  commentForm.content = ''
+}
+
 function handleAddComment(row?: any) {
   if (!canTaskCommentAdd.value) return $sdk.msgError('当前操作没有权限')
-  const taskId = row?.taskId || params.value.taskId
-  if (!taskId) {
-    $sdk.msgError('请先选择任务')
-    return
-  }
-  
-  // 打开添加评论对话框
-  $sdk.confirm('确定要添加评论吗？').then(() => {
-    console.log('打开添加评论对话框')
-  })
+  resetCommentForm()
+  commentForm.taskId = String(row?.taskId || params.value.taskId || '')
+  dialogTitle.value = '添加评论'
+  dialogVisible.value = true
 }
 
-// 编辑评论
 function handleEditComment(row: any) {
   if (!canTaskCommentUpdate.value) return $sdk.msgError('当前操作没有权限')
-  // 打开编辑评论对话框
-  console.log('打开编辑评论对话框', row)
+  resetCommentForm()
+  commentForm.id = String(row.id || '')
+  commentForm.taskId = String(row.taskId || '')
+  commentForm.content = row.content || ''
+  dialogTitle.value = '编辑评论'
+  dialogVisible.value = true
 }
 
-// 删除评论
 function handleDeleteComment(row: any) {
   if (!canTaskCommentDelete.value) return $sdk.msgError('当前操作没有权限')
   $sdk.confirm('确定要删除该评论吗？').then(() => {
@@ -44,12 +57,26 @@ function handleDeleteComment(row: any) {
     })
   })
 }
-// 批量删除评论
-function handleBatchDelete() {
-  if (!canTaskCommentDelete.value) return $sdk.msgError('当前操作没有权限')
-  $sdk.confirm('确定要批量删除选中的评论吗？').then(() => {
-    $sdk.msgSuccess('批量删除成功')
-    rctRef.value.getList()
+
+function submitComment() {
+  formRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return
+    submitLoading.value = true
+    try {
+      if (commentForm.id) {
+        await updateComment(commentForm.id, { content: commentForm.content })
+        $sdk.msgSuccess('评论修改成功')
+      } else {
+        await addComment({ taskId: commentForm.taskId, content: commentForm.content })
+        $sdk.msgSuccess('评论添加成功')
+      }
+      dialogVisible.value = false
+      rctRef.value.getList()
+    } catch (error: any) {
+      $sdk.msgError(error?.message || error?.response?.data?.message || '评论提交失败')
+    } finally {
+      submitLoading.value = false
+    }
   })
 }
 
@@ -67,18 +94,21 @@ const getButtons = (row: any) => [
         <BaInput v-model="query.userId" label="用户ID" prop="userId"></BaInput>
       </template>
 
-      <template #operation="{ selectedIds }">
+      <template #operation>
         <div class="flexBetween">
           <el-button v-if="canTaskCommentAdd" type="primary" @click="handleAddComment">添加评论</el-button>
-          <el-button v-if="canTaskCommentDelete" :disabled="!selectedIds.length" @click="handleBatchDelete" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
         <el-table-column label="评论内容" prop="content" :show-overflow-tooltip="true" min-width="300" />
-        <el-table-column label="评论人" prop="user.nickname" width="120" />
-        <el-table-column label="所属任务" prop="task.name" width="150" :show-overflow-tooltip="true" />
-        <el-table-column label="评论时间" prop="createdAt" width="180" />
+        <el-table-column label="评论人" width="120">
+          <template #default="{ row }">{{ row.user?.nickname || row.user?.name || row.userId || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="所属任务" width="150" :show-overflow-tooltip="true">
+          <template #default="{ row }">{{ row.task?.name || row.taskId || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="评论时间" prop="createTime" width="180" />
         <el-table-column label="是否编辑" prop="isEdited" width="100">
           <template #default="{ row }">
             <el-tag :type="row.isEdited === '1' ? 'warning' : 'info'" size="small">
@@ -100,6 +130,19 @@ const getButtons = (row: any) => [
         <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
+
+    <BaDialog v-model="dialogVisible" :title="dialogTitle" width="560" @confirm="submitComment">
+      <template #form>
+        <el-form ref="formRef" :model="commentForm" :rules="commentRules" label-width="90px" v-loading="submitLoading">
+          <el-form-item label="任务ID" prop="taskId">
+            <el-input v-model="commentForm.taskId" placeholder="请输入任务ID" :disabled="!!commentForm.id" />
+          </el-form-item>
+          <el-form-item label="评论内容" prop="content">
+            <el-input v-model="commentForm.content" type="textarea" :rows="5" placeholder="请输入评论内容" maxlength="1000" show-word-limit />
+          </el-form-item>
+        </el-form>
+      </template>
+    </BaDialog>
   </div>
 </template>
 

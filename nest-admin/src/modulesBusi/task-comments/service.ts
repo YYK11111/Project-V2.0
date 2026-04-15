@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { FindManyOptions, Repository } from 'typeorm'
 import { TaskComment } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { TaskCommentDto, UpdateTaskCommentDto } from './dto'
+import { Task } from '../tasks/entity'
 
 @Injectable()
 export class TaskCommentsService extends BaseService<TaskComment, TaskCommentDto> {
-  constructor(@InjectRepository(TaskComment) repository: Repository<TaskComment>) {
+  constructor(
+    @InjectRepository(TaskComment) repository: Repository<TaskComment>,
+    @InjectRepository(Task) private readonly taskRepository: Repository<Task>,
+  ) {
     super(TaskComment, repository)
   }
 
@@ -31,39 +35,51 @@ export class TaskCommentsService extends BaseService<TaskComment, TaskCommentDto
    * 添加任务评论
    */
   async addComment(data: TaskCommentDto, userId: string): Promise<TaskComment> {
+    if (!userId) {
+      throw new BadRequestException('当前登录用户不存在')
+    }
+    const task = await this.taskRepository.findOne({ where: { id: data.taskId } as any })
+    if (!task) {
+      throw new NotFoundException('任务不存在')
+    }
     const commentData = {
       ...data,
-      userId
+      userId,
     }
-    return this.add(commentData)
+    const saved = await this.add(commentData)
+    return this.repository.findOne({ where: { id: saved.id } as any, relations: ['user', 'task'] })
   }
 
   /**
    * 更新评论
    */
   async updateComment(id: string, data: UpdateTaskCommentDto, userId: string): Promise<TaskComment> {
-    // 检查是否是评论作者
-    const comment = await this.getOne({ id })
+    const comment = await this.repository.findOne({ where: { id } as any, relations: ['user', 'task'] })
+    if (!comment) {
+      throw new NotFoundException('评论不存在')
+    }
     if (comment.userId !== userId) {
-      throw new Error('只能编辑自己的评论')
+      throw new ForbiddenException('只能编辑自己的评论')
     }
 
-    await this.update({ 
+    await this.update({
       id,
-      ...data, 
-      isEdited: '1' 
+      ...data,
+      isEdited: '1',
     })
-    return this.getOne({ id })
+    return this.repository.findOne({ where: { id } as any, relations: ['user', 'task'] })
   }
 
   /**
    * 删除评论
    */
   async deleteComment(id: string, userId: string): Promise<any> {
-    // 检查是否是评论作者
-    const comment = await this.getOne({ id })
+    const comment = await this.repository.findOne({ where: { id } as any })
+    if (!comment) {
+      throw new NotFoundException('评论不存在')
+    }
     if (comment.userId !== userId) {
-      throw new Error('只能删除自己的评论')
+      throw new ForbiddenException('只能删除自己的评论')
     }
 
     return this.del([id])

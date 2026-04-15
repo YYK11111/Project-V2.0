@@ -5,12 +5,13 @@ import { TaskComment } from './entity'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { UsersModule } from 'src/modules/users/users.module'
 import { TasksBusiModule } from '../tasks/module'
+import { Task } from '../tasks/entity'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TaskComment]), 
+    TypeOrmModule.forFeature([TaskComment, Task]),
     UsersModule,
-    TasksBusiModule
+    TasksBusiModule,
   ],
   controllers: [TaskCommentsController],
   providers: [TaskCommentsService],

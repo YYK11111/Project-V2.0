@@ -1,12 +1,13 @@
 // @ts-nocheck
 import request from '@/utils/request'
+import { addComment, updateComment, deleteComment, getTaskComments } from '../taskCommentManage/api'
 
 const baseUrl = '/business/tasks'
 
 function normalizePageData(res) {
   const page = res?.data?.data || res?.data || {}
-  const list = page.list || page.rows || []
-  const total = Number(page.total || res?.total || 0)
+  const list = Array.isArray(page) ? page : page.list || page.rows || page.data || []
+  const total = Number((Array.isArray(page) ? res?.total : page.total) || res?.total || 0)
   return {
     ...res,
     list,
@@ -84,4 +85,18 @@ export function checkCircularDependency(taskId, dependencyId) {
 
 export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}
+
+export { addComment, updateComment, deleteComment, getTaskComments }
+
+export function getTimeLogs(taskId) {
+  return request({ url: `${baseUrl}/${taskId}/timelogs`, method: 'get' })
+}
+
+export function addTimeLog(taskId, data) {
+  return request({ url: `${baseUrl}/${taskId}/timelogs`, method: 'post', data })
+}
+
+export function deleteTimeLog(id) {
+  return request({ url: `${baseUrl}/timelogs/${id}`, method: 'delete' })
 }

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindManyOptions, In, Like, Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { Task, TaskStatus } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
@@ -9,6 +9,8 @@ import { TaskDependency } from './entities/task-dependency.entity'
 import { TaskTimeLog } from './entities/task-time-log.entity'
 import { SysFileService } from 'src/modules/sys/file/service'
 import { SaveDto } from 'src/common/dto'
+import { User } from 'src/modules/users/entities/user.entity'
+import { TaskComment } from '../task-comments/entity'
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -16,12 +18,52 @@ export class TasksService extends BaseService<Task, TaskDto> {
     @InjectRepository(Task) repository: Repository<Task>,
     @InjectRepository(TaskDependency) private dependencyRepository: Repository<TaskDependency>,
     @InjectRepository(TaskTimeLog) private timeLogRepository: Repository<TaskTimeLog>,
+    @InjectRepository(TaskComment) private taskCommentRepository: Repository<TaskComment>,
+    @InjectRepository(User) private userRepository: Repository<User>,
     private readonly sysFileService: SysFileService,
   ) {
     super(Task, repository)
   }
 
+  private normalizeTaskPayload(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
+    if (typeof dto.executorIds === 'string' && !dto.executorIds) {
+      dto.executorIds = [] as any
+    }
+    if (dto.executorIds == null) {
+      dto.executorIds = [] as any
+    }
+    if (!Array.isArray(dto.executorIds)) {
+      dto.executorIds = [dto.executorIds].filter(Boolean) as any
+    }
+    return dto
+  }
+
+  private async generateTaskCode(): Promise<string> {
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '')
+    const prefix = `TSK-${today}-`
+
+    const latest = await this.repository
+      .createQueryBuilder('task')
+      .where('task.code LIKE :prefix', { prefix: prefix + '%' })
+      .orderBy('task.code', 'DESC')
+      .getOne()
+
+    let seq = 1
+    if (latest?.code) {
+      const lastSeq = parseInt(String(latest.code).replace(prefix, ''), 10)
+      if (!isNaN(lastSeq)) {
+        seq = lastSeq + 1
+      }
+    }
+
+    return `${prefix}${seq.toString().padStart(4, '0')}`
+  }
+
   async save(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
+    this.normalizeTaskPayload(dto)
+    if (!dto.id && !dto.code) {
+      dto.code = await this.generateTaskCode()
+    }
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -49,6 +91,10 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async add(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
+    this.normalizeTaskPayload(dto)
+    if (!dto.code) {
+      dto.code = await this.generateTaskCode()
+    }
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -70,6 +116,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async update(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
+    this.normalizeTaskPayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -97,20 +144,166 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return files.map((f) => f.id)
   }
 
-  async list(query: QueryListDto): Promise<ResponseListDto<Task>> {
-    let { name, status, priority, leaderId, projectId, parentId } = query
-    let queryOrm: FindManyOptions = {
-      where: {
-        name: this.sqlLike(name),
-        status,
-        priority,
-        leaderId,
-        projectId,
-        parentId,
-      },
-      relations: ['leader', 'project'],
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
     }
-    return this.listBy(queryOrm, query)
+  }
+
+  private mapTaskSummary(task?: Task | null) {
+    if (!task) return null
+    return {
+      id: task.id,
+      code: task.code,
+      name: task.name,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  private async fillExecutors(executorIds: string[] = []) {
+    const normalizedExecutorIds = Array.from(new Set((executorIds || []).filter(Boolean).map((id) => String(id))))
+    if (!normalizedExecutorIds.length) return []
+
+    const users = await this.userRepository.find({ where: normalizedExecutorIds.map((id) => ({ id })) })
+    const userMap = new Map(users.map((user) => [String(user.id), user]))
+    return normalizedExecutorIds.map((id) => this.mapUserSummary(userMap.get(id))).filter(Boolean)
+  }
+
+  private async ensureTaskCode(task: Task) {
+    if (task?.code) return task.code
+    const code = await this.generateTaskCode()
+    await this.repository.update(task.id, { code })
+    task.code = code
+    return code
+  }
+
+  private async buildTaskDetail(task: Task) {
+    await this.ensureTaskCode(task)
+    const executors = await this.fillExecutors(task.executorIds || [])
+
+    return {
+      ...task,
+      project: this.mapProjectSummary(task.project),
+      leader: this.mapUserSummary(task.leader),
+      parent: this.mapTaskSummary(task.parent),
+      executors,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<Task | null> {
+    const task = await super.getOne(
+      {
+        where: query,
+        relations: ['leader', 'project', 'parent'],
+      },
+      isError,
+    )
+    if (!task) return task
+    return this.buildTaskDetail(task) as any
+  }
+
+  async list(query: QueryListDto): Promise<ResponseListDto<Task>> {
+    let { name, status, priority, leaderId, projectId, parentId, hasComment, hasReport, reportFreshness } = query
+    const taskQuery = this.repository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.leader', 'leader')
+      .leftJoinAndSelect('task.project', 'project')
+
+    if (name !== undefined && name !== '') {
+      taskQuery.andWhere('task.name LIKE :name', { name: `%${String(name).replace(/%/g, '\\%').replace(/_/g, '\\_')}%` })
+    }
+    if (status !== undefined && status !== '') {
+      taskQuery.andWhere('task.status = :status', { status })
+    }
+    if (priority !== undefined && priority !== '') {
+      taskQuery.andWhere('task.priority = :priority', { priority })
+    }
+    if (leaderId !== undefined && leaderId !== '') {
+      taskQuery.andWhere('task.leader_id = :leaderId', { leaderId })
+    }
+    if (projectId !== undefined && projectId !== '') {
+      taskQuery.andWhere('task.project_id = :projectId', { projectId })
+    }
+    if (parentId !== undefined && parentId !== '') {
+      taskQuery.andWhere('task.parent_id = :parentId', { parentId })
+    }
+    if (hasComment === '1') {
+      taskQuery.andWhere('EXISTS (SELECT 1 FROM task_comment comment WHERE comment.task_id = task.id AND comment.is_delete IS NULL)')
+    }
+    if (hasComment === '0') {
+      taskQuery.andWhere('NOT EXISTS (SELECT 1 FROM task_comment comment WHERE comment.task_id = task.id AND comment.is_delete IS NULL)')
+    }
+    if (hasReport === '1') {
+      taskQuery.andWhere('EXISTS (SELECT 1 FROM task_time_log timelog WHERE timelog.task_id = task.id AND timelog.is_delete IS NULL)')
+    }
+    if (hasReport === '0') {
+      taskQuery.andWhere('NOT EXISTS (SELECT 1 FROM task_time_log timelog WHERE timelog.task_id = task.id AND timelog.is_delete IS NULL)')
+    }
+    if (reportFreshness === 'stale7d') {
+      taskQuery.andWhere(`
+        NOT EXISTS (
+          SELECT 1
+          FROM task_time_log timelog_recent
+          WHERE timelog_recent.task_id = task.id
+            AND timelog_recent.is_delete IS NULL
+            AND timelog_recent.create_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        )
+      `)
+    }
+
+    taskQuery.orderBy('task.create_time', 'DESC')
+
+    const pageNum = Number(query.pageNum || 1)
+    const pageSize = Number(query.pageSize || 10)
+    if (pageNum && pageSize) {
+      taskQuery.skip((pageNum - 1) * pageSize).take(pageSize)
+    }
+
+    const [rows, total] = await taskQuery.getManyAndCount()
+    const taskIds = rows.map((row) => String(row.id)).filter(Boolean)
+    const executorIds = Array.from(new Set(rows.flatMap((row) => row.executorIds || []).filter(Boolean).map((id) => String(id))))
+    const users = executorIds.length ? await this.userRepository.find({ where: executorIds.map((id) => ({ id })) }) : []
+    const userMap = new Map(users.map((user) => [String(user.id), user]))
+    const commentSummary = taskIds.length
+      ? await this.taskCommentRepository
+        .createQueryBuilder('comment')
+        .select('comment.task_id', 'taskId')
+        .addSelect('COUNT(comment.id)', 'commentCount')
+        .where('comment.task_id IN (:...taskIds)', { taskIds })
+        .groupBy('comment.task_id')
+        .getRawMany()
+      : []
+    const latestReportSummary = taskIds.length
+      ? await this.timeLogRepository
+        .createQueryBuilder('timelog')
+        .select('timelog.task_id', 'taskId')
+        .addSelect('MAX(timelog.create_time)', 'latestReportTime')
+        .where('timelog.task_id IN (:...taskIds)', { taskIds })
+        .groupBy('timelog.task_id')
+        .getRawMany()
+      : []
+    const commentCountMap = new Map(commentSummary.map((item) => [String(item.taskId), Number(item.commentCount || 0)]))
+    const latestReportMap = new Map(latestReportSummary.map((item) => [String(item.taskId), item.latestReportTime || '']))
+    rows.forEach((row) => {
+      row.leader = this.mapUserSummary(row.leader as any) as any
+      row.project = this.mapProjectSummary(row.project) as any
+      row.executors = (row.executorIds || []).map((id) => this.mapUserSummary(userMap.get(String(id)))).filter(Boolean) as any
+      row['commentCount'] = commentCountMap.get(String(row.id)) || 0
+      row['latestReportTime'] = latestReportMap.get(String(row.id)) || ''
+    })
+    return { data: rows, total, _flag: true }
   }
 
   /**
@@ -271,6 +464,13 @@ export class TasksService extends BaseService<Task, TaskDto> {
    * 添加工时记录
    */
   async addTimeLog(taskId: number, hours: number, description: string, workDate: string, userId: string): Promise<TaskTimeLog> {
+    if (!userId) {
+      throw new BadRequestException('当前登录用户不存在')
+    }
+    const task = await this.repository.findOne({ where: { id: String(taskId) } as any })
+    if (!task) {
+      throw new NotFoundException('任务不存在')
+    }
     const timeLog = this.timeLogRepository.create({
       taskId,
       hours,
@@ -283,7 +483,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
     // 更新任务的实际工时
     await this.updateActualHours(taskId)
     
-    return saved
+    return this.timeLogRepository.findOne({ where: { id: saved.id } as any, relations: ['user'] })
   }
 
   /**
@@ -314,10 +514,13 @@ export class TasksService extends BaseService<Task, TaskDto> {
   /**
    * 删除工时记录
    */
-  async deleteTimeLog(id: number): Promise<void> {
+  async deleteTimeLog(id: number, userId: string): Promise<void> {
     const log = await this.timeLogRepository.findOne({ where: { id: String(id) } })
     if (!log) {
       throw new NotFoundException('工时记录不存在')
+    }
+    if (String(log.userId) !== String(userId)) {
+      throw new ForbiddenException('只能删除自己的工时记录')
     }
     
     const taskId = log.taskId

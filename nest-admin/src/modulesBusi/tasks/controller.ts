@@ -82,9 +82,11 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Post(':taskId/timelogs')
   addTimeLog(
     @Param('taskId') taskId: string,
-    @Body() body: { hours: number; description: string; workDate: string; userId: string },
+    @Body() body: { hours: number; description: string; workDate: string },
+    @Req() req: any,
   ) {
-    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, body.userId)
+    const userId = req.user?.id || req.user?.name
+    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, userId)
   }
 
   @Get(':taskId/timelogs')
@@ -93,7 +95,8 @@ export class TasksController extends BaseController<Task, TasksService> {
   }
 
   @Delete('timelogs/:id')
-  deleteTimeLog(@Param('id') id: string) {
-    return this.service.deleteTimeLog(Number(id))
+  deleteTimeLog(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name
+    return this.service.deleteTimeLog(Number(id), userId)
   }
 }
