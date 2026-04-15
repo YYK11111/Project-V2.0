@@ -465,9 +465,21 @@ export class TasksService extends BaseService<Task, TaskDto> {
   /**
    * 添加工时记录
    */
-  async addTimeLog(taskId: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = []): Promise<TaskTimeLog> {
+  async addTimeLog(taskId: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = [], progress?: number): Promise<TaskTimeLog> {
     if (!userId) {
       throw new BadRequestException('当前登录用户不存在')
+    }
+    if (!workDate) {
+      throw new BadRequestException('工作日期不能为空')
+    }
+    if (!hours || Number(hours) <= 0) {
+      throw new BadRequestException('工时必须大于0')
+    }
+    if (!String(description || '').trim()) {
+      throw new BadRequestException('汇报内容不能为空')
+    }
+    if (progress === undefined || progress === null || Number(progress) < 0 || Number(progress) > 100) {
+      throw new BadRequestException('当前进度必须在0到100之间')
     }
     const task = await this.repository.findOne({ where: { id: String(taskId) } as any })
     if (!task) {
@@ -476,12 +488,16 @@ export class TasksService extends BaseService<Task, TaskDto> {
     const timeLog = this.timeLogRepository.create({
       taskId,
       hours,
+      progress,
       description,
       workDate,
       userId,
       attachments,
     })
     const saved = await this.timeLogRepository.save(timeLog)
+    if (progress !== undefined && progress !== null) {
+      await this.repository.update(taskId, { progress })
+    }
     
     // 更新任务的实际工时
     await this.updateActualHours(taskId)
@@ -568,9 +584,21 @@ export class TasksService extends BaseService<Task, TaskDto> {
     await this.updateActualHours(taskId)
   }
 
-  async updateTimeLog(id: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = []): Promise<TaskTimeLog> {
+  async updateTimeLog(id: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = [], progress?: number): Promise<TaskTimeLog> {
     if (!userId) {
       throw new BadRequestException('当前登录用户不存在')
+    }
+    if (!workDate) {
+      throw new BadRequestException('工作日期不能为空')
+    }
+    if (!hours || Number(hours) <= 0) {
+      throw new BadRequestException('工时必须大于0')
+    }
+    if (!String(description || '').trim()) {
+      throw new BadRequestException('汇报内容不能为空')
+    }
+    if (progress === undefined || progress === null || Number(progress) < 0 || Number(progress) > 100) {
+      throw new BadRequestException('当前进度必须在0到100之间')
     }
     const log = await this.timeLogRepository.findOne({ where: { id: String(id) } as any })
     if (!log) {
@@ -582,10 +610,15 @@ export class TasksService extends BaseService<Task, TaskDto> {
 
     await this.timeLogRepository.update(String(id), {
       hours,
+      progress,
       description,
       workDate,
       attachments,
     })
+
+    if (progress !== undefined && progress !== null) {
+      await this.repository.update(log.taskId, { progress })
+    }
 
     await this.updateActualHours(log.taskId)
     return this.timeLogRepository.findOne({ where: { id: String(id) } as any, relations: ['user', 'task'] })

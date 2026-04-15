@@ -38,6 +38,9 @@ export class TaskCommentsService extends BaseService<TaskComment, TaskCommentDto
     if (!userId) {
       throw new BadRequestException('当前登录用户不存在')
     }
+    if (!String(data.content || '').trim()) {
+      throw new BadRequestException('评论内容不能为空')
+    }
     const task = await this.taskRepository.findOne({ where: { id: data.taskId } as any })
     if (!task) {
       throw new NotFoundException('任务不存在')
@@ -54,6 +57,9 @@ export class TaskCommentsService extends BaseService<TaskComment, TaskCommentDto
    * 更新评论
    */
   async updateComment(id: string, data: UpdateTaskCommentDto, userId: string): Promise<TaskComment> {
+    if (!String(data.content || '').trim()) {
+      throw new BadRequestException('评论内容不能为空')
+    }
     const comment = await this.repository.findOne({ where: { id } as any, relations: ['user', 'task'] })
     if (!comment) {
       throw new NotFoundException('评论不存在')

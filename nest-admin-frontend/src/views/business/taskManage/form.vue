@@ -3,8 +3,10 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { ChatDotRound, DocumentAdd } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
+import { getList as getSprintList } from '@/views/business/sprintManage/api'
 import { useUserStore } from '@/stores/user'
 import UserSelect from '@/components/UserSelect.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -77,6 +79,7 @@ const commentSectionRef = ref()
 const dependencies = ref([])
 const dependents = ref([])
 const availableTasks = ref([])
+const sprintList = ref([])
 const showDependencyDialog = ref(false)
 const newDependencyId = ref('')
 const taskComments = ref([])
@@ -87,18 +90,28 @@ const commentSubmitting = ref(false)
 const timeLogSubmitting = ref(false)
 const commentDialogVisible = ref(false)
 const reportDialogVisible = ref(false)
+const defaultReportTemplate = '<p>今日完成：</p><p><br></p><p>遇到问题：</p><p><br></p><p>下一步计划：</p><p><br></p>'
 const commentForm = reactive({
   id: '',
   content: '',
   attachments: [],
 })
+const commentRules = {
+  content: [{ required: true, message: '请输入评论内容', trigger: 'blur' }],
+}
 const timeLogForm = reactive({
   id: '',
   workDate: '',
   hours: 1,
   description: '',
   attachments: [],
+  progress: 0,
 })
+const timeLogRules = {
+  workDate: [{ required: true, message: '请选择工作日期', trigger: 'change' }],
+  hours: [{ required: true, message: '请输入工时', trigger: 'blur' }],
+  progress: [{ required: true, message: '请输入当前进度', trigger: 'blur' }],
+}
 const currentUserId = computed(() => String(userStore.id || ''))
 const canCommentOnTask = computed(() => !!hasTaskId.value)
 const canAddTimeLog = computed(() => !!hasTaskId.value)
@@ -202,6 +215,12 @@ async function submitTaskTimeLog() {
   if (!timeLogForm.hours || Number(timeLogForm.hours) <= 0) {
     return $sdk.msgWarning('请输入有效工时')
   }
+  if (!String(timeLogForm.description || '').replace(/<[^>]+>/g, '').trim()) {
+    return $sdk.msgWarning('请输入汇报内容')
+  }
+  if (timeLogForm.progress === undefined || timeLogForm.progress === null || Number(timeLogForm.progress) < 0 || Number(timeLogForm.progress) > 100) {
+    return $sdk.msgWarning('请输入0到100之间的当前进度')
+  }
   timeLogSubmitting.value = true
   try {
     const payload = {
@@ -209,6 +228,7 @@ async function submitTaskTimeLog() {
       hours: Number(timeLogForm.hours),
       description: timeLogForm.description || '',
       attachments: timeLogForm.attachments || [],
+      progress: Number(timeLogForm.progress || 0),
     }
     if (timeLogForm.id) {
       await updateTimeLog(timeLogForm.id, payload)
@@ -223,6 +243,7 @@ async function submitTaskTimeLog() {
     timeLogForm.hours = 1
     timeLogForm.description = ''
     timeLogForm.attachments = []
+    timeLogForm.progress = Number(form.value.progress || 0)
     await Promise.all([loadTimeLogs(), reloadCurrent()])
   } catch (error) {
     $sdk.msgError(error?.message || error?.response?.data?.message || '任务汇报添加失败')
@@ -236,6 +257,7 @@ function startEditTimeLog(item) {
   timeLogForm.id = String(item.id)
   timeLogForm.workDate = item.workDate || ''
   timeLogForm.hours = Number(item.hours || 1)
+  timeLogForm.progress = Number(item.progress ?? (form.value.progress || 0))
   timeLogForm.description = item.description || ''
   timeLogForm.attachments = item.attachments || []
   reportDialogVisible.value = true
@@ -245,8 +267,9 @@ function resetTimeLogForm() {
   timeLogForm.id = ''
   timeLogForm.workDate = ''
   timeLogForm.hours = 1
-  timeLogForm.description = ''
+  timeLogForm.description = defaultReportTemplate
   timeLogForm.attachments = []
+  timeLogForm.progress = Number(form.value.progress || 0)
 }
 
 function openTimeLogDialog() {
@@ -292,8 +315,14 @@ async function loadAvailableTasks() {
   availableTasks.value = allTasks.filter(t => t.id !== route.query.id)
 }
 
+async function loadSprintOptions() {
+  const res = await getSprintList({ pageNum: 1, pageSize: 1000, projectId: form.value.projectId || undefined })
+  sprintList.value = res.list || []
+}
+
 watch(() => form.value.projectId, () => {
   loadAvailableTasks()
+  loadSprintOptions()
 })
 
 async function handleAddDependency() {
@@ -334,6 +363,7 @@ if (hasTaskId.value) {
   })
   loadTaskComments()
   loadTimeLogs()
+  loadSprintOptions()
 }
 
 function reloadCurrent() {
@@ -436,6 +466,8 @@ watch(hasTaskId, (value) => {
     <div class="mb20">
       <el-page-header @back="$router.back()" :title="isReadonly ? '查看任务' : isEdit ? '编辑任务' : '新增任务'">
         <template #extra>
+          <el-button v-if="hasTaskId" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
+          <el-button v-if="hasTaskId" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </template>
@@ -499,6 +531,18 @@ watch(hasTaskId, (value) => {
               </div>
             </el-form-item>
           </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="task-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="所属Sprint">
+              <ViewEntity v-if="isReadonly" :title="form.sprint?.name" />
+              <el-select v-else v-model="form.sprintId" placeholder="请选择Sprint" style="width: 100%" clearable>
+                <el-option v-for="sprint in sprintList" :key="sprint.id" :label="sprint.name" :value="sprint.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12"></el-col>
         </el-row>
 
         <el-row :gutter="20" class="task-info-row">
@@ -579,20 +623,31 @@ watch(hasTaskId, (value) => {
 
         <div class="metric-grid">
           <div class="metric-card">
+            <div class="metric-card__title">进度</div>
+            <div class="metric-card__desc">用于表达任务当前完成百分比。</div>
+              <div v-if="isReadonly" class="progress-compact">
+                <div class="progress-compact__value">{{ form.progress ?? 0 }}%</div>
+                <el-progress :percentage="Number(form.progress || 0)" :stroke-width="8" :show-text="false" />
+              </div>
+              <el-input-number v-else v-model="form.progress" :min="0" :max="100" :step="5" style="width: 100%" />
+          </div>
+          <div class="metric-card">
             <div class="metric-card__title">预估工时</div>
             <div class="metric-card__desc">用于评估交付成本和排期。</div>
               <ViewField v-if="isReadonly" :value="form.estimatedHours" class="view-field--inline" />
               <el-input-number v-else v-model="form.estimatedHours" :min="0" :step="1" style="width: 100%" />
           </div>
-          <div v-if="isEdit" class="metric-card">
+          <div v-if="hasTaskId" class="metric-card">
             <div class="metric-card__title">实际工时</div>
             <div class="metric-card__desc">建议通过任务汇报维护。</div>
-                <el-input-number v-model="form.actualHours" :min="0" :step="1" style="width: 100%" :disabled="isReadonly" />
+                <ViewField v-if="isReadonly" :value="form.actualHours" class="view-field--inline" />
+                <el-input-number v-else v-model="form.actualHours" :min="0" :step="1" style="width: 100%" :disabled="isReadonly" />
           </div>
-          <div v-if="isEdit" class="metric-card">
+          <div v-if="hasTaskId" class="metric-card">
             <div class="metric-card__title">剩余工时</div>
             <div class="metric-card__desc">用于跟踪当前执行剩余工作量。</div>
-              <el-input-number v-model="form.remainingHours" :min="0" :step="1" style="width: 100%" :disabled="isReadonly" />
+              <ViewField v-if="isReadonly" :value="form.remainingHours" class="view-field--inline" />
+              <el-input-number v-else v-model="form.remainingHours" :min="0" :step="1" style="width: 100%" :disabled="isReadonly" />
           </div>
           <div class="metric-card">
             <div class="metric-card__title">故事点</div>
@@ -615,19 +670,25 @@ watch(hasTaskId, (value) => {
         <div v-if="hasTaskId" ref="reportSectionRef" class="execution-subsection" v-loading="timeLogLoading">
           <div class="execution-subsection__header">
             <div>
-              <div class="execution-subsection__title">任务汇报</div>
+              <div class="execution-subsection__title">
+                <span>任务汇报</span>
+                <el-tag size="small" type="success">{{ timeLogs.length }}</el-tag>
+              </div>
               <div class="execution-subsection__desc">记录每天在任务上的投入、进展和工作内容，作为轻量任务汇报。</div>
             </div>
-            <el-button type="primary" @click="openTimeLogDialog">新增汇报</el-button>
           </div>
 
           <div v-if="timeLogs.length" class="record-list">
             <div v-for="item in timeLogs" :key="item.id" class="record-card">
-              <div class="record-card__meta">
-                <span>{{ getDisplayUserName(item.user, item.userId) }}</span>
-                <span>{{ item.workDate || '-' }}</span>
-                <span>{{ item.hours }} 小时</span>
-                <span>{{ item.createTime || '-' }}</span>
+              <div class="record-card__header">
+                <div class="record-card__author">{{ getDisplayUserName(item.user, item.userId) }}</div>
+                <div class="record-card__meta">
+                  <el-tag size="small" effect="plain">{{ item.workDate || '-' }}</el-tag>
+                  <el-tag size="small" type="success" effect="plain">{{ item.hours }} 小时</el-tag>
+                  <el-tag size="small" type="warning" effect="plain">进度 {{ item.progress ?? 0 }}%</el-tag>
+                  <span>{{ item.createTime || '-' }}</span>
+                  <span v-if="item.attachments?.length">{{ item.attachments.length }} 个附件</span>
+                </div>
               </div>
               <ViewRichText v-if="item.description" :html="item.description" class="record-card__content record-card__content--rich" />
               <div v-else class="record-card__content">未填写工作内容</div>
@@ -646,19 +707,22 @@ watch(hasTaskId, (value) => {
 
       <section v-if="hasTaskId" ref="commentSectionRef" class="task-section section-card section-card--comment" v-loading="commentLoading">
         <div class="task-section__header">
-          <div class="task-section__title">任务评论</div>
+          <div class="task-section__title">
+            <span>任务评论</span>
+            <el-tag size="small" type="primary">{{ taskComments.length }}</el-tag>
+          </div>
           <div class="task-section__desc">用于记录任务讨论、补充说明和协作反馈。</div>
-          <el-button type="primary" @click="openCommentDialog">发表评论</el-button>
         </div>
 
         <div v-if="taskComments.length" class="comment-list">
           <div v-for="item in taskComments" :key="item.id" class="comment-card">
             <div class="comment-card__header">
-              <div>
+              <div class="comment-card__summary">
                 <div class="comment-card__author">{{ getDisplayUserName(item.user, item.userId) }}</div>
                 <div class="comment-card__meta">
                   <span>{{ item.createTime || '-' }}</span>
                   <span v-if="item.isEdited === '1'">已编辑</span>
+                  <span v-if="item.attachments?.length">{{ item.attachments.length }} 个附件</span>
                 </div>
               </div>
               <div v-if="isCurrentUserRecord(item.userId)" class="comment-card__actions">
@@ -757,15 +821,19 @@ watch(hasTaskId, (value) => {
 
     <BaDialog v-model="reportDialogVisible" :title="timeLogForm.id ? '编辑任务汇报' : '新增任务汇报'" width="760" @confirm="submitTaskTimeLog">
       <template #form>
-        <el-form label-width="90px" v-loading="timeLogSubmitting">
-          <el-form-item label="工作日期">
-            <el-date-picker v-model="timeLogForm.workDate" type="date" value-format="YYYY-MM-DD" placeholder="选择工作日期" style="width: 100%" />
+        <el-form :model="timeLogForm" :rules="timeLogRules" label-width="90px" v-loading="timeLogSubmitting" require-asterisk-position="right">
+          <el-form-item label="工作日期" prop="workDate" required>
+            <el-date-picker v-model="timeLogForm.workDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择工作日期" style="width: 100%" />
           </el-form-item>
-          <el-form-item label="工时">
-            <el-input-number v-model="timeLogForm.hours" :min="0.5" :step="0.5" style="width: 100%" />
+          <el-form-item label="工时" prop="hours" required>
+            <el-input-number v-model="timeLogForm.hours" :min="0.5" :step="0.5" style="width: 100%" placeholder="请输入工时" />
           </el-form-item>
-          <el-form-item label="汇报内容">
-            <Editor v-model="timeLogForm.description" style="min-height: 220px" />
+          <el-form-item label="当前进度" prop="progress" required>
+            <el-input-number v-model="timeLogForm.progress" :min="0" :max="100" :step="5" style="width: 100%" placeholder="请输入当前进度" />
+          </el-form-item>
+          <el-form-item label="汇报内容" required>
+            <Editor v-model="timeLogForm.description" style="min-height: 220px" placeholder="请填写本次任务汇报内容" />
+            <div class="field-tip">建议填写本次完成内容、遇到的问题和下一步计划</div>
           </el-form-item>
           <el-form-item label="汇报附件">
             <Upload v-model:fileList="timeLogForm.attachments" type="file" multiple />
@@ -776,8 +844,8 @@ watch(hasTaskId, (value) => {
 
     <BaDialog v-model="commentDialogVisible" :title="commentForm.id ? '编辑评论' : '发表评论'" width="680" @confirm="submitTaskComment">
       <template #form>
-        <el-form label-width="90px" v-loading="commentSubmitting">
-          <el-form-item label="评论内容">
+        <el-form :model="commentForm" :rules="commentRules" label-width="90px" v-loading="commentSubmitting" require-asterisk-position="right">
+          <el-form-item label="评论内容" prop="content" required>
             <el-input v-model="commentForm.content" type="textarea" :rows="5" maxlength="1000" show-word-limit placeholder="请输入评论内容" />
           </el-form-item>
           <el-form-item label="评论附件">
@@ -824,6 +892,9 @@ watch(hasTaskId, (value) => {
 }
 
 .task-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 600;
   color: var(--el-text-color-primary);
@@ -845,14 +916,14 @@ watch(hasTaskId, (value) => {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .metric-card {
-  padding: 16px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 10px;
   border: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-extra-light);
 }
@@ -865,10 +936,22 @@ watch(hasTaskId, (value) => {
 
 .metric-card__desc {
   margin-top: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--el-text-color-secondary);
+}
+
+.progress-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-compact__value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
 }
 
 .execution-subsection {
@@ -885,6 +968,9 @@ watch(hasTaskId, (value) => {
 }
 
 .execution-subsection__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 600;
   color: var(--el-text-color-primary);
@@ -928,16 +1014,24 @@ watch(hasTaskId, (value) => {
   color: var(--el-text-color-secondary);
 }
 
+.record-card__header,
 .comment-card__header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
+.record-card__author,
 .comment-card__author {
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+}
+
+.comment-card__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .record-card__content,
@@ -1059,6 +1153,12 @@ watch(hasTaskId, (value) => {
 
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1080px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

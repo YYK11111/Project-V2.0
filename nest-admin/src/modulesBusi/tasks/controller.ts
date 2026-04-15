@@ -82,11 +82,11 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Post(':taskId/timelogs')
   addTimeLog(
     @Param('taskId') taskId: string,
-    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[] },
+    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[]; progress?: number },
     @Req() req: any,
   ) {
     const userId = req.user?.id || req.user?.name
-    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, userId, body.attachments)
+    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, userId, body.attachments, body.progress)
   }
 
   @Get('timelogs')
@@ -108,10 +108,10 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Put('timelogs/:id')
   updateTimeLog(
     @Param('id') id: string,
-    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[] },
+    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[]; progress?: number },
     @Req() req: any,
   ) {
     const userId = req.user?.id || req.user?.name
-    return this.service.updateTimeLog(Number(id), body.hours, body.description, body.workDate, userId, body.attachments)
+    return this.service.updateTimeLog(Number(id), body.hours, body.description, body.workDate, userId, body.attachments, body.progress)
   }
 }

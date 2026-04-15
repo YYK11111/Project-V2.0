@@ -20,6 +20,9 @@ export class TaskTimeLog extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, comment: '工时（小时）' })
   hours: number
 
+  @Column({ type: 'int', nullable: true, comment: '汇报时任务进度（0-100）' })
+  progress: number
+
   @Column({ type: 'text', nullable: true, comment: '工作内容描述' })
   description: string
 

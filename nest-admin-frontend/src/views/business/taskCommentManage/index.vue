@@ -64,15 +64,15 @@ function handleDeleteComment(row: any) {
 function submitComment() {
   formRef.value?.validate(async (valid: boolean) => {
     if (!valid) return
-    submitLoading.value = true
-    try {
-      if (commentForm.id) {
-        await updateComment(commentForm.id, { content: commentForm.content })
-        $sdk.msgSuccess('评论修改成功')
-      } else {
-        await addComment({ taskId: commentForm.taskId, content: commentForm.content })
-        $sdk.msgSuccess('评论添加成功')
-      }
+      submitLoading.value = true
+      try {
+        if (commentForm.id) {
+          await updateComment(commentForm.id, { content: commentForm.content.trim() })
+          $sdk.msgSuccess('评论修改成功')
+        } else {
+          await addComment({ taskId: commentForm.taskId, content: commentForm.content.trim() })
+          $sdk.msgSuccess('评论添加成功')
+        }
       dialogVisible.value = false
       rctRef.value.getList()
     } catch (error: any) {
@@ -144,12 +144,12 @@ const getButtons = (row: any) => [
 
     <BaDialog v-model="dialogVisible" :title="dialogTitle" width="560" @confirm="submitComment">
       <template #form>
-        <el-form ref="formRef" :model="commentForm" :rules="commentRules" label-width="90px" v-loading="submitLoading">
-          <el-form-item label="任务ID" prop="taskId">
+        <el-form ref="formRef" :model="commentForm" :rules="commentRules" label-width="90px" v-loading="submitLoading" require-asterisk-position="right">
+          <el-form-item label="任务ID" prop="taskId" required>
             <el-input v-model="commentForm.taskId" placeholder="请输入任务ID" :disabled="!!commentForm.id" />
           </el-form-item>
-          <el-form-item label="评论内容" prop="content">
-            <el-input v-model="commentForm.content" type="textarea" :rows="5" placeholder="请输入评论内容" maxlength="1000" show-word-limit />
+          <el-form-item label="评论内容" prop="content" required>
+            <el-input v-model="commentForm.content" type="textarea" :rows="5" placeholder="请填写评论内容" maxlength="1000" show-word-limit />
           </el-form-item>
         </el-form>
       </template>

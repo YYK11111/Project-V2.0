@@ -16,6 +16,7 @@ const formRef = ref()
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增任务汇报')
 const submitLoading = ref(false)
+const defaultReportTemplate = '<p>今日完成：</p><p><br></p><p>遇到问题：</p><p><br></p><p>下一步计划：</p><p><br></p>'
 const currentUserId = computed(() => String(userStore.id || ''))
 const canTaskReportAdd = computed(() => checkPermi(['business/tasks/timelog/add']))
 const canTaskReportDelete = computed(() => checkPermi(['business/tasks/timelog/delete']))
@@ -27,12 +28,14 @@ const reportForm = reactive({
   hours: 1,
   description: '',
   attachments: [],
+  progress: 0,
 })
 
 const reportRules = {
   taskId: [{ required: true, message: '请输入任务ID', trigger: 'blur' }],
   workDate: [{ required: true, message: '请选择工作日期', trigger: 'change' }],
   hours: [{ required: true, message: '请输入工时', trigger: 'blur' }],
+  progress: [{ required: true, message: '请输入当前进度', trigger: 'blur' }],
 }
 
 function resetReportForm() {
@@ -40,14 +43,16 @@ function resetReportForm() {
   reportForm.taskId = ''
   reportForm.workDate = dayjs().format('YYYY-MM-DD')
   reportForm.hours = 1
-  reportForm.description = ''
+  reportForm.description = defaultReportTemplate
   reportForm.attachments = []
+  reportForm.progress = 0
 }
 
 function handleAddReport(row?: any) {
   if (!canTaskReportAdd.value) return $sdk.msgError('当前操作没有权限')
   resetReportForm()
   reportForm.taskId = String(row?.taskId || params.value.taskId || '')
+  reportForm.progress = Number(row?.task?.progress || 0)
   dialogTitle.value = '新增任务汇报'
   dialogVisible.value = true
 }
@@ -59,6 +64,7 @@ function handleEditReport(row: any) {
   reportForm.taskId = String(row.taskId || '')
   reportForm.workDate = row.workDate || dayjs().format('YYYY-MM-DD')
   reportForm.hours = Number(row.hours || 1)
+  reportForm.progress = Number(row.progress ?? 0)
   reportForm.description = row.description || ''
   reportForm.attachments = row.attachments || []
   dialogTitle.value = '编辑任务汇报'
@@ -78,6 +84,12 @@ function handleDeleteReport(row: any) {
 function submitReport() {
   formRef.value?.validate(async (valid: boolean) => {
     if (!valid) return
+    if (!String(reportForm.description || '').replace(/<[^>]+>/g, '').trim()) {
+      return $sdk.msgError('请输入汇报内容')
+    }
+    if (reportForm.progress === undefined || reportForm.progress === null || Number(reportForm.progress) < 0 || Number(reportForm.progress) > 100) {
+      return $sdk.msgError('请输入0到100之间的当前进度')
+    }
     submitLoading.value = true
     try {
       const payload = {
@@ -85,6 +97,7 @@ function submitReport() {
         hours: Number(reportForm.hours),
         description: reportForm.description || '',
         attachments: reportForm.attachments || [],
+        progress: Number(reportForm.progress || 0),
       }
       if (reportForm.id) {
         await updateReport(reportForm.id, payload)
@@ -145,6 +158,9 @@ const getButtons = (row: any) => [
         <el-table-column label="工时" width="90">
           <template #default="{ row }">{{ row.hours }} 小时</template>
         </el-table-column>
+        <el-table-column label="进度" width="90">
+          <template #default="{ row }">{{ row.progress ?? 0 }}%</template>
+        </el-table-column>
         <el-table-column label="汇报内容" prop="description" min-width="300" :show-overflow-tooltip="true">
           <template #default="{ row }"><span v-html="row.description || '未填写汇报内容'"></span></template>
         </el-table-column>
@@ -164,18 +180,22 @@ const getButtons = (row: any) => [
 
     <BaDialog v-model="dialogVisible" :title="dialogTitle" width="760" @confirm="submitReport">
       <template #form>
-        <el-form ref="formRef" :model="reportForm" :rules="reportRules" label-width="90px" v-loading="submitLoading">
-          <el-form-item label="任务ID" prop="taskId">
+        <el-form ref="formRef" :model="reportForm" :rules="reportRules" label-width="90px" v-loading="submitLoading" require-asterisk-position="right">
+          <el-form-item label="任务ID" prop="taskId" required>
             <el-input v-model="reportForm.taskId" placeholder="请输入任务ID" :disabled="!!reportForm.id" />
           </el-form-item>
-          <el-form-item label="工作日期" prop="workDate">
+          <el-form-item label="工作日期" prop="workDate" required>
             <el-date-picker v-model="reportForm.workDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择工作日期" style="width: 100%" />
           </el-form-item>
-          <el-form-item label="工时" prop="hours">
-            <el-input-number v-model="reportForm.hours" :min="0.5" :step="0.5" style="width: 100%" />
+          <el-form-item label="工时" prop="hours" required>
+            <el-input-number v-model="reportForm.hours" :min="0.5" :step="0.5" style="width: 100%" placeholder="请输入工时" />
           </el-form-item>
-          <el-form-item label="汇报内容" prop="description">
-            <Editor v-model="reportForm.description" style="min-height: 220px" />
+          <el-form-item label="当前进度" prop="progress" required>
+            <el-input-number v-model="reportForm.progress" :min="0" :max="100" :step="5" style="width: 100%" placeholder="请输入当前进度" />
+          </el-form-item>
+          <el-form-item label="汇报内容" required>
+            <Editor v-model="reportForm.description" style="min-height: 220px" placeholder="请填写本次任务汇报内容" />
+            <div class="report-form-tip">建议填写本次完成内容、遇到的问题和下一步计划</div>
           </el-form-item>
           <el-form-item label="汇报附件">
             <Upload v-model:fileList="reportForm.attachments" type="file" multiple />
@@ -188,3 +208,12 @@ const getButtons = (row: any) => [
     </BaDialog>
   </div>
 </template>
+
+<style scoped>
+.report-form-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--el-text-color-secondary);
+}
+</style>
