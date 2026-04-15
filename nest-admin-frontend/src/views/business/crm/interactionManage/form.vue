@@ -2,6 +2,8 @@
 import { getOne, save, update, getInteractionTypes } from './api'
 import { getList as getCustomerList } from '../customerManage/api'
 import { useUserStore } from '@/stores/user'
+import ViewEntity from '@/components/view/ViewEntity.vue'
+import ViewField from '@/components/view/ViewField.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -35,11 +37,14 @@ getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
   customerList.value = res.list || []
 })
 
-const isEdit = computed(() => !!route.query.id)
+const isView = computed(() => route.query.action === 'view')
+const hasInteractionId = computed(() => !!route.query.id)
+const isEdit = computed(() => !!route.query.id && !isView.value)
+const isReadonly = computed(() => isView.value)
 const canInteractionAdd = computed(() => checkPermi(['business/crm/interactions/add']))
 const canInteractionUpdate = computed(() => checkPermi(['business/crm/interactions/update']))
 
-if (isEdit.value) {
+if (hasInteractionId.value) {
   getOne(route.query.id).then(({ data }) => {
     form.value = { ...data }
   })
@@ -68,12 +73,13 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isEdit ? '编辑互动记录' : '新增互动记录'" />
+      <el-page-header @back="$router.back()" :title="isReadonly ? '查看互动记录' : isEdit ? '编辑互动记录' : '新增互动记录'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
       <el-form-item label="客户" prop="customerId">
-        <el-select v-model="form.customerId" placeholder="请选择客户" filterable style="width: 100%">
+        <ViewEntity v-if="isReadonly" :title="form.customer?.name" :subtitle="form.customer?.code" />
+        <el-select v-else v-model="form.customerId" placeholder="请选择客户" filterable style="width: 100%">
           <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id" />
         </el-select>
       </el-form-item>
@@ -81,14 +87,17 @@ function cancel() {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="互动类型" prop="interactionType">
-            <el-select v-model="form.interactionType" placeholder="请选择互动类型" style="width: 100%">
+            <ViewField v-if="isReadonly" :value="interactionTypes[form.interactionType]" />
+            <el-select v-else v-model="form.interactionType" placeholder="请选择互动类型" style="width: 100%">
               <el-option v-for="(value, key) of interactionTypes" :key="key" :label="value" :value="key" />
             </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="互动时间" prop="interactionTime">
+            <ViewField v-if="isReadonly" :value="form.interactionTime" />
             <el-date-picker
+              v-else
               v-model="form.interactionTime"
               type="datetime"
               placeholder="选择互动时间"
@@ -99,7 +108,9 @@ function cancel() {
       </el-row>
 
       <el-form-item label="互动内容" prop="content">
+        <ViewField v-if="isReadonly" :value="form.content" />
         <el-input
+          v-else
           v-model="form.content"
           type="textarea"
           :rows="6"
@@ -111,12 +122,15 @@ function cancel() {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="互动人" prop="operatorName">
-            <el-input v-model="form.operatorName" disabled />
+            <ViewField v-if="isReadonly" :value="form.operatorName" />
+            <el-input v-else v-model="form.operatorName" disabled />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="下次跟进时间" prop="nextFollowTime">
+            <ViewField v-if="isReadonly" :value="form.nextFollowTime" />
             <el-date-picker
+              v-else
               v-model="form.nextFollowTime"
               type="datetime"
               placeholder="选择下次跟进时间"
@@ -127,8 +141,8 @@ function cancel() {
       </el-row>
 
       <el-form-item>
-        <el-button v-if="isEdit ? canInteractionUpdate : canInteractionAdd" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">取消</el-button>
+        <el-button v-if="!isReadonly && (isEdit ? canInteractionUpdate : canInteractionAdd)" type="primary" @click="submit">提交</el-button>
+        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
       </el-form-item>
     </el-form>
   </div>

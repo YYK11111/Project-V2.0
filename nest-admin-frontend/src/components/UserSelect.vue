@@ -27,10 +27,6 @@ const props = defineProps({
   filterDept: {
     type: Boolean,
     default: false
-  },
-  compact: {
-    type: Boolean,
-    default: false
   }
 })
 
@@ -40,18 +36,7 @@ const loading = ref(false)
 const userList = ref([])
 const deptList = ref([])
 const searchDept = ref('')
-
-const selectedUsers = computed(() => {
-  const list = userList.value
-  if (props.multiple && Array.isArray(props.modelValue)) {
-    return list.filter(u => props.modelValue.includes(u.id))
-  }
-  if (!props.multiple && props.modelValue) {
-    const user = list.find(u => u.id === props.modelValue)
-    return user ? [user] : []
-  }
-  return []
-})
+const selectedUserMap = ref({})
 
 function getDisplayName(user) {
   return user?.nickname || user?.name || '-'
@@ -72,6 +57,29 @@ function getAvatarText(user) {
   return getDisplayName(user)?.charAt(0) || '?'
 }
 
+function updateSelectedUserMap(list = []) {
+  const nextMap = { ...selectedUserMap.value }
+  list.forEach((user) => {
+    if (!user?.id) return
+    nextMap[user.id] = user
+  })
+  selectedUserMap.value = nextMap
+}
+
+function getSelectedUser(value) {
+  if (!value) return null
+  return selectedUserMap.value[value] || userList.value.find((user) => user.id === value) || null
+}
+
+const selectedUsers = computed(() => {
+  if (props.multiple) {
+    const values = Array.isArray(props.modelValue) ? props.modelValue : []
+    return values.map((value) => ({ value, user: getSelectedUser(value) })).filter((item) => item.value)
+  }
+  if (!props.modelValue) return []
+  return [{ value: props.modelValue, user: getSelectedUser(props.modelValue) }]
+})
+
 function loadUserList(keywords = '') {
   loading.value = true
   const query = {
@@ -90,6 +98,7 @@ function loadUserList(keywords = '') {
   getUserList(query)
     .then(({ data }) => {
       userList.value = data || []
+      updateSelectedUserMap(userList.value)
     })
     .finally(() => {
       loading.value = false
@@ -158,6 +167,15 @@ watch(() => props.modelValue, () => {
     @visible-change="handleVisibleChange"
     style="width: 100%"
   >
+    <template v-if="!multiple" #label>
+      <div v-if="selectedUsers[0]?.user" class="user-selected-label">
+        <el-avatar :size="20" :src="selectedUsers[0].user.avatar || undefined">
+          {{ getAvatarText(selectedUsers[0].user) }}
+        </el-avatar>
+        <span class="user-selected-text">{{ getDisplayName(selectedUsers[0].user) }}</span>
+      </div>
+    </template>
+
     <template #header v-if="filterDept">
       <el-select
         v-model="searchDept"
@@ -199,23 +217,44 @@ watch(() => props.modelValue, () => {
     </template>
   </el-select>
 
-  <template v-if="!compact && selectedUsers.length > 0">
-    <div class="selected-list">
-      <div
-        v-for="user in selectedUsers"
-        :key="user.id"
-        class="selected-item"
-      >
-        <el-avatar :size="20" :src="user.avatar || undefined">
-          {{ getAvatarText(user) }}
-        </el-avatar>
-        <span class="selected-name">{{ getDisplayName(user) }}</span>
-      </div>
+  <div v-if="multiple && selectedUsers.length" class="selected-user-preview">
+    <div v-for="item in selectedUsers" :key="item.value" class="selected-user-preview__item">
+      <el-avatar :size="20" :src="item.user?.avatar || undefined">
+        {{ getAvatarText(item.user) }}
+      </el-avatar>
+      <span class="selected-user-preview__text">{{ getDisplayName(item.user) }}</span>
     </div>
-  </template>
+  </div>
+
 </template>
 
 <style scoped>
+.selected-user-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.selected-user-preview__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.selected-user-preview__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--el-text-color-primary);
+}
+
 .user-option {
   display: flex;
   align-items: center;
@@ -247,29 +286,33 @@ watch(() => props.modelValue, () => {
   color: #909399;
 }
 
-.selected-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-}
-
-.selected-item {
-  display: flex;
+.user-selected-label {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #fff;
-  border-radius: 999px;
-  border: 1px solid #e4e7ed;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1;
 }
 
-.selected-name {
+.user-selected-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
-  color: #303133;
+}
+
+:deep(.el-select__tags) {
+  gap: 4px;
+}
+
+:deep(.el-select__tags .el-tag) {
+  max-width: 220px;
+}
+
+:deep(.el-select__tags .el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

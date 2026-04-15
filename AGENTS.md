@@ -1,54 +1,37 @@
 # Project-V2.0 Agent Notes
 
-## Repo Shape
-- This repo is not a workspace. Treat `nest-admin/` and `nest-admin-frontend/` as separate npm projects with their own `package-lock.json` and scripts.
-- Root `package.json` is not an app entrypoint; it only holds a few shared type/JWT deps.
+## Repo Boundaries
+- This repo is not a workspace. `nest-admin/` and `nest-admin-frontend/` are separate npm projects with separate lockfiles and scripts.
+- Root `package.json` is not an app entrypoint; it only provides a shared check script: `npm run check:api-contract`.
 
 ## Backend (`nest-admin`)
 - Use `npm run dev` for local backend work. It runs `nest start --debug --watch -- -b swc env=dev`.
-- Production boot is `npm run start:prod`, which runs `node dist/src/main env=prod`. The `env=...` CLI arg is required because `config/index.ts` reads `process.argv` to choose config.
-- Build with `npm run build`.
-- Lint with `npm run lint`. Format with `npm run format`.
-- Unit tests are only `*.spec.ts` under `src/` because Jest `rootDir` is `src` and `testRegex` is `.*\.spec\.ts$`.
-- E2E tests use `npm run test:e2e` with `test/jest-e2e.json` and `*.e2e-spec.ts`.
-
-## Backend Wiring
-- Real backend entrypoint is `nest-admin/src/main.ts`.
-- Global API prefix is `/api` via `app.setGlobalPrefix(config.apiBase)`. Frontend requests and manual curl tests should include `/api`.
-- Path aliases are registered at runtime in `src/main.ts` via `tsconfig-paths`; imports like `config` resolve to `config/index`.
-- `src/common/BaseController.ts` defines the default CRUD route shape used across many modules: `POST /save`, `POST /add`, `PUT /update`, `DELETE /del/:ids`, `GET /list`, `GET /getOne/:id`.
+- `env=...` is required on backend start commands. `config/index.ts` reads `process.argv` to choose config; `npm run start:prod` works because it runs `node dist/src/main env=prod`.
+- Real entrypoint is `src/main.ts`. It registers `tsconfig-paths`, enables CORS, applies global prefix `/api`, and wraps responses with `GlobalInterceptor`.
 - `src/app.module.ts` is the composition root for system modules (`src/modules`), business modules (`src/modulesBusi`), AI (`src/modulesAi`), scheduled tasks, and workflow listeners.
-
-## Backend Data / Env Gotchas
-- Default DB config in `nest-admin/config/index.ts` points to MySQL database `psd2`, not `nest_admin`.
-- Both `dev` and `prod` configs set TypeORM `synchronize: true`. Be conservative with entity changes.
-- `config/index.ts` contains placeholder JWT secret text, then merges `config/secret.js` or `config/secret.copy.js` if present. Put real secrets there instead of hardcoding them into source.
-- Backend expects MySQL and Redis for normal local startup.
+- `src/common/BaseController.ts` defines the common CRUD routes many modules inherit: `POST /save`, `POST /add`, `PUT /update`, `DELETE /del/:ids`, `GET /list`, `GET /getOne/:id`.
+- Jest unit tests only pick up `src/**/*.spec.ts` because `rootDir` is `src` and `testRegex` is `.*\.spec\.ts$`. E2E tests are separate under `test/*.e2e-spec.ts` via `npm run test:e2e`.
+- Default DB config points to MySQL database `psd2`, and both `dev` and `prod` have TypeORM `synchronize: true`; be conservative with entity changes.
+- `config/index.ts` merges `config/secret.js` or `config/secret.copy.js` if present. Do not hardcode real secrets into source.
 
 ## Frontend (`nest-admin-frontend`)
-- Use `npm run dev` for local frontend work.
-- `npm run test` is not a test runner. It starts Vite in `--mode=test`.
-- Build commands are mode-specific: `npm run build`, `npm run build:dev`, `npm run build:test`.
-- Type-check with `npm run type-check` (`vue-tsc --build --force`). There is no dedicated lint script in `package.json`.
+- Use `npm run dev` for local frontend work. Vite serves on `1994` in development and `1995` in production mode.
+- `npm run test` is not a test runner; it starts Vite with `--mode=test`.
+- Real entrypoint is `src/main.ts`, not the older `main.js` mentioned in upstream docs.
+- `sys.config.js` decides runtime environment from `window.location.origin` after build; do not simplify this to `NODE_ENV` only.
+- `src/utils/request.js` uses `/api` in local development and relies on the Vite proxy in `vite.config.ts`. Manual local API calls should usually include `/api`.
+- `request.get(url, secondArg)` is overridden so the second argument is used directly as query params. Do not call it as `request.get(url, { params })`.
+- Vite auto-imports Vue, Vue Router, Pinia, and Element Plus helpers/components, and registers SVG icons from `src/assets/icons/svg`.
 
-## Frontend Wiring
-- Real frontend entrypoint is `nest-admin-frontend/src/main.ts`.
-- Vite dev server port is `1994` in development and `1995` in production mode, from `vite.config.ts`.
-- Dev API calls should usually go through Vite proxy: `src/utils/request.js` uses `/api` when `NODE_ENV === 'development'`, and `vite.config.ts` proxies `/api` to `sys.config.js` `BASE_API`.
-- `src/utils/request.js` overrides `request.get(url, secondArg)` so the second argument is used directly as query params. Do **not** wrap it as `{ params }`.
-- The app decides runtime environment from `window.location.origin` in `sys.config.js`, not just from `NODE_ENV`. Keep domain-based env selection intact when changing config.
-- Router uses `createWebHistory`, not hash history.
-- Vite auto-imports Vue, Vue Router, Pinia, Element Plus components, and registers SVG icons from `src/assets/icons/svg`.
-- Frontend repo contains generated/build outputs (`dist/`, `auto-imports.d.ts`, `components.d.ts`) and leftover `*.sync-conflict-*` files under `src/`. Prefer editing the canonical source files, not generated artifacts or conflict copies.
-
-## API Contract Rules
-- Prefer unwrapping transport response layers in `src/api/**` or `views/**/api.ts`; Vue pages should consume stable business data directly.
-- Avoid response-shape guessing in pages (`res.data.data`, `res.data?.data?.*`); that logic belongs in API adapters.
-- Backend services/controllers should avoid hand-wrapping `{ code, data }` payloads when `GlobalInterceptor` is already wrapping responses.
+## API Contract Guardrails
+- Keep response-shape unwrapping in `src/api/**` or `views/**/api.ts`; pages should not depend on `res.data.data` or similar nested transport access.
+- Backend controllers/services should return business data directly when possible; do not hand-wrap `{ code, data }` because `GlobalInterceptor` already wraps responses.
+- Use the root check after API-shape changes: `npm run check:api-contract`.
 
 ## Verification Order
-- Backend-focused change: run `npm run lint` in `nest-admin`, then the smallest relevant Jest command (`npm test` or `npm run test:e2e` only if needed).
-- Frontend-focused change: run `npm run type-check` in `nest-admin-frontend`, then the narrowest useful build command if config/runtime wiring changed.
+- Backend change: run `npm run lint` in `nest-admin`, then the narrowest relevant Jest command.
+- Frontend change: run `npm run type-check` in `nest-admin-frontend`, then the smallest useful build command only if config/build wiring changed.
+- Cross-stack API change: run the relevant backend/frontend verification plus root `npm run check:api-contract`.
 
-## Deployment Caution
-- `nest-admin/bin/build.sh` does a destructive `git reset --hard HEAD` before `git pull`. Do not run it casually in a working tree.
+## Dangerous Script
+- Do not casually run `nest-admin/bin/build.sh`; it does `git reset --hard HEAD` before `git pull`.

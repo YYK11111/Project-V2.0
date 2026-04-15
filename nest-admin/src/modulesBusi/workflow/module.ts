@@ -26,6 +26,7 @@ import { CcNodeHandler } from './handler/impl/cc-node.handler';
 import { DelayNodeHandler } from './handler/impl/delay-node.handler';
 import { FormNodeHandler } from './handler/impl/form-node.handler';
 import { NoticesModule } from '../../modules/notices/module';
+import { MessagesModule } from '../../modules/messages/module';
 import { UsersModule } from '../../modules/users/users.module';
 import { DepstModule } from '../../modules/depts/depts.module';
 import { ProjectsModule } from '../projects/module';
@@ -60,6 +61,7 @@ import { ProjectChange } from '../changes/entity';
       ProjectChange,
     ]),
     NoticesModule,
+    MessagesModule,
     UsersModule,
     DepstModule,
     forwardRef(() => ProjectsModule),

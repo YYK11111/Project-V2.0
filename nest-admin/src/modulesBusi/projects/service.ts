@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindManyOptions, In, Like, Repository } from 'typeorm'
+import { DataSource, EntityManager, FindManyOptions, In, Like, Repository } from 'typeorm'
 import { Project, ProjectStatus } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
@@ -9,10 +9,13 @@ import { Task, TaskStatus } from '../tasks/entity'
 import { Ticket, TicketStatus } from '../tickets/entity'
 import { Document } from '../documents/entity'
 import { SysFileService } from 'src/modules/sys/file/service'
-import { SysFile } from 'src/modules/sys/file/entity'
+import { FileStatus, SysFile } from 'src/modules/sys/file/entity'
 import { SaveDto } from 'src/common/dto'
 import { ProjectMember, ProjectMemberRole } from '../project-members/entity'
 import { Milestone, MilestoneStatus } from '../milestones/entity'
+import { Risk, RiskLevel, RiskStatus } from '../risks/entity'
+import { ProjectChange, ChangeImpact, ChangeStatus } from '../changes/entity'
+import { Sprint, SprintStatus } from '../sprints/entity'
 
 @Injectable()
 export class ProjectsService extends BaseService<Project, ProjectDto> {
@@ -23,124 +26,122 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     @InjectRepository(Document) private documentRepository: Repository<Document>,
     @InjectRepository(ProjectMember) private projectMemberRepository: Repository<ProjectMember>,
     @InjectRepository(Milestone) private milestoneRepository: Repository<Milestone>,
+    @InjectRepository(Risk) private riskRepository: Repository<Risk>,
+    @InjectRepository(ProjectChange) private changeRepository: Repository<ProjectChange>,
+    @InjectRepository(Sprint) private sprintRepository: Repository<Sprint>,
     private readonly sysFileService: SysFileService,
+    private readonly dataSource: DataSource,
   ) {
     super(Project, repository)
   }
 
-  async save(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
-    const attachments = dto.attachments
-    const members = dto.members || []
-    const milestones = dto.milestones || []
-    delete dto.attachments
-    delete dto.members
-    delete dto.milestones
-
-    if (!dto.code) {
-      dto.code = await this.generateProjectCode()
-    }
-
-    dto.status ??= ProjectStatus.draft
-
-    const result = await super.save(dto)
-    const saved = Array.isArray(result) ? result[0] : result
-
-    if (saved?.id) {
-      await this.syncMembers(saved.id, members)
-      await this.syncMilestones(saved.id, milestones)
-    }
-
-    if (attachments !== undefined) {
-      const fileIds = await this.getFileIdsByPaths(attachments)
-      if (fileIds.length > 0) {
-        await this.sysFileService.associateFiles({
-          businessType: 'project',
-          businessId: saved.id,
-          fileIds,
-        })
-      } else if (attachments.length === 0 && saved.id) {
-        await this.sysFileService.associateFiles({
-          businessType: 'project',
-          businessId: saved.id,
-          fileIds: [],
-        })
-      }
-    }
-
-    return result
+  private getFileRepository(manager?: EntityManager) {
+    return manager ? manager.getRepository(SysFile) : this.sysFileService['repository']
   }
 
-  async add(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
-    const attachments = dto.attachments
-    const members = dto.members || []
-    const milestones = dto.milestones || []
-    delete dto.attachments
-    delete dto.members
-    delete dto.milestones
-
-    if (!dto.code) {
-      dto.code = await this.generateProjectCode()
+  private normalizeProjectPayload(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
+    if (typeof dto.attachments === 'string' && !dto.attachments) {
+      dto.attachments = [] as any
     }
-
-    dto.status ??= ProjectStatus.draft
-
-    const result = await super.add(dto)
-    const saved = Array.isArray(result) ? result[0] : result
-
-    if (saved?.id) {
-      await this.syncMembers(saved.id, members)
-      await this.syncMilestones(saved.id, milestones)
+    if (dto.attachments != null && !Array.isArray(dto.attachments)) {
+      dto.attachments = [dto.attachments].filter(Boolean) as any
     }
-
-    if (attachments !== undefined && attachments.length > 0) {
-      const fileIds = await this.getFileIdsByPaths(attachments)
-      if (fileIds.length > 0) {
-        await this.sysFileService.associateFiles({
-          businessType: 'project',
-          businessId: saved.id,
-          fileIds,
-        })
-      }
-    }
-
-    return result
+    dto.members = Array.isArray(dto.members) ? dto.members : []
+    dto.milestones = Array.isArray(dto.milestones) ? dto.milestones : []
+    return dto
   }
 
-  async update(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
-    const attachments = dto.attachments
-    const members = dto.members || []
-    const milestones = dto.milestones || []
-    delete dto.attachments
-    delete dto.members
-    delete dto.milestones
-
-    const result = await super.update(dto)
-    const saved = Array.isArray(result) ? result[0] : result
-
-    if (saved?.id) {
-      await this.syncMembers(saved.id, members)
-      await this.syncMilestones(saved.id, milestones)
-    }
-
-    if (attachments !== undefined) {
-      const fileIds = await this.getFileIdsByPaths(attachments)
-      await this.sysFileService.associateFiles({
-        businessType: 'project',
-        businessId: saved.id,
-        fileIds,
-      })
-    }
-
-    return result
-  }
-
-  private async getFileIdsByPaths(paths: string[]): Promise<string[]> {
+  private async getFileIdsByPaths(paths: string[], manager?: EntityManager): Promise<string[]> {
     if (!paths || paths.length === 0) return []
-    const files = await this.sysFileService['repository'].find({
+    const files = await this.getFileRepository(manager).find({
       where: { storedPath: In(paths) },
       select: ['id'],
     })
     return files.map((f) => f.id)
+  }
+
+  private async associateFilesInTransaction(
+    manager: EntityManager,
+    businessId: string,
+    attachments: string[] | undefined,
+  ) {
+    if (attachments === undefined || !businessId) return
+    const fileIds = await this.getFileIdsByPaths(attachments, manager)
+    await manager.getRepository(SysFile).update(
+      { businessType: 'project', businessId } as any,
+      {
+        businessType: null as any,
+        businessId: null as any,
+        status: FileStatus.Pending as any,
+      },
+    )
+    if (fileIds.length === 0) return
+    await manager.getRepository(SysFile).update(
+      { id: In(fileIds) } as any,
+      {
+        businessType: 'project',
+        businessId,
+        status: FileStatus.Associated as any,
+      },
+    )
+  }
+
+  private async saveProjectGraph(
+    dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] },
+    mode: 'save' | 'add' | 'update',
+  ) {
+    this.normalizeProjectPayload(dto)
+    const attachments = dto.attachments
+    const members = dto.members || []
+    const milestones = dto.milestones || []
+    delete dto.attachments
+    delete dto.members
+    delete dto.milestones
+
+    if ((mode === 'save' || mode === 'add') && !dto.code) {
+      dto.code = await this.generateProjectCode()
+    }
+
+    dto.status ??= ProjectStatus.draft
+
+    return this.dataSource.transaction(async (manager) => {
+      const projectRepository = manager.getRepository(Project)
+      const projectMemberRepository = manager.getRepository(ProjectMember)
+      const milestoneRepository = manager.getRepository(Milestone)
+      const baseService = new BaseService<Project, ProjectDto>(Project, projectRepository)
+
+      let result: Project | Project[]
+      if (mode === 'add') {
+        delete dto.id
+        result = await baseService.add(dto as any)
+      } else if (mode === 'update') {
+        if (!dto.id) throw new Error('数据不存在')
+        result = await baseService.update(dto as any)
+      } else {
+        result = await baseService.save(dto as any)
+      }
+
+      const saved = Array.isArray(result) ? result[0] : result
+      if (!saved?.id) return result
+
+      await this.syncMembers(saved.id, members, projectMemberRepository)
+      await this.syncMilestones(saved.id, milestones, milestoneRepository)
+      await this.associateFilesInTransaction(manager, saved.id, attachments)
+
+      return result
+    })
+  }
+
+  async save(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
+    return this.saveProjectGraph(dto, 'save')
+  }
+
+  async add(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
+    return this.saveProjectGraph(dto, 'add')
+  }
+
+  async update(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
+    return this.saveProjectGraph(dto, 'update')
   }
 
   private async generateProjectCode(): Promise<string> {
@@ -226,13 +227,13 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     }
   }
 
-  private async syncMembers(projectId: string, members: any[]) {
-    const existingMembers = await this.projectMemberRepository.find({ where: { projectId } })
+  private async syncMembers(projectId: string, members: any[], repository = this.projectMemberRepository) {
+    const existingMembers = await repository.find({ where: { projectId } })
     const incomingIds = new Set(members.filter((item) => item.id).map((item) => String(item.id)))
 
     for (const member of existingMembers) {
       if (!incomingIds.has(String(member.id))) {
-        await this.projectMemberRepository.update(member.id, { isDelete: '1' as any })
+        await repository.update(member.id, { isDelete: '1' as any })
       }
     }
 
@@ -248,23 +249,23 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       }
 
       if (member.id) {
-        await this.projectMemberRepository.update(member.id, {
+        await repository.update(member.id, {
           ...payload,
           isDelete: null as any,
         })
       } else {
-        await this.projectMemberRepository.save(new ProjectMember(payload))
+        await repository.save(new ProjectMember(payload))
       }
     }
   }
 
-  private async syncMilestones(projectId: string, milestones: any[]) {
-    const existingMilestones = await this.milestoneRepository.find({ where: { projectId } })
+  private async syncMilestones(projectId: string, milestones: any[], repository = this.milestoneRepository) {
+    const existingMilestones = await repository.find({ where: { projectId } })
     const incomingIds = new Set(milestones.filter((item) => item.id).map((item) => String(item.id)))
 
     for (const milestone of existingMilestones) {
       if (!incomingIds.has(String(milestone.id))) {
-        await this.milestoneRepository.update(milestone.id, { isDelete: '1' as any })
+        await repository.update(milestone.id, { isDelete: '1' as any })
       }
     }
 
@@ -281,12 +282,12 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       }
 
       if (milestone.id) {
-        await this.milestoneRepository.update(milestone.id, {
+        await repository.update(milestone.id, {
           ...payload,
           isDelete: null as any,
         })
       } else {
-        await this.milestoneRepository.save(new Milestone(payload))
+        await repository.save(new Milestone(payload))
       }
     }
   }
@@ -347,6 +348,115 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         total: totalDocuments
       },
       progress: progress
+    }
+  }
+
+  async getDashboard(id: string): Promise<any> {
+    const project = await this.getOne({ id })
+    const [tasks, tickets, milestones, risks, changes, sprints] = await Promise.all([
+      this.taskRepository.find({ where: { projectId: id }, relations: ['leader'], order: { endDate: 'ASC', createTime: 'DESC' } }),
+      this.ticketRepository.find({ where: { projectId: id }, relations: ['handler'], order: { createTime: 'DESC' } }),
+      this.milestoneRepository.find({ where: { projectId: id }, order: { dueDate: 'ASC', sort: 'ASC', createTime: 'ASC' } }),
+      this.riskRepository.find({ where: { projectId: id }, relations: ['riskOwner'], order: { level: 'DESC', dueDate: 'ASC', createTime: 'DESC' } }),
+      this.changeRepository.find({ where: { projectId: id }, order: { impact: 'DESC', createTime: 'DESC' } }),
+      this.sprintRepository.find({ where: { projectId: id }, order: { startDate: 'DESC', createTime: 'DESC' } }),
+    ])
+
+    const now = new Date()
+    const dueSoonDays = 7
+    const getDayDiff = (dateString?: string) => {
+      if (!dateString) return null
+      const targetDate = new Date(dateString)
+      if (Number.isNaN(targetDate.getTime())) return null
+      return Math.ceil((targetDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    }
+    const isTaskCompleted = (task: Task) => [TaskStatus.completed, TaskStatus.rejected].includes(task.status)
+    const isTicketResolved = (ticket: Ticket) => [TicketStatus.resolved, TicketStatus.closed].includes(ticket.status)
+    const isRiskClosed = (risk: Risk) => [RiskStatus.resolved, RiskStatus.closed].includes(risk.status)
+
+    const taskSummary = {
+      total: tasks.length,
+      completed: tasks.filter(isTaskCompleted).length,
+      inProgress: tasks.filter((item) => item.status === TaskStatus.inProgress).length,
+      pending: tasks.filter((item) => item.status === TaskStatus.pending).length,
+      overdue: tasks.filter((item) => !isTaskCompleted(item) && (getDayDiff(item.endDate) ?? 1) < 0).length,
+      dueSoon: tasks.filter((item) => {
+        const diff = getDayDiff(item.endDate)
+        return !isTaskCompleted(item) && diff !== null && diff >= 0 && diff <= dueSoonDays
+      }).length,
+    }
+
+    const ticketSummary = {
+      total: tickets.length,
+      open: tickets.filter((item) => !isTicketResolved(item)).length,
+      critical: tickets.filter((item) => item.severity === '1' && !isTicketResolved(item)).length,
+    }
+
+    const riskSummary = {
+      total: risks.length,
+      active: risks.filter((item) => !isRiskClosed(item)).length,
+      high: risks.filter((item) => [RiskLevel.high, RiskLevel.critical].includes(item.level) && !isRiskClosed(item)).length,
+      overdue: risks.filter((item) => !isRiskClosed(item) && (getDayDiff(item.dueDate) ?? 1) < 0).length,
+    }
+
+    const changeSummary = {
+      total: changes.length,
+      pendingApproval: changes.filter((item) => item.status === ChangeStatus.pending).length,
+      highImpact: changes.filter((item) => item.impact === ChangeImpact.high).length,
+      implemented: changes.filter((item) => item.status === ChangeStatus.implemented).length,
+    }
+
+    const milestoneSummary = {
+      total: milestones.length,
+      completed: milestones.filter((item) => item.status === MilestoneStatus.completed).length,
+      delayed: milestones.filter((item) => item.status === MilestoneStatus.delayed).length,
+      dueSoon: milestones.filter((item) => {
+        const diff = getDayDiff(item.dueDate)
+        return item.status !== MilestoneStatus.completed && diff !== null && diff >= 0 && diff <= dueSoonDays
+      }).length,
+      overdue: milestones.filter((item) => item.status !== MilestoneStatus.completed && (getDayDiff(item.dueDate) ?? 1) < 0).length,
+    }
+
+    const sprintSummary = {
+      total: sprints.length,
+      active: sprints.filter((item) => item.status === SprintStatus.active).length,
+      planning: sprints.filter((item) => item.status === SprintStatus.planning).length,
+      current: sprints.find((item) => item.status === SprintStatus.active) || sprints.find((item) => item.status === SprintStatus.planning) || null,
+    }
+
+    return {
+      project,
+      tasks,
+      tickets,
+      milestones,
+      risks,
+      changes,
+      sprints,
+      summary: {
+        taskSummary,
+        ticketSummary,
+        riskSummary,
+        changeSummary,
+        milestoneSummary,
+        sprintSummary,
+        budget: Number(project?.budget || 0),
+        actualCost: Number(project?.actualCost || 0),
+        costVariance: Number(project?.actualCost || 0) - Number(project?.budget || 0),
+      },
+      focus: {
+        dueSoonTasks: tasks.filter((item) => {
+          const diff = getDayDiff(item.endDate)
+          return !isTaskCompleted(item) && diff !== null && diff >= 0 && diff <= dueSoonDays
+        }).slice(0, 5),
+        overdueTasks: tasks.filter((item) => !isTaskCompleted(item) && (getDayDiff(item.endDate) ?? 1) < 0).slice(0, 5),
+        criticalTickets: tickets.filter((item) => item.severity === '1' && !isTicketResolved(item)).slice(0, 5),
+        highRisks: risks.filter((item) => [RiskLevel.high, RiskLevel.critical].includes(item.level) && !isRiskClosed(item)).slice(0, 5),
+        pendingChanges: changes.filter((item) => item.status === ChangeStatus.pending).slice(0, 5),
+        dueSoonMilestones: milestones.filter((item) => {
+          const diff = getDayDiff(item.dueDate)
+          return item.status !== MilestoneStatus.completed && diff !== null && diff >= 0 && diff <= dueSoonDays
+        }).slice(0, 5),
+      },
     }
   }
 }

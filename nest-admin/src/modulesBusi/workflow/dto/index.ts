@@ -157,6 +157,22 @@ export class CancelWorkflowDto {
 }
 
 /**
+ * 发起人结束退回实例DTO
+ */
+export class CloseReturnedWorkflowDto {
+  @IsOptional()
+  reason?: string;
+}
+
+/**
+ * 重新提交退回实例DTO
+ */
+export class ResubmitReturnedWorkflowDto {
+  @IsOptional()
+  comment?: string;
+}
+
+/**
  * 转交任务DTO
  */
 export class TransferTaskDto {

@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req } from '@nestjs/common';
 import { WorkflowService } from './service';
 import { BusinessFieldService } from '../../common/services/business-field.service';
-import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflowDto, CompleteTaskDto, TransferTaskDto, AddSignTaskDto, WithdrawWorkflowDto, CancelWorkflowDto } from './dto';
+import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflowDto, CompleteTaskDto, TransferTaskDto, AddSignTaskDto, WithdrawWorkflowDto, CancelWorkflowDto, CloseReturnedWorkflowDto, ResubmitReturnedWorkflowDto } from './dto';
 
 @Controller('workflow')
 export class WorkflowController {
@@ -142,6 +142,24 @@ export class WorkflowController {
     @Query('userId') userId: string,
   ) {
     return this.workflowService.cancelInstance(id, userId, dto);
+  }
+
+  @Post('instances/:id/close-returned')
+  async closeReturnedInstance(
+    @Param('id') id: string,
+    @Body() dto: CloseReturnedWorkflowDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.closeReturnedInstance(id, userId, dto);
+  }
+
+  @Post('instances/:id/resubmit-returned')
+  async resubmitReturnedInstance(
+    @Param('id') id: string,
+    @Body() dto: ResubmitReturnedWorkflowDto,
+    @Query('userId') userId: string,
+  ) {
+    return this.workflowService.resubmitReturnedInstance(id, userId, dto);
   }
 
   @Get('instances/:id/history')

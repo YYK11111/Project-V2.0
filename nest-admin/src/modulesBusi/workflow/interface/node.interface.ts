@@ -96,7 +96,7 @@ export interface ConditionNodeProperties extends BaseNodeProperties {
 /**
  * 通知节点属性
  */
-export interface NotificationNodeProperties extends BaseNodeProperties {
+export interface NotificationNodeProperties extends ApprovalNodeProperties {
   /** 通知类型 */
   notificationType?: 'email' | 'sms' | 'system' | 'wechat';
   /** 通知模板（标题） */
@@ -112,10 +112,7 @@ export interface NotificationNodeProperties extends BaseNodeProperties {
 /**
  * 抄送节点属性
  */
-export interface CcNodeProperties extends BaseNodeProperties {
-  /** 统一抄送配置 */
-  ccConfig?: ApprovalNodeProperties;
-}
+export interface CcNodeProperties extends ApprovalNodeProperties {}
 
 /**
  * 延时节点属性

@@ -23,7 +23,8 @@ const canOpportunityUpdate = computed(() => checkPermi(['business/crm/opportunit
 const canOpportunityDelete = computed(() => checkPermi(['business/crm/opportunities/delete']))
 
 const getButtons = (row) => [
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canOpportunityUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/opportunity/form') },
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/opportunityManage/form') },
+  { key: 'edit', label: '修改', type: 'primary', disabled: !canOpportunityUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/opportunityManage/form') },
   { key: 'delete', label: '删除', danger: true, disabled: !canOpportunityDelete.value, onClick: () => rctRef.value.del(del, row.id) },
 ]
 </script>
@@ -43,7 +44,7 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canOpportunityAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/opportunity/form')">新增销售机会</el-button>
+          <el-button v-if="canOpportunityAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/opportunityManage/form')">新增销售机会</el-button>
           <el-button v-if="canOpportunityDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>

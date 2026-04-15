@@ -6,6 +6,7 @@ import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { CreateSprintDto } from './dto'
 import { Task, TaskStatus } from '../tasks/entity'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
@@ -21,8 +22,8 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     let queryOrm: FindManyOptions = {
       where: {
         name: this.sqlLike(name),
-        projectId,
-        status,
+        projectId: projectId || undefined,
+        status: status || undefined,
       },
       relations: ['project', 'scrumMaster'],
       order: { sort: 'ASC', startDate: 'DESC' },
@@ -153,5 +154,41 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     })
 
     return { success: true, completedPoints }
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const sprint = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'scrumMaster'],
+      },
+      isError,
+    )
+    if (!sprint) return sprint
+
+    return {
+      ...sprint,
+      project: this.mapProjectSummary(sprint.project),
+      scrumMaster: this.mapUserSummary(sprint.scrumMaster),
+    }
   }
 }

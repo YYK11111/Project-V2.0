@@ -15,9 +15,12 @@ import { SysFileModule } from 'src/modules/sys/file/module'
 import { ProjectMilestoneTemplateService } from './milestone-template.service'
 import { ProjectMember } from '../project-members/entity'
 import { Milestone } from '../milestones/entity'
+import { Risk } from '../risks/entity'
+import { ProjectChange } from '../changes/entity'
+import { Sprint } from '../sprints/entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Project, Task, Ticket, Document, UserStory, ProjectMember, Milestone]), UsersModule, CrmModule, SysFileModule],
+  imports: [TypeOrmModule.forFeature([Project, Task, Ticket, Document, UserStory, ProjectMember, Milestone, Risk, ProjectChange, Sprint]), UsersModule, CrmModule, SysFileModule],
   controllers: [ProjectsController, UserStoryController],
   providers: [ProjectsService, UserStoryService, ProjectMilestoneTemplateService],
   exports: [ProjectsService, UserStoryService, ProjectMilestoneTemplateService],

@@ -69,7 +69,9 @@ export class WorkflowDataLoaderService {
     const configData = config.getConfig();
     if (!configData) return null;
 
-    return configData.triggers?.[triggerEvent] || null;
+    const trigger = configData.triggers?.[triggerEvent] || null;
+    if (!trigger || trigger.enabled === false) return null;
+    return trigger;
   }
 
   async getBusinessConfig(businessType: string): Promise<WorkflowBusinessConfig | null> {

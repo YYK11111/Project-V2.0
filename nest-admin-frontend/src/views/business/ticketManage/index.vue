@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
 import { getList, getType, getStatus, del, submitApproval } from './api'
+import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref({})
@@ -25,6 +25,15 @@ async function handleSubmitApproval(row) {
   $sdk.msgSuccess('提交审批成功')
   rctRef.value?.getList()
 }
+
+const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+
+const getButtons = (row) => [
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
+  { key: 'edit', label: '修改', disabled: !canTicketUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') },
+  { key: 'submitApproval', label: '提交审批', type: 'warning', disabled: !canTicketSubmitApproval.value || !canSubmitTicketApproval(row), onClick: () => handleSubmitApproval(row) },
+  { key: 'delete', label: '删除', danger: true, disabled: !canTicketDelete.value, onClick: () => rctRef.value.del(del, row.id) },
+]
 </script>
 
 <template>
@@ -42,8 +51,8 @@ async function handleSubmitApproval(row) {
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canTicketAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/ticketManage/form')">新增工单</el-button>
-          <el-button v-if="canTicketDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canTicketAdd" type="primary" @click="rctRef.goRoute(null, '/ticketManage/form')">新增工单</el-button>
+          <el-button v-if="canTicketDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
@@ -71,7 +80,7 @@ async function handleSubmitApproval(row) {
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
             <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -80,68 +89,8 @@ async function handleSubmitApproval(row) {
       </template>
 
       <template #tableOperation="{ row }">
-        <div class="tableOperation">
-          <el-tooltip content="修改" placement="top">
-            <el-button 
-              link 
-              type="primary" 
-              :icon="Edit" 
-              size="small" 
-              circle
-              :disabled="!canTicketUpdate"
-              @click="canTicketUpdate && $refs.rctRef.goRoute(row.id, '/ticketManage/form')"
-            />
-          </el-tooltip>
-          <el-tooltip content="提交审批" placement="top">
-            <el-button
-              link
-              type="warning"
-              size="small"
-              circle
-              :disabled="!canTicketSubmitApproval || row.status !== '1' || row.approvalStatus === '1'"
-              @click="canTicketSubmitApproval && handleSubmitApproval(row)"
-            >审</el-button>
-          </el-tooltip>
-          <el-tooltip content="删除" placement="top">
-            <el-button 
-              link 
-              type="danger" 
-              :icon="Delete" 
-              size="small" 
-              circle
-              :disabled="!canTicketDelete"
-              @click="canTicketDelete && $refs.rctRef.del(del, row.id)"
-            />
-          </el-tooltip>
-        </div>
+        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.tableOperation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
-  }
-}
-</style>

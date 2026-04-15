@@ -33,18 +33,22 @@ const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canSprintUpdate = computed(() => checkPermi(['business/sprints/update']))
 const canSprintDelete = computed(() => checkPermi(['business/sprints/delete']))
 
+function getFormPath() {
+  return `${route.path.replace(/\/$/, '')}/form`
+}
+
 const handleAdd = () => {
   if (!canSprintAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push('/business/sprintManage/form')
+  router.push(getFormPath())
 }
 
 const handleEdit = (row) => {
   if (!canSprintUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(`/business/sprintManage/form?id=${row.id}`)
+  router.push(`${getFormPath()}?id=${row.id}`)
 }
 
 const handleView = (row) => {
-  router.push(`/business/sprintManage/form?id=${row.id}&action=view`)
+  router.push(`${getFormPath()}?id=${row.id}&action=view`)
 }
 
 const handleDel = async (row) => {

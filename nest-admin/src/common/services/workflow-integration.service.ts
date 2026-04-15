@@ -2,8 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Project, ProjectStatus } from 'src/modulesBusi/projects/entity'
-import { Task } from 'src/modulesBusi/tasks/entity'
-import { Ticket } from 'src/modulesBusi/tickets/entity'
+import { Task, TaskStatus } from 'src/modulesBusi/tasks/entity'
+import { Ticket, TicketStatus } from 'src/modulesBusi/tickets/entity'
 import { ProjectChange, ChangeStatus } from 'src/modulesBusi/changes/entity'
 import { Customer } from 'src/modulesBusi/crm/customers/entity'
 import { WorkflowService } from 'src/modulesBusi/workflow/service'
@@ -106,7 +106,7 @@ export class WorkflowIntegrationService {
         await this.projectRepository.update(projectId, {
           status: ProjectStatus.draft as any,
           approvalStatus: '3',
-          currentNodeName: '立项审批已拒绝',
+          currentNodeName: '立项审批已驳回',
         })
       }
     } else if (businessKey?.startsWith('project_close_')) {
@@ -121,33 +121,178 @@ export class WorkflowIntegrationService {
         await this.projectRepository.update(projectId, {
           status: ProjectStatus.executing as any,
           approvalStatus: '3',
-          currentNodeName: '结项审批已拒绝',
+          currentNodeName: '结项审批已驳回',
         })
       }
     } else if (businessKey?.startsWith('task_')) {
       const taskId = businessKey.replace('task_', '')
       await this.taskRepository.update(taskId, {
+        status: status === 'completed' ? TaskStatus.inProgress : TaskStatus.rejected,
         approvalStatus: status === 'completed' ? '2' : '3',
-        currentNodeName: status === 'completed' ? '任务审批已通过' : '任务审批已拒绝',
+        currentNodeName: status === 'completed' ? '任务审批已通过，进入处理中' : '任务审批已驳回',
       } as any)
     } else if (businessKey?.startsWith('ticket_')) {
       const ticketId = businessKey.replace('ticket_', '')
       await this.ticketRepository.update(ticketId, {
+        status: status === 'completed' ? TicketStatus.inProgress : TicketStatus.closed,
         approvalStatus: status === 'completed' ? '2' : '3',
-        currentNodeName: status === 'completed' ? '工单审批已通过' : '工单审批已拒绝',
+        currentNodeName: status === 'completed' ? '工单审批已通过，进入处理中' : '工单审批已驳回，已关闭',
       } as any)
     } else if (businessKey?.startsWith('change_')) {
       const changeId = businessKey.replace('change_', '')
       await this.changeRepository.update(changeId, {
         status: status === 'completed' ? ChangeStatus.approved : ChangeStatus.rejected,
         approvalStatus: status === 'completed' ? '2' : '3',
-        currentNodeName: status === 'completed' ? '变更审批已通过' : '变更审批已拒绝',
+        currentNodeName: status === 'completed' ? '变更审批已通过' : '变更审批已驳回',
       } as any)
     } else if (businessKey?.startsWith('customer_')) {
       const customerId = businessKey.replace('customer_', '')
       await this.customerRepository.update(customerId, {
+        status: status === 'completed' ? '2' : '4',
         approvalStatus: status === 'completed' ? '2' : '3',
-        currentNodeName: status === 'completed' ? '客户审批已通过' : '客户审批已拒绝',
+        currentNodeName: status === 'completed' ? '客户审批已通过，转为意向客户' : '客户审批已驳回，转为流失客户',
+      } as any)
+    }
+  }
+
+  async handleReturnedToStarter(instanceId: string, variables: any): Promise<void> {
+    const businessKey = variables.businessKey
+
+    if (businessKey?.startsWith('project_') && !businessKey.includes('close')) {
+      const projectId = businessKey.replace('project_', '')
+      await this.projectRepository.update(projectId, {
+        status: ProjectStatus.draft as any,
+        approvalStatus: '3',
+        currentNodeName: '已退回发起人，待修改后重新提交',
+      })
+    } else if (businessKey?.startsWith('project_close_')) {
+      const projectId = businessKey.replace('project_close_', '')
+      await this.projectRepository.update(projectId, {
+        status: ProjectStatus.executing as any,
+        approvalStatus: '3',
+        currentNodeName: '结项申请已退回发起人，待处理',
+      })
+    } else if (businessKey?.startsWith('task_')) {
+      const taskId = businessKey.replace('task_', '')
+      await this.taskRepository.update(taskId, {
+        approvalStatus: '3',
+        currentNodeName: '已退回发起人，待修改后重新提交',
+      } as any)
+    } else if (businessKey?.startsWith('ticket_')) {
+      const ticketId = businessKey.replace('ticket_', '')
+      await this.ticketRepository.update(ticketId, {
+        approvalStatus: '3',
+        currentNodeName: '已退回发起人，待修改后重新提交',
+      } as any)
+    } else if (businessKey?.startsWith('change_')) {
+      const changeId = businessKey.replace('change_', '')
+      await this.changeRepository.update(changeId, {
+        approvalStatus: '3',
+        currentNodeName: '已退回发起人，待修改后重新提交',
+      } as any)
+    } else if (businessKey?.startsWith('customer_')) {
+      const customerId = businessKey.replace('customer_', '')
+      await this.customerRepository.update(customerId, {
+        approvalStatus: '3',
+        currentNodeName: '已退回发起人，待修改后重新提交',
+      } as any)
+    }
+  }
+
+  async handleCloseReturnedInstance(instanceId: string, variables: any): Promise<void> {
+    const businessKey = variables.businessKey
+
+    if (businessKey?.startsWith('project_') && !businessKey.includes('close')) {
+      const projectId = businessKey.replace('project_', '')
+      await this.projectRepository.update(projectId, {
+        status: ProjectStatus.draft as any,
+        approvalStatus: '3',
+        currentNodeName: '立项审批已驳回，实例已结束',
+      })
+    } else if (businessKey?.startsWith('project_close_')) {
+      const projectId = businessKey.replace('project_close_', '')
+      await this.projectRepository.update(projectId, {
+        status: ProjectStatus.executing as any,
+        approvalStatus: '3',
+        currentNodeName: '结项审批已驳回，实例已结束',
+      })
+    } else if (businessKey?.startsWith('task_')) {
+      const taskId = businessKey.replace('task_', '')
+      await this.taskRepository.update(taskId, {
+        status: TaskStatus.rejected,
+        approvalStatus: '3',
+        currentNodeName: '任务审批已驳回，实例已结束',
+      } as any)
+    } else if (businessKey?.startsWith('ticket_')) {
+      const ticketId = businessKey.replace('ticket_', '')
+      await this.ticketRepository.update(ticketId, {
+        status: TicketStatus.closed,
+        approvalStatus: '3',
+        currentNodeName: '工单审批已驳回，实例已结束',
+      } as any)
+    } else if (businessKey?.startsWith('change_')) {
+      const changeId = businessKey.replace('change_', '')
+      await this.changeRepository.update(changeId, {
+        status: ChangeStatus.rejected,
+        approvalStatus: '3',
+        currentNodeName: '变更审批已驳回，实例已结束',
+      } as any)
+    } else if (businessKey?.startsWith('customer_')) {
+      const customerId = businessKey.replace('customer_', '')
+      await this.customerRepository.update(customerId, {
+        status: '4',
+        approvalStatus: '3',
+        currentNodeName: '客户审批已驳回，实例已结束',
+      } as any)
+    }
+  }
+
+  async handleResubmitReturnedInstance(instanceId: string, variables: any): Promise<void> {
+    const businessKey = variables.businessKey
+
+    if (businessKey?.startsWith('project_') && !businessKey.includes('close')) {
+      const projectId = businessKey.replace('project_', '')
+      await this.projectRepository.update(projectId, {
+        workflowInstanceId: instanceId,
+        status: ProjectStatus.approvalPending as any,
+        approvalStatus: '1',
+        currentNodeName: '立项审批中',
+      })
+    } else if (businessKey?.startsWith('project_close_')) {
+      const projectId = businessKey.replace('project_close_', '')
+      await this.projectRepository.update(projectId, {
+        workflowInstanceId: instanceId,
+        status: ProjectStatus.closeApprovalPending as any,
+        approvalStatus: '1',
+        currentNodeName: '结项审批中',
+      })
+    } else if (businessKey?.startsWith('task_')) {
+      const taskId = businessKey.replace('task_', '')
+      await this.taskRepository.update(taskId, {
+        workflowInstanceId: instanceId,
+        approvalStatus: '1',
+        currentNodeName: '任务审批中',
+      } as any)
+    } else if (businessKey?.startsWith('ticket_')) {
+      const ticketId = businessKey.replace('ticket_', '')
+      await this.ticketRepository.update(ticketId, {
+        workflowInstanceId: instanceId,
+        approvalStatus: '1',
+        currentNodeName: '工单审批中',
+      } as any)
+    } else if (businessKey?.startsWith('change_')) {
+      const changeId = businessKey.replace('change_', '')
+      await this.changeRepository.update(changeId, {
+        workflowInstanceId: instanceId,
+        approvalStatus: '1',
+        currentNodeName: '变更审批中',
+      } as any)
+    } else if (businessKey?.startsWith('customer_')) {
+      const customerId = businessKey.replace('customer_', '')
+      await this.customerRepository.update(customerId, {
+        workflowInstanceId: instanceId,
+        approvalStatus: '1',
+        currentNodeName: '客户审批中',
       } as any)
     }
   }
@@ -222,6 +367,7 @@ export class WorkflowIntegrationService {
   async startCustomerApproval(customerId: string, initiatorId: string): Promise<string> {
     const customer = await this.customerRepository.findOne({ where: { id: customerId } })
     if (!customer) throw new BadRequestException('客户不存在')
+    if (!customer.salesId) throw new BadRequestException('客户审批前必须维护销售负责人')
 
     const instance = await this.workflowService.startBusinessWorkflow(
       {

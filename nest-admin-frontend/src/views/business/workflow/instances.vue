@@ -13,12 +13,15 @@ const currentUserId = userStore.id
 const params = ref({ status: '', mode: 'participant' })
 const rctRef = ref()
 const route = useRoute()
+const highlightedInstanceId = computed(() => String(route.query.highlight || ''))
 const canWorkflowInstanceGetOne = computed(() => checkPermi(['business/workflow/instances/getOne']))
 const canWorkflowInstanceCancel = computed(() => checkPermi(['business/workflow/instances/cancel']))
 const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflow/instances/withdraw']))
+const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/instances/cancel']))
 
 const getButtons = (row: any) => [
   { key: 'detail', label: '详情', disabled: !canWorkflowInstanceGetOne.value, onClick: () => viewDetail(row) },
+  { key: 'closeReturned', label: '结束退回实例', type: 'danger', show: canWorkflowInstanceCloseReturned.value && row.status === '1' && row.starterId === currentUserId && row.variables?._returnedToStarter, onClick: () => handleCloseReturned(row) },
   { key: 'cancel', label: '终止', type: 'warning', show: canWorkflowInstanceCancel.value && row.status === '1', onClick: () => handleCancel(row) },
   { key: 'withdraw', label: '撤回', danger: true, show: canWorkflowInstanceWithdraw.value && row.status === '1' && row.starterId === currentUserId, onClick: () => handleWithdraw(row) },
 ]
@@ -35,6 +38,10 @@ const cancelForm = reactive({ reason: '' })
 const withdrawVisible = ref(false)
 const currentWithdrawInstance = ref<any>(null)
 const withdrawForm = reactive({ comment: '' })
+
+const closeReturnedVisible = ref(false)
+const currentCloseReturnedInstance = ref<any>(null)
+const closeReturnedForm = reactive({ reason: '' })
 
 const viewDetail = async (row: any) => {
   if (!canWorkflowInstanceGetOne.value) {
@@ -54,8 +61,18 @@ const getHistoryItemType = (action: string) => {
 }
 
 const getActionText = (action: string) => {
-  const texts: Record<string, string> = { '1': '同意', '2': '拒绝', '3': '撤回', '4': '转交', '5': '加签', '6': '终止', 'execute': '执行' }
+  const texts: Record<string, string> = { '1': '同意', '2': '驳回', '3': '撤回', '4': '转交', '5': '加签', '6': '终止', 'execute': '执行' }
   return texts[action] || action
+}
+
+const getHistoryActionText = (item: any) => {
+  if (item?.action === 'execute' && String(item?.comment || '').includes('发起人重新提交审批')) {
+    return '发起人重新提交'
+  }
+  if (item?.action === '2' && currentInstance.value?.variables?._lastRejectTarget === 'start') {
+    return '驳回（退回发起人）'
+  }
+  return getActionText(item?.action)
 }
 
 const handleCancel = (row: any) => { currentCancelInstance.value = row; cancelForm.reason = ''; cancelVisible.value = true }
@@ -63,6 +80,9 @@ const submitCancel = () => api.cancelWorkflowInstance(currentCancelInstance.valu
 
 const handleWithdraw = (row: any) => { currentWithdrawInstance.value = row; withdrawForm.comment = ''; withdrawVisible.value = true }
 const submitWithdraw = () => api.withdrawWorkflow(currentWithdrawInstance.value.id, { comment: withdrawForm.comment }).then(() => { ElMessage.success('流程已撤回'); withdrawVisible.value = false; rctRef.value.getList() })
+
+const handleCloseReturned = (row: any) => { currentCloseReturnedInstance.value = row; closeReturnedForm.reason = ''; closeReturnedVisible.value = true }
+const submitCloseReturned = () => api.closeReturnedWorkflowInstance(currentCloseReturnedInstance.value.id, { reason: closeReturnedForm.reason }).then(() => { ElMessage.success('退回实例已结束'); closeReturnedVisible.value = false; rctRef.value.getList() })
 
 onMounted(async () => {
   const highlightId = route.query.highlight
@@ -94,10 +114,22 @@ onMounted(async () => {
       </template>
       <template #table>
         <el-table-column prop="definitionCode" label="流程编码" width="120" />
+        <el-table-column prop="id" label="实例ID" width="160" />
         <el-table-column prop="businessType" label="业务对象" width="100" />
         <el-table-column prop="businessTitle" label="业务标题" min-width="180" :show-overflow-tooltip="true" />
         <el-table-column prop="businessCode" label="业务编号" width="160" :show-overflow-tooltip="true" />
         <el-table-column prop="businessKey" label="业务单号" width="180" />
+        <el-table-column label="业务对象ID" width="140">
+          <template #default="{ row }">
+            {{ String(row.businessKey || '').split('_').pop() || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="当前定位" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="highlightedInstanceId && String(row.id) === highlightedInstanceId" type="success" size="small">当前实例</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="starterId" label="发起人ID" width="120" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -133,6 +165,27 @@ onMounted(async () => {
             <el-descriptions-item label="开始时间">{{ currentInstance.startTime }}</el-descriptions-item>
             <el-descriptions-item label="结束时间">{{ currentInstance.endTime || '-' }}</el-descriptions-item>
             <el-descriptions-item label="耗时">{{ currentInstance.duration ? currentInstance.duration + 'ms' : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="退回发起人" v-if="currentInstance.variables?._returnedToStarter">
+              <el-tag type="warning">是</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="退回时间" v-if="currentInstance.variables?._returnedToStarterAt">
+              {{ currentInstance.variables?._returnedToStarterAt }}
+            </el-descriptions-item>
+            <el-descriptions-item label="退回目标" v-if="currentInstance.variables?._lastRejectTargetName">
+              {{ currentInstance.variables?._lastRejectTargetName }}
+            </el-descriptions-item>
+            <el-descriptions-item label="退回意见" :span="2" v-if="currentInstance.variables?._returnedComment">
+              {{ currentInstance.variables?._returnedComment }}
+            </el-descriptions-item>
+            <el-descriptions-item label="结束退回实例" v-if="currentInstance.variables?._returnedClosedByStarter">
+              <el-tag type="info">已结束</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="结束时间" v-if="currentInstance.variables?._returnedClosedAt">
+              {{ currentInstance.variables?._returnedClosedAt }}
+            </el-descriptions-item>
+            <el-descriptions-item label="结束原因" :span="2" v-if="currentInstance.variables?._returnedCloseReason">
+              {{ currentInstance.variables?._returnedCloseReason }}
+            </el-descriptions-item>
             <el-descriptions-item label="流程变量" :span="2"><pre class="code-block">{{ JSON.stringify(currentInstance.variables, null, 2) }}</pre></el-descriptions-item>
           </el-descriptions>
         </el-tab-pane>
@@ -140,7 +193,7 @@ onMounted(async () => {
           <el-timeline v-if="historyList.length > 0">
             <el-timeline-item v-for="(item, index) in historyList" :key="index" :timestamp="item.createTime" :type="getHistoryItemType(item.action)" placement="top">
               <el-card>
-                <h4>{{ getActionText(item.action) }} - {{ item.nodeName || '流程节点' }}</h4>
+                <h4>{{ getHistoryActionText(item) }} - {{ item.nodeName || '流程节点' }}</h4>
                 <p v-if="item.operatorId">操作人ID: {{ item.operatorId }}</p>
                 <p v-if="item.comment">审批意见: {{ item.comment }}</p>
               </el-card>
@@ -157,6 +210,10 @@ onMounted(async () => {
 
     <BaDialog v-model="withdrawVisible" title="撤回流程" width="500" @confirm="submitWithdraw">
       <template #form><BaInput v-model="withdrawForm.comment" prop="comment" type="textarea" label="撤回原因" /></template>
+    </BaDialog>
+
+    <BaDialog v-model="closeReturnedVisible" title="结束退回实例" width="500" @confirm="submitCloseReturned">
+      <template #form><BaInput v-model="closeReturnedForm.reason" prop="reason" type="textarea" label="结束原因" /></template>
     </BaDialog>
   </div>
 </template>

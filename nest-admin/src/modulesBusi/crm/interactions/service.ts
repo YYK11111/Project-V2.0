@@ -5,6 +5,7 @@ import { CustomerInteraction } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { CustomerInteractionDto } from './dto'
+import { Customer } from '../customers/entity'
 
 @Injectable()
 export class CustomerInteractionService extends BaseService<CustomerInteraction, CustomerInteractionDto> {
@@ -39,5 +40,30 @@ export class CustomerInteractionService extends BaseService<CustomerInteraction,
       where: { customerId },
       relations: ['customer'],
     })
+  }
+
+  private mapCustomerSummary(customer?: Customer | null) {
+    if (!customer) return null
+    return {
+      id: customer.id,
+      code: customer.code,
+      name: customer.name,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const interaction = await super.getOne(
+      {
+        where: query,
+        relations: ['customer'],
+      },
+      isError,
+    )
+    if (!interaction) return interaction
+
+    return {
+      ...interaction,
+      customer: this.mapCustomerSummary(interaction.customer),
+    }
   }
 }

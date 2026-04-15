@@ -35,18 +35,22 @@ const columns = [
   { prop: 'scheduleImpact', label: '进度影响(天)', width: 100 },
 ]
 
+function getFormPath() {
+  return `${route.path.replace(/\/$/, '')}/form`
+}
+
 const handleAdd = () => {
   if (!canChangeAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push('/business/changeManage/form')
+  router.push(getFormPath())
 }
 
 const handleEdit = (row) => {
   if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(`/business/changeManage/form?id=${row.id}`)
+  router.push(`${getFormPath()}?id=${row.id}`)
 }
 
 const handleView = (row) => {
-  router.push(`/business/changeManage/form?id=${row.id}&action=view`)
+  router.push(`${getFormPath()}?id=${row.id}&action=view`)
 }
 
 const handleDel = async (row) => {
@@ -64,6 +68,8 @@ const handleSubmitApproval = async (row) => {
   $sdk.msgSuccess('提交审批成功')
   rctRef.value?.getList()
 }
+
+const canSubmitChangeApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getStatusType = (status) => {
   const map = { '1': 'info', '2': 'warning', '3': 'success', '4': 'danger', '5': 'primary' }
@@ -116,7 +122,7 @@ onMounted(async () => {
       <el-table-column prop="approvalStatus" label="审批状态" width="110">
         <template #default="{ row }">
           <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
-            {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+            {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
           </el-tag>
         </template>
       </el-table-column>
@@ -130,7 +136,7 @@ onMounted(async () => {
     <template #tableOperation="{ row }">
       <TableOperation :buttons="[
         { key: 'view', label: '查看', onClick: () => handleView(row) },
-        { key: 'submit', label: '提交审批', type: 'warning', disabled: !canChangeSubmitApproval.value || row.status !== '1' || row.approvalStatus === '1', onClick: () => handleSubmitApproval(row) },
+        { key: 'submit', label: '提交审批', type: 'warning', disabled: !canChangeSubmitApproval.value || !canSubmitChangeApproval(row), onClick: () => handleSubmitApproval(row) },
         { key: 'edit', label: '修改', disabled: !canChangeUpdate.value, onClick: () => handleEdit(row) },
         { key: 'delete', label: '删除', danger: true, disabled: !canChangeDelete.value, onClick: () => handleDel(row) },
       ]" :row="row" />

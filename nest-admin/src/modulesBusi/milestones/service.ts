@@ -5,6 +5,7 @@ import { Milestone, MilestoneStatus } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { CreateMilestoneDto } from './dto'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class MilestonesService extends BaseService<Milestone, CreateMilestoneDto> {
@@ -17,8 +18,8 @@ export class MilestonesService extends BaseService<Milestone, CreateMilestoneDto
     let queryOrm: FindManyOptions = {
       where: {
         name: this.sqlLike(name),
-        projectId,
-        status,
+        projectId: projectId || undefined,
+        status: status || undefined,
       },
       relations: ['project', 'creator'],
       order: { sort: 'ASC', createTime: 'DESC' },
@@ -32,5 +33,41 @@ export class MilestonesService extends BaseService<Milestone, CreateMilestoneDto
       updateData.completedDate = new Date().toISOString().split('T')[0]
     }
     return this.repository.update(id, updateData)
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const milestone = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'creator'],
+      },
+      isError,
+    )
+    if (!milestone) return milestone
+
+    return {
+      ...milestone,
+      project: this.mapProjectSummary(milestone.project),
+      creator: this.mapUserSummary(milestone.creator),
+    }
   }
 }

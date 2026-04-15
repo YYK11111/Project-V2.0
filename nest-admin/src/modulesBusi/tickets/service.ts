@@ -7,6 +7,7 @@ import { BaseService } from 'src/common/BaseService'
 import { TicketDto } from './dto'
 import { SysFileService } from 'src/modules/sys/file/service'
 import { SaveDto } from 'src/common/dto'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class TicketsService extends BaseService<Ticket, TicketDto> {
@@ -15,6 +16,16 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     private readonly sysFileService: SysFileService,
   ) {
     super(Ticket, repository)
+  }
+
+  private normalizeTicketPayload(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    if (typeof dto.attachments === 'string' && !dto.attachments) {
+      dto.attachments = [] as any
+    }
+    if (dto.attachments != null && !Array.isArray(dto.attachments)) {
+      dto.attachments = [dto.attachments].filter(Boolean) as any
+    }
+    return dto
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<Ticket>> {
@@ -33,6 +44,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async save(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    this.normalizeTicketPayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -60,6 +72,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async add(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    this.normalizeTicketPayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -81,6 +94,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async update(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    this.normalizeTicketPayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -106,5 +120,55 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       select: ['id'],
     })
     return files.map((f) => f.id)
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  private mapTaskSummary(task?: any) {
+    if (!task) return null
+    return {
+      id: task.id,
+      code: task.code,
+      name: task.name,
+    }
+  }
+
+  private buildTicketDetail(ticket: Ticket) {
+    return {
+      ...ticket,
+      project: this.mapProjectSummary(ticket.project),
+      task: this.mapTaskSummary(ticket.task),
+      submitter: this.mapUserSummary(ticket.submitter),
+      handler: this.mapUserSummary(ticket.handler),
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const ticket = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'task', 'submitter', 'handler'],
+      },
+      isError,
+    )
+    if (!ticket) return ticket
+    return this.buildTicketDetail(ticket)
   }
 }

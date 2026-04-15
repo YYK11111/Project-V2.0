@@ -15,6 +15,7 @@ export interface TriggerConfig {
   businessScene?: string;
   statusTriggerValues?: string[];
   condition?: string;
+  enabled?: boolean;
 }
 
 export interface BusinessConfigData {
@@ -50,9 +51,13 @@ export class WorkflowBusinessConfig {
 
   getConfig(): BusinessConfigData | null {
     try {
+      const triggerConfig = typeof this.triggerConfig === 'string'
+        ? JSON.parse(this.triggerConfig)
+        : (this.triggerConfig || {})
+
       return {
         fieldDefinitions: this.fieldDefinitions ? JSON.parse(this.fieldDefinitions) : [],
-        triggers: this.triggerConfig ? JSON.parse(this.triggerConfig) : {},
+        triggers: triggerConfig,
       };
     } catch {
       return null;

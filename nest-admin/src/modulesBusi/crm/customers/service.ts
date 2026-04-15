@@ -5,6 +5,8 @@ import { Customer } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { CustomerDto } from './dto'
+import dayjs from 'dayjs'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class CustomersService extends BaseService<Customer, CustomerDto> {
@@ -12,6 +14,20 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     @InjectRepository(Customer) repository: Repository<Customer>,
   ) {
     super(Customer, repository)
+  }
+
+  async save(dto: any) {
+    if (!dto.code) {
+      dto.code = await this.generateCustomerCode()
+    }
+    return super.save(dto)
+  }
+
+  async add(dto: any) {
+    if (!dto.code) {
+      dto.code = await this.generateCustomerCode()
+    }
+    return super.add(dto)
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<Customer>> {
@@ -75,5 +91,44 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
   // Count method for stats
   async count(options: any): Promise<number> {
     return this.repository.count(options)
+  }
+
+  private async generateCustomerCode() {
+    const datePart = dayjs().format('YYYYMMDD')
+    const prefix = `CUS-${datePart}-`
+    const list = await this.repository.find({
+      where: { code: this.sqlLike(prefix) as any },
+      order: { code: 'DESC' as any },
+      take: 1,
+    })
+    const latestCode = list[0]?.code || ''
+    const currentSeq = Number(latestCode.split('-').pop() || 0)
+    return `${prefix}${String(currentSeq + 1).padStart(4, '0')}`
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const customer = await super.getOne(
+      {
+        where: query,
+        relations: ['sales'],
+      },
+      isError,
+    )
+    if (!customer) return customer
+
+    return {
+      ...customer,
+      sales: this.mapUserSummary(customer.sales),
+    }
   }
 }

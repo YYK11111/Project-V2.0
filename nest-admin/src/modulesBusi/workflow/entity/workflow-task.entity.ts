@@ -42,8 +42,8 @@ export class WorkflowTask extends BaseEntity {
   @BaseColumn({ type: 'char', length: 1, default: '1', name: 'status', comment: '状态: 1待处理 2处理中 3已完成 4已取消' })
   status: string;
 
-  /** 审批动作: 1同意 2拒绝 3撤回 4转交 */
-  @BaseColumn({ type: 'char', length: 1, nullable: true, name: 'action', comment: '审批动作: 1同意 2拒绝 3撤回 4转交' })
+  /** 审批动作: 1同意 2驳回 3撤回 4转交 */
+  @BaseColumn({ type: 'char', length: 1, nullable: true, name: 'action', comment: '审批动作: 1同意 2驳回 3撤回 4转交' })
   action: string;
 
   /** 审批意见 */

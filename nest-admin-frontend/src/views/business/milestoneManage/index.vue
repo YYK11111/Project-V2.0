@@ -11,6 +11,7 @@ const route = useRoute()
 
 const loading = ref(false)
 const statusMap = ref({})
+const projectList = ref([])
 const projectMap = ref({})
 const params = ref({
   projectId: route.query.projectId || '',
@@ -32,18 +33,22 @@ const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
 const canMilestoneUpdate = computed(() => checkPermi(['business/milestones/update']))
 const canMilestoneDelete = computed(() => checkPermi(['business/milestones/delete']))
 
+function getFormPath() {
+  return `${route.path.replace(/\/$/, '')}/form`
+}
+
 const handleAdd = () => {
   if (!canMilestoneAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push('/business/milestoneManage/form')
+  router.push(getFormPath())
 }
 
 const handleEdit = (row) => {
   if (!canMilestoneUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(`/business/milestoneManage/form?id=${row.id}`)
+  router.push(`${getFormPath()}?id=${row.id}`)
 }
 
 const handleView = (row) => {
-  router.push(`/business/milestoneManage/form?id=${row.id}&action=view`)
+  router.push(`${getFormPath()}?id=${row.id}&action=view`)
 }
 
 const handleDel = async (row) => {
@@ -57,7 +62,8 @@ const handleDel = async (row) => {
 onMounted(async () => {
   const [statusRes, projectRes] = await Promise.all([getStatus(), getProjectList({ pageNum: 1, pageSize: 1000 })])
   statusMap.value = statusRes.data || {}
-  projectMap.value = (projectRes.list || []).reduce((acc, p) => {
+  projectList.value = projectRes.list || []
+  projectMap.value = projectList.value.reduce((acc, p) => {
     acc[p.id] = p.name
     return acc
   }, {})
@@ -73,7 +79,7 @@ const getStatusType = (status) => {
   <RequestChartTable ref="rctRef" :params="params" :request="getList">
     <template #query="{ query }">
       <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 200px; margin-right: 10px">
-        <el-option v-for="p in projectMap" :key="p.key" :label="p.value" :value="p.key" />
+        <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
       </el-select>
       <el-select v-model="query.status" placeholder="状态" clearable style="width: 150px">
         <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />

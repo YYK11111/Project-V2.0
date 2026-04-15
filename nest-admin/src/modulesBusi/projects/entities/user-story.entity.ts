@@ -32,7 +32,7 @@ export const userStoryStatusMap = {
   [UserStoryStatus.inProgress]: '进行中',
   [UserStoryStatus.done]: '已完成',
   [UserStoryStatus.accepted]: '已验收',
-  [UserStoryStatus.rejected]: '已拒绝',
+  [UserStoryStatus.rejected]: '已驳回',
 }
 
 @MyEntity('user_story')

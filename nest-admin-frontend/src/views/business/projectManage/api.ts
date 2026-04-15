@@ -24,6 +24,10 @@ export function getOne(id) {
   return request({ url: `${baseUrl}/getOne/${id}`, method: 'get' })
 }
 
+export function getDashboard(id) {
+  return request({ url: `${baseUrl}/dashboard/${id}`, method: 'get' })
+}
+
 export function save(data) {
   return request({ url: `${baseUrl}/save`, method: 'post', data })
 }

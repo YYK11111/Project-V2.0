@@ -5,6 +5,7 @@ import { getList, del, getStatus, getType, getChildren } from './api'
 import { checkPermi } from '@/utils/permission'
 
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const list = ref([])
@@ -65,18 +66,22 @@ function handleReset() {
   loadData()
 }
 
+function getFormPath() {
+  return `${route.path.replace(/\/$/, '')}/form`
+}
+
 function handleAdd() {
   if (!canStoryAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push('/business/userStoryManage/form')
+  router.push(getFormPath())
 }
 
 function handleEdit(row) {
   if (!canStoryUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(`/business/userStoryManage/form?id=${row.id}`)
+  router.push(`${getFormPath()}?id=${row.id}`)
 }
 
 function handleView(row) {
-  router.push(`/business/userStoryManage/form?id=${row.id}&action=view`)
+  router.push(`${getFormPath()}?id=${row.id}&action=view`)
 }
 
 function handleDelete(row) {

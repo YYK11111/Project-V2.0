@@ -6,6 +6,7 @@ import merge from 'lodash.merge'
 export default {
   // 饼图
   name: 'ChartPie',
+  emits: ['slice-click'],
   components: {},
   props: {
     // 图例
@@ -29,7 +30,10 @@ export default {
     },
   },
   data() {
-    return {}
+    return {
+      myChart: null,
+      resizeObserver: null,
+    }
   },
   computed: {},
   watch: {
@@ -39,17 +43,50 @@ export default {
         this.drawChart()
       },
     },
+    option: {
+      deep: true,
+      handler() {
+        this.drawChart()
+      },
+    },
   },
   created() {},
   mounted() {
+    this.initResizeObserver()
     this.drawChart()
   },
+  beforeUnmount() {
+    this.destroyChart()
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect()
+      this.resizeObserver = null
+    }
+  },
   methods: {
+    initResizeObserver() {
+      if (!this.$refs.chart || this.resizeObserver) return
+      this.resizeObserver = new ResizeObserver(() => {
+        this.myChart?.resize()
+      })
+      this.resizeObserver.observe(this.$refs.chart)
+    },
+    destroyChart() {
+      if (this.myChart) {
+        this.myChart.off('click')
+        this.myChart.dispose()
+        this.myChart = null
+      }
+    },
     drawChart() {
-      // eslint-disable-next-line
+      if (!this.$refs.chart) return
+      this.initResizeObserver()
+
       if (!this.series?.length) {
+        this.destroyChart()
         return
       }
+
+      this.destroyChart()
       this.myChart = echarts.init(this.$refs.chart)
       let option = {
         color: echartColors,
@@ -117,10 +154,12 @@ export default {
       }
       this.option && merge(option, this.option)
       option && this.myChart.setOption(option)
-
-      new ResizeObserver((entries) => {
-        this.myChart.resize()
-      }).observe(this.$refs.chart)
+      this.myChart.on('click', (params) => {
+        this.$emit('slice-click', params)
+      })
+      this.$nextTick(() => {
+        this.myChart?.resize()
+      })
     },
   },
 }
@@ -137,7 +176,8 @@ export default {
 .chart {
   position: relative;
   max-height: 100%;
-  min-width: 400px;
-  min-height: 400px;
+  width: 100%;
+  min-width: 0;
+  min-height: 280px;
 }
 </style>

@@ -5,6 +5,7 @@ import { Risk, RiskStatus } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { CreateRiskDto } from './dto'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class RisksService extends BaseService<Risk, CreateRiskDto> {
@@ -17,10 +18,10 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     let queryOrm: FindManyOptions = {
       where: {
         name: this.sqlLike(name),
-        projectId,
-        status,
-        level,
-        category,
+        projectId: projectId || undefined,
+        status: status || undefined,
+        level: level || undefined,
+        category: category || undefined,
       },
       relations: ['project', 'riskOwner'],
       order: { sort: 'ASC', createTime: 'DESC' },
@@ -33,5 +34,41 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       status: RiskStatus.resolved,
       resolvedDate: new Date().toISOString().split('T')[0],
     })
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const risk = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'riskOwner'],
+      },
+      isError,
+    )
+    if (!risk) return risk
+
+    return {
+      ...risk,
+      project: this.mapProjectSummary(risk.project),
+      riskOwner: this.mapUserSummary(risk.riskOwner),
+    }
   }
 }

@@ -4,6 +4,7 @@ import { NodeType, NodeExecutionContext, NodeResult, CcNodeProperties } from '..
 import { NoticesService } from '../../../../modules/notices/service';
 import { BoolNum } from '../../../../common/type/base';
 import { WorkflowAssigneeResolverService } from '../../../../common/services/workflow-assignee-resolver.service';
+import { MessagesService } from '../../../../modules/messages/service';
 
 /**
  * 抄送节点处理器
@@ -15,6 +16,7 @@ export class CcNodeHandler implements INodeHandler {
   constructor(
     private noticesService: NoticesService,
     private assigneeResolver: WorkflowAssigneeResolverService,
+    private messagesService: MessagesService,
   ) {}
 
   async execute(context: NodeExecutionContext): Promise<NodeResult> {
@@ -42,6 +44,18 @@ export class CcNodeHandler implements INodeHandler {
         remark: `workflow_cc:${context.instanceId}:${context.nodeId}`,
         receiverIds: ccReceivers,
       });
+      for (const receiverId of ccReceivers) {
+        await this.messagesService.sendMessage({
+          title: '【待阅】流程抄送通知',
+          content: `您被抄送关注流程实例 ${context.instanceId}`,
+          messageType: 'cc',
+          sourceType: 'workflow_instance',
+          sourceId: context.instanceId,
+          receiverId,
+          linkUrl: '',
+          linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
+        })
+      }
       console.log(`[CC] Sent to ${ccReceivers.length} CC receiver(s) for instance ${context.instanceId}`);
     } catch (error) {
       console.error(`[CC] Failed to send CC notification: ${error.message}`);
@@ -55,18 +69,18 @@ export class CcNodeHandler implements INodeHandler {
   }
 
   private async getCcReceivers(props: CcNodeProperties, variables: Record<string, any>): Promise<string[]> {
-    if (!props.ccConfig?.assigneeType) {
+    if (!props.assigneeType) {
       return []
     }
 
     return this.assigneeResolver.resolve(
       {
-        type: props.ccConfig.assigneeType as 'user' | 'department' | 'business_field',
-        userId: props.ccConfig.assigneeValue,
-        departmentId: props.ccConfig.departmentId,
-        departmentMode: props.ccConfig.departmentMode,
-        fieldPath: props.ccConfig.fieldPath,
-        businessType: props.ccConfig.businessType,
+        type: props.assigneeType as 'user' | 'department' | 'business_field',
+        userId: props.assigneeValue,
+        departmentId: props.departmentId,
+        departmentMode: props.departmentMode,
+        fieldPath: props.fieldPath,
+        businessType: props.businessType,
       },
       variables._businessData,
     )

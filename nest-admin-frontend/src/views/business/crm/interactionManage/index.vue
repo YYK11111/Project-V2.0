@@ -23,7 +23,8 @@ const canInteractionUpdate = computed(() => checkPermi(['business/crm/interactio
 const canInteractionDelete = computed(() => checkPermi(['business/crm/interactions/delete']))
 
 const getButtons = (row) => [
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canInteractionUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/interaction/form') },
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/interactionManage/form') },
+  { key: 'edit', label: '修改', type: 'primary', disabled: !canInteractionUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/interactionManage/form') },
   { key: 'delete', label: '删除', danger: true, disabled: !canInteractionDelete.value, onClick: () => rctRef.value.del(del, row.id) },
 ]
 </script>
@@ -43,7 +44,7 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canInteractionAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/interaction/form')">新增互动记录</el-button>
+          <el-button v-if="canInteractionAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/interactionManage/form')">新增互动记录</el-button>
           <el-button v-if="canInteractionDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>

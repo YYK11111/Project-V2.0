@@ -1,6 +1,10 @@
 <script setup>
-import { getOne, save, update, getType, getProjectList } from './api'
+import { getOne, save, update, getType } from './api'
 import UserSelect from '@/components/UserSelect.vue'
+import ProjectSelect from '@/components/ProjectSelect.vue'
+import ViewEntity from '@/components/view/ViewEntity.vue'
+import ViewField from '@/components/view/ViewField.vue'
+import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -26,15 +30,14 @@ const rules = {
 const type = ref({})
 getType().then(({ data }) => (type.value = data))
 
-// TODO: 获取项目列表
-const projectList = ref([])
-getProjectList().then((res) => (projectList.value = res.list || []))
-
-const isEdit = computed(() => !!route.query.id)
+const isView = computed(() => route.query.action === 'view')
+const hasDocumentId = computed(() => !!route.query.id)
+const isEdit = computed(() => !!route.query.id && !isView.value)
+const isReadonly = computed(() => isView.value)
 const canDocumentAdd = computed(() => checkPermi(['business/documents/add']))
 const canDocumentUpdate = computed(() => checkPermi(['business/documents/update']))
 
-if (isEdit.value) {
+if (hasDocumentId.value) {
   getOne(route.query.id).then(({ data }) => {
     form.value = { ...data }
   })
@@ -63,22 +66,23 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isEdit ? '编辑文档' : '新增文档'" />
+      <el-page-header @back="$router.back()" :title="isReadonly ? '查看文档' : isEdit ? '编辑文档' : '新增文档'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
       <el-form-item label="文档名称" prop="name">
-        <el-input v-model="form.name" placeholder="请输入文档名称" maxlength="100" show-word-limit />
+        <ViewField v-if="isReadonly" :value="form.name" />
+        <el-input v-else v-model="form.name" placeholder="请输入文档名称" maxlength="100" show-word-limit />
       </el-form-item>
 
       <el-form-item label="所属项目" prop="projectId">
-        <el-select v-model="form.projectId" placeholder="请选择项目" style="width: 100%">
-          <el-option v-for="project in projectList" :key="project.id" :label="project.name" :value="project.id" />
-        </el-select>
+        <ViewEntity v-if="isReadonly" :title="form.project?.name" :subtitle="form.project?.code" />
+        <ProjectSelect v-else v-model="form.projectId" placeholder="请选择项目" />
       </el-form-item>
 
       <el-form-item label="文档类型" prop="type">
-        <el-select v-model="form.type" placeholder="请选择文档类型" style="width: 100%">
+        <ViewField v-if="isReadonly" :value="type[form.type]" />
+        <el-select v-else v-model="form.type" placeholder="请选择文档类型" style="width: 100%">
           <el-option v-for="(value, key) of type" :key="key" :label="value" :value="key" />
         </el-select>
       </el-form-item>
@@ -86,18 +90,22 @@ function cancel() {
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="版本号" prop="version">
-            <el-input v-model="form.version" placeholder="请输入版本号" maxlength="20" />
+            <ViewField v-if="isReadonly" :value="form.version" />
+            <el-input v-else v-model="form.version" placeholder="请输入版本号" maxlength="20" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="上传人" prop="uploaderId">
-            <UserSelect v-model="form.uploaderId" placeholder="请选择上传人" clearable />
+            <ViewUser v-if="isReadonly" :user="form.uploader" />
+            <UserSelect v-else v-model="form.uploaderId" placeholder="请选择上传人" clearable />
           </el-form-item>
         </el-col>
       </el-row>
 
       <el-form-item label="文档内容" prop="content">
+        <ViewField v-if="isReadonly" :value="form.content" />
         <el-input
+          v-else
           v-model="form.content"
           type="textarea"
           :rows="6"
@@ -107,12 +115,16 @@ function cancel() {
       </el-form-item>
 
       <el-form-item label="文件链接" prop="fileUrl">
-        <el-input v-model="form.fileUrl" placeholder="请输入文件存储链接" maxlength="500" />
+        <template v-if="isReadonly">
+          <a v-if="form.fileUrl" :href="form.fileUrl" target="_blank">{{ form.fileUrl }}</a>
+          <ViewField v-else value="" />
+        </template>
+        <el-input v-else v-model="form.fileUrl" placeholder="请输入文件存储链接" maxlength="500" />
       </el-form-item>
 
       <el-form-item>
-        <el-button v-if="isEdit ? canDocumentUpdate : canDocumentAdd" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">取消</el-button>
+        <el-button v-if="!isReadonly && (isEdit ? canDocumentUpdate : canDocumentAdd)" type="primary" @click="submit">提交</el-button>
+        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
       </el-form-item>
     </el-form>
   </div>

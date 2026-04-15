@@ -32,7 +32,7 @@ const handleReject = (row: any) => {
   if (!canWorkflowTaskComplete.value) return $sdk.msgError('当前操作没有权限')
   currentTask.value = row
   approvalAction.value = 'reject'
-  approvalTitle.value = '拒绝审批'
+  approvalTitle.value = '驳回审批'
   approvalForm.comment = ''
   approvalDialogVisible.value = true
 }
@@ -49,7 +49,7 @@ const submitApproval = async () => {
   if (!currentTask.value) return
   try {
     await api.completeTask(currentTask.value.id, { action: approvalAction.value, comment: approvalForm.comment })
-    ElMessage.success(approvalAction.value === 'approve' ? '已同意' : '已拒绝')
+    ElMessage.success(approvalAction.value === 'approve' ? '已同意' : '已驳回')
     approvalDialogVisible.value = false
     rctRef.value.getList()
   } catch (error: any) { ElMessage.error(error.response?.data?.message || '操作失败') }
@@ -72,7 +72,7 @@ const getBusinessRoute = (row: any) => {
   if (row.businessType === 'change') return { path: '/changeManage/form', query }
   if (row.businessType === 'ticket') return { path: '/ticketManage/form', query }
   if (row.businessType === 'task') return { path: '/taskManage/form', query }
-  if (row.businessType === 'customer') return { path: '/crm/customer/form', query }
+  if (row.businessType === 'customer') return { path: '/crm/customerManage/form', query }
   return null
 }
 
@@ -100,7 +100,7 @@ const viewInstanceDetail = (row: any) => {
       </template>
       <template #tableOperation="{ row }">
         <el-button v-if="canWorkflowTaskComplete" type="primary" size="small" @click="handleApprove(row)">同意</el-button>
-        <el-button v-if="canWorkflowTaskComplete" type="danger" size="small" @click="handleReject(row)">拒绝</el-button>
+        <el-button v-if="canWorkflowTaskComplete" type="danger" size="small" @click="handleReject(row)">驳回</el-button>
         <el-button v-if="canWorkflowTaskTransfer" type="warning" size="small" @click="handleTransfer(row)">转交</el-button>
       </template>
     </RequestChartTable>

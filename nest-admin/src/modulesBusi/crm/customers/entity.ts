@@ -83,7 +83,7 @@ export class Customer extends BaseEntity {
   status: string
 
   // 归属信息
-  @BaseColumn({ length: 36, nullable: true, comment: '销售负责人ID' })
+  @BaseColumn({ type: 'bigint', nullable: true, name: 'sales_id', comment: '销售负责人ID' })
   salesId: string
 
   @ManyToOne(() => User)
@@ -106,7 +106,7 @@ export class Customer extends BaseEntity {
   @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '工作流实例ID' })
   workflowInstanceId: string
 
-  @BaseColumn({ type: 'char', length: 1, default: '0', comment: '审批状态: 0无需审批 1审批中 2已通过 3已拒绝' })
+  @BaseColumn({ type: 'char', length: 1, default: '0', comment: '审批状态: 0无需审批 1审批中 2已通过 3已驳回' })
   approvalStatus: string
 
   @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '当前审批节点名称' })

@@ -4,6 +4,7 @@ import { FindManyOptions, Repository } from 'typeorm'
 import { UserStory, UserStoryStatus } from './entities/user-story.entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class UserStoryService extends BaseService<UserStory, any> {
@@ -17,12 +18,12 @@ export class UserStoryService extends BaseService<UserStory, any> {
     let { projectId, sprintId, status, type, parentId, assigneeId } = query
     let queryOrm: FindManyOptions = {
       where: {
-        projectId,
-        sprintId,
-        status,
-        type,
-        parentId,
-        assigneeId,
+        projectId: projectId || undefined,
+        sprintId: sprintId || undefined,
+        status: status || undefined,
+        type: type || undefined,
+        parentId: parentId || undefined,
+        assigneeId: assigneeId || undefined,
       },
       relations: ['project', 'sprint', 'assignee', 'reporter', 'parent'],
       order: { priority: 'ASC', createTime: 'DESC' },
@@ -86,5 +87,60 @@ export class UserStoryService extends BaseService<UserStory, any> {
       { pageNum: 1, pageSize: 100 }
     )
     return result.data || []
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  private mapSprintSummary(sprint?: any) {
+    if (!sprint) return null
+    return {
+      id: sprint.id,
+      name: sprint.name,
+    }
+  }
+
+  private mapStorySummary(story?: UserStory | null) {
+    if (!story) return null
+    return {
+      id: story.id,
+      title: story.title,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const story = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'sprint', 'assignee', 'reporter', 'parent'],
+      },
+      isError,
+    )
+    if (!story) return story
+
+    return {
+      ...story,
+      project: this.mapProjectSummary(story.project),
+      sprint: this.mapSprintSummary(story.sprint),
+      assignee: this.mapUserSummary(story.assignee),
+      reporter: this.mapUserSummary(story.reporter),
+      parent: this.mapStorySummary(story.parent),
+    }
   }
 }

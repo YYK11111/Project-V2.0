@@ -43,7 +43,7 @@ export class CustomerLoader implements BusinessDataLoader {
         contactEmail: customer.contactEmail,
         customerValue: customer.customerValue,
         description: customer.description,
-        salesId: customer.salesId,
+        salesId: customer.salesId || customer.sales?.id || '',
         sales: customer.sales ? {
           id: customer.sales.id,
           nickname: customer.sales.nickname,

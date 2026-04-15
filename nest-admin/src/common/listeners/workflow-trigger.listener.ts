@@ -24,8 +24,10 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
   private mapEntityName(entityName: string): string {
     const map: Record<string, string> = {
       'Project': 'project',
+      'Task': 'task',
       'Customer': 'customer',
       'Ticket': 'ticket',
+      'ProjectChange': 'change',
       'Change': 'change',
     };
     return map[entityName] || entityName.toLowerCase();
@@ -40,7 +42,7 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
 
     try {
         const triggerConfig = await this.dataLoader.getTriggerConfig(businessType, 'onCreate');
-        if (triggerConfig) {
+        if (triggerConfig?.businessScene) {
           const businessKey = `${businessType}_${entity.id}`;
           console.log(`[WorkflowTrigger] Triggering workflow for ${businessKey}`);
           await this.workflowService.startBusinessWorkflow({
@@ -70,7 +72,7 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
 
       try {
         const triggerConfig = await this.dataLoader.getTriggerConfig(businessType, 'onStatusChange');
-        if (triggerConfig && this.matchStatusTrigger(entity, triggerConfig)) {
+        if (triggerConfig?.businessScene && this.matchStatusTrigger(entity, triggerConfig)) {
           const businessKey = `${businessType}_${entity.id}`;
           console.log(`[WorkflowTrigger] Status change triggers workflow for ${businessKey}`);
           await this.workflowService.startBusinessWorkflow({
@@ -88,6 +90,6 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
 
   private matchStatusTrigger(entity: any, config: any): boolean {
     if (!config.statusTriggerValues) return false;
-    return config.statusTriggerValues.includes(entity.status);
+    return config.statusTriggerValues.map(String).includes(String(entity.status));
   }
 }

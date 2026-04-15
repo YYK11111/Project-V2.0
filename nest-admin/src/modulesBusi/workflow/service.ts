@@ -12,7 +12,9 @@ import { NodeHandlerFactory } from './handler/node-handler.factory';
 import { NodeExecutionContext, NodeResult, NodeConfig, FlowConfig, Condition } from './interface/node.interface';
 import { NodeType, ConditionOperator, InstanceStatus, TaskStatus, TaskAction, AssigneeType, MultiInstanceType, CompleteType, AssigneeEmptyAction } from './interface/node-type.enum';
 import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflowDto, CompleteTaskDto, TransferTaskDto, AddSignTaskDto, WithdrawWorkflowDto, CancelWorkflowDto } from './dto';
+import { CloseReturnedWorkflowDto, ResubmitReturnedWorkflowDto } from './dto';
 import { NoticesService } from '../../modules/notices/service';
+import { MessagesService } from '../../modules/messages/service';
 import { BoolNum } from '../../common/type/base';
 import { UsersService } from '../../modules/users/users.service';
 import { DeptService } from '../../modules/depts/depts.service';
@@ -36,6 +38,7 @@ export class WorkflowService {
     private nodeHandlerFactory: NodeHandlerFactory,
     @Inject(forwardRef(() => NoticesService))
     private noticesService: NoticesService,
+    private messagesService: MessagesService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private deptService: DeptService,
@@ -45,13 +48,96 @@ export class WorkflowService {
     private workflowIntegrationService: WorkflowIntegrationService,
   ) {}
 
+  private normalizeNodeProperties(node: NodeConfig): NodeConfig['properties'] {
+    const properties = (node?.properties || {}) as Record<string, any>
+
+    if (node.type === NodeType.APPROVAL) {
+      const legacyConfig = properties.approverConfig || {}
+      const { approverConfig, ...restProperties } = properties
+      return {
+        assigneeType: 'business_field',
+        assigneeValue: '',
+        departmentId: '',
+        departmentMode: 'leader',
+        fieldPath: '',
+        businessType: restProperties.businessType || legacyConfig.businessType || '',
+        assigneeEmptyAction: 'error',
+        assigneeEmptyFallbackUserId: '',
+        assigneeEmptyFallbackFieldPath: '',
+        multiInstanceType: 'sequential',
+        ...legacyConfig,
+        ...restProperties,
+        allowRollback: restProperties.allowRollback ?? true,
+      } as any
+    }
+
+    if (node.type === NodeType.NOTIFICATION) {
+      const legacyConfig = properties.notificationConfig || {}
+      const { notificationConfig, ...restProperties } = properties
+      return {
+        notificationType: 'system',
+        notificationTemplate: '',
+        notificationContent: '',
+        assigneeType: 'business_field',
+        assigneeValue: '',
+        departmentId: '',
+        departmentMode: 'leader',
+        fieldPath: '',
+        businessType: restProperties.businessType || legacyConfig.businessType || '',
+        assigneeEmptyAction: 'skip',
+        assigneeEmptyFallbackUserId: '',
+        assigneeEmptyFallbackFieldPath: '',
+        multiInstanceType: 'sequential',
+        ...legacyConfig,
+        ...restProperties,
+      } as any
+    }
+
+    if (node.type === NodeType.CC) {
+      const legacyConfig = properties.ccConfig || {}
+      const { ccConfig, ...restProperties } = properties
+      return {
+        assigneeType: 'business_field',
+        assigneeValue: '',
+        departmentId: '',
+        departmentMode: 'leader',
+        fieldPath: '',
+        businessType: restProperties.businessType || legacyConfig.businessType || '',
+        assigneeEmptyAction: 'error',
+        assigneeEmptyFallbackUserId: '',
+        assigneeEmptyFallbackFieldPath: '',
+        multiInstanceType: 'parallel',
+        ...legacyConfig,
+        ...restProperties,
+      } as any
+    }
+
+    return properties as any
+  }
+
+  private normalizeDefinitionNodes(nodes: NodeConfig[] = []): NodeConfig[] {
+    return nodes.map((node) => ({
+      ...node,
+      properties: this.normalizeNodeProperties(node),
+    }))
+  }
+
+  private normalizeDefinition<T extends WorkflowDefinition | Partial<WorkflowDefinition>>(definition: T): T {
+    if (!definition?.nodes) return definition
+    return {
+      ...definition,
+      nodes: this.normalizeDefinitionNodes(definition.nodes as NodeConfig[]),
+    } as T
+  }
+
   // ==================== 流程定义管理 ====================
 
   /**
    * 获取所有流程定义列表
    */
   async listDefinitions(): Promise<WorkflowDefinition[]> {
-    return this.definitionRepo.find({ order: { createTime: 'DESC' } });
+    const definitions = await this.definitionRepo.find({ order: { createTime: 'DESC' } })
+    return definitions.map((definition) => this.normalizeDefinition(definition))
   }
 
   /**
@@ -71,13 +157,15 @@ export class WorkflowService {
 
     const version = existing ? (existing.version || 1) + 1 : 1;
 
+    const normalizedDto = this.normalizeDefinition(dto as Partial<WorkflowDefinition>) as Partial<WorkflowDefinition>
     const definition = this.definitionRepo.create({
-      ...dto,
+      ...normalizedDto,
       version,
       isActive: '0',
-    });
+    }) as WorkflowDefinition
 
-    return this.definitionRepo.save(definition);
+    const savedDefinition = await this.definitionRepo.save(definition)
+    return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
   }
 
   /**
@@ -121,8 +209,9 @@ export class WorkflowService {
         throw new BadRequestException('工作流定义不存在');
       }
       delete dto.isActive
-      Object.assign(definition, dto);
-      return this.definitionRepo.save(definition);
+      Object.assign(definition, this.normalizeDefinition(dto));
+      const savedDefinition = await this.definitionRepo.save(definition as WorkflowDefinition)
+      return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
     } else {
       // 新增
       return this.createDefinition(dto);
@@ -138,8 +227,9 @@ export class WorkflowService {
       throw new BadRequestException('工作流定义不存在');
     }
 
-    Object.assign(definition, dto);
-    return this.definitionRepo.save(definition);
+    Object.assign(definition, this.normalizeDefinition(dto as any));
+    const savedDefinition = await this.definitionRepo.save(definition as WorkflowDefinition)
+    return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
   }
 
   /**
@@ -150,7 +240,7 @@ export class WorkflowService {
     if (!definition) {
       throw new BadRequestException('工作流定义不存在');
     }
-    return definition;
+    return this.normalizeDefinition(definition);
   }
 
   /**
@@ -164,7 +254,7 @@ export class WorkflowService {
     if (!definition) {
       throw new BadRequestException(`工作流定义不存在: ${code}`);
     }
-    return definition;
+    return this.normalizeDefinition(definition);
   }
 
   async getDefinitionByScene(businessType: string, businessScene: string): Promise<WorkflowDefinition> {
@@ -181,7 +271,7 @@ export class WorkflowService {
       throw new BadRequestException(`业务对象 ${businessType} 场景 ${businessScene} 存在多条已发布流程，请先清理重复配置`)
     }
 
-    return definitions[0]
+    return this.normalizeDefinition(definitions[0])
   }
 
   /**
@@ -264,7 +354,9 @@ export class WorkflowService {
       isActive: '0',
     });
 
-    return this.definitionRepo.save(copy);
+    const normalizedCopy = this.normalizeDefinition(copy as WorkflowDefinition)
+    const savedDefinition = await this.definitionRepo.save(normalizedCopy as WorkflowDefinition)
+    return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
   }
 
   // ==================== 流程实例管理 ====================
@@ -790,10 +882,48 @@ export class WorkflowService {
       };
 
       await this.noticesService.add(noticeDto);
+      await this.messagesService.sendMessage({
+        title: `待办审批：${node.name}`,
+        content: noticeDto.content,
+        messageType: 'todo',
+        sourceType: 'workflow_task',
+        sourceId: task.id,
+        receiverId: task.assigneeId,
+        senderId: instance.starterId,
+        linkUrl: this.getBusinessRoute(instance.businessKey),
+        linkParams: this.getBusinessRouteParams(instance.businessKey, task.id, instance.id),
+      })
 
       console.log(`[Workflow] Sent notification for task ${task.id} to user ${task.assigneeId}`);
     } catch (error) {
       console.error(`[Workflow] Failed to send notification: ${error.message}`);
+    }
+  }
+
+  private async sendReturnToStarterMessage(instance: WorkflowInstance, task: WorkflowTask, comment?: string): Promise<void> {
+    try {
+      const now = new Date().toISOString()
+      await this.messagesService.sendMessage({
+        title: '审批已退回，请处理',
+        content: `您发起的审批已被驳回并退回发起人处理。
+
+流程：${instance.definitionCode}
+节点：${task.nodeName}
+审批人：${await this.getUserDisplayName(task.assigneeId)}
+时间：${now}
+意见：${comment || '-'}
+
+请根据意见修改业务内容后继续处理。`,
+        messageType: 'cc',
+        sourceType: 'workflow_instance',
+        sourceId: instance.id,
+        receiverId: instance.starterId,
+        senderId: task.assigneeId,
+        linkUrl: this.getBusinessRoute(instance.businessKey),
+        linkParams: this.getBusinessRouteParams(instance.businessKey, '', instance.id),
+      })
+    } catch (error) {
+      console.error(`[Workflow] Failed to send return-to-starter message: ${error.message}`)
     }
   }
 
@@ -828,6 +958,7 @@ export class WorkflowService {
     task.comment = dto.comment;
     task.completeTime = new Date().toISOString();
     await this.taskRepo.save(task);
+    await this.messagesService.deactivateWorkflowTaskMessages(task.id);
 
     await this.recordHistory(instance, null, {
       ...task,
@@ -861,12 +992,36 @@ export class WorkflowService {
       // 驳回到指定节点
       const targetNodeIndex = definition.nodes.findIndex(n => n.id === dto.targetNodeId);
       if (targetNodeIndex >= 0) {
+        const targetNode = definition.nodes[targetNodeIndex]
         // 取消该节点之前的所有任务，重新执行该节点
+        const pendingTasks = await this.taskRepo.find({ where: { instanceId: instance.id, status: TaskStatus.PENDING } as any, select: ['id'] });
         await this.taskRepo.update(
           { instanceId: instance.id, status: TaskStatus.PENDING },
           { status: TaskStatus.CANCELLED }
         );
-        await this.executeNode(instance, definition, targetNodeIndex);
+        await this.messagesService.deactivateWorkflowTaskMessages(pendingTasks.map((item) => item.id));
+        if (targetNode.type === NodeType.START) {
+          instance.status = InstanceStatus.RUNNING
+          instance.endTime = null
+          instance.duration = null
+          instance.variables = {
+            ...(instance.variables || {}),
+            _lastRejectTarget: 'start',
+            _lastRejectTargetName: targetNode.name || '开始',
+            _returnedToStarter: true,
+            _returnedToStarterAt: new Date().toISOString(),
+            _returnedByTaskId: task.id,
+            _returnedComment: dto.comment || '',
+          }
+          await this.instanceRepo.save(instance)
+          await this.workflowIntegrationService.handleReturnedToStarter(instance.id, {
+            businessKey: instance.businessKey,
+            ...(instance.variables || {}),
+          })
+          await this.sendReturnToStarterMessage(instance, task, dto.comment)
+        } else {
+          await this.executeNode(instance, definition, targetNodeIndex);
+        }
       } else {
         await this.failInstance(instance);
       }
@@ -875,6 +1030,123 @@ export class WorkflowService {
     }
 
     return this.instanceRepo.findOne({ where: { id: instance.id } });
+  }
+
+  async closeReturnedInstance(instanceId: string, userId: string, dto?: CloseReturnedWorkflowDto): Promise<WorkflowInstance> {
+    const instance = await this.instanceRepo.findOne({ where: { id: instanceId } })
+    if (!instance) {
+      throw new BadRequestException('流程实例不存在')
+    }
+    if (instance.starterId !== userId) {
+      throw new ForbiddenException('只有发起人可以结束已退回实例')
+    }
+    if (instance.status !== InstanceStatus.RUNNING) {
+      throw new BadRequestException('当前实例不可结束')
+    }
+    if (!instance.variables?._returnedToStarter) {
+      throw new BadRequestException('当前实例不是退回发起人状态')
+    }
+
+    await this.workflowIntegrationService.handleCloseReturnedInstance(instance.id, {
+      businessKey: instance.businessKey,
+      ...(instance.variables || {}),
+      closeReason: dto?.reason || '',
+    })
+
+    const activeTaskIds = await this.taskRepo.find({
+      where: { instanceId, status: TaskStatus.PENDING } as any,
+      select: ['id'],
+    })
+    await this.taskRepo.update(
+      { instanceId, status: TaskStatus.PENDING },
+      { status: TaskStatus.CANCELLED, comment: dto?.reason || '发起人结束退回实例' },
+    )
+    await this.messagesService.deactivateWorkflowTaskMessages(activeTaskIds.map((item) => item.id))
+
+    instance.status = InstanceStatus.CANCELLED
+    instance.endTime = new Date().toISOString()
+    const startTime = new Date(instance.startTime).getTime()
+    const endTime = new Date(instance.endTime).getTime()
+    instance.duration = String(endTime - startTime)
+    instance.variables = {
+      ...(instance.variables || {}),
+      _returnedClosedByStarter: true,
+      _returnedClosedAt: instance.endTime,
+      _returnedCloseReason: dto?.reason || '',
+    }
+    await this.instanceRepo.save(instance)
+
+    await this.recordHistory(instance, null, {
+      nodeId: instance.variables?._lastRejectTargetName || 'start',
+      nodeName: '开始',
+      operatorId: userId,
+      comment: dto?.reason || '发起人结束退回实例',
+    } as any, TaskAction.CANCEL)
+
+    return this.instanceRepo.findOne({ where: { id: instance.id } })
+  }
+
+  async resubmitReturnedInstance(instanceId: string, userId: string, dto?: ResubmitReturnedWorkflowDto): Promise<WorkflowInstance> {
+    const instance = await this.instanceRepo.findOne({ where: { id: instanceId } })
+    if (!instance) {
+      throw new BadRequestException('流程实例不存在')
+    }
+    if (instance.starterId !== userId) {
+      throw new ForbiddenException('只有发起人可以重新提交退回实例')
+    }
+    if (instance.status !== InstanceStatus.RUNNING) {
+      throw new BadRequestException('当前实例不可重新提交')
+    }
+    if (!instance.variables?._returnedToStarter) {
+      throw new BadRequestException('当前实例不是退回发起人状态')
+    }
+
+    const definition = await this.definitionRepo.findOne({ where: { id: instance.definitionId } })
+    if (!definition) {
+      throw new BadRequestException('流程定义不存在')
+    }
+
+    instance.variables = {
+      ...(instance.variables || {}),
+      _returnedToStarter: false,
+      _returnedResubmitted: true,
+      _returnedResubmittedAt: new Date().toISOString(),
+      _returnedResubmitComment: dto?.comment || '',
+    }
+    delete instance.variables._returnedToStarterAt
+    delete instance.variables._returnedByTaskId
+    delete instance.variables._returnedComment
+    await this.instanceRepo.save(instance)
+
+    await this.workflowIntegrationService.handleResubmitReturnedInstance(instance.id, {
+      businessKey: instance.businessKey,
+      ...(instance.variables || {}),
+    })
+
+    await this.recordHistory(instance, null, {
+      nodeId: 'start',
+      nodeName: '开始',
+      operatorId: userId,
+      comment: dto?.comment || '发起人重新提交审批',
+    } as any, 'execute' as any)
+
+    const startNodeIndex = definition.nodes.findIndex((node) => node.type === NodeType.START)
+    if (startNodeIndex < 0) {
+      throw new BadRequestException('流程缺少开始节点')
+    }
+    const startNode = definition.nodes[startNodeIndex]
+    const nextNodeIds = await this.findNextNodes(definition, startNode, instance)
+    if (!nextNodeIds.length) {
+      throw new BadRequestException('开始节点后未配置可执行节点')
+    }
+    for (const nextNodeId of nextNodeIds) {
+      const nextNodeIndex = definition.nodes.findIndex((node) => node.id === nextNodeId)
+      if (nextNodeIndex >= 0) {
+        await this.executeNode(instance, definition, nextNodeIndex)
+      }
+    }
+
+    return this.instanceRepo.findOne({ where: { id: instance.id } })
   }
 
   /**
@@ -896,7 +1168,13 @@ export class WorkflowService {
     }
 
     task.assigneeId = dto.targetUserId;
-    return this.taskRepo.save(task);
+    const savedTask = await this.taskRepo.save(task);
+    await this.messagesService.deactivateWorkflowTaskMessages(task.id);
+    const instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } });
+    if (instance) {
+      await this.sendApprovalNotification(savedTask, instance, { name: task.nodeName });
+    }
+    return savedTask;
   }
 
   /**
@@ -997,6 +1275,29 @@ export class WorkflowService {
     if (!userId) return ''
     const user = await this.usersService.getOne({ id: userId }, false)
     return user?.nickname || user?.name || userId
+  }
+
+  private getBusinessRoute(businessKey: string) {
+    const businessType = String(businessKey || '').split('_')[0]
+    if (businessType === 'project') return '/projectManage/detail'
+    if (businessType === 'change') return '/changeManage/form'
+    if (businessType === 'ticket') return '/ticketManage/form'
+    if (businessType === 'task') return '/taskManage/form'
+    if (businessType === 'customer') return '/crm/customerManage/form'
+    if (businessType === 'interaction') return '/crm/interactionManage/form'
+    if (businessType === 'opportunity') return '/crm/opportunityManage/form'
+    if (businessType === 'contract') return '/crm/contractManage/form'
+    return ''
+  }
+
+  private getBusinessRouteParams(businessKey: string, taskId?: string, instanceId?: string) {
+    const businessId = String(businessKey || '').split('_').pop()
+    return {
+      id: businessId,
+      taskId: taskId || '',
+      instanceId: instanceId || '',
+      fromWorkflow: '1',
+    }
   }
 
   /**
@@ -1107,10 +1408,12 @@ export class WorkflowService {
     }
 
     // 取消所有待办任务
+    const pendingTasks = await this.taskRepo.find({ where: { instanceId, status: TaskStatus.PENDING } as any, select: ['id'] })
     await this.taskRepo.update(
       { instanceId, status: TaskStatus.PENDING },
       { status: TaskStatus.CANCELLED, comment: dto?.comment || '发起人撤回' }
     );
+    await this.messagesService.deactivateWorkflowTaskMessages(pendingTasks.map((item) => item.id))
 
     // 记录撤回历史
     await this.recordHistory(instance, null, {
@@ -1143,10 +1446,12 @@ export class WorkflowService {
     }
 
     // 取消所有待办任务
+    const pendingTasks = await this.taskRepo.find({ where: { instanceId, status: TaskStatus.PENDING } as any, select: ['id'] })
     await this.taskRepo.update(
       { instanceId, status: TaskStatus.PENDING },
       { status: TaskStatus.CANCELLED, comment: dto?.reason || '管理员终止' }
     );
+    await this.messagesService.deactivateWorkflowTaskMessages(pendingTasks.map((item) => item.id))
 
     // 记录终止历史
     await this.recordHistory(instance, null, {
@@ -1168,10 +1473,24 @@ export class WorkflowService {
    * 获取流程实例历史记录
    */
   async getInstanceHistory(instanceId: string): Promise<WorkflowHistory[]> {
-    const historyList = await this.historyRepo.find({
-      where: { instanceId },
-      order: { createTime: 'ASC' },
-    });
+    const historyList = await this.historyRepo
+      .createQueryBuilder('history')
+      .select([
+        'history.id',
+        'history.createTime',
+        'history.instanceId',
+        'history.taskId',
+        'history.nodeId',
+        'history.nodeName',
+        'history.operatorId',
+        'history.operatorName',
+        'history.action',
+        'history.comment',
+        'history.variables',
+      ])
+      .where('history.instanceId = :instanceId', { instanceId })
+      .orderBy('history.createTime', 'ASC')
+      .getMany();
     return Promise.all(historyList.map(async (item) => ({
       ...item,
       operatorName: await this.getUserDisplayName(item.operatorId),

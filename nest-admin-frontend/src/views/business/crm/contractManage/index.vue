@@ -23,7 +23,8 @@ const canContractUpdate = computed(() => checkPermi(['business/crm/contracts/upd
 const canContractDelete = computed(() => checkPermi(['business/crm/contracts/delete']))
 
 const getButtons = (row) => [
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canContractUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/contract/form') },
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/contractManage/form') },
+  { key: 'edit', label: '修改', type: 'primary', disabled: !canContractUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/contractManage/form') },
   { key: 'delete', label: '删除', danger: true, disabled: !canContractDelete.value, onClick: () => rctRef.value.del(del, row.id) },
 ]
 </script>
@@ -43,7 +44,7 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canContractAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/contract/form')">新增合同</el-button>
+          <el-button v-if="canContractAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/contractManage/form')">新增合同</el-button>
           <el-button v-if="canContractDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>

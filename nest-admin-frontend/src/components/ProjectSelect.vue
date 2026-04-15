@@ -26,6 +26,10 @@ const props = defineProps({
   filterStatus: {
     type: Boolean,
     default: false
+  },
+  excludeStatuses: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -61,7 +65,10 @@ function loadProjectList(keywords = '') {
   
   getProjectList(query)
     .then(({ data }) => {
-      projectList.value = data || []
+      const rows = data || []
+      projectList.value = props.excludeStatuses.length
+        ? rows.filter((project) => !props.excludeStatuses.includes(String(project.status)))
+        : rows
     })
     .finally(() => {
       loading.value = false

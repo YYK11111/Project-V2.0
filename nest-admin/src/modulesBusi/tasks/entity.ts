@@ -76,6 +76,9 @@ export class Task extends BaseEntity {
   @BaseColumn({ type: 'json', nullable: true, name: 'executor_ids', comment: '经办人ID数组' })
   executorIds: string[]
 
+  /** 经办人详情（非持久化） */
+  executors?: User[]
+
   @BaseColumn({ nullable: true, name: 'parent_id', comment: '父任务ID' })
   parentId: string
 
@@ -119,7 +122,7 @@ export class Task extends BaseEntity {
   @BaseColumn({ type: 'int', default: 0, comment: '进度（0-100）' })
   progress: number
 
-  @BaseColumn({ type: 'text', nullable: true, comment: '任务描述' })
+  @BaseColumn({ type: 'longtext', nullable: true, comment: '任务描述' })
   description: string
 
   @BaseColumn({ type: 'json', nullable: true, comment: '任务附件' })
@@ -136,7 +139,7 @@ export class Task extends BaseEntity {
   @BaseColumn({ type: 'int', nullable: true, comment: '剩余工时（小时）' })
   remainingHours: number
 
-  @BaseColumn({ type: 'varchar', length: 500, nullable: true, comment: '验收标准' })
+  @BaseColumn({ type: 'longtext', nullable: true, comment: '验收标准' })
   acceptanceCriteria: string
 
   @BaseColumn({ type: 'int', nullable: true, comment: '故事点' })
@@ -145,7 +148,7 @@ export class Task extends BaseEntity {
   @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '工作流实例ID' })
   workflowInstanceId: string
 
-  @BaseColumn({ type: 'char', length: 1, default: '0', comment: '审批状态: 0无需审批 1审批中 2已通过 3已拒绝' })
+  @BaseColumn({ type: 'char', length: 1, default: '0', comment: '审批状态: 0无需审批 1审批中 2已通过 3已驳回' })
   approvalStatus: string
 
   @BaseColumn({ type: 'varchar', length: 100, nullable: true, comment: '当前审批节点名称' })

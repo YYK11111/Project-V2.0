@@ -61,6 +61,12 @@ export const constantRoutes = [
         name: 'Profile',
         meta: { title: '个人中心', icon: 'user' },
       },
+      {
+        path: 'messages',
+        component: () => import('@/views/system/messageCenter/index.vue'),
+        name: 'MessageCenter',
+        meta: { title: '消息中心', icon: 'bell' },
+      },
     ],
   },
   {
@@ -163,6 +169,10 @@ function transRouter(routesData, parentPath) {
 
     route.name = route.path?.replace(/[/:]/g, '-')?.replace(/^-+/, '') || route.component?.replace(/\//g, '-')
 
+    const hasChildren = Array.isArray(route.children) && route.children.length > 0
+    let routeComponent = null
+    let wrapRouteWithRouterView = false
+
     if (route.type === 'catalog') {
       // 一级目录使用 Layout，二级目录如果有实际组件则加载组件，否则使用 routerView
       if (level == 1) {
@@ -182,7 +192,13 @@ function transRouter(routesData, parentPath) {
         // 一级菜单使用 Layout 作为容器
         route.component = Layout
       } else if (route.component && route.component !== '') {
-        route.component = loadView(route)
+        routeComponent = loadView(route)
+        if (hasChildren) {
+          route.component = routerView
+          wrapRouteWithRouterView = true
+        } else {
+          route.component = routeComponent
+        }
       } else {
         route.component = routerView
       }
@@ -194,6 +210,19 @@ function transRouter(routesData, parentPath) {
     let children = route.children
     if (children && children.length) {
       route.children = transRouter(route.children, route.path)
+    }
+
+    if (wrapRouteWithRouterView && routeComponent) {
+      route.children = [
+        {
+          path: '',
+          component: routeComponent,
+          name: `${route.name}-index`,
+          meta: { ...route.meta },
+          isHidden: true,
+        },
+        ...(route.children || []),
+      ]
     }
 
     // 设置 redirect：一级目录有可见子菜单时重定向到第一个子菜单

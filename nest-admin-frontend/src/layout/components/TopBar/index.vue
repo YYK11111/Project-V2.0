@@ -17,6 +17,7 @@
 
     <div class="quick flexCenterBetween --MarginR">
       <svg-icon class="right-icon menuItem" icon="AIkefu" @click="useAppStore().AIDrawer = true"></svg-icon>
+      <MessageBell />
       <!-- v-if="useAppStore().sysConfig?.ai" -->
 
       <AIDrawer />
@@ -84,6 +85,7 @@ import { useAppStore } from '@/stores/app'
 
 import TopMenu from './TopMenu.vue'
 import AIDrawer from './AIDrawer/index.vue'
+import MessageBell from './MessageBell.vue'
 import { useDark, useToggle } from '@vueuse/core'
 let dark = useDark()
 const settingsRef = ref<any>(null)

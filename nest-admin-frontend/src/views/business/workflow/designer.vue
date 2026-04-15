@@ -116,8 +116,8 @@
               <!-- 连接线端点 - 起点（仅选中时显示） -->
               <circle
                 v-if="selectedFlowId === flow.id && getFlowStartPoint(flow).x !== undefined"
-                :cx="getFlowStartPoint(flow).x"
-                :cy="getFlowStartPoint(flow).y"
+                :cx="getDragFlowStartPoint(flow).x"
+                :cy="getDragFlowStartPoint(flow).y"
                 r="6"
                 :fill="getFlowColor(flow)"
                 stroke="#fff"
@@ -128,8 +128,8 @@
               <!-- 连接线端点 - 终点（仅选中时显示） -->
               <circle
                 v-if="selectedFlowId === flow.id && getFlowEndPoint(flow).x !== undefined"
-                :cx="getFlowEndPoint(flow).x"
-                :cy="getFlowEndPoint(flow).y"
+                :cx="getDragFlowEndPoint(flow).x"
+                :cy="getDragFlowEndPoint(flow).y"
                 r="6"
                 :fill="getFlowColor(flow)"
                 stroke="#fff"
@@ -246,13 +246,22 @@
                   <el-divider>审批配置</el-divider>
                   <el-form-item label="审批人配置">
                     <ApproverSelector
-                      v-model="selectedNode.properties.approverConfig"
+                      v-model="selectedNode.properties"
                       :business-type="businessType"
                     />
                   </el-form-item>
                   <el-form-item label="允许驳回">
                     <el-switch v-model="selectedNode.properties.allowRollback" />
                   </el-form-item>
+                </template>
+
+                <template v-if="selectedNode.type === 'start'">
+                  <el-alert
+                    title="开始节点只能有一条流出连接线，且不能接收入线。若需要调整流程走向，请修改现有连线目标。"
+                    type="info"
+                    :closable="false"
+                    show-icon
+                  />
                 </template>
 
                 <!-- 条件节点属性 -->
@@ -305,11 +314,54 @@
                       <el-option label="短信" value="sms" />
                     </el-select>
                   </el-form-item>
-                  <el-form-item label="接收人">
-                    <el-input v-model="selectedNode.properties.notificationReceivers" placeholder="${initiator}" />
+                  <el-form-item label="通知对象">
+                    <ApproverSelector
+                      v-model="selectedNode.properties"
+                      :business-type="businessType"
+                      mode="notification"
+                    />
                   </el-form-item>
-                  <el-form-item label="通知模板">
+                  <el-form-item label="通知标题">
                     <el-input v-model="selectedNode.properties.notificationTemplate" type="textarea" :rows="3" />
+                    <el-select
+                      v-model="notificationTitleVariable"
+                      class="variable-insert-select"
+                      placeholder="插入变量"
+                      clearable
+                      filterable
+                      @change="(val) => insertNotificationVariable('notificationTemplate', val)"
+                    >
+                      <el-option
+                        v-for="item in notificationVariableOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
+                    </el-select>
+                    <div class="template-hint">
+                      可用变量示例：`${workflow.name}`、`${instance.id}`、`${_businessData.data.name}`、`${_businessData.data.code}`
+                    </div>
+                  </el-form-item>
+                  <el-form-item label="通知内容">
+                    <el-input v-model="selectedNode.properties.notificationContent" type="textarea" :rows="4" />
+                    <el-select
+                      v-model="notificationContentVariable"
+                      class="variable-insert-select"
+                      placeholder="插入变量"
+                      clearable
+                      filterable
+                      @change="(val) => insertNotificationVariable('notificationContent', val)"
+                    >
+                      <el-option
+                        v-for="item in notificationVariableOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
+                    </el-select>
+                    <div class="template-hint">
+                      可用变量示例：`${workflow.name}`、`${node.name}`、`${operatorId}`、`${_businessData.data.title}`、`${_businessData.data.status}`
+                    </div>
                   </el-form-item>
                 </template>
 
@@ -318,7 +370,7 @@
                   <el-divider>抄送配置</el-divider>
                   <el-form-item label="抄送对象">
                     <ApproverSelector
-                      v-model="selectedNode.properties.ccConfig"
+                      v-model="selectedNode.properties"
                       :business-type="businessType"
                     />
                   </el-form-item>
@@ -498,6 +550,8 @@ const businessScene = ref('')
 const triggerEvent = ref('')
 const businessFieldMappings = ref([])
 const deptTreeData = ref([])
+const notificationTitleVariable = ref('')
+const notificationContentVariable = ref('')
 
 // 节点配置
 const nodes = ref([])
@@ -511,7 +565,71 @@ const tempLineEnd = ref({ x: 0, y: 0 }) // 临时连线终点
 const hoveredAnchor = ref(null)       // 悬停的锚点 { nodeId, position }
 const selectedFlowId = ref('')         // 选中的连线ID
 const draggingFlowEndpoint = ref(null) // 拖动连线端点 { flow, endpoint: 'source' | 'target' }
+const draggingFlowPreviewPoint = ref(null) // 拖动中的预览端点 { x, y }
+const draggingFlowNearestAnchor = ref(null) // 拖动中的最近锚点 { nodeId, position }
 const flowEndpointOffset = reactive({ x: 0, y: 0 })
+
+const createAssigneeDefaults = (emptyAction = 'error', multiInstanceType = 'sequential') => ({
+  assigneeType: 'business_field',
+  assigneeValue: '',
+  departmentId: '',
+  departmentMode: 'leader',
+  fieldPath: '',
+  businessType: businessType.value,
+  assigneeEmptyAction: emptyAction,
+  assigneeEmptyFallbackUserId: '',
+  assigneeEmptyFallbackFieldPath: '',
+  multiInstanceType,
+})
+
+const normalizeNodeProperties = (node) => {
+  const properties = node.properties || {}
+
+  if (node.type === 'approval') {
+    const legacyConfig = properties.approverConfig || {}
+    const { approverConfig, ...restProperties } = properties
+    return {
+      ...createAssigneeDefaults('error', 'sequential'),
+      ...legacyConfig,
+      ...restProperties,
+      allowRollback: restProperties.allowRollback ?? true,
+    }
+  }
+
+  if (node.type === 'notification') {
+    const legacyConfig = properties.notificationConfig || {}
+    const { notificationConfig, ...restProperties } = properties
+    return {
+      notificationType: 'system',
+      notificationTemplate: '',
+      notificationContent: '',
+      ...createAssigneeDefaults('skip', 'sequential'),
+      ...legacyConfig,
+      ...restProperties,
+    }
+  }
+
+  if (node.type === 'cc') {
+    const legacyConfig = properties.ccConfig || {}
+    const { ccConfig, ...restProperties } = properties
+    return {
+      ...createAssigneeDefaults('error', 'parallel'),
+      ...legacyConfig,
+      ...restProperties,
+    }
+  }
+
+  if (node.type === 'condition') {
+    return {
+      conditions: [],
+      ...properties,
+    }
+  }
+
+  return properties
+}
+
+const getNodeAssigneeConfig = (node) => normalizeNodeProperties(node)
 
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
 const selectedFlow = computed(() => flows.value.find(f => f.id === selectedFlowId.value))
@@ -556,6 +674,19 @@ const businessFieldLabelMap = computed(() => {
   }
   return map
 })
+const notificationVariableOptions = computed(() => {
+  const businessFieldItems = businessFieldMappings.value.map((field) => ({
+    label: `业务字段 / ${field.fieldLabel}`,
+    value: '${_businessData.data.' + field.fieldName + '}',
+  }))
+  return [
+    { label: '流程名称', value: '${workflow.name}' },
+    { label: '流程实例ID', value: '${instance.id}' },
+    { label: '当前节点名称', value: '${node.name}' },
+    { label: '操作人ID', value: '${operatorId}' },
+    ...businessFieldItems,
+  ]
+})
 const deptLabelMap = computed(() => {
   const map = new Map()
   const walk = (nodes = []) => {
@@ -580,7 +711,7 @@ const canvasWidth = computed(() => {
 
 const getCanvasElements = () => {
   const canvasEl = canvasRef.value
-  const contentEl = canvasEl?.querySelector('.canvas-content')
+  const contentEl = canvasEl?.querySelector('.canvas-content') || canvasEl
   return { canvasEl, contentEl }
 }
 
@@ -590,8 +721,8 @@ const getCanvasPoint = (clientX, clientY) => {
 
   const rect = contentEl.getBoundingClientRect()
   return {
-    x: (clientX - rect.left + canvasEl.scrollLeft) / zoom.value,
-    y: (clientY - rect.top + canvasEl.scrollTop) / zoom.value,
+    x: (clientX - rect.left) / zoom.value,
+    y: (clientY - rect.top) / zoom.value,
   }
 }
 
@@ -651,6 +782,32 @@ const getFlowEndPoint = (flow) => {
   return anchor
 }
 
+const getDragFlowStartPoint = (flow) => {
+  if (!draggingFlowEndpoint.value || draggingFlowEndpoint.value.flow.id !== flow.id) {
+    return getFlowStartPoint(flow)
+  }
+  if (draggingFlowEndpoint.value.endpoint !== 'source') {
+    return getFlowStartPoint(flow)
+  }
+  if (draggingFlowNearestAnchor.value) {
+    return getAnchorPoint(draggingFlowNearestAnchor.value.nodeId, draggingFlowNearestAnchor.value.position)
+  }
+  return draggingFlowPreviewPoint.value || getFlowStartPoint(flow)
+}
+
+const getDragFlowEndPoint = (flow) => {
+  if (!draggingFlowEndpoint.value || draggingFlowEndpoint.value.flow.id !== flow.id) {
+    return getFlowEndPoint(flow)
+  }
+  if (draggingFlowEndpoint.value.endpoint !== 'target') {
+    return getFlowEndPoint(flow)
+  }
+  if (draggingFlowNearestAnchor.value) {
+    return getAnchorPoint(draggingFlowNearestAnchor.value.nodeId, draggingFlowNearestAnchor.value.position)
+  }
+  return draggingFlowPreviewPoint.value || getFlowEndPoint(flow)
+}
+
 // 贝塞尔曲线路径生成
 const getBezierPath = (flow) => {
   const sourceNode = getSourceNode(flow)
@@ -661,8 +818,8 @@ const getBezierPath = (flow) => {
   const sourcePos = flow.sourceAnchor || 'right'
   const targetPos = flow.targetAnchor || 'left'
   
-  const start = getAnchorPoint(flow.sourceNodeId, sourcePos)
-  const end = getAnchorPoint(flow.targetNodeId, targetPos)
+  const start = draggingFlowEndpoint.value?.flow.id === flow.id ? getDragFlowStartPoint(flow) : getAnchorPoint(flow.sourceNodeId, sourcePos)
+  const end = draggingFlowEndpoint.value?.flow.id === flow.id ? getDragFlowEndPoint(flow) : getAnchorPoint(flow.targetNodeId, targetPos)
 
   // 计算控制点偏移
   const dx = Math.abs(end.x - start.x)
@@ -781,9 +938,15 @@ const canConnectTo = (targetNodeId) => {
 }
 
 const multiOutgoingNodeTypes = ['condition']
+const noIncomingNodeTypes = ['start']
+const noOutgoingNodeTypes = ['end']
 
 const getOutgoingFlows = (nodeId) => {
   return flows.value.filter((flow) => flow.sourceNodeId === nodeId && flow.targetNodeId)
+}
+
+const getIncomingFlows = (nodeId) => {
+  return flows.value.filter((flow) => flow.targetNodeId === nodeId && flow.sourceNodeId)
 }
 
 const getInvalidConnectionReason = (source, target, flowType = 'normal') => {
@@ -791,13 +954,25 @@ const getInvalidConnectionReason = (source, target, flowType = 'normal') => {
   if (source.nodeId === target.nodeId) return '节点不能连接到自身'
 
   const sourceNode = nodes.value.find((node) => node.id === source.nodeId)
+  const targetNode = nodes.value.find((node) => node.id === target.nodeId)
   if (!sourceNode) return '源节点不存在'
-  if (sourceNode.type === 'end') return '结束节点不能创建流出连接线'
+  if (!targetNode) return '目标节点不存在'
+  if (noOutgoingNodeTypes.includes(sourceNode.type)) return '结束节点不能创建流出连接线'
+  if (noIncomingNodeTypes.includes(targetNode.type)) return '开始节点不能接收入线，请从开始节点向后连接'
 
   if (!multiOutgoingNodeTypes.includes(sourceNode.type)) {
     const outgoingFlows = getOutgoingFlows(source.nodeId)
     if (outgoingFlows.length > 0) {
-      return `${getNodeTypeName(sourceNode.type)}仅允许一条流出连接线`
+      return sourceNode.type === 'start'
+        ? '开始节点只能有一条流出连接线，请调整现有连线目标'
+        : `${getNodeTypeName(sourceNode.type)}仅允许一条流出连接线`
+    }
+  }
+
+  if (sourceNode.type === 'condition') {
+    const duplicatedTarget = getOutgoingFlows(source.nodeId).some((flow) => flow.targetNodeId === target.nodeId)
+    if (duplicatedTarget) {
+      return '同一个条件节点不能重复连接到同一个目标节点'
     }
   }
 
@@ -962,6 +1137,18 @@ const getUserDisplayName = (userValue) => {
   return String(userValue)
 }
 
+const insertNotificationVariable = (field, value) => {
+  if (!selectedNode.value || selectedNode.value.type !== 'notification' || !value) return
+  const currentValue = selectedNode.value.properties?.[field] || ''
+  selectedNode.value.properties[field] = `${currentValue}${currentValue ? ' ' : ''}${value}`
+  if (field === 'notificationTemplate') {
+    notificationTitleVariable.value = ''
+  }
+  if (field === 'notificationContent') {
+    notificationContentVariable.value = ''
+  }
+}
+
 const getAssigneeSourceSummary = (config, prefix = '来源') => {
   if (config.assigneeType === 'business_field') {
     return `${prefix}：业务字段 ${getBusinessFieldLabel(config.fieldPath)}${getFallbackFieldSuffix(config.assigneeEmptyFallbackFieldPath)}`
@@ -1027,6 +1214,7 @@ const validationIssues = computed(() => {
 
   nodes.value.forEach((node) => {
     const outgoingFlows = getOutgoingFlows(node.id)
+    const incomingFlows = getIncomingFlows(node.id)
 
     if (node.type === 'end' && outgoingFlows.length > 0) {
       issues.push({ type: 'structure', level: 'error', message: '结束节点不能存在流出连接线', nodeName: node.name, nodeId: node.id })
@@ -1036,12 +1224,24 @@ const validationIssues = computed(() => {
       issues.push({ type: 'structure', level: 'error', message: '开始节点至少需要一条流出连接线', nodeName: node.name, nodeId: node.id })
     }
 
+    if (node.type === 'start' && outgoingFlows.length > 1) {
+      issues.push({ type: 'structure', level: 'error', message: '开始节点只能保留一条流出连接线，请删除多余分支或调整现有连线目标', nodeName: node.name, nodeId: node.id })
+    }
+
+    if (node.type === 'start' && incomingFlows.length > 0) {
+      issues.push({ type: 'structure', level: 'error', message: '开始节点不能存在流入连接线', nodeName: node.name, nodeId: node.id })
+    }
+
+    if (node.type !== 'start' && node.type !== 'condition' && incomingFlows.length === 0) {
+      issues.push({ type: 'structure', level: 'warning', message: `${getNodeTypeName(node.type)}未接入主流程`, nodeName: node.name, nodeId: node.id })
+    }
+
     if (!multiOutgoingNodeTypes.includes(node.type) && node.type !== 'end' && outgoingFlows.length > 1) {
       issues.push({ type: 'structure', level: 'error', message: `${getNodeTypeName(node.type)}仅允许一条流出连接线`, nodeName: node.name, nodeId: node.id })
     }
 
     if (node.type === 'approval') {
-      const config = node.properties?.approverConfig || {}
+      const config = getNodeAssigneeConfig(node)
       if (!config.assigneeType) {
           issues.push({ type: 'approval', level: 'error', message: '审批人来源未配置', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'user' && !config.assigneeValue) {
@@ -1058,6 +1258,10 @@ const validationIssues = computed(() => {
       if (!conditions.length) {
         issues.push({ type: 'condition', level: 'error', message: '条件节点未配置任何条件', nodeName: node.name, nodeId: node.id })
       }
+      const targetIds = outgoingFlows.map((flow) => flow.targetNodeId).filter(Boolean)
+      if (new Set(targetIds).size !== targetIds.length) {
+        issues.push({ type: 'condition', level: 'error', message: '条件节点存在重复目标分支，同一个目标节点只能连接一次', nodeName: node.name, nodeId: node.id })
+      }
       conditions.forEach((condition, index) => {
         const flow = getConditionFlow(node.id, condition.id)
         if (!flow?.targetNodeId) {
@@ -1071,7 +1275,7 @@ const validationIssues = computed(() => {
     }
 
     if (node.type === 'cc') {
-      const config = node.properties?.ccConfig || {}
+      const config = getNodeAssigneeConfig(node)
       if (!config.assigneeType) {
         issues.push({ type: 'cc', level: 'error', message: '抄送对象来源未配置', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'user' && !config.assigneeValue) {
@@ -1080,6 +1284,19 @@ const validationIssues = computed(() => {
         issues.push({ type: 'cc', level: 'error', message: '固定部门配置不完整', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
         issues.push({ type: 'cc', level: 'error', message: '业务字段未选择', nodeName: node.name, nodeId: node.id })
+      }
+    }
+
+    if (node.type === 'notification') {
+      const config = getNodeAssigneeConfig(node)
+      if (!config.assigneeType) {
+        issues.push({ type: 'notification', level: 'error', message: '通知对象来源未配置', nodeName: node.name, nodeId: node.id })
+      } else if (config.assigneeType === 'user' && !config.assigneeValue) {
+        issues.push({ type: 'notification', level: 'error', message: '固定人员未选择', nodeName: node.name, nodeId: node.id })
+      } else if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) {
+        issues.push({ type: 'notification', level: 'error', message: '固定部门配置不完整', nodeName: node.name, nodeId: node.id })
+      } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
+        issues.push({ type: 'notification', level: 'error', message: '业务字段未选择', nodeName: node.name, nodeId: node.id })
       }
     }
 
@@ -1124,7 +1341,7 @@ const focusIssue = (issue) => {
 
 const isNodeIncomplete = (node) => {
   if (node.type === 'approval') {
-    const config = node.properties?.approverConfig || {}
+    const config = getNodeAssigneeConfig(node)
     if (!config.assigneeType) return true
     if (config.assigneeType === 'user' && !config.assigneeValue) return true
     if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) return true
@@ -1138,9 +1355,17 @@ const isNodeIncomplete = (node) => {
     if (!getDefaultFlow(node.id)?.targetNodeId) return false
   }
 
-    if (node.type === 'cc') {
-      const config = node.properties?.ccConfig || {}
-      if (!config.assigneeType) return true
+  if (node.type === 'cc') {
+    const config = getNodeAssigneeConfig(node)
+    if (!config.assigneeType) return true
+    if (config.assigneeType === 'user' && !config.assigneeValue) return true
+    if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) return true
+    if (config.assigneeType === 'business_field' && !config.fieldPath) return true
+  }
+
+  if (node.type === 'notification') {
+    const config = getNodeAssigneeConfig(node)
+    if (!config.assigneeType) return true
     if (config.assigneeType === 'user' && !config.assigneeValue) return true
     if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) return true
     if (config.assigneeType === 'business_field' && !config.fieldPath) return true
@@ -1155,7 +1380,7 @@ const isNodeIncomplete = (node) => {
 
 const getPreviewNodeSummary = (node) => {
   if (node.type === 'approval') {
-    const config = node.properties?.approverConfig || {}
+    const config = getNodeAssigneeConfig(node)
     return getAssigneeSourceSummary(config, '审批人来源')
   }
 
@@ -1169,11 +1394,12 @@ const getPreviewNodeSummary = (node) => {
   }
 
   if (node.type === 'notification') {
-    return `通知：${node.properties?.notificationType || 'system'}`
+    const config = getNodeAssigneeConfig(node)
+    return `${getAssigneeSourceSummary(config, '通知对象')}；方式：${node.properties?.notificationType || 'system'}`
   }
 
   if (node.type === 'cc') {
-    const config = node.properties?.ccConfig || {}
+    const config = getNodeAssigneeConfig(node)
     return getAssigneeSourceSummary(config, '抄送来源')
   }
 
@@ -1190,7 +1416,7 @@ const getPreviewNodeSummary = (node) => {
 
 const getNodeSummary = (node) => {
   if (node.type === 'approval') {
-    const config = node.properties?.approverConfig || {}
+    const config = getNodeAssigneeConfig(node)
     return getAssigneeSourceSummary(config, '审批人来源')
   }
 
@@ -1202,11 +1428,12 @@ const getNodeSummary = (node) => {
   }
 
   if (node.type === 'notification') {
-    return `通知方式：${node.properties?.notificationType || 'system'}`
+    const config = getNodeAssigneeConfig(node)
+    return `${getAssigneeSourceSummary(config, '通知对象')}；通知方式：${node.properties?.notificationType || 'system'}`
   }
 
   if (node.type === 'cc') {
-    const config = node.properties?.ccConfig || {}
+    const config = getNodeAssigneeConfig(node)
     return getAssigneeSourceSummary(config, '抄送来源')
   }
 
@@ -1273,18 +1500,7 @@ const getDefaultProperties = (type) => {
     start: {},
     end: {},
     approval: {
-      approverConfig: {
-        assigneeType: 'business_field',
-        assigneeValue: '',
-        departmentId: '',
-        departmentMode: 'leader',
-        fieldPath: '',
-        businessType: businessType.value,
-        assigneeEmptyAction: 'error',
-        assigneeEmptyFallbackUserId: '',
-        assigneeEmptyFallbackFieldPath: '',
-        multiInstanceType: 'sequential',
-      },
+      ...createAssigneeDefaults('error', 'sequential'),
       allowRollback: true,
     },
     condition: {
@@ -1292,22 +1508,12 @@ const getDefaultProperties = (type) => {
     },
     notification: {
       notificationType: 'system',
-      notificationReceivers: '',
       notificationTemplate: '',
+      notificationContent: '',
+      ...createAssigneeDefaults('skip', 'sequential'),
     },
     cc: {
-      ccConfig: {
-        assigneeType: 'business_field',
-        assigneeValue: '',
-        departmentId: '',
-        departmentMode: 'leader',
-        fieldPath: '',
-        businessType: businessType.value,
-        assigneeEmptyAction: 'error',
-        assigneeEmptyFallbackUserId: '',
-        assigneeEmptyFallbackFieldPath: '',
-        multiInstanceType: 'parallel',
-      },
+      ...createAssigneeDefaults('error', 'parallel'),
     },
     delay: {
       delayType: 'fixed',
@@ -1558,6 +1764,8 @@ const onFlowEndpointMouseDown = (event, flow, endpoint) => {
   
   flowEndpointOffset.x = point.x - anchor.x
   flowEndpointOffset.y = point.y - anchor.y
+  draggingFlowPreviewPoint.value = anchor
+  draggingFlowNearestAnchor.value = null
   
   document.addEventListener('mousemove', onFlowEndpointMouseMove)
   document.addEventListener('mouseup', onFlowEndpointMouseUp)
@@ -1569,33 +1777,55 @@ const onFlowEndpointMouseMove = (event) => {
   const point = getCanvasPoint(event.clientX, event.clientY)
   const mouseX = point.x - flowEndpointOffset.x
   const mouseY = point.y - flowEndpointOffset.y
+  draggingFlowPreviewPoint.value = { x: mouseX, y: mouseY }
   
   const nearest = findNearestAnchor(mouseX, mouseY, draggingFlowEndpoint.value.flow.id)
+  draggingFlowNearestAnchor.value = nearest
   
-  if (nearest) {
-    const { flow, endpoint } = draggingFlowEndpoint.value
-    // 通过数组索引更新以确保响应式
-    const flowIndex = flows.value.findIndex(f => f.id === flow.id)
-    if (flowIndex !== -1) {
-      const updatedFlow = { ...flows.value[flowIndex] }
-      if (endpoint === 'source') {
-        updatedFlow.sourceNodeId = nearest.nodeId
-        updatedFlow.sourceAnchor = nearest.position
-      } else {
-        updatedFlow.targetNodeId = nearest.nodeId
-        updatedFlow.targetAnchor = nearest.position
-      }
-      flows.value[flowIndex] = updatedFlow
-      // 更新 draggingFlowEndpoint 的引用
-      draggingFlowEndpoint.value.flow = updatedFlow
-    }
+  if (!nearest) {
+    return
   }
+
+  const { flow, endpoint } = draggingFlowEndpoint.value
+  const flowIndex = flows.value.findIndex(f => f.id === flow.id)
+  if (flowIndex === -1) return
+
+  const currentFlow = flows.value[flowIndex]
+  const updatedFlow = { ...currentFlow }
+  const nextSource = endpoint === 'source'
+    ? { nodeId: nearest.nodeId, position: nearest.position }
+    : { nodeId: updatedFlow.sourceNodeId, position: updatedFlow.sourceAnchor || 'right' }
+  const nextTarget = endpoint === 'target'
+    ? { nodeId: nearest.nodeId, position: nearest.position }
+    : { nodeId: updatedFlow.targetNodeId, position: updatedFlow.targetAnchor || 'left' }
+  const checkFlowType = updatedFlow.flowType || 'normal'
+  const rollbackFlow = { ...currentFlow, targetNodeId: '' }
+  flows.value[flowIndex] = rollbackFlow
+  const error = getInvalidConnectionReason(nextSource, nextTarget, checkFlowType)
+  if (error) {
+    flows.value[flowIndex] = currentFlow
+    return
+  }
+  if (endpoint === 'source') {
+    updatedFlow.sourceNodeId = nearest.nodeId
+    updatedFlow.sourceAnchor = nearest.position
+  } else {
+    updatedFlow.targetNodeId = nearest.nodeId
+    updatedFlow.targetAnchor = nearest.position
+  }
+  flows.value[flowIndex] = updatedFlow
+  draggingFlowEndpoint.value.flow = updatedFlow
 }
 
 // 结束拖动连接线端点
 const onFlowEndpointMouseUp = () => {
   document.removeEventListener('mousemove', onFlowEndpointMouseMove)
   document.removeEventListener('mouseup', onFlowEndpointMouseUp)
+  if (draggingFlowEndpoint.value && !draggingFlowNearestAnchor.value) {
+    ElMessage.info('请将连线端点拖到合法节点锚点上')
+  }
+  draggingFlowPreviewPoint.value = null
+  draggingFlowNearestAnchor.value = null
   draggingFlowEndpoint.value = null
 }
 
@@ -1623,14 +1853,10 @@ const onNodeMouseDown = (event, node) => {
   if (target?.closest?.('.anchor')) return
   
   draggingNode.value = node
-  
-  // 使用 currentTarget 确保获取的是节点本身的 rect
-  const nodeElement = event.currentTarget
-  const nodeRect = nodeElement.getBoundingClientRect()
-  
-  // 计算鼠标相对于节点内部的偏移
-  dragOffset.x = event.clientX - nodeRect.left
-  dragOffset.y = event.clientY - nodeRect.top
+
+  const point = getCanvasPoint(event.clientX, event.clientY)
+  dragOffset.x = point.x - node.x
+  dragOffset.y = point.y - node.y
   
   document.addEventListener('mousemove', onNodeMouseMove)
   document.addEventListener('mouseup', onNodeMouseUp)
@@ -1729,25 +1955,7 @@ const setDefaultConditionFlow = (flowId) => {
 
 const normalizeLoadedData = (data) => {
   nodes.value = (data.nodes || []).map((node) => {
-    if (node.type === 'approval') {
-      node.properties = {
-        approverConfig: {
-          assigneeType: 'business_field',
-          assigneeValue: '',
-          departmentId: '',
-          departmentMode: 'leader',
-          fieldPath: '',
-          businessType: businessType.value,
-          assigneeEmptyAction: 'error',
-          assigneeEmptyFallbackUserId: '',
-          assigneeEmptyFallbackFieldPath: '',
-          multiInstanceType: 'sequential',
-          ...(node.properties?.approverConfig || {}),
-        },
-        allowRollback: true,
-        ...node.properties,
-      }
-    }
+    node.properties = normalizeNodeProperties(node)
 
     if (node.type === 'condition') {
       node.properties = {
@@ -1762,25 +1970,6 @@ const normalizeLoadedData = (data) => {
         value: '',
         ...condition,
       }))
-    }
-
-    if (node.type === 'cc') {
-      node.properties = {
-        ccConfig: {
-          assigneeType: 'business_field',
-          assigneeValue: '',
-          departmentId: '',
-          departmentMode: 'leader',
-          fieldPath: '',
-          businessType: businessType.value,
-          assigneeEmptyAction: 'error',
-          assigneeEmptyFallbackUserId: '',
-          assigneeEmptyFallbackFieldPath: '',
-          multiInstanceType: 'parallel',
-          ...(node.properties?.ccConfig || {}),
-        },
-        ...node.properties,
-      }
     }
 
     return node
@@ -1842,42 +2031,24 @@ const validateWorkflowDefinition = () => {
 
 const buildSubmitNodes = () => {
   return nodes.value.map((node) => {
+    const properties = normalizeNodeProperties(node)
+
     if (node.type === 'condition') {
       return {
         ...node,
         properties: {
-          ...node.properties,
-          conditions: (node.properties.conditions || []).map((condition) => ({
+          ...properties,
+          conditions: (properties.conditions || []).map((condition) => ({
             ...condition,
           })),
         },
       }
     }
 
-    if (node.type === 'cc') {
-      const restProperties = node.properties || {}
-      return {
-        ...node,
-        properties: {
-          ...restProperties,
-          ccConfig: {
-            assigneeType: 'business_field',
-            assigneeValue: '',
-            departmentId: '',
-            departmentMode: 'leader',
-            fieldPath: '',
-            businessType: businessType.value,
-            assigneeEmptyAction: 'error',
-            assigneeEmptyFallbackUserId: '',
-            assigneeEmptyFallbackFieldPath: '',
-            multiInstanceType: 'parallel',
-            ...(restProperties.ccConfig || {}),
-          },
-        },
-      }
+    return {
+      ...node,
+      properties,
     }
-
-    return node
   })
 }
 
@@ -2414,6 +2585,8 @@ const onCanvasClick = () => {
   border-left: 1px solid #ddd;
   padding: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .issue-panel {
@@ -2454,6 +2627,7 @@ const onCanvasClick = () => {
 
 .condition-list {
   padding: 10px 0;
+  min-width: 0;
 }
 
 .condition-item {
@@ -2461,6 +2635,7 @@ const onCanvasClick = () => {
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 10px;
+  min-width: 0;
 }
 
 .condition-header {
@@ -2468,6 +2643,9 @@ const onCanvasClick = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .condition-hint {
@@ -2494,6 +2672,8 @@ const onCanvasClick = () => {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .condition-label {
@@ -2516,12 +2696,27 @@ const onCanvasClick = () => {
   gap: 8px;
   color: #666;
   font-size: 12px;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .flow-hint {
   margin-top: 6px;
   color: #e67e22;
   font-size: 12px;
+}
+
+.template-hint {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.variable-insert-select {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .summary-panel {
@@ -2551,6 +2746,28 @@ const onCanvasClick = () => {
   color: #606266;
   line-height: 1.6;
   font-size: 13px;
+  word-break: break-word;
+}
+
+:deep(.designer-properties .el-tabs),
+:deep(.designer-properties .el-tabs__content),
+:deep(.designer-properties .el-tab-pane),
+:deep(.designer-properties .el-form),
+:deep(.designer-properties .el-form-item),
+:deep(.designer-properties .el-form-item__content) {
+  min-width: 0;
+}
+
+:deep(.designer-properties .el-input),
+:deep(.designer-properties .el-select),
+:deep(.designer-properties .el-cascader),
+:deep(.designer-properties .el-tree-select) {
+  max-width: 100%;
+}
+
+:deep(.designer-properties .el-alert__title),
+:deep(.designer-properties .el-form-item__content span) {
+  word-break: break-word;
 }
 
 /* 流程预览样式 */

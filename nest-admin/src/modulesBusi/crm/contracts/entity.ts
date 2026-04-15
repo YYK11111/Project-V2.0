@@ -2,6 +2,7 @@ import { IsNotEmpty, MaxLength, IsOptional } from 'class-validator'
 import { BaseEntity, BaseColumn, MyEntity, DbUnique } from 'src/common/entity/BaseEntity'
 import { JoinColumn, ManyToOne } from 'typeorm'
 import { Customer } from '../customers/entity'
+import { User } from 'src/modules/users/entities/user.entity'
 
 // 合同状态字典
 export const contractStatusMap = {
@@ -81,6 +82,10 @@ export class Contract extends BaseEntity {
   @BaseColumn({ length: 36, comment: '合同负责人ID' })
   @IsNotEmpty({ message: '合同负责人ID不能为空' })
   ownerId: string
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'owner_id' })
+  owner: User
 
   // 合同文件
   @BaseColumn({ length: 255, nullable: true, comment: '合同文件路径' })

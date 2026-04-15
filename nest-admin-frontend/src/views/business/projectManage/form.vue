@@ -1,13 +1,19 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, Delete, Document } from '@element-plus/icons-vue'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectType } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { checkPermi } from '@/utils/permission'
 import UserSelect from '@/components/UserSelect.vue'
 import Editor from '@/components/Editor/index.vue'
 import Upload from '@/components/Upload.vue'
+import ViewEntity from '@/components/view/ViewEntity.vue'
+import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
+import ViewRichText from '@/components/view/ViewRichText.vue'
+import ViewTagField from '@/components/view/ViewTagField.vue'
+import ViewUser from '@/components/view/ViewUser.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,6 +122,9 @@ getProjectType().then(({ data }) => (projectType.value = data || {}))
 getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
   customerList.value = res.list || []
 })
+
+const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
+const currentCustomer = computed(() => form.value.customer || customerMap.value.get(String(form.value.customerId || '')) || null)
 
 watch(
   () => form.value.projectType,
@@ -262,97 +271,109 @@ function cancel() {
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
       <div class="project-sections">
-        <section class="section-card">
+        <section class="section-card section-card--basic">
           <div class="section-header section-header--stack">
             <div>
               <div class="section-title">基本信息</div>
               <div class="section-desc">维护项目基础属性、负责人、时间计划和预算进度。</div>
             </div>
           </div>
-            <el-row :gutter="20">
+            <el-row :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目名称" prop="name">
-                  <el-input v-model="form.name" placeholder="请输入项目名称" maxlength="100" show-word-limit :disabled="isView" />
+                  <ViewField v-if="isView" :value="form.name" />
+                  <el-input v-else v-model="form.name" placeholder="请输入项目名称" maxlength="100" show-word-limit />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目编号">
-                  <el-input v-model="form.code" placeholder="保存后自动生成" disabled />
+                  <ViewField v-if="isView" :value="form.code" />
+                  <el-input v-else v-model="form.code" placeholder="保存后自动生成" disabled />
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-row :gutter="20">
+            <el-row :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="客户">
-                  <el-select v-model="form.customerId" placeholder="请选择客户" style="width: 100%" clearable :disabled="isView">
+                  <ViewEntity v-if="isView" :title="currentCustomer?.name" :subtitle="currentCustomer?.code" />
+                  <el-select v-else v-model="form.customerId" placeholder="请选择客户" style="width: 100%" clearable>
                     <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id" />
                   </el-select>
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目类型" prop="projectType">
-                  <el-select v-model="form.projectType" placeholder="请选择项目类型" style="width: 100%" :disabled="isView || isEdit">
+                  <ViewField v-if="isView" :value="projectType[form.projectType]" />
+                  <el-select v-else v-model="form.projectType" placeholder="请选择项目类型" style="width: 100%" :disabled="isEdit">
                     <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
                   </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-row :gutter="20">
+            <el-row :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目负责人" prop="leaderId">
-                  <UserSelect v-model="form.leaderId" placeholder="请选择项目负责人" :disabled="isView" clearable />
+                  <ViewUser v-if="isView" :user="form.leader" />
+                  <UserSelect v-else v-model="form.leaderId" placeholder="请选择项目负责人" clearable />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="优先级" prop="priority">
-                  <el-select v-model="form.priority" placeholder="请选择优先级" style="width: 100%" :disabled="isView">
+                  <ViewTagField v-if="isView" :text="priority[form.priority]" :type="form.priority === '3' ? 'danger' : form.priority === '2' ? 'warning' : 'info'" />
+                  <el-select v-else v-model="form.priority" placeholder="请选择优先级" style="width: 100%">
                     <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
                   </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-row :gutter="20">
+            <el-row :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="开始时间" prop="startDate">
-                  <el-date-picker v-model="form.startDate" type="date" placeholder="选择开始时间" value-format="YYYY-MM-DD" style="width: 100%" :disabled="isView" />
+                  <ViewField v-if="isView" :value="form.startDate" />
+                  <el-date-picker v-else v-model="form.startDate" type="date" placeholder="选择开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="结束时间" prop="endDate">
-                  <el-date-picker v-model="form.endDate" type="date" placeholder="选择结束时间" value-format="YYYY-MM-DD" style="width: 100%" :disabled="isView" />
+                  <ViewField v-if="isView" :value="form.endDate" />
+                  <el-date-picker v-else v-model="form.endDate" type="date" placeholder="选择结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-row :gutter="20">
+            <el-row :gutter="20" class="basic-info-row basic-info-row--last">
               <el-col :xs="24" :sm="8">
                 <el-form-item label="状态">
-                  <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%" :disabled="isView">
+                  <ViewTagField v-if="isView" :text="status[form.status]" :type="form.status === '6' ? 'success' : form.status === '3' ? 'primary' : form.status === '4' ? 'warning' : form.status === '7' ? 'danger' : 'info'" />
+                  <el-select v-else v-model="form.status" placeholder="请选择状态" style="width: 100%" disabled>
                     <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
                   </el-select>
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="8">
                 <el-form-item label="项目预算">
-                  <el-input-number v-model="form.budget" :min="0" :precision="2" :step="1000" style="width: 100%" :disabled="isView" />
+                  <ViewField v-if="isView" :value="form.budget" />
+                  <el-input-number v-else v-model="form.budget" :min="0" :precision="2" :step="1000" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="8">
                 <el-form-item label="实际成本">
-                  <el-input-number v-model="form.actualCost" :min="0" :precision="2" :step="1000" style="width: 100%" :disabled="isView" />
+                  <ViewField v-if="isView" :value="form.actualCost" />
+                  <el-input-number v-else v-model="form.actualCost" :min="0" :precision="2" :step="1000" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-form-item label="进度(%)">
-              <el-slider v-model="form.progress" :min="0" :max="100" show-input :disabled="isView" />
+            <el-form-item label="进度(%)" class="basic-info-progress-item">
+              <ViewField v-if="isView" :value="form.progress" />
+              <el-slider v-else v-model="form.progress" :min="0" :max="100" show-input />
             </el-form-item>
         </section>
 
-        <section class="section-card">
+        <section class="section-card section-card--table">
           <div class="section-header">
             <div>
               <div class="section-title">项目成员</div>
@@ -366,14 +387,16 @@ function cancel() {
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="成员" width="260">
                 <template #default="{ row }">
-                  <div class="cell-editor">
-                    <UserSelect v-model="row.userId" placeholder="请选择成员" :disabled="isView" clearable compact />
+                  <ViewUser v-if="isView" :user="row.user" />
+                  <div v-else class="cell-editor">
+                    <UserSelect v-model="row.userId" placeholder="请选择成员" :disabled="isView" clearable />
                   </div>
                 </template>
               </el-table-column>
               <el-table-column label="角色" width="180">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="memberRoleOptions[row.role]" />
+                  <div v-else class="cell-editor">
                     <el-select v-model="row.role" placeholder="请选择角色" style="width: 100%" :disabled="isView">
                       <el-option v-for="(label, key) in memberRoleOptions" :key="key" :label="label" :value="key" />
                     </el-select>
@@ -382,19 +405,22 @@ function cancel() {
               </el-table-column>
               <el-table-column label="核心成员" width="110">
                 <template #default="{ row }">
-                  <el-switch v-model="row.isCore" active-value="1" inactive-value="0" :disabled="isView" />
+                  <ViewField v-if="isView" :value="row.isCore === '1' ? '是' : '否'" />
+                  <el-switch v-else v-model="row.isCore" active-value="1" inactive-value="0" :disabled="isView" />
                 </template>
               </el-table-column>
               <el-table-column label="备注" width="220">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="row.remark" />
+                  <div v-else class="cell-editor">
                     <el-input v-model="row.remark" placeholder="请输入备注" :disabled="isView" />
                   </div>
                 </template>
               </el-table-column>
               <el-table-column label="排序" width="120">
                 <template #default="{ row }">
-                  <div class="cell-editor cell-editor--compact">
+                  <ViewField v-if="isView" :value="row.sort" />
+                  <div v-else class="cell-editor cell-editor--compact">
                     <el-input-number v-model="row.sort" :min="0" style="width: 100%" :disabled="isView" />
                   </div>
                 </template>
@@ -410,7 +436,7 @@ function cancel() {
           </div>
         </section>
 
-        <section class="section-card">
+        <section class="section-card section-card--table">
           <div class="section-header">
             <div>
               <div class="section-title">里程碑计划</div>
@@ -427,21 +453,24 @@ function cancel() {
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="里程碑名称" width="220">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="row.name" />
+                  <div v-else class="cell-editor">
                     <el-input v-model="row.name" placeholder="请输入里程碑名称" :disabled="isView" />
                   </div>
                 </template>
               </el-table-column>
               <el-table-column label="计划完成日期" width="160">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="row.dueDate" />
+                  <div v-else class="cell-editor">
                     <el-date-picker v-model="row.dueDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" :disabled="isView" />
                   </div>
                 </template>
               </el-table-column>
               <el-table-column label="状态" width="130">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="{ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[row.status]" />
+                  <div v-else class="cell-editor">
                     <el-select v-model="row.status" style="width: 100%" :disabled="isView">
                       <el-option label="待完成" value="1" />
                       <el-option label="已完成" value="2" />
@@ -453,7 +482,8 @@ function cancel() {
               </el-table-column>
               <el-table-column label="交付物" width="260">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
+                  <div v-else class="cell-editor">
                     <el-select v-model="row.deliverables" multiple filterable allow-create default-first-option collapse-tags collapse-tags-tooltip placeholder="请输入交付物" style="width: 100%" :disabled="isView">
                       <el-option v-for="item in row.deliverables || []" :key="item" :label="item" :value="item" />
                     </el-select>
@@ -462,14 +492,16 @@ function cancel() {
               </el-table-column>
               <el-table-column label="描述" width="240">
                 <template #default="{ row }">
-                  <div class="cell-editor">
+                  <ViewField v-if="isView" :value="row.description" />
+                  <div v-else class="cell-editor">
                     <el-input v-model="row.description" placeholder="请输入说明" :disabled="isView" />
                   </div>
                 </template>
               </el-table-column>
               <el-table-column label="排序" width="120">
                 <template #default="{ row }">
-                  <div class="cell-editor cell-editor--compact">
+                  <ViewField v-if="isView" :value="row.sort" />
+                  <div v-else class="cell-editor cell-editor--compact">
                     <el-input-number v-model="row.sort" :min="0" style="width: 100%" :disabled="isView" />
                   </div>
                 </template>
@@ -485,7 +517,7 @@ function cancel() {
           </div>
         </section>
 
-        <section class="section-card">
+        <section class="section-card section-card--content">
           <div class="section-header section-header--stack">
             <div>
               <div class="section-title">项目描述与附件</div>
@@ -494,18 +526,12 @@ function cancel() {
           </div>
 
           <el-form-item label="项目描述">
-            <div v-if="isView" v-html="form.description || '无描述'" class="view-content" />
+            <ViewRichText v-if="isView" :html="form.description" />
             <Editor v-else v-model="form.description" style="min-height: 260px" />
           </el-form-item>
 
           <el-form-item label="项目附件">
-            <div v-if="isView" class="view-attachments">
-              <div v-for="(item, index) in form.attachments" :key="index" class="view-file-item">
-                <el-icon><Document /></el-icon>
-                <a :href="item.url || item" target="_blank">{{ item.name || item.originalName || `附件 ${index + 1}` }}</a>
-              </div>
-              <span v-if="!form.attachments?.length" class="no-data">无附件</span>
-            </div>
+            <ViewFileList v-if="isView" :files="form.attachments || []" />
             <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
           </el-form-item>
         </section>
@@ -547,6 +573,42 @@ function cancel() {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.section-card--basic .section-header {
+  margin-bottom: 20px;
+}
+
+.section-card--table .section-header {
+  margin-bottom: 20px;
+}
+
+.section-card--table .table-wrapper {
+  margin-top: 4px;
+}
+
+.section-card--content .section-header {
+  margin-bottom: 20px;
+}
+
+.section-card--content :deep(.el-form-item) {
+  margin-bottom: 22px;
+}
+
+.section-card--content :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.basic-info-row {
+  margin-bottom: 8px;
+}
+
+.basic-info-row--last {
+  margin-bottom: 4px;
+}
+
+.basic-info-progress-item {
+  margin-top: 10px;
 }
 
 .section-title {
@@ -616,42 +678,4 @@ function cancel() {
   margin-top: 20px;
 }
 
-.view-content {
-  min-height: 120px;
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-  background-color: #f8fafc;
-  line-height: 1.7;
-  color: #606266;
-}
-
-.view-attachments {
-  width: 100%;
-}
-
-.view-file-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-}
-
-.view-file-item a {
-  color: #409eff;
-  text-decoration: none;
-}
-
-.view-file-item a:hover {
-  text-decoration: underline;
-}
-
-.no-data {
-  color: #909399;
-  font-size: 14px;
-}
 </style>

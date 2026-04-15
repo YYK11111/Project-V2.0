@@ -39,6 +39,11 @@ export class ProjectsController extends BaseController<Project, ProjectsService>
     return this.service.getStatistics(id)
   }
 
+  @Get('dashboard/:id')
+  getDashboard(@Param('id') id: string) {
+    return this.service.getDashboard(id)
+  }
+
   @Post(':id/submit-approval')
   async submitApproval(
     @Param('id') id: string,

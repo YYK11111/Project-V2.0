@@ -7,6 +7,7 @@ import { BaseService } from 'src/common/BaseService'
 import { CreateChangeDto } from './dto'
 import { SysFileService } from 'src/modules/sys/file/service'
 import { SaveDto } from 'src/common/dto'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> {
@@ -17,14 +18,24 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
     super(ProjectChange, repository)
   }
 
+  private normalizeChangePayload(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    if (typeof dto.attachments === 'string' && !dto.attachments) {
+      dto.attachments = [] as any
+    }
+    if (dto.attachments != null && !Array.isArray(dto.attachments)) {
+      dto.attachments = [dto.attachments].filter(Boolean) as any
+    }
+    return dto
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<ProjectChange>> {
     let { projectId, status, type, name } = query
     let queryOrm: FindManyOptions = {
       where: {
         title: this.sqlLike(name),
-        projectId,
-        status,
-        type,
+        projectId: projectId || undefined,
+        status: status || undefined,
+        type: type || undefined,
       },
       relations: ['project', 'requester', 'approver'],
       order: { sort: 'ASC', createTime: 'DESC' },
@@ -51,6 +62,7 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
   }
 
   async save(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    this.normalizeChangePayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -78,6 +90,7 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
   }
 
   async add(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    this.normalizeChangePayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -99,6 +112,7 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
   }
 
   async update(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    this.normalizeChangePayload(dto)
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -124,5 +138,45 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
       select: ['id'],
     })
     return files.map((f) => f.id)
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  private buildChangeDetail(change: ProjectChange) {
+    return {
+      ...change,
+      project: this.mapProjectSummary(change.project),
+      requester: this.mapUserSummary(change.requester),
+      approver: this.mapUserSummary(change.approver),
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const change = await super.getOne(
+      {
+        where: query,
+        relations: ['project', 'requester', 'approver'],
+      },
+      isError,
+    )
+    if (!change) return change
+    return this.buildChangeDetail(change)
   }
 }

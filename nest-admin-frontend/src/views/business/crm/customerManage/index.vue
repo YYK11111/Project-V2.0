@@ -30,9 +30,12 @@ async function handleSubmitApproval(row) {
   rctRef.value?.getList()
 }
 
+const canSubmitCustomerApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+
 const getButtons = (row) => [
-  { key: 'submit', label: '提交审批', type: 'warning', disabled: !canCustomerSubmitApproval.value || row.status !== '1' || row.approvalStatus === '1', onClick: () => handleSubmitApproval(row) },
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canCustomerUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/customer/form') },
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
+  { key: 'submit', label: '提交审批', type: 'warning', disabled: !canCustomerSubmitApproval.value || !canSubmitCustomerApproval(row), onClick: () => handleSubmitApproval(row) },
+  { key: 'edit', label: '修改', type: 'primary', disabled: !canCustomerUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') },
   { key: 'delete', label: '删除', danger: true, disabled: !canCustomerDelete.value, onClick: () => rctRef.value.del(del, row.id) },
 ]
 </script>
@@ -55,7 +58,7 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canCustomerAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/customer/form')">新增客户</el-button>
+          <el-button v-if="canCustomerAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/customerManage/form')">新增客户</el-button>
           <el-button v-if="canCustomerDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
@@ -88,7 +91,7 @@ const getButtons = (row) => [
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
             <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已拒绝' }[row.approvalStatus] || '无需审批' }}
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
             </el-tag>
           </template>
         </el-table-column>

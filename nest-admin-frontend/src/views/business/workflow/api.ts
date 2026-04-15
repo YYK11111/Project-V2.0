@@ -157,6 +157,26 @@ export function cancelWorkflowInstance(instanceId: string, data?: any) {
   })
 }
 
+export function closeReturnedWorkflowInstance(instanceId: string, data?: any) {
+  const userId = getUserId()
+  return request({
+    url: `/workflow/instances/${instanceId}/close-returned`,
+    method: 'post',
+    params: { userId },
+    data,
+  })
+}
+
+export function resubmitReturnedWorkflowInstance(instanceId: string, data?: any) {
+  const userId = getUserId()
+  return request({
+    url: `/workflow/instances/${instanceId}/resubmit-returned`,
+    method: 'post',
+    params: { userId },
+    data,
+  })
+}
+
 export function getWorkflowHistory(instanceId: string) {
   return request({
     url: `/workflow/instances/${instanceId}/history`,

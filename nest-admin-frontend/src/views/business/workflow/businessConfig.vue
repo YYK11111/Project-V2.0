@@ -23,6 +23,7 @@ type ConfigForm = {
 const rctRef = ref()
 const params = ref({})
 const dialogRef = ref()
+const editingTriggerConfig = ref<Record<string, any>>({})
 
 const canWorkflowConfigAdd = computed(() => checkPermi(['business/workflow/configs/add']))
 const canWorkflowConfigUpdate = computed(() => checkPermi(['business/workflow/configs/update']))
@@ -100,6 +101,7 @@ const save = (data: any) => {
   }
 
   const triggerConfig = {
+    ...editingTriggerConfig.value,
     [data.form.value.triggerEvent]: {
       triggerEvent: data.form.value.triggerEvent,
       businessScene: data.form.value.businessScene,
@@ -139,9 +141,10 @@ const handleDelete = (row: any) => {
   })
 }
 
-const openDialog = (row?: any) => {
+const openDialog = (row?: any, triggerRow?: TriggerRow) => {
+  editingTriggerConfig.value = row ? { ...parseTriggerConfig(row.triggerConfig || '{}') } : {}
   const triggers = row ? getTriggerRows(row) : []
-  const trigger: TriggerRow = triggers[0] || {
+  const trigger: TriggerRow = triggerRow || triggers[0] || {
     triggerEvent: '',
     businessScene: '',
     statusTriggerValues: [],
@@ -156,9 +159,29 @@ const openDialog = (row?: any) => {
   } as ConfigForm)
 }
 
+const removeTrigger = (row: any, triggerEvent: string) => {
+  if (!canWorkflowConfigDelete.value) {
+    ElMessage.warning('当前操作没有权限')
+    return
+  }
+
+  const config = { ...parseTriggerConfig(row.triggerConfig || '{}') }
+  delete config[triggerEvent]
+
+  saveBusinessConfig({
+    businessType: row.businessType,
+    name: row.name || getBusinessTypeName(row.businessType),
+    triggerConfig: JSON.stringify(config),
+    isActive: Object.keys(config).length ? row.isActive : '0',
+  }).then(() => {
+    ElMessage.success('自动触发规则已移除')
+    rctRef.value.getList()
+  })
+}
+
 const getButtons = (row: any) => [
-  { key: 'edit', label: '编辑', disabled: !canWorkflowConfigUpdate.value, onClick: () => openDialog(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canWorkflowConfigDelete.value, onClick: () => handleDelete(row) },
+  { key: 'edit', label: '新增/编辑规则', disabled: !canWorkflowConfigUpdate.value, onClick: () => openDialog(row) },
+  { key: 'delete', label: '删除对象配置', danger: true, disabled: !canWorkflowConfigDelete.value, onClick: () => handleDelete(row) },
 ]
 </script>
 
@@ -176,7 +199,7 @@ const getButtons = (row: any) => [
           <div>
             <el-button v-if="canWorkflowConfigAdd" type="primary" @click="openDialog()">新建自动触发配置</el-button>
           </div>
-          <el-button v-if="canWorkflowConfigDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteBusinessConfig)" type="danger">批量删除</el-button>
+          <el-button v-if="canWorkflowConfigDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteBusinessConfig)" type="danger">批量删除对象配置</el-button>
         </div>
       </template>
 
@@ -191,7 +214,10 @@ const getButtons = (row: any) => [
             <div v-for="trigger in getTriggerRows(row)" :key="trigger.triggerEvent" class="trigger-item">
               <el-tag size="small" type="success" class="mr-5">{{ getTriggerEventName(trigger.triggerEvent) }}</el-tag>
               <span class="mr-5">{{ getBusinessSceneName(row.businessType, trigger.businessScene) }}</span>
+              <el-tag size="small" :type="trigger.enabled ? 'success' : 'info'" class="mr-5">{{ trigger.enabled ? '规则启用' : '规则停用' }}</el-tag>
               <span v-if="trigger.statusTriggerValues?.length" class="text-gray">触发状态：{{ trigger.statusTriggerValues.join(', ') }}</span>
+              <el-button v-if="canWorkflowConfigUpdate" link type="primary" class="ml-8" @click="openDialog(row, trigger)">编辑</el-button>
+              <el-button v-if="canWorkflowConfigDelete" link type="danger" @click="removeTrigger(row, trigger.triggerEvent)">移除</el-button>
             </div>
             <span v-if="!getTriggerRows(row).length" class="text-gray">未配置</span>
           </template>
@@ -250,5 +276,9 @@ const getButtons = (row: any) => [
 
 .text-gray {
   color: #909399;
+}
+
+.ml-8 {
+  margin-left: 8px;
 }
 </style>

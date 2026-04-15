@@ -18,6 +18,28 @@ SET trigger_config = JSON_OBJECT(
 )
 WHERE business_type = 'project';
 
+INSERT INTO wf_business_config (business_type, name, table_name, id_field, trigger_config, is_active)
+SELECT 'task', '任务', 'task', 'id', JSON_OBJECT(
+  'onCreate', JSON_OBJECT(
+    'triggerEvent', 'onCreate',
+    'name', '任务创建审批',
+    'businessScene', 'approval',
+    'enabled', true
+  )
+), '1'
+WHERE NOT EXISTS (SELECT 1 FROM wf_business_config WHERE business_type = 'task');
+
+UPDATE wf_business_config
+SET trigger_config = JSON_OBJECT(
+  'onCreate', JSON_OBJECT(
+    'triggerEvent', 'onCreate',
+    'name', '任务创建审批',
+    'businessScene', 'approval',
+    'enabled', true
+  )
+)
+WHERE business_type = 'task';
+
 UPDATE wf_business_config
 SET trigger_config = JSON_OBJECT(
   'onCreate', JSON_OBJECT(

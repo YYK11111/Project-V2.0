@@ -2,7 +2,7 @@ import { Between, FindManyOptions, FindOneOptions, FindOptionsWhere, Like, Repos
 import { BoolNum } from './type/base'
 import { QueryListDto, ResponseListDto, SaveDto } from './dto'
 import dayjs from 'dayjs'
-import { validate } from 'class-validator'
+import { getMetadataStorage, validate } from 'class-validator'
 
 // 服务基类
 export class BaseService<T, K> {
@@ -11,6 +11,13 @@ export class BaseService<T, K> {
   constructor(Entity: { new (): T }, repository: Repository<T>) {
     this.Entity = Entity
     this.repository = repository
+  }
+
+  private hasValidationMetadata(entity: object) {
+    const target = entity?.constructor
+    if (!target) return false
+    const metadata = getMetadataStorage().getTargetValidationMetadatas(target, '', false, false)
+    return metadata.length > 0
   }
 
   // typeorm save 会保存关系，create 和 update 不会保存关系
@@ -26,9 +33,11 @@ export class BaseService<T, K> {
     let data = new this.Entity(dto)
 
     // 字段校验 / class-validator
-    const errors = await validate(data, { skipMissingProperties: true })
-    if (errors.length > 0) {
-      throw new Error(Object.values(errors[0].constraints)[0])
+    if (this.hasValidationMetadata(data)) {
+      const errors = await validate(data, { skipMissingProperties: true })
+      if (errors.length > 0) {
+        throw new Error(Object.values(errors[0].constraints)[0])
+      }
     }
 
     // 数据库唯一字段校验 / @DbUnique

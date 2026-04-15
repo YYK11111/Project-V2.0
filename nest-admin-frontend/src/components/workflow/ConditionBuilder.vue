@@ -1,7 +1,7 @@
 <template>
   <div class="condition-builder">
     <div class="condition-row">
-      <el-select v-model="condition.fieldSource" @change="onFieldSourceChange" style="width: 120px;" :disabled="disabled">
+      <el-select v-model="condition.fieldSource" @change="onFieldSourceChange" class="condition-control condition-control--source" :disabled="disabled">
         <el-option label="业务字段" value="field" />
         <el-option label="表达式" value="expression" />
       </el-select>
@@ -14,8 +14,9 @@
           @change="emitUpdate"
           clearable
           filterable
+          :filter-method="onFieldSearch"
           :disabled="disabled"
-          style="width: 240px;"
+          class="condition-control condition-control--field"
         >
           <el-option-group v-for="group in fieldGroups" :key="group.label" :label="group.label">
             <el-option
@@ -36,11 +37,11 @@
         placeholder="${project.budget}"
         @input="emitUpdate"
         :disabled="disabled"
-        style="width: 200px;"
+        class="condition-control condition-control--field"
       />
 
       <!-- 操作符 -->
-      <el-select v-model="condition.operator" @change="emitUpdate" style="width: 140px;" :disabled="disabled">
+      <el-select v-model="condition.operator" @change="emitUpdate" class="condition-control condition-control--operator" :disabled="disabled">
         <el-option v-for="op in operatorOptions" :key="op.value" :label="op.label" :value="op.value" />
       </el-select>
 
@@ -52,7 +53,7 @@
           v-model="condition.value"
           placeholder="选择值"
           @change="emitUpdate"
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           clearable
           :disabled="disabled"
         >
@@ -71,7 +72,7 @@
           :props="{ label: 'name', value: 'id', checkStrictly: true, emitPath: false }"
           placeholder="选择部门"
           clearable
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           @change="emitUpdate"
           :disabled="disabled"
         />
@@ -80,7 +81,7 @@
           v-model="condition.value"
           placeholder="请选择人员"
           clearable
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           :disabled="disabled"
         />
         <!-- 部门类型 -->
@@ -91,7 +92,7 @@
           :props="{ label: 'name', value: 'id', checkStrictly: true, emitPath: false }"
           placeholder="选择部门"
           clearable
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           @change="emitUpdate"
           :disabled="disabled"
         />
@@ -102,7 +103,7 @@
           placeholder="请选择人员"
           clearable
           multiple
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           :disabled="disabled"
         />
         <!-- 部门数组 -->
@@ -113,7 +114,7 @@
           :props="{ label: 'name', value: 'id', checkStrictly: true, multiple: true, emitPath: false }"
           placeholder="选择部门"
           clearable
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           @change="emitUpdate"
           :disabled="disabled"
         />
@@ -124,7 +125,7 @@
           type="number"
           placeholder="输入数字"
           @input="emitUpdate"
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           :disabled="disabled"
         />
         <!-- 其他 -->
@@ -133,12 +134,12 @@
           v-model="condition.value"
           placeholder="输入值"
           @input="emitUpdate"
-          style="width: 150px;"
+          class="condition-control condition-control--value"
           :disabled="disabled"
         />
       </template>
 
-      <el-button type="danger" @click="$emit('remove')" :disabled="disabled">删除</el-button>
+      <el-button type="danger" class="condition-remove" @click="$emit('remove')" :disabled="disabled">删除</el-button>
     </div>
 
     <div class="condition-expr-preview">
@@ -173,6 +174,7 @@ const emit = defineEmits(['update:modelValue', 'remove'])
 
 const fieldMappings = ref([])
 const deptTreeData = ref([])
+const fieldSearchKeyword = ref('')
 
 const loadFieldMappings = async (businessType) => {
   if (!businessType) return
@@ -216,7 +218,18 @@ const fieldOptions = computed(() => {
 
 const fieldGroups = computed(() => {
   const groups = new Map()
-  for (const field of fieldOptions.value) {
+  const keyword = fieldSearchKeyword.value.trim().toLowerCase()
+  const filteredFields = keyword
+    ? fieldOptions.value.filter((field) => {
+        const haystack = [field.fieldLabel, field.fieldName, field.description, field.group]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(keyword)
+      })
+    : fieldOptions.value
+
+  for (const field of filteredFields) {
     const label = field.group || '业务字段'
     if (!groups.has(label)) {
       groups.set(label, [])
@@ -225,6 +238,10 @@ const fieldGroups = computed(() => {
   }
   return Array.from(groups.entries()).map(([label, fields]) => ({ label, fields }))
 })
+
+const onFieldSearch = (keyword) => {
+  fieldSearchKeyword.value = keyword
+}
 
 const selectedFieldDef = computed(() => {
   if (!condition.value.field) return null
@@ -355,6 +372,7 @@ const onFieldSourceChange = () => {
   condition.value.field = []
   condition.value.value = ''
   condition.value.operator = 'eq'
+  fieldSearchKeyword.value = ''
   emitUpdate()
 }
 
@@ -378,6 +396,8 @@ const emitUpdate = () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .condition-row {
@@ -385,11 +405,47 @@ const emitUpdate = () => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.condition-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.condition-control--source {
+  flex: 1 1 120px;
+}
+
+.condition-control--field {
+  flex: 2 1 220px;
+}
+
+.condition-control--operator {
+  flex: 1 1 140px;
+}
+
+.condition-control--value {
+  flex: 1 1 160px;
+}
+
+.condition-remove {
+  flex: 0 0 auto;
+}
+
+:deep(.condition-control .el-input),
+:deep(.condition-control .el-select),
+:deep(.condition-control .el-cascader) {
+  width: 100%;
 }
 
 .condition-expr-preview {
   font-size: 12px;
   color: #666;
+  width: 100%;
+  min-width: 0;
+  word-break: break-all;
 }
 
 .condition-expr-preview code {

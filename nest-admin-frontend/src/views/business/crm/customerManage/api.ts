@@ -5,8 +5,8 @@ const baseUrl = '/business/crm/customers'
 
 function normalizePageData(res) {
   const page = res?.data?.data || res?.data || {}
-  const list = page.list || []
-  const total = Number(page.total || 0)
+  const list = Array.isArray(page) ? page : page.list || page.rows || page.data || []
+  const total = Number((Array.isArray(page) ? res?.total : page.total) || res?.total || 0)
   return {
     ...res,
     list,

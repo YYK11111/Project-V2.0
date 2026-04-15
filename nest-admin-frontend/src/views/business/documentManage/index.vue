@@ -26,6 +26,7 @@ function handleUpgradeVersion(row) {
 }
 
 const getButtons = (row) => [
+  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/documentManage/form') },
   { key: 'edit', label: '修改', type: 'primary', disabled: !canDocumentUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/documentManage/form') },
   { key: 'upgrade', label: '升级版本', type: 'success', disabled: !canDocumentUpdate.value, onClick: () => handleUpgradeVersion(row) },
   { key: 'delete', label: '删除', danger: true, disabled: !canDocumentDelete.value, onClick: () => rctRef.value.del(del, row.id) },

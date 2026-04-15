@@ -5,6 +5,7 @@ import { Document, DocumentType } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
 import { DocumentDto } from './dto'
+import { User } from 'src/modules/users/entities/user.entity'
 
 @Injectable()
 export class DocumentsService extends BaseService<Document, DocumentDto> {
@@ -34,5 +35,41 @@ export class DocumentsService extends BaseService<Document, DocumentDto> {
     parts[parts.length - 1] += 1
     const newVersion = parts.join('.')
     return this.repository.update(id, { version: newVersion })
+  }
+
+  private mapUserSummary(user?: User | null) {
+    if (!user) return null
+    return {
+      id: user.id,
+      name: user.name,
+      nickname: user.nickname,
+      avatar: user.avatar,
+    }
+  }
+
+  private mapProjectSummary(project?: any) {
+    if (!project) return null
+    return {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+    }
+  }
+
+  async getOne(query, isError = true): Promise<any | null> {
+    const document = await super.getOne(
+      {
+        where: query,
+        relations: ['uploader', 'project'],
+      },
+      isError,
+    )
+    if (!document) return document
+
+    return {
+      ...document,
+      project: this.mapProjectSummary(document.project),
+      uploader: this.mapUserSummary(document.uploader),
+    }
   }
 }

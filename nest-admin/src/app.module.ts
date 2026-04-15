@@ -35,6 +35,7 @@ import { SprintsModule } from './modulesBusi/sprints/module'
 import { ChangesModule } from './modulesBusi/changes/module'
 import { SysFileModule } from './modules/sys/file/module'
 import { WorkflowTriggerModule } from './common/listeners/workflow-trigger.module'
+import { MessagesModule } from './modules/messages/module'
 
 @Dependencies(DataSource)
 @Module({
@@ -71,6 +72,7 @@ import { WorkflowTriggerModule } from './common/listeners/workflow-trigger.modul
     ChangesModule,
     SysFileModule,
     WorkflowTriggerModule,
+    MessagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -45,18 +45,22 @@ const fetchAllRisks = async () => {
   return res.list || []
 }
 
+function getFormPath() {
+  return `${route.path.replace(/\/$/, '')}/form`
+}
+
 const handleAdd = () => {
   if (!canRiskAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push('/business/riskManage/form')
+  router.push(getFormPath())
 }
 
 const handleEdit = (row) => {
   if (!canRiskUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(`/business/riskManage/form?id=${row.id}`)
+  router.push(`${getFormPath()}?id=${row.id}`)
 }
 
 const handleView = (row) => {
-  router.push(`/business/riskManage/form?id=${row.id}&action=view`)
+  router.push(`${getFormPath()}?id=${row.id}&action=view`)
 }
 
 const handleDel = async (row) => {
@@ -91,7 +95,7 @@ const handleShowMatrix = async () => {
 
 const handleRiskClick = (risk) => {
   matrixDialogVisible.value = false
-  router.push(`/business/riskManage/form?id=${risk.id}`)
+  router.push(`${getFormPath()}?id=${risk.id}`)
 }
 
 const getButtons = (row) => [

@@ -1,14 +1,14 @@
 <template>
   <div class="RouterPage" v-loading="$store.loading">
     <!-- <RouterView class="page" id="page-container" /> -->
-    <router-view v-slot="{ Component }" class="page max-h-full" id="page-container">
+    <router-view v-slot="{ Component, route }" class="page max-h-full" id="page-container">
       <!-- <transition name="fade-transform" mode="out-in">
           <keep-alive :key="route.path">
             <component :is="Component" />
           </keep-alive>
         </transition> -->
       <keep-alive>
-        <component :is="Component" />
+        <component :is="Component" :key="route.fullPath" />
       </keep-alive>
     </router-view>
   </div>

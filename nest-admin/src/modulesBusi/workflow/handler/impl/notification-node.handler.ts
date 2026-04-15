@@ -3,6 +3,8 @@ import { INodeHandler } from '../../interface/node-handler.interface';
 import { NodeType, NodeExecutionContext, NodeResult, NotificationNodeProperties } from '../../interface/node.interface';
 import { NoticesService } from '../../../../modules/notices/service';
 import { BoolNum } from '../../../../common/type/base';
+import { WorkflowAssigneeResolverService } from '../../../../common/services/workflow-assignee-resolver.service';
+import { MessagesService } from '../../../../modules/messages/service';
 
 /**
  * 通知节点处理器
@@ -11,7 +13,11 @@ import { BoolNum } from '../../../../common/type/base';
 export class NotificationNodeHandler implements INodeHandler {
   readonly nodeType = NodeType.NOTIFICATION;
 
-  constructor(private noticesService: NoticesService) {}
+  constructor(
+    private noticesService: NoticesService,
+    private assigneeResolver: WorkflowAssigneeResolverService,
+    private messagesService: MessagesService,
+  ) {}
 
   async execute(context: NodeExecutionContext): Promise<NodeResult> {
     const props = context.variables._nodeProperties as NotificationNodeProperties;
@@ -20,7 +26,7 @@ export class NotificationNodeHandler implements INodeHandler {
       return { success: true, nextNodeIds: [], outputData: { status: 'skipped' } };
     }
 
-    const receivers = this.parseReceivers(props.notificationReceiverExpr, context.variables);
+    const receivers = await this.getNotificationReceivers(props, context.variables);
     const title = this.renderTemplate(props.notificationTemplate || '流程通知', context.variables);
     const content = this.renderTemplate(props.notificationContent || '', context.variables);
 
@@ -37,6 +43,18 @@ export class NotificationNodeHandler implements INodeHandler {
         remark: `workflow_notification:${context.instanceId}:${context.nodeId}`,
         receiverIds: receivers,
       });
+      for (const receiverId of receivers) {
+        await this.messagesService.sendMessage({
+          title,
+          content,
+          messageType: 'cc',
+          sourceType: 'workflow_instance',
+          sourceId: context.instanceId,
+          receiverId,
+          linkUrl: '',
+          linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
+        })
+      }
       console.log(`[Notification] Sent to ${receivers.length} receiver(s) for instance ${context.instanceId}`);
     } catch (error) {
       console.error(`[Notification] Failed to send notification: ${error.message}`);
@@ -47,6 +65,24 @@ export class NotificationNodeHandler implements INodeHandler {
       nextNodeIds: [],
       outputData: { status: 'notification_sent', receivers },
     };
+  }
+
+  private async getNotificationReceivers(props: NotificationNodeProperties, variables: Record<string, any>): Promise<string[]> {
+    if (props.assigneeType) {
+      return this.assigneeResolver.resolve(
+        {
+          type: props.assigneeType as 'user' | 'department' | 'business_field',
+          userId: props.assigneeValue,
+          departmentId: props.departmentId,
+          departmentMode: props.departmentMode,
+          fieldPath: props.fieldPath,
+          businessType: props.businessType,
+        },
+        variables._businessData,
+      )
+    }
+
+    return this.parseReceivers(props.notificationReceiverExpr || props.notificationReceivers, variables)
   }
 
   /**
