@@ -263,7 +263,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       `)
     }
 
-    taskQuery.orderBy('task.create_time', 'DESC')
+    taskQuery.orderBy('task.createTime', 'DESC')
 
     const pageNum = Number(query.pageNum || 1)
     const pageSize = Number(query.pageSize || 10)
@@ -274,25 +274,27 @@ export class TasksService extends BaseService<Task, TaskDto> {
     const [rows, total] = await taskQuery.getManyAndCount()
     const taskIds = rows.map((row) => String(row.id)).filter(Boolean)
     const executorIds = Array.from(new Set(rows.flatMap((row) => row.executorIds || []).filter(Boolean).map((id) => String(id))))
-    const users = executorIds.length ? await this.userRepository.find({ where: executorIds.map((id) => ({ id })) }) : []
+    const users = executorIds.length ? await this.userRepository.find({ where: executorIds.map((id) => ({ id: String(id) })) }) : []
     const userMap = new Map(users.map((user) => [String(user.id), user]))
     const commentSummary = taskIds.length
-      ? await this.taskCommentRepository
-        .createQueryBuilder('comment')
-        .select('comment.task_id', 'taskId')
-        .addSelect('COUNT(comment.id)', 'commentCount')
-        .where('comment.task_id IN (:...taskIds)', { taskIds })
-        .groupBy('comment.task_id')
-        .getRawMany()
+      ? await this.taskCommentRepository.query(
+        `SELECT task_id AS taskId, COUNT(id) AS commentCount
+         FROM task_comment
+         WHERE task_id IN (?)
+           AND is_delete IS NULL
+         GROUP BY task_id`,
+        [taskIds],
+      )
       : []
     const latestReportSummary = taskIds.length
-      ? await this.timeLogRepository
-        .createQueryBuilder('timelog')
-        .select('timelog.task_id', 'taskId')
-        .addSelect('MAX(timelog.create_time)', 'latestReportTime')
-        .where('timelog.task_id IN (:...taskIds)', { taskIds })
-        .groupBy('timelog.task_id')
-        .getRawMany()
+      ? await this.timeLogRepository.query(
+        `SELECT task_id AS taskId, MAX(create_time) AS latestReportTime
+         FROM task_time_log
+         WHERE task_id IN (?)
+           AND is_delete IS NULL
+         GROUP BY task_id`,
+        [taskIds],
+      )
       : []
     const commentCountMap = new Map(commentSummary.map((item) => [String(item.taskId), Number(item.commentCount || 0)]))
     const latestReportMap = new Map(latestReportSummary.map((item) => [String(item.taskId), item.latestReportTime || '']))
@@ -463,7 +465,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
   /**
    * 添加工时记录
    */
-  async addTimeLog(taskId: number, hours: number, description: string, workDate: string, userId: string): Promise<TaskTimeLog> {
+  async addTimeLog(taskId: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = []): Promise<TaskTimeLog> {
     if (!userId) {
       throw new BadRequestException('当前登录用户不存在')
     }
@@ -477,6 +479,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       description,
       workDate,
       userId,
+      attachments,
     })
     const saved = await this.timeLogRepository.save(timeLog)
     
@@ -495,6 +498,41 @@ export class TasksService extends BaseService<Task, TaskDto> {
       relations: ['user'],
       order: { createTime: 'DESC' },
     })
+  }
+
+  async getTimeLogList(query: QueryListDto): Promise<ResponseListDto<TaskTimeLog>> {
+    const { taskId, userId, beginDate, endDate, pageNum, pageSize } = query
+    const timeLogQuery = this.timeLogRepository
+      .createQueryBuilder('timelog')
+      .leftJoinAndSelect('timelog.user', 'user')
+      .leftJoinAndSelect('timelog.task', 'task')
+      .orderBy('timelog.createTime', 'DESC')
+
+    if (taskId !== undefined && taskId !== '') {
+      timeLogQuery.andWhere('timelog.task_id = :taskId', { taskId })
+    }
+    if (userId !== undefined && userId !== '') {
+      timeLogQuery.andWhere('timelog.user_id = :userId', { userId })
+    }
+    if (beginDate !== undefined && beginDate !== '') {
+      timeLogQuery.andWhere('timelog.work_date >= :beginDate', { beginDate })
+    }
+    if (endDate !== undefined && endDate !== '') {
+      timeLogQuery.andWhere('timelog.work_date <= :endDate', { endDate })
+    }
+
+    const pageNumValue = Number(pageNum || 1)
+    const pageSizeValue = Number(pageSize || 10)
+    if (pageNumValue && pageSizeValue) {
+      timeLogQuery.skip((pageNumValue - 1) * pageSizeValue).take(pageSizeValue)
+    }
+
+    const [rows, total] = await timeLogQuery.getManyAndCount()
+    rows.forEach((row) => {
+      row.user = this.mapUserSummary(row.user as any) as any
+      row.task = this.mapTaskSummary(row.task as any) as any
+    })
+    return { data: rows, total, _flag: true }
   }
 
   /**
@@ -528,5 +566,28 @@ export class TasksService extends BaseService<Task, TaskDto> {
     
     // 更新任务的实际工时
     await this.updateActualHours(taskId)
+  }
+
+  async updateTimeLog(id: number, hours: number, description: string, workDate: string, userId: string, attachments: string[] = []): Promise<TaskTimeLog> {
+    if (!userId) {
+      throw new BadRequestException('当前登录用户不存在')
+    }
+    const log = await this.timeLogRepository.findOne({ where: { id: String(id) } as any })
+    if (!log) {
+      throw new NotFoundException('工时记录不存在')
+    }
+    if (String(log.userId) !== String(userId)) {
+      throw new ForbiddenException('只能编辑自己的工时记录')
+    }
+
+    await this.timeLogRepository.update(String(id), {
+      hours,
+      description,
+      workDate,
+      attachments,
+    })
+
+    await this.updateActualHours(log.taskId)
+    return this.timeLogRepository.findOne({ where: { id: String(id) } as any, relations: ['user', 'task'] })
   }
 }

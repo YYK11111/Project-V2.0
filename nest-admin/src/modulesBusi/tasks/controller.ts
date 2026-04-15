@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Delete, Req } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Query, Delete, Req, Put } from '@nestjs/common'
 import { TasksService } from './service'
 import { QueryListDto } from 'src/common/dto'
 import { Task, taskStatusMap, priorityMap } from './entity'
@@ -82,11 +82,16 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Post(':taskId/timelogs')
   addTimeLog(
     @Param('taskId') taskId: string,
-    @Body() body: { hours: number; description: string; workDate: string },
+    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[] },
     @Req() req: any,
   ) {
     const userId = req.user?.id || req.user?.name
-    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, userId)
+    return this.service.addTimeLog(Number(taskId), body.hours, body.description, body.workDate, userId, body.attachments)
+  }
+
+  @Get('timelogs')
+  getTimeLogList(@Query() query: QueryListDto) {
+    return this.service.getTimeLogList(query)
   }
 
   @Get(':taskId/timelogs')
@@ -98,5 +103,15 @@ export class TasksController extends BaseController<Task, TasksService> {
   deleteTimeLog(@Param('id') id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name
     return this.service.deleteTimeLog(Number(id), userId)
+  }
+
+  @Put('timelogs/:id')
+  updateTimeLog(
+    @Param('id') id: string,
+    @Body() body: { hours: number; description: string; workDate: string; attachments?: string[] },
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id || req.user?.name
+    return this.service.updateTimeLog(Number(id), body.hours, body.description, body.workDate, userId, body.attachments)
   }
 }

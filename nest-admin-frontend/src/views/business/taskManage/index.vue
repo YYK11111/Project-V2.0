@@ -44,6 +44,10 @@ function isReportStale(row) {
   return dayjs(row.latestReportTime).isBefore(dayjs().subtract(7, 'day'))
 }
 
+function isRowAttentionNeeded(row) {
+  return !row.commentCount || isReportStale(row)
+}
+
 const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
@@ -89,6 +93,12 @@ const getButtons = (row) => [
 
       <template #table>
         <el-table-column label="任务名称" prop="name" :show-overflow-tooltip="true" min-width="200" />
+        <el-table-column label="协作提醒" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="isRowAttentionNeeded(row)" type="warning" size="small">需跟进</el-tag>
+            <el-tag v-else type="success" size="small">正常</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="任务编号" prop="code" width="120" />
         <el-table-column label="负责人" prop="leader.nickname" width="100" />
         <el-table-column label="经办人" min-width="140" :show-overflow-tooltip="true">

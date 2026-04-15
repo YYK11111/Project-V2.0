@@ -16,7 +16,7 @@ function normalizePageData(res) {
 // 获取任务评论列表
 export function getList(params) {
   return request({
-    url: '/business/task-comments',
+    url: '/business/task-comments/list',
     method: 'get',
     params,
   }).then(normalizePageData)

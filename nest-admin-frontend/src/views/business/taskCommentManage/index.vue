@@ -2,15 +2,18 @@
 import { reactive, ref } from 'vue'
 import { getList, addComment, updateComment, deleteComment } from './api'
 import TableOperation from '@/components/TableOperation.vue'
+import { useUserStore } from '@/stores/user'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref<Record<string, any>>({})
+const userStore = useUserStore()
 
 const rctRef = ref()
 const formRef = ref()
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加评论')
 const submitLoading = ref(false)
+const currentUserId = computed(() => String(userStore.id || ''))
 const canTaskCommentAdd = computed(() => checkPermi(['business/taskComments/add']))
 const canTaskCommentUpdate = computed(() => checkPermi(['business/taskComments/update']))
 const canTaskCommentDelete = computed(() => checkPermi(['business/taskComments/delete']))
@@ -80,9 +83,17 @@ function submitComment() {
   })
 }
 
+function isCurrentUserComment(row: any) {
+  return String(row?.userId || '') === currentUserId.value
+}
+
 const getButtons = (row: any) => [
-  { key: 'edit', label: '编辑', type: 'primary', disabled: !canTaskCommentUpdate.value, onClick: () => handleEditComment(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canTaskCommentDelete.value, onClick: () => handleDeleteComment(row) },
+  ...(canTaskCommentUpdate.value && isCurrentUserComment(row)
+    ? [{ key: 'edit', label: '编辑', type: 'primary', onClick: () => handleEditComment(row) }]
+    : []),
+  ...(canTaskCommentDelete.value && isCurrentUserComment(row)
+    ? [{ key: 'delete', label: '删除', danger: true, onClick: () => handleDeleteComment(row) }]
+    : []),
 ]
 </script>
 

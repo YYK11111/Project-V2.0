@@ -23,6 +23,9 @@ export class TaskTimeLog extends BaseEntity {
   @Column({ type: 'text', nullable: true, comment: '工作内容描述' })
   description: string
 
+  @Column({ type: 'json', nullable: true, comment: '汇报附件' })
+  attachments: string[]
+
   @Column({ type: 'date', name: 'work_date', comment: '工作日期' })
   workDate: string
 

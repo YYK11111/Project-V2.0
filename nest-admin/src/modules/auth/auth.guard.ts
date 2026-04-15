@@ -143,8 +143,10 @@ export class AuthGuard implements CanActivate {
       ['GET', /^business\/tasks\/[^/]+\/dependencies$/, 'business/tasks/dependency/list'],
       ['POST', /^business\/tasks\/[^/]+\/dependencies$/, 'business/tasks/dependency/add'],
       ['DELETE', /^business\/tasks\/[^/]+\/dependencies\/[^/]+$/, 'business/tasks/dependency/delete'],
+      ['GET', /^business\/tasks\/timelogs$/, 'business/tasks/timelog/list'],
       ['GET', /^business\/tasks\/[^/]+\/timelogs$/, 'business/tasks/timelog/list'],
       ['POST', /^business\/tasks\/[^/]+\/timelogs$/, 'business/tasks/timelog/add'],
+      ['PUT', /^business\/tasks\/timelogs\/[^/]+$/, 'business/tasks/timelog/add'],
       ['DELETE', /^business\/tasks\/timelogs\/[^/]+$/, 'business/tasks/timelog/delete'],
 
       ['GET', /^business\/tickets\/list$/, 'business/tickets/list'],

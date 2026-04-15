@@ -3,7 +3,7 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, deleteTimeLog } from './api'
+import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { useUserStore } from '@/stores/user'
 import UserSelect from '@/components/UserSelect.vue'
@@ -15,6 +15,7 @@ import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
+import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import ViewUserList from '@/components/view/ViewUserList.vue'
 import { checkPermi } from '@/utils/permission'
@@ -84,14 +85,19 @@ const commentLoading = ref(false)
 const timeLogLoading = ref(false)
 const commentSubmitting = ref(false)
 const timeLogSubmitting = ref(false)
+const commentDialogVisible = ref(false)
+const reportDialogVisible = ref(false)
 const commentForm = reactive({
   id: '',
   content: '',
+  attachments: [],
 })
 const timeLogForm = reactive({
+  id: '',
   workDate: '',
   hours: 1,
   description: '',
+  attachments: [],
 })
 const currentUserId = computed(() => String(userStore.id || ''))
 const canCommentOnTask = computed(() => !!hasTaskId.value)
@@ -130,12 +136,20 @@ async function loadTimeLogs() {
 function resetCommentForm() {
   commentForm.id = ''
   commentForm.content = ''
+  commentForm.attachments = []
+}
+
+function openCommentDialog() {
+  resetCommentForm()
+  commentDialogVisible.value = true
 }
 
 function startEditComment(item) {
   if (!isCurrentUserRecord(item.userId)) return
   commentForm.id = String(item.id)
   commentForm.content = item.content || ''
+  commentForm.attachments = item.attachments || []
+  commentDialogVisible.value = true
 }
 
 async function submitTaskComment() {
@@ -146,12 +160,13 @@ async function submitTaskComment() {
   commentSubmitting.value = true
   try {
     if (commentForm.id) {
-      await updateComment(commentForm.id, { content: commentForm.content.trim() })
+      await updateComment(commentForm.id, { content: commentForm.content.trim(), attachments: commentForm.attachments || [] })
       $sdk.msgSuccess('评论修改成功')
     } else {
-      await addComment({ taskId: route.query.id, content: commentForm.content.trim() })
+      await addComment({ taskId: route.query.id, content: commentForm.content.trim(), attachments: commentForm.attachments || [] })
       $sdk.msgSuccess('评论发布成功')
     }
+    commentDialogVisible.value = false
     resetCommentForm()
     await loadTaskComments()
   } catch (error) {
@@ -169,6 +184,7 @@ async function handleDeleteTaskComment(item) {
     $sdk.msgSuccess('评论删除成功')
     if (String(commentForm.id) === String(item.id)) {
       resetCommentForm()
+      commentDialogVisible.value = false
     }
     await loadTaskComments()
   } catch (error) {
@@ -188,15 +204,25 @@ async function submitTaskTimeLog() {
   }
   timeLogSubmitting.value = true
   try {
-    await addTimeLog(route.query.id, {
+    const payload = {
       workDate: timeLogForm.workDate,
       hours: Number(timeLogForm.hours),
-      description: timeLogForm.description?.trim() || '',
-    })
+      description: timeLogForm.description || '',
+      attachments: timeLogForm.attachments || [],
+    }
+    if (timeLogForm.id) {
+      await updateTimeLog(timeLogForm.id, payload)
+      $sdk.msgSuccess('任务汇报已修改')
+    } else {
+      await addTimeLog(route.query.id, payload)
       $sdk.msgSuccess('任务汇报已添加')
+    }
+    reportDialogVisible.value = false
+    timeLogForm.id = ''
     timeLogForm.workDate = ''
     timeLogForm.hours = 1
     timeLogForm.description = ''
+    timeLogForm.attachments = []
     await Promise.all([loadTimeLogs(), reloadCurrent()])
   } catch (error) {
     $sdk.msgError(error?.message || error?.response?.data?.message || '任务汇报添加失败')
@@ -205,12 +231,39 @@ async function submitTaskTimeLog() {
   }
 }
 
+function startEditTimeLog(item) {
+  if (!isCurrentUserRecord(item.userId)) return $sdk.msgWarning('只能编辑自己的任务汇报')
+  timeLogForm.id = String(item.id)
+  timeLogForm.workDate = item.workDate || ''
+  timeLogForm.hours = Number(item.hours || 1)
+  timeLogForm.description = item.description || ''
+  timeLogForm.attachments = item.attachments || []
+  reportDialogVisible.value = true
+}
+
+function resetTimeLogForm() {
+  timeLogForm.id = ''
+  timeLogForm.workDate = ''
+  timeLogForm.hours = 1
+  timeLogForm.description = ''
+  timeLogForm.attachments = []
+}
+
+function openTimeLogDialog() {
+  resetTimeLogForm()
+  reportDialogVisible.value = true
+}
+
 async function handleDeleteTimeLog(item) {
   if (!isCurrentUserRecord(item.userId)) return $sdk.msgWarning('只能删除自己的任务汇报')
   try {
     await $sdk.confirm('确定要删除这条任务汇报吗？')
     await deleteTimeLog(item.id)
     $sdk.msgSuccess('任务汇报删除成功')
+    if (String(timeLogForm.id) === String(item.id)) {
+      resetTimeLogForm()
+      reportDialogVisible.value = false
+    }
     await Promise.all([loadTimeLogs(), reloadCurrent()])
   } catch (error) {
     if (error !== 'cancel') {
@@ -496,7 +549,7 @@ watch(hasTaskId, (value) => {
         <el-row :gutter="20" class="task-info-row task-info-row--last">
           <el-col v-if="hasTaskId" :xs="24" :sm="12">
             <el-form-item label="状态" prop="status">
-                <ViewField v-if="isReadonly" :value="status[form.status]" />
+                <ViewTagField v-if="isReadonly" :text="status[form.status]" :type="form.status === '3' ? 'success' : form.status === '2' ? 'warning' : form.status === '4' ? 'danger' : 'info'" />
                 <el-select v-else v-model="form.status" placeholder="请选择状态" style="width: 100%">
                 <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key" />
               </el-select>
@@ -504,7 +557,7 @@ watch(hasTaskId, (value) => {
           </el-col>
           <el-col :xs="24" :sm="hasTaskId ? 12 : 24">
             <el-form-item label="优先级" prop="priority">
-                <ViewField v-if="isReadonly" :value="priority[form.priority]" />
+                <ViewTagField v-if="isReadonly" :text="priority[form.priority]" :type="form.priority === '3' ? 'danger' : form.priority === '2' ? 'warning' : 'info'" />
                 <el-select v-else v-model="form.priority" placeholder="请选择优先级" style="width: 100%">
                 <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key" />
               </el-select>
@@ -565,26 +618,7 @@ watch(hasTaskId, (value) => {
               <div class="execution-subsection__title">任务汇报</div>
               <div class="execution-subsection__desc">记录每天在任务上的投入、进展和工作内容，作为轻量任务汇报。</div>
             </div>
-          </div>
-
-          <div class="record-editor">
-            <el-date-picker
-              v-model="timeLogForm.workDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择工作日期"
-              class="record-editor__date" />
-            <el-input-number v-model="timeLogForm.hours" :min="0.5" :step="0.5" class="record-editor__hours" />
-            <el-input
-              v-model="timeLogForm.description"
-              type="textarea"
-              :rows="3"
-              maxlength="1000"
-              show-word-limit
-              placeholder="请输入今天完成的工作内容、遇到的问题或下一步计划" />
-            <div class="record-editor__actions">
-              <el-button type="primary" :loading="timeLogSubmitting" @click="submitTaskTimeLog">提交任务汇报</el-button>
-            </div>
+            <el-button type="primary" @click="openTimeLogDialog">新增汇报</el-button>
           </div>
 
           <div v-if="timeLogs.length" class="record-list">
@@ -595,8 +629,13 @@ watch(hasTaskId, (value) => {
                 <span>{{ item.hours }} 小时</span>
                 <span>{{ item.createTime || '-' }}</span>
               </div>
-              <div class="record-card__content">{{ item.description || '未填写工作内容' }}</div>
+              <ViewRichText v-if="item.description" :html="item.description" class="record-card__content record-card__content--rich" />
+              <div v-else class="record-card__content">未填写工作内容</div>
+              <div v-if="item.attachments?.length" class="record-card__attachments">
+                <ViewFileList :files="item.attachments" />
+              </div>
               <div v-if="isCurrentUserRecord(item.userId)" class="record-card__actions">
+                <el-button link type="primary" @click="startEditTimeLog(item)">编辑</el-button>
                 <el-button link type="danger" @click="handleDeleteTimeLog(item)">删除</el-button>
               </div>
             </div>
@@ -609,21 +648,7 @@ watch(hasTaskId, (value) => {
         <div class="task-section__header">
           <div class="task-section__title">任务评论</div>
           <div class="task-section__desc">用于记录任务讨论、补充说明和协作反馈。</div>
-        </div>
-
-        <div class="comment-editor">
-          <div class="comment-editor__title">{{ commentForm.id ? '编辑评论' : '发表评论' }}</div>
-          <el-input
-            v-model="commentForm.content"
-            type="textarea"
-            :rows="4"
-            maxlength="1000"
-            show-word-limit
-            placeholder="请输入评论内容" />
-          <div class="comment-editor__actions">
-            <el-button type="primary" :loading="commentSubmitting" @click="submitTaskComment">{{ commentForm.id ? '保存评论' : '发布评论' }}</el-button>
-            <el-button v-if="commentForm.id" @click="resetCommentForm">取消编辑</el-button>
-          </div>
+          <el-button type="primary" @click="openCommentDialog">发表评论</el-button>
         </div>
 
         <div v-if="taskComments.length" class="comment-list">
@@ -642,6 +667,9 @@ watch(hasTaskId, (value) => {
               </div>
             </div>
             <div class="comment-card__content">{{ item.content }}</div>
+            <div v-if="item.attachments?.length" class="comment-card__attachments">
+              <ViewFileList :files="item.attachments" />
+            </div>
           </div>
         </div>
         <el-empty v-else description="暂无任务评论" />
@@ -654,9 +682,7 @@ watch(hasTaskId, (value) => {
         </div>
 
         <el-form-item label="审批状态">
-          <el-tag :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'">
-            {{ { '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批' }}
-          </el-tag>
+          <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
         </el-form-item>
 
         <el-form-item label="当前审批节点" v-if="form.currentNodeName">
@@ -728,6 +754,38 @@ watch(hasTaskId, (value) => {
         @approved="reloadCurrent"
       />
     </div>
+
+    <BaDialog v-model="reportDialogVisible" :title="timeLogForm.id ? '编辑任务汇报' : '新增任务汇报'" width="760" @confirm="submitTaskTimeLog">
+      <template #form>
+        <el-form label-width="90px" v-loading="timeLogSubmitting">
+          <el-form-item label="工作日期">
+            <el-date-picker v-model="timeLogForm.workDate" type="date" value-format="YYYY-MM-DD" placeholder="选择工作日期" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="工时">
+            <el-input-number v-model="timeLogForm.hours" :min="0.5" :step="0.5" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="汇报内容">
+            <Editor v-model="timeLogForm.description" style="min-height: 220px" />
+          </el-form-item>
+          <el-form-item label="汇报附件">
+            <Upload v-model:fileList="timeLogForm.attachments" type="file" multiple />
+          </el-form-item>
+        </el-form>
+      </template>
+    </BaDialog>
+
+    <BaDialog v-model="commentDialogVisible" :title="commentForm.id ? '编辑评论' : '发表评论'" width="680" @confirm="submitTaskComment">
+      <template #form>
+        <el-form label-width="90px" v-loading="commentSubmitting">
+          <el-form-item label="评论内容">
+            <el-input v-model="commentForm.content" type="textarea" :rows="5" maxlength="1000" show-word-limit placeholder="请输入评论内容" />
+          </el-form-item>
+          <el-form-item label="评论附件">
+            <Upload v-model:fileList="commentForm.attachments" type="file" multiple />
+          </el-form-item>
+        </el-form>
+      </template>
+    </BaDialog>
   </div>
 </template>
 
@@ -838,31 +896,6 @@ watch(hasTaskId, (value) => {
   color: var(--el-text-color-secondary);
 }
 
-.record-editor,
-.comment-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--el-fill-color-extra-light);
-}
-
-.comment-editor__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.record-editor__date {
-  max-width: 220px;
-}
-
-.record-editor__hours {
-  max-width: 220px;
-}
-
 .record-editor__actions,
 .comment-editor__actions,
 .record-card__actions,
@@ -914,6 +947,17 @@ watch(hasTaskId, (value) => {
   word-break: break-word;
   line-height: 1.7;
   color: var(--el-text-color-regular);
+}
+
+.record-card__content--rich {
+  white-space: normal;
+}
+
+.record-card__attachments,
+.comment-card__attachments {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--el-border-color-lighter);
 }
 
 .dependency-group {

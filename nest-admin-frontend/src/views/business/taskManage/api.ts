@@ -97,6 +97,10 @@ export function addTimeLog(taskId, data) {
   return request({ url: `${baseUrl}/${taskId}/timelogs`, method: 'post', data })
 }
 
+export function updateTimeLog(id, data) {
+  return request({ url: `${baseUrl}/timelogs/${id}`, method: 'put', data })
+}
+
 export function deleteTimeLog(id) {
   return request({ url: `${baseUrl}/timelogs/${id}`, method: 'delete' })
 }
