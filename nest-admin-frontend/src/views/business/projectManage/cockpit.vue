@@ -94,7 +94,7 @@ watch(() => route.query.projectId, (value) => {
 
 <template>
   <div class="project-cockpit-page" v-loading="loading">
-    <el-page-header @back="$router.back()" title="项目管理驾驶舱">
+    <el-page-header @back="$router.back()" title="驾驶舱">
       <template #content>
         <div class="cockpit-header-text">聚合查看项目整体健康度、交付风险和执行焦点</div>
       </template>

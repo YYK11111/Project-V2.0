@@ -67,6 +67,24 @@ export const constantRoutes = [
         name: 'MessageCenter',
         meta: { title: '消息中心', icon: 'bell' },
       },
+      {
+        path: '/documentManage/form',
+        component: () => import('@/views/business/documentManage/form.vue'),
+        name: 'DocumentFormHidden',
+        meta: { title: '文档表单' },
+      },
+      {
+        path: '/content/articleManage/aev',
+        component: () => import('@/views/content/articleManage/aev.vue'),
+        name: 'ArticleManageAevHidden',
+        meta: { title: '文章编辑' },
+      },
+      {
+        path: '/content/aev',
+        component: () => import('@/views/content/articleManage/aev.vue'),
+        name: 'ContentAevHidden',
+        meta: { title: '文章编辑' },
+      },
     ],
   },
   {

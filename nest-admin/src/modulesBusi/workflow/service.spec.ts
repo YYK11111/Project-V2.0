@@ -350,7 +350,7 @@ describe('WorkflowService listInstances', () => {
 
     const service = new WorkflowService(
       {} as any,
-      { createQueryBuilder: jest.fn(() => instanceQb) } as any,
+      { createQueryBuilder: jest.fn(() => instanceQb), query: jest.fn() } as any,
       { createQueryBuilder: jest.fn(() => taskQb) } as any,
       {} as any,
       {} as any,
@@ -370,16 +370,25 @@ describe('WorkflowService listInstances', () => {
 
   it('participant 模式按最近任务去重实例后查询', async () => {
     const { service, taskQb, instanceQb } = createService()
-    taskQb.getRawMany.mockResolvedValue([{ instanceId: 'ins_1' }, { instanceId: 'ins_2' }])
-    instanceQb.getMany.mockResolvedValue([{ id: 'ins_1' }, { id: 'ins_2' }])
+    taskQb.getRawMany.mockResolvedValue([
+      { instanceId: 'ins_2', latestTaskTime: '2026-04-16 10:00:00' },
+      { instanceId: 'ins_1', latestTaskTime: '2026-04-16 09:00:00' },
+    ])
+    ;((service as any).instanceRepo.query as jest.Mock).mockResolvedValue([
+      { id: 'ins_1', startTime: '2026-04-16 09:00:00' },
+      { id: 'ins_2', startTime: '2026-04-16 10:00:00' },
+    ])
 
     const result = await service.listInstances('user_1', '1', 'participant')
 
     expect(taskQb.where).toHaveBeenCalledWith('task.assigneeId = :userId', { userId: 'user_1' })
     expect(taskQb.groupBy).toHaveBeenCalledWith('task.instanceId')
-    expect(instanceQb.where).toHaveBeenCalledWith('instance.id IN (:...instanceIds)', { instanceIds: ['ins_1', 'ins_2'] })
-    expect(instanceQb.andWhere).toHaveBeenCalledWith('instance.status = :status', { status: '1' })
-    expect(result).toEqual([{ id: 'ins_1' }, { id: 'ins_2' }])
+    expect((service as any).instanceRepo.query).toHaveBeenCalled()
+    expect(instanceQb.orderBy).not.toHaveBeenCalled()
+    expect(result).toEqual([
+      { id: 'ins_2', startTime: '2026-04-16 10:00:00' },
+      { id: 'ins_1', startTime: '2026-04-16 09:00:00' },
+    ])
   })
 
   it('starter 模式按发起人和状态查询实例', async () => {

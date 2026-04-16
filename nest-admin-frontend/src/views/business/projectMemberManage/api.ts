@@ -16,7 +16,7 @@ function normalizePageData(res) {
 // 获取项目成员列表
 export function getList(params) {
   return request({
-    url: '/business/project-members',
+    url: '/business/project-members/list',
     method: 'get',
     params
   }).then(normalizePageData)
@@ -28,6 +28,21 @@ export function getRoles() {
     url: '/business/project-members/getRoles',
     method: 'get'
   })
+}
+
+export function getStats() {
+  return request({
+    url: '/business/project-members/stats',
+    method: 'get'
+  })
+}
+
+export function getProjectOverview(params) {
+  return request({
+    url: '/business/project-members/project-overview',
+    method: 'get',
+    params,
+  }).then(normalizePageData)
 }
 
 // 添加项目成员

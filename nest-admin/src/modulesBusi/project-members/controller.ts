@@ -16,6 +16,16 @@ export class ProjectMembersController extends BaseController<ProjectMember, Proj
     return projectMemberRoleMap
   }
 
+  @Get('stats')
+  getStats() {
+    return this.service.getStats()
+  }
+
+  @Get('project-overview')
+  getProjectOverview(@Query() query: QueryListDto) {
+    return this.service.getProjectOverview(query)
+  }
+
   @Post()
   addMember(@Body() data: ProjectMemberDto) {
     return this.service.addMember(data)

@@ -75,6 +75,56 @@ const getHistoryActionText = (item: any) => {
   return getActionText(item?.action)
 }
 
+const getBusinessTypeLabel = (type: string) => {
+  const map: Record<string, string> = {
+    project: '项目',
+    task: '任务',
+    ticket: '工单',
+    change: '变更',
+    customer: '客户',
+    interaction: '互动',
+    opportunity: '商机',
+    contract: '合同',
+  }
+  return map[type] || type || '-'
+}
+
+const getBusinessObjectId = (businessKey: string) => {
+  return String(businessKey || '').split('_').pop() || '-'
+}
+
+const formatDuration = (value: string | number) => {
+  const totalMilliseconds = Number(value || 0)
+  if (!Number.isFinite(totalMilliseconds) || totalMilliseconds <= 0) {
+    return '-'
+  }
+  if (totalMilliseconds < 1000) {
+    return `${totalMilliseconds}毫秒`
+  }
+
+  const totalSeconds = Math.floor(totalMilliseconds / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}小时${minutes}分${seconds}秒`
+  }
+  if (minutes > 0) {
+    return `${minutes}分${seconds}秒`
+  }
+  return `${seconds}秒`
+}
+
+const getHistoryOperatorText = (item: any) => {
+  const name = item?.operatorName || item?.operatorId || '-'
+  return item?.operatorId && item?.operatorName ? `${item.operatorName}（${item.operatorId}）` : name
+}
+
+const getHistoryCommentText = (item: any) => {
+  return item?.comment || '无审批意见'
+}
+
 const handleCancel = (row: any) => { currentCancelInstance.value = row; cancelForm.reason = ''; cancelVisible.value = true }
 const submitCancel = () => api.cancelWorkflowInstance(currentCancelInstance.value.id, { reason: cancelForm.reason }).then(() => { ElMessage.success('流程已终止'); cancelVisible.value = false; rctRef.value.getList() })
 
@@ -115,10 +165,21 @@ onMounted(async () => {
       <template #table>
         <el-table-column prop="definitionCode" label="流程编码" width="120" />
         <el-table-column prop="id" label="实例ID" width="160" />
-        <el-table-column prop="businessType" label="业务对象" width="100" />
-        <el-table-column prop="businessTitle" label="业务标题" min-width="180" :show-overflow-tooltip="true" />
+        <el-table-column prop="businessType" label="业务对象" width="100">
+          <template #default="{ row }">
+            {{ getBusinessTypeLabel(row.businessType) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="businessTitle" label="业务标题" min-width="220" :show-overflow-tooltip="true">
+          <template #default="{ row }">
+            <div class="instance-title-cell">
+              <span class="instance-title-cell__title">{{ row.businessTitle || '-' }}</span>
+              <span v-if="row.businessCode" class="instance-title-cell__code">{{ row.businessCode }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="businessCode" label="业务编号" width="160" :show-overflow-tooltip="true" />
-        <el-table-column prop="businessKey" label="业务单号" width="180" />
+        <el-table-column prop="businessKey" label="系统业务键" width="180" :show-overflow-tooltip="true" />
         <el-table-column label="业务对象ID" width="140">
           <template #default="{ row }">
             {{ String(row.businessKey || '').split('_').pop() || '-' }}
@@ -130,7 +191,12 @@ onMounted(async () => {
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="starterId" label="发起人ID" width="120" />
+        <el-table-column label="发起人" min-width="160" :show-overflow-tooltip="true">
+          <template #default="{ row }">
+            <span>{{ row.starterName || '-' }}</span>
+            <span v-if="row.starterId" class="instance-meta-id">（{{ row.starterId }}）</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === '1' ? 'warning' : row.status === '2' ? 'success' : 'info'">
@@ -149,53 +215,70 @@ onMounted(async () => {
     <BaDialog v-model="detailVisible" title="流程实例详情" width="80%">
       <el-tabs v-model="detailTab">
         <el-tab-pane label="基本信息" name="info">
-          <el-descriptions :column="2" border v-if="currentInstance">
-            <el-descriptions-item label="实例ID">{{ currentInstance.id }}</el-descriptions-item>
-            <el-descriptions-item label="流程编码">{{ currentInstance.definitionCode }}</el-descriptions-item>
-            <el-descriptions-item label="业务对象">{{ currentInstance.businessType }}</el-descriptions-item>
-            <el-descriptions-item label="业务标题">{{ currentInstance.businessTitle || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="业务单号">{{ currentInstance.businessKey }}</el-descriptions-item>
-            <el-descriptions-item label="业务编号">{{ currentInstance.businessCode || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="发起人ID">{{ currentInstance.starterId }}</el-descriptions-item>
-            <el-descriptions-item label="状态">
-              <el-tag :type="currentInstance.status === '1' ? 'warning' : currentInstance.status === '2' ? 'success' : 'info'">
-                {{ currentInstance.status === '1' ? '进行中' : currentInstance.status === '2' ? '已完成' : '已取消' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="开始时间">{{ currentInstance.startTime }}</el-descriptions-item>
-            <el-descriptions-item label="结束时间">{{ currentInstance.endTime || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="耗时">{{ currentInstance.duration ? currentInstance.duration + 'ms' : '-' }}</el-descriptions-item>
-            <el-descriptions-item label="退回发起人" v-if="currentInstance.variables?._returnedToStarter">
-              <el-tag type="warning">是</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="退回时间" v-if="currentInstance.variables?._returnedToStarterAt">
-              {{ currentInstance.variables?._returnedToStarterAt }}
-            </el-descriptions-item>
-            <el-descriptions-item label="退回目标" v-if="currentInstance.variables?._lastRejectTargetName">
-              {{ currentInstance.variables?._lastRejectTargetName }}
-            </el-descriptions-item>
-            <el-descriptions-item label="退回意见" :span="2" v-if="currentInstance.variables?._returnedComment">
-              {{ currentInstance.variables?._returnedComment }}
-            </el-descriptions-item>
-            <el-descriptions-item label="结束退回实例" v-if="currentInstance.variables?._returnedClosedByStarter">
-              <el-tag type="info">已结束</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="结束时间" v-if="currentInstance.variables?._returnedClosedAt">
-              {{ currentInstance.variables?._returnedClosedAt }}
-            </el-descriptions-item>
-            <el-descriptions-item label="结束原因" :span="2" v-if="currentInstance.variables?._returnedCloseReason">
-              {{ currentInstance.variables?._returnedCloseReason }}
-            </el-descriptions-item>
-            <el-descriptions-item label="流程变量" :span="2"><pre class="code-block">{{ JSON.stringify(currentInstance.variables, null, 2) }}</pre></el-descriptions-item>
-          </el-descriptions>
+          <template v-if="currentInstance">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="实例ID">{{ currentInstance.id }}</el-descriptions-item>
+              <el-descriptions-item label="流程编码">{{ currentInstance.definitionCode }}</el-descriptions-item>
+              <el-descriptions-item label="业务对象">{{ getBusinessTypeLabel(currentInstance.businessType) }}</el-descriptions-item>
+              <el-descriptions-item label="业务标题">{{ currentInstance.businessTitle || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="业务编号">{{ currentInstance.businessCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="业务对象ID">{{ getBusinessObjectId(currentInstance.businessKey) }}</el-descriptions-item>
+              <el-descriptions-item label="系统业务键">{{ currentInstance.businessKey || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="发起人">
+                {{ currentInstance.starterName || '-' }}
+                <template v-if="currentInstance.starterId">（{{ currentInstance.starterId }}）</template>
+              </el-descriptions-item>
+              <el-descriptions-item label="状态">
+                <el-tag :type="currentInstance.status === '1' ? 'warning' : currentInstance.status === '2' ? 'success' : 'info'">
+                  {{ currentInstance.status === '1' ? '进行中' : currentInstance.status === '2' ? '已完成' : '已取消' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="开始时间">{{ currentInstance.startTime }}</el-descriptions-item>
+              <el-descriptions-item label="结束时间">{{ currentInstance.endTime || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="耗时">{{ formatDuration(currentInstance.duration) }}</el-descriptions-item>
+              <el-descriptions-item label="退回发起人" v-if="currentInstance.variables?._returnedToStarter">
+                <el-tag type="warning">是</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="退回时间" v-if="currentInstance.variables?._returnedToStarterAt">
+                {{ currentInstance.variables?._returnedToStarterAt }}
+              </el-descriptions-item>
+              <el-descriptions-item label="退回目标" v-if="currentInstance.variables?._lastRejectTargetName">
+                {{ currentInstance.variables?._lastRejectTargetName }}
+              </el-descriptions-item>
+              <el-descriptions-item label="退回意见" :span="2" v-if="currentInstance.variables?._returnedComment">
+                {{ currentInstance.variables?._returnedComment }}
+              </el-descriptions-item>
+              <el-descriptions-item label="结束退回实例" v-if="currentInstance.variables?._returnedClosedByStarter">
+                <el-tag type="info">已结束</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="结束时间" v-if="currentInstance.variables?._returnedClosedAt">
+                {{ currentInstance.variables?._returnedClosedAt }}
+              </el-descriptions-item>
+              <el-descriptions-item label="结束原因" :span="2" v-if="currentInstance.variables?._returnedCloseReason">
+                {{ currentInstance.variables?._returnedCloseReason }}
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <el-collapse class="variables-collapse">
+              <el-collapse-item title="展开查看原始流程变量" name="variables">
+                <pre class="code-block">{{ JSON.stringify(currentInstance.variables, null, 2) }}</pre>
+              </el-collapse-item>
+            </el-collapse>
+          </template>
         </el-tab-pane>
         <el-tab-pane label="审批历史" name="history">
           <el-timeline v-if="historyList.length > 0">
             <el-timeline-item v-for="(item, index) in historyList" :key="index" :timestamp="item.createTime" :type="getHistoryItemType(item.action)" placement="top">
-              <el-card>
-                <h4>{{ getHistoryActionText(item) }} - {{ item.nodeName || '流程节点' }}</h4>
-                <p v-if="item.operatorId">操作人ID: {{ item.operatorId }}</p>
-                <p v-if="item.comment">审批意见: {{ item.comment }}</p>
+              <el-card class="history-card">
+                <div class="history-card__header">
+                  <div class="history-card__title">{{ item.nodeName || '流程节点' }}</div>
+                  <el-tag :type="getHistoryItemType(item.action)" size="small">{{ getHistoryActionText(item) }}</el-tag>
+                </div>
+                <div class="history-card__meta">
+                  <span>操作人：{{ getHistoryOperatorText(item) }}</span>
+                  <span>时间：{{ item.createTime || '-' }}</span>
+                </div>
+                <div class="history-card__comment">审批意见：{{ getHistoryCommentText(item) }}</div>
               </el-card>
             </el-timeline-item>
           </el-timeline>
@@ -220,4 +303,13 @@ onMounted(async () => {
 
 <style scoped>
 .code-block { background-color: #f5f7fa; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+.variables-collapse { margin-top: 16px; }
+.history-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.history-card__title { font-weight: 600; color: var(--el-text-color-primary); }
+.history-card__meta { display: flex; flex-wrap: wrap; gap: 12px; color: var(--el-text-color-secondary); font-size: 13px; margin-bottom: 8px; }
+.history-card__comment { line-height: 1.6; color: var(--el-text-color-regular); }
+.instance-title-cell { display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
+.instance-title-cell__title { color: var(--el-text-color-primary); }
+.instance-title-cell__code { font-size: 12px; color: var(--el-text-color-secondary); }
+.instance-meta-id { color: var(--el-text-color-secondary); }
 </style>

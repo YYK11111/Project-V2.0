@@ -142,7 +142,7 @@ catalog.getTrees()
 
         <template #operation="{ selectedIds }">
           <div class="flexBetween">
-            <el-button type="primary" @click="$refs.rctRef.goRoute()">新增</el-button>
+            <el-button type="primary" @click="$refs.rctRef.goRoute(null, '/content/aev')">新增</el-button>
             <el-button :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
           </div>
         </template>
@@ -166,7 +166,7 @@ catalog.getTrees()
           </el-table-column>
         </template>
         <template #tableOperation="{ row }">
-          <TbOpBtn icon="edit" @click="$refs.rctRef.goRoute(row.id)">修改</TbOpBtn>
+          <TbOpBtn icon="edit" @click="$refs.rctRef.goRoute(row.id, '/content/aev')">修改</TbOpBtn>
           <TbOpBtn icon="delete" @click="$refs.rctRef.del(del, row.id)">删除</TbOpBtn>
         </template>
       </RequestChartTable>

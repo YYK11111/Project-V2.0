@@ -45,7 +45,7 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canDocumentAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/documentManage/form')">新增文档</el-button>
+          <el-button v-if="canDocumentAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/documentManage/form')">新增项目文档</el-button>
           <el-button v-if="canDocumentDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
