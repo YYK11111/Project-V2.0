@@ -65,8 +65,8 @@ export class Menu extends BaseEntity {
   @BaseColumn({ length: 100, comment: '菜单图标' })
   icon: string
 
-  @BaseColumn({ length: 8, default: '1', comment: '排序' })
-  order: string
+  @BaseColumn({ type: 'int', default: 1, comment: '排序' })
+  order: number
 
   @BaseColumn({ length: 100, comment: '路由地址' })
   path: string

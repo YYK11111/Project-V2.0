@@ -114,6 +114,23 @@ export const constantRoutes = [
 ]
 
 import { getLoginUserMenus } from '@/views/system/roles/api'
+
+function sortMenuTreeByOrder(routes = []) {
+  return [...routes]
+    .sort((left, right) => {
+      const leftOrder = Number(left.order || 0)
+      const rightOrder = Number(right.order || 0)
+      if (leftOrder === rightOrder) {
+        return String(left.createTime || '') < String(right.createTime || '') ? 1 : -1
+      }
+      return leftOrder - rightOrder
+    })
+    .map((route) => ({
+      ...route,
+      children: Array.isArray(route.children) ? sortMenuTreeByOrder(route.children) : route.children,
+    }))
+}
+
 export function getUserRoutes(router) {
   // 向后端请求路由数据
   return getLoginUserMenus().then(({ data }) => {
@@ -127,7 +144,7 @@ export function getUserRoutes(router) {
       })
       return Promise.reject()
     }
-    const userRoutes = transRouter(data)
+    const userRoutes = transRouter(sortMenuTreeByOrder(data))
     console.log('=== Generated Routes ===', JSON.stringify(userRoutes, null, 2))
     useMenusStore().addRoutes = userRoutes
     useMenusStore().routes = userRoutes.concat(constantRoutes)

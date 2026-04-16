@@ -127,7 +127,7 @@ getTreesFun()
         </el-form-item>
 
         <el-form-item label="显示排序" prop="order">
-          <el-input-number v-model="form.order" :precision="2" :step="1" :min="0" />
+          <el-input-number v-model="form.order" :precision="0" :step="1" :min="0" />
         </el-form-item>
         <!-- <BaRadioGroup v-model="form.isFrame" v-if="form.type != 'button'" label="是否外链">
 					<el-radio label="0">否</el-radio>

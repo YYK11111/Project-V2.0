@@ -29,15 +29,15 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'business/workflow/in
 
 -- 业务核心菜单
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '项目管理', 'projectManage', 'business/projectManage/index', 'catalog', NULL, '4', 'project', '0', '1', NULL, 'business:project', NOW(), 'system', 'system'
+SELECT '项目管理', 'projectManage', 'business/projectManage/index', 'catalog', NULL, '4', 'project', '0', '1', NULL, 'business/projectManage', NOW(), 'system', 'system'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = 'projectManage' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '任务管理', 'taskManage', 'business/taskManage/index', 'catalog', NULL, '5', 'task', '0', '1', NULL, 'business:task', NOW(), 'system', 'system'
+SELECT '任务管理', 'taskManage', 'business/taskManage/index', 'catalog', NULL, '5', 'task', '0', '1', NULL, 'business/taskManage', NOW(), 'system', 'system'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '工单管理', 'ticketManage', 'business/ticketManage/index', 'catalog', NULL, '6', 'ticket', '0', '1', NULL, 'business:ticket', NOW(), 'system', 'system'
+SELECT '工单管理', 'ticketManage', 'business/ticketManage/index', 'catalog', NULL, '6', 'ticket', '0', '1', NULL, 'business/ticketManage', NOW(), 'system', 'system'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = 'ticketManage' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)

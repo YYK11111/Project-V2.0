@@ -11,7 +11,7 @@ WHERE id = @projectRoot;
 
 -- 项目信息：项目列表入口
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '项目信息', 'projectInfo', 'business/projectManage/index', 'menu', @projectRoot, '1', 'list', '0', '1', NULL, 'business:project', NOW(), 'system', 'system'
+SELECT '项目信息', 'projectInfo', 'business/projectManage/index', 'menu', @projectRoot, '1', 'list', '0', '1', NULL, 'business/projectInfo', NOW(), 'system', 'system'
 WHERE @projectRoot IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectRoot AND path = 'projectInfo' AND is_delete IS NULL);
 

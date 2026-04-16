@@ -46,11 +46,12 @@ export class MenusService extends BaseService<Menu, CreateMenuDto> {
       }
     }
 
-    return isTree ? arrayToTree(data) : data
+    return isTree ? this.sortMenuTree(arrayToTree(data)) : this.sortMenuList(data)
   }
 
   async getTrees(query): Promise<Menu[]> {
-    return this.repository.findTrees()
+    const res = await this.repository.find()
+    return this.sortMenuTree(arrayToTree(res))
   }
 
   async treeselect() {
@@ -59,8 +60,28 @@ export class MenusService extends BaseService<Menu, CreateMenuDto> {
         order: 'ASC',
       },
     })
-    const tree = arrayToTree(res)
+    const tree = this.sortMenuTree(arrayToTree(res))
     return tree
+  }
+
+  private sortMenuList(data: Menu[]) {
+    return [...data].sort((left, right) => this.compareMenuOrder(left, right))
+  }
+
+  private sortMenuTree(data: Menu[]) {
+    return this.sortMenuList(data).map((item) => ({
+      ...item,
+      children: item.children?.length ? this.sortMenuTree(item.children) : item.children,
+    }))
+  }
+
+  private compareMenuOrder(left: Menu, right: Menu) {
+    const leftOrder = Number(left.order || 0)
+    const rightOrder = Number(right.order || 0)
+    if (leftOrder === rightOrder) {
+      return +new Date(right.createTime) - +new Date(left.createTime)
+    }
+    return leftOrder - rightOrder
   }
 
   async dataValidate(data: { id; permissions?: string[] }) {

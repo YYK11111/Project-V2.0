@@ -12,7 +12,7 @@ SET component = '',
 WHERE id = @taskRoot;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '任务信息', 'taskInfo', 'business/taskManage/index', 'menu', @taskRoot, '1', 'list', '0', '1', NULL, 'business:task', NOW(), 'system', 'system'
+SELECT '任务信息', 'taskInfo', 'business/taskManage/index', 'menu', @taskRoot, '1', 'list', '0', '1', NULL, 'business/taskInfo', NOW(), 'system', 'system'
 WHERE @taskRoot IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @taskRoot AND path = 'taskInfo' AND is_delete IS NULL);
 
@@ -24,7 +24,7 @@ SET component = '',
 WHERE id = @ticketRoot;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '工单信息', 'ticketInfo', 'business/ticketManage/index', 'menu', @ticketRoot, '1', 'list', '0', '1', NULL, 'business:ticket', NOW(), 'system', 'system'
+SELECT '工单信息', 'ticketInfo', 'business/ticketManage/index', 'menu', @ticketRoot, '1', 'list', '0', '1', NULL, 'business/ticketInfo', NOW(), 'system', 'system'
 WHERE @ticketRoot IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @ticketRoot AND path = 'ticketInfo' AND is_delete IS NULL);
 

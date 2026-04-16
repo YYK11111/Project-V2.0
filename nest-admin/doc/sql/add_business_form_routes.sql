@@ -15,21 +15,21 @@ SET @documentId = (SELECT id FROM sys_menu WHERE path = 'documentManage' AND par
 -- 项目管理 - 表单路由
 -- =====================================================
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '99', '', '1', '1', NULL, 'business:project:edit', NOW(), 'system')
+VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '99', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system')
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- =====================================================
 -- 任务管理 - 表单路由
 -- =====================================================
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '99', '', '1', '1', NULL, 'business:task:edit', NOW(), 'system')
+VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '99', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system')
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- =====================================================
 -- 工单管理 - 表单路由
 -- =====================================================
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('工单表单', 'form', 'business/ticketManage/form', 'menu', @ticketId, '99', '', '1', '1', NULL, 'business:ticket:edit', NOW(), 'system')
+VALUES ('工单表单', 'form', 'business/ticketManage/form', 'menu', @ticketId, '99', '', '1', '1', NULL, 'business/tickets/update', NOW(), 'system')
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- =====================================================

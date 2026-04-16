@@ -85,9 +85,9 @@
 ## 📝 权限配置
 
 所有菜单的 `permissionKey` 保持不变：
-- `business:project` - 项目管理
-- `business:task` - 任务管理
-- `business:ticket` - 工单管理
+- `business/projectManage` - 项目管理目录
+- `business/taskManage` - 任务管理目录
+- `business/ticketManage` - 工单管理目录
 - `business:document` - 文档管理
 - `business:project:edit` - 项目编辑权限
 - 等等...

@@ -112,10 +112,12 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
     })
 
     const menus = [...menuMap.values()].sort((a, b) => {
-      if (a.order === b.order) {
+      const leftOrder = Number(a.order || 0)
+      const rightOrder = Number(b.order || 0)
+      if (leftOrder === rightOrder) {
         return +new Date(b.createTime) - +new Date(a.createTime)
       }
-      return +a.order - +b.order
+      return leftOrder - rightOrder
     })
 
     return isTree ? arrayToTree(menus) : menus

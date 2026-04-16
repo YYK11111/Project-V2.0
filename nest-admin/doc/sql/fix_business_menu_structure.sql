@@ -19,11 +19,11 @@ DELETE FROM sys_menu WHERE path = '/projectManage/form' AND parent_id = @project
 
 -- 添加项目列表页
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目列表', 'index', 'business/projectManage/index', 'menu', @projectId, '1', 'list', '0', '1', NULL, 'business:project:list', NOW(), 'system');
+VALUES ('项目列表', 'index', 'business/projectManage/index', 'menu', @projectId, '1', 'list', '0', '1', NULL, 'business/projectInfo', NOW(), 'system');
 
 -- 重新添加项目表单页（使用相对路径）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '2', '', '1', '1', NULL, 'business:project:edit', NOW(), 'system');
+VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '2', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system');
 
 -- =====================================================
 -- 2. 任务管理
@@ -34,10 +34,10 @@ DELETE FROM sys_menu WHERE path = 'taskManage/form' AND parent_id = @taskId;
 DELETE FROM sys_menu WHERE path = '/taskManage/form' AND parent_id = @taskId;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务列表', 'index', 'business/taskManage/index', 'menu', @taskId, '1', 'list', '0', '1', NULL, 'business:task:list', NOW(), 'system');
+VALUES ('任务列表', 'index', 'business/taskManage/index', 'menu', @taskId, '1', 'list', '0', '1', NULL, 'business/taskInfo', NOW(), 'system');
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '2', '', '1', '1', NULL, 'business:task:edit', NOW(), 'system');
+VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '2', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system');
 
 -- =====================================================
 -- 3. 工单管理
@@ -48,10 +48,10 @@ DELETE FROM sys_menu WHERE path = 'ticketManage/form' AND parent_id = @ticketId;
 DELETE FROM sys_menu WHERE path = '/ticketManage/form' AND parent_id = @ticketId;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('工单列表', 'index', 'business/ticketManage/index', 'menu', @ticketId, '1', 'list', '0', '1', NULL, 'business:ticket:list', NOW(), 'system');
+VALUES ('工单列表', 'index', 'business/ticketManage/index', 'menu', @ticketId, '1', 'list', '0', '1', NULL, 'business/ticketInfo', NOW(), 'system');
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('工单表单', 'form', 'business/ticketManage/form', 'menu', @ticketId, '2', '', '1', '1', NULL, 'business:ticket:edit', NOW(), 'system');
+VALUES ('工单表单', 'form', 'business/ticketManage/form', 'menu', @ticketId, '2', '', '1', '1', NULL, 'business/tickets/update', NOW(), 'system');
 
 -- =====================================================
 -- 4. 文档管理

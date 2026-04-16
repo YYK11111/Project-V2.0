@@ -3,15 +3,15 @@
 
 -- 插入项目管理菜单（顶级菜单，type=catalog支持子路由）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目管理', 'projectManage', 'business/projectManage/index', 'catalog', NULL, '4', 'project', '0', '1', NULL, 'business:project', NOW(), 'system');
+VALUES ('项目管理', 'projectManage', 'business/projectManage/index', 'catalog', NULL, '4', 'project', '0', '1', NULL, 'business/projectManage', NOW(), 'system');
 
 -- 插入任务管理菜单（顶级菜单）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务管理', 'taskManage', 'business/taskManage/index', 'catalog', NULL, '5', 'task', '0', '1', NULL, 'business:task', NOW(), 'system');
+VALUES ('任务管理', 'taskManage', 'business/taskManage/index', 'catalog', NULL, '5', 'task', '0', '1', NULL, 'business/taskManage', NOW(), 'system');
 
 -- 插入工单管理菜单（顶级菜单）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('工单管理', 'ticketManage', 'business/ticketManage/index', 'catalog', NULL, '6', 'ticket', '0', '1', NULL, 'business:ticket', NOW(), 'system');
+VALUES ('工单管理', 'ticketManage', 'business/ticketManage/index', 'catalog', NULL, '6', 'ticket', '0', '1', NULL, 'business/ticketManage', NOW(), 'system');
 
 -- 插入文档管理菜单（顶级菜单）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
