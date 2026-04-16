@@ -98,6 +98,42 @@ export const constantRoutes = [
         meta: { title: '我的借阅' },
       },
       {
+        path: '/content/articleManage/home',
+        component: () => import('@/views/content/articleManage/home.vue'),
+        name: 'KnowledgeHomeHidden',
+        meta: { title: '知识中心' },
+      },
+      {
+        path: '/content/articleManage/index',
+        component: () => import('@/views/content/articleManage/index.vue'),
+        name: 'KnowledgeManageHidden',
+        meta: { title: '知识后台' },
+      },
+      {
+        path: '/content/articleManage/manage',
+        component: () => import('@/views/content/articleManage/index.vue'),
+        name: 'KnowledgeManagePageHidden',
+        meta: { title: '后台管理' },
+      },
+      {
+        path: '/content/articleManage/search',
+        component: () => import('@/views/content/articleManage/search.vue'),
+        name: 'KnowledgeSearchHidden',
+        meta: { title: '知识搜索' },
+      },
+      {
+        path: '/content/articleManage/aiRetrieveDebug',
+        component: () => import('@/views/content/articleManage/aiRetrieveDebug.vue'),
+        name: 'KnowledgeAiRetrieveDebugHidden',
+        meta: { title: 'AI检索调试' },
+      },
+      {
+        path: '/content/articleManage/detail',
+        component: () => import('@/views/content/articleManage/detail.vue'),
+        name: 'ArticleDetailHidden',
+        meta: { title: '知识详情' },
+      },
+      {
         path: '/content/articleManage/borrowApproval',
         component: () => import('@/views/content/articleManage/borrowApproval.vue'),
         name: 'ArticleBorrowApprovalHidden',

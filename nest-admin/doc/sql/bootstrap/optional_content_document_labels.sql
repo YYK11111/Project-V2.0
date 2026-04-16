@@ -1,12 +1,12 @@
 SET NAMES utf8mb4;
 
 UPDATE sys_menu
-SET name = '文章中心'
+SET name = '知识中心'
 WHERE path = 'content'
   AND is_delete IS NULL;
 
 UPDATE sys_menu
-SET name = '文章中心',
+SET name = '知识中心',
     path = 'content',
     component = 'content/articleManage/index',
     type = 'menu',
