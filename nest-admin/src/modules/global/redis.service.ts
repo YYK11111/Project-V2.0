@@ -91,6 +91,7 @@ export class RedisService {
         (!query.address || item.address.includes(query.address))
       )
     })
+    data = data.map(({ session, password, ...item }) => item)
     let { pageNum, pageSize } = query
     return [data.slice(--pageNum * pageSize, pageSize), data.length]
   }
@@ -106,6 +107,10 @@ export class RedisService {
 
   async delRedisOnlineUser(session) {
     return await this.del(`user.online:${session}`)
+  }
+
+  async existsOnlineUser(session: string) {
+    return await this.exists(`user.online:${session}`)
   }
 
   // 获取权限列表

@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException, Inject } from '@ne
 import { forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Like } from 'typeorm';
 import dayjs from 'dayjs';
 import { WorkflowDefinition } from './entity/workflow-definition.entity';
 import { WorkflowInstance } from './entity/workflow-instance.entity';
@@ -866,16 +867,13 @@ export class WorkflowService {
    */
   private async sendApprovalNotification(task: WorkflowTask, instance: WorkflowInstance, node: any): Promise<void> {
     try {
+      const messageSummary = await this.buildWorkflowMessageSummary(instance, {
+        nodeName: node.name,
+        actionLabel: '待办',
+      })
       const noticeDto: any = {
-        title: `待办审批：${node.name}`,
-        content: `您有一个新的审批任务待处理。
-
-流程：${instance.definitionCode}
-节点：${node.name}
-发起人：${instance.starterId}
-时间：${new Date().toISOString()}
-
-请及时处理。`,
+        title: messageSummary.todoTitle,
+        content: messageSummary.todoContent,
         isActive: BoolNum.Yes,
         remark: `workflow_task:${task.id}`,
         receiverIds: [task.assigneeId],
@@ -883,7 +881,7 @@ export class WorkflowService {
 
       await this.noticesService.add(noticeDto);
       await this.messagesService.sendMessage({
-        title: `待办审批：${node.name}`,
+        title: messageSummary.todoTitle,
         content: noticeDto.content,
         messageType: 'todo',
         sourceType: 'workflow_task',
@@ -892,6 +890,7 @@ export class WorkflowService {
         senderId: instance.starterId,
         linkUrl: this.getBusinessRoute(instance.businessKey),
         linkParams: this.getBusinessRouteParams(instance.businessKey, task.id, instance.id),
+        extraData: messageSummary.extraData,
       })
 
       console.log(`[Workflow] Sent notification for task ${task.id} to user ${task.assigneeId}`);
@@ -903,10 +902,15 @@ export class WorkflowService {
   private async sendReturnToStarterMessage(instance: WorkflowInstance, task: WorkflowTask, comment?: string): Promise<void> {
     try {
       const now = new Date().toISOString()
+      const messageSummary = await this.buildWorkflowMessageSummary(instance, {
+        nodeName: task.nodeName,
+        actionLabel: '待阅',
+      })
       await this.messagesService.sendMessage({
-        title: '审批已退回，请处理',
-        content: `您发起的审批已被驳回并退回发起人处理。
+        title: `【待阅】退回处理 - ${messageSummary.businessLabel}`,
+        content: `您发起的审批已被退回，请根据意见处理。
 
+业务对象：${messageSummary.businessLabel}
 流程：${instance.definitionCode}
 节点：${task.nodeName}
 审批人：${await this.getUserDisplayName(task.assigneeId)}
@@ -921,6 +925,7 @@ export class WorkflowService {
         senderId: task.assigneeId,
         linkUrl: this.getBusinessRoute(instance.businessKey),
         linkParams: this.getBusinessRouteParams(instance.businessKey, '', instance.id),
+        extraData: messageSummary.extraData,
       })
     } catch (error) {
       console.error(`[Workflow] Failed to send return-to-starter message: ${error.message}`)
@@ -1188,6 +1193,81 @@ export class WorkflowService {
     return Promise.all(tasks.map((task) => this.attachBusinessSummaryToTask(task)))
   }
 
+  async getHandledHistory(userId: string, query: { pageNum?: number; pageSize?: number; keyword?: string; businessType?: string; action?: string }) {
+    const pageNum = Number(query.pageNum || 1)
+    const pageSize = Number(query.pageSize || 10)
+    const keyword = String(query.keyword || '').trim()
+    const action = String(query.action || '').trim()
+    const businessType = String(query.businessType || '').trim()
+
+    const actionList = ['1', '2', '3', '4', '5', '6', 'execute']
+    const where: any = {
+      operatorId: userId,
+    }
+    if (action) {
+      where.action = action
+    }
+
+    const [historyList, total] = await this.historyRepo.findAndCount({
+      where,
+      order: { createTime: 'DESC' },
+      skip: (pageNum - 1) * pageSize,
+      take: pageSize * 3,
+    })
+
+    const list = (await Promise.all(
+      historyList
+        .filter((item) => actionList.includes(String(item.action || '')))
+        .map(async (item) => {
+          const instance = await this.instanceRepo.findOne({ where: { id: item.instanceId } })
+          if (!instance) return null
+          const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
+          const title = this.buildHandledHistoryTitle(summary.businessType, summary.businessTitle, summary.businessCode)
+          const data = {
+            historyId: item.id,
+            instanceId: item.instanceId,
+            taskId: item.taskId,
+            nodeId: item.nodeId,
+            nodeName: item.nodeName,
+            action: item.action,
+            actionText: this.getHistoryActionText(item.action, item.comment),
+            comment: item.comment,
+            operatorId: item.operatorId,
+            operatorName: await this.getUserDisplayName(item.operatorId),
+            businessType: summary.businessType,
+            businessTitle: summary.businessTitle,
+            businessCode: summary.businessCode,
+            businessKey: instance.businessKey,
+            starterId: instance.starterId,
+            starterName: await this.getUserDisplayName(instance.starterId),
+            status: instance.status,
+            title,
+            linkUrl: this.getBusinessRoute(instance.businessKey),
+            linkParams: this.getBusinessRouteParams(instance.businessKey, '', instance.id),
+            createTime: item.createTime,
+          }
+
+          if (businessType && data.businessType !== businessType) {
+            return null
+          }
+          if (keyword) {
+            const text = [data.title, data.nodeName, data.comment, data.businessTitle, data.businessCode].filter(Boolean).join(' ')
+            if (!text.includes(keyword)) {
+              return null
+            }
+          }
+          return data
+        }),
+    ))
+      .filter(Boolean)
+      .slice(0, pageSize)
+
+    return {
+      total: keyword || businessType ? list.length : total,
+      list,
+    }
+  }
+
   /**
    * 获取流程实例详情
    */
@@ -1297,6 +1377,67 @@ export class WorkflowService {
       taskId: taskId || '',
       instanceId: instanceId || '',
       fromWorkflow: '1',
+    }
+  }
+
+  private getHistoryActionText(action: string, comment?: string) {
+    const actionMap: Record<string, string> = {
+      '1': '同意',
+      '2': '驳回',
+      '3': '撤回',
+      '4': '转交',
+      '5': '加签',
+      '6': '终止',
+      execute: String(comment || '').includes('发起人重新提交审批') ? '发起人重新提交' : '执行',
+    }
+    return actionMap[action] || action
+  }
+
+  private buildHandledHistoryTitle(businessType: string, businessTitle: string, businessCode: string) {
+    const typeMap: Record<string, string> = {
+      project: '项目',
+      task: '任务',
+      ticket: '工单',
+      change: '变更',
+      customer: '客户',
+    }
+    const typeLabel = typeMap[businessType] || businessType || '业务'
+    return `【已办】${typeLabel}审批 - ${businessTitle}${businessCode ? `（${businessCode}）` : ''}`
+  }
+
+  private async buildWorkflowMessageSummary(instance: WorkflowInstance, options: { nodeName?: string; actionLabel: '待办' | '待阅' }) {
+    const summary = await this.getBusinessSummary(instance.businessKey, instance.variables)
+    const typeMap: Record<string, string> = {
+      project: '项目',
+      task: '任务',
+      ticket: '工单',
+      change: '变更',
+      customer: '客户',
+    }
+    const typeLabel = typeMap[summary.businessType] || summary.businessType || '业务'
+    const businessLabel = `${summary.businessTitle}${summary.businessCode ? `（${summary.businessCode}）` : ''}`
+    const starterName = await this.getUserDisplayName(instance.starterId)
+    return {
+      businessLabel,
+      todoTitle: `【${options.actionLabel}】${typeLabel}审批 - ${businessLabel}`,
+      todoContent: `您有一个新的审批任务待处理。
+
+业务对象：${businessLabel}
+流程：${instance.definitionCode}
+当前节点：${options.nodeName || '-'}
+发起人：${starterName}
+时间：${new Date().toISOString()}
+
+请及时处理。`,
+      extraData: {
+        businessType: summary.businessType,
+        businessTitle: summary.businessTitle,
+        businessCode: summary.businessCode,
+        starterId: instance.starterId,
+        starterName,
+        nodeName: options.nodeName || '',
+        instanceId: instance.id,
+      },
     }
   }
 

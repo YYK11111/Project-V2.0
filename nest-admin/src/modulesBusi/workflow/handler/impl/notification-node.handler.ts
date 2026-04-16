@@ -36,23 +36,39 @@ export class NotificationNodeHandler implements INodeHandler {
     }
 
     try {
+      const businessData = context.variables?._businessData?.data || {}
+      const businessTitle = businessData.name || businessData.title || context.instanceId
+      const businessCode = businessData.code || businessData.id || ''
+      const businessType = context.variables?._businessData?.businessType || ''
+      const businessLabel = `${businessTitle}${businessCode ? `（${businessCode}）` : ''}`
+      const normalizedTitle = `【待阅】流程通知 - ${businessLabel}`
+      const normalizedContent = `${content || '您收到一条流程通知。'}
+
+业务对象：${businessLabel}
+节点：${context.nodeId}`.trim()
       await this.noticesService.add({
-        title,
-        content,
+        title: normalizedTitle,
+        content: normalizedContent,
         isActive: BoolNum.Yes,
         remark: `workflow_notification:${context.instanceId}:${context.nodeId}`,
         receiverIds: receivers,
       });
       for (const receiverId of receivers) {
         await this.messagesService.sendMessage({
-          title,
-          content,
+          title: normalizedTitle,
+          content: normalizedContent,
           messageType: 'cc',
           sourceType: 'workflow_instance',
           sourceId: context.instanceId,
           receiverId,
           linkUrl: '',
           linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
+          extraData: {
+            businessType,
+            businessTitle,
+            businessCode,
+            nodeName: context.nodeId,
+          },
         })
       }
       console.log(`[Notification] Sent to ${receivers.length} receiver(s) for instance ${context.instanceId}`);

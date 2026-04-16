@@ -1,8 +1,16 @@
 import axios from 'axios'
 import qs from 'qs'
 import { useUserStore } from '../stores/user'
-import { getToken, setToken } from '@/utils/auth'
 import { errorCode } from '@/utils/dictionary'
+
+let isHandlingUnauthorized = false
+const publicUnauthorizedIgnoreList = ['/system/common/getCaptchaImage', '/system/configs/list']
+
+function shouldIgnoreUnauthorized(config = {}) {
+  const requestUrl = config.url || ''
+  const isLoginPage = window.location.pathname === '/login'
+  return isLoginPage || publicUnauthorizedIgnoreList.some((path) => requestUrl.includes(path))
+}
 
 // 创建axios实例
 function requestFactory(getway = '') {
@@ -12,21 +20,17 @@ function requestFactory(getway = '') {
     // 超时
     // timeout: process.env.NODE_ENV === 'development' ? 0 : 8000,
     paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'brackets' }),
+    withCredentials: true,
   })
 
   // request拦截器
   service.interceptors.request.use(
     (config) => {
-      // 是否需要设置 token
-      const isToken = (config.headers || {}).isToken === false
-      if (getToken() && !isToken) {
-        Object.assign(config.headers, window.sysConfig.headers) // 让每个请求携带自定义token 请根据实际情况自行修改
-      }
       return config
     },
     (error) => {
       console.log(error)
-      Promise.reject(error)
+      return Promise.reject(error)
     },
   )
 
@@ -41,13 +45,25 @@ function requestFactory(getway = '') {
       if ([200].includes(code)) {
         return data
       } else if (code == 401) {
-        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', {
-          confirmButtonText: '重新登录',
-          cancelButtonText: '取消',
-          type: 'warning',
-        }).then(() => {
-          useUserStore().logout()
-        })
+        if (shouldIgnoreUnauthorized(res.config)) {
+          return Promise.reject(new Error(msg))
+        }
+        if (!isHandlingUnauthorized) {
+          isHandlingUnauthorized = true
+          const redirectPath = window.location.pathname + window.location.search
+          ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', {
+            confirmButtonText: '重新登录',
+            cancelButtonText: '取消',
+            type: 'warning',
+          })
+            .then(() => {
+              useUserStore().handleSessionExpired(redirectPath)
+            })
+            .finally(() => {
+              isHandlingUnauthorized = false
+            })
+        }
+        return Promise.reject(new Error(msg))
       } else {
         if (process.env.NODE_ENV === 'development') {
           ElMessage({
@@ -59,7 +75,7 @@ function requestFactory(getway = '') {
             message: msg,
           })
         }
-        return Promise.reject()
+        return Promise.reject(new Error(msg))
       }
     },
     (error) => {
@@ -73,12 +89,15 @@ function requestFactory(getway = '') {
         let status = response.status
         msg = '系统接口:' + status + '异常'
       }
+      if (response?.status === 401 && shouldIgnoreUnauthorized(config)) {
+        return Promise.reject(error)
+      }
       ElMessage({
         message: `${msg}:${config?.url}`,
         type: 'error',
         duration: 5 * 1000,
       })
-      return Promise.reject()
+      return Promise.reject(error)
     },
   )
 

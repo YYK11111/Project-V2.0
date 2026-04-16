@@ -25,7 +25,7 @@ export function send(data, callback) {
   const xhr = new XMLHttpRequest()
   xhr.open('POST', window.sysConfig.BASE_API + serve + '/send')
 
-  xhr.setRequestHeader('Authorization', window.sysConfig.headers.Authorization)
+  xhr.withCredentials = true
   xhr.setRequestHeader('Content-type', 'application/json')
   xhr.setRequestHeader('Accept', 'text/event-stream')
 

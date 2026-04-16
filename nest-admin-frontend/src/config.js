@@ -1,4 +1,3 @@
-import { getToken } from '@/utils/auth'
 import { config } from '../sys.config'
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -14,10 +13,6 @@ globalThis.sysConfig = {
     system: '/system',
     business: '/business',
   },
-  get headers() {
-    return { Authorization: 'Bearer ' + getToken() }
-  },
-
   // 以下仅用于系统信息展示，不作为项目变量使用，请勿在代码中使用
   // _version: 'v2.0.0-20260109', // 当前版本信息
   _packDateTime: __PACK_DATETIME__, // 打包时间

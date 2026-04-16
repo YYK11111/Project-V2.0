@@ -10,6 +10,14 @@ export class WorkflowController {
     private readonly businessFieldService: BusinessFieldService,
   ) {}
 
+  private getCurrentUserId(req: Record<string, any>): string {
+    const userId = req.user?.id || req.user?.sub
+    if (!userId) {
+      throw new Error('当前用户不存在')
+    }
+    return String(userId)
+  }
+
   // ==================== 流程定义接口 ====================
 
   @Post('definitions/save')
@@ -71,9 +79,9 @@ export class WorkflowController {
   @Post('instances/start')
   async startWorkflow(
     @Body() dto: StartWorkflowDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.startWorkflow(dto, userId);
+    return this.workflowService.startWorkflow(dto, this.getCurrentUserId(req));
   }
 
   @Get('instances/:id')
@@ -83,45 +91,45 @@ export class WorkflowController {
 
   @Get('instances')
   async listInstances(
-    @Query('userId') userId?: string,
     @Query('status') status?: string,
     @Query('mode') mode?: 'starter' | 'participant',
+    @Req() req?,
   ) {
-    return this.workflowService.listInstances(userId, status, mode || 'starter');
+    return this.workflowService.listInstances(this.getCurrentUserId(req), status, mode || 'starter');
   }
 
   // ==================== 任务接口 ====================
 
   @Get('tasks/my')
-  async getMyTasks(@Query('userId') userId: string) {
-    return this.workflowService.getPendingTasks(userId);
+  async getMyTasks(@Req() req) {
+    return this.workflowService.getPendingTasks(this.getCurrentUserId(req));
   }
 
   @Post('tasks/:id/complete')
   async completeTask(
     @Param('id') id: string,
     @Body() dto: CompleteTaskDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.completeTask(id, userId, dto);
+    return this.workflowService.completeTask(id, this.getCurrentUserId(req), dto);
   }
 
   @Post('tasks/:id/transfer')
   async transferTask(
     @Param('id') id: string,
     @Body() dto: TransferTaskDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.transferTask(id, userId, dto);
+    return this.workflowService.transferTask(id, this.getCurrentUserId(req), dto);
   }
 
   @Post('tasks/:id/add-sign')
   async addSignTask(
     @Param('id') id: string,
     @Body() dto: AddSignTaskDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.addSignTask(id, userId, dto);
+    return this.workflowService.addSignTask(id, this.getCurrentUserId(req), dto);
   }
 
   // ==================== 流程实例操作接口 ====================
@@ -130,36 +138,36 @@ export class WorkflowController {
   async withdrawWorkflow(
     @Param('id') id: string,
     @Body() dto: WithdrawWorkflowDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.withdrawWorkflow(id, userId, dto);
+    return this.workflowService.withdrawWorkflow(id, this.getCurrentUserId(req), dto);
   }
 
   @Post('instances/:id/cancel')
   async cancelInstance(
     @Param('id') id: string,
     @Body() dto: CancelWorkflowDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.cancelInstance(id, userId, dto);
+    return this.workflowService.cancelInstance(id, this.getCurrentUserId(req), dto);
   }
 
   @Post('instances/:id/close-returned')
   async closeReturnedInstance(
     @Param('id') id: string,
     @Body() dto: CloseReturnedWorkflowDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.closeReturnedInstance(id, userId, dto);
+    return this.workflowService.closeReturnedInstance(id, this.getCurrentUserId(req), dto);
   }
 
   @Post('instances/:id/resubmit-returned')
   async resubmitReturnedInstance(
     @Param('id') id: string,
     @Body() dto: ResubmitReturnedWorkflowDto,
-    @Query('userId') userId: string,
+    @Req() req,
   ) {
-    return this.workflowService.resubmitReturnedInstance(id, userId, dto);
+    return this.workflowService.resubmitReturnedInstance(id, this.getCurrentUserId(req), dto);
   }
 
   @Get('instances/:id/history')
@@ -170,6 +178,11 @@ export class WorkflowController {
   @Get('instances/:id/tasks')
   async getInstanceTasks(@Param('id') id: string) {
     return this.workflowService.getInstanceTasks(id);
+  }
+
+  @Get('history/my-handled')
+  async getHandledHistory(@Req() req, @Query() query) {
+    return this.workflowService.getHandledHistory(this.getCurrentUserId(req), query)
   }
 
   // ==================== 业务对象配置接口 ====================

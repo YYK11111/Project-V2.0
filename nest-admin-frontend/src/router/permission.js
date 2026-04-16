@@ -3,7 +3,6 @@ import { useUserStore } from '../stores/user'
 import { ElMessage as Message } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import { getToken } from '@/utils/auth'
 import { getUserRoutes } from './routes'
 
 NProgress.configure({ showSpinner: true })
@@ -14,28 +13,29 @@ const noLoginList = ['/authRedirect', '/login', '/register'] // 没有token才�
 export default function permission(router) {
   router.beforeEach(async (to, from) => {
     NProgress.start()
-    await useAppStore().getConfig()
+    if (!noLoginList.includes(to.path)) {
+      await useAppStore().getConfig()
+    }
     if (!(whiteList.includes(to.path) || to.meta.isOpen)) {
-      if (getToken()) {
+      const userStore = useUserStore()
+      if (userStore.name) {
         if (noLoginList.includes(to.path)) {
           return { path: window.sysConfig.BASE_URL }
-        } else {
-          if (useUserStore().name) {
-            return
-          } else {
-            try {
-              await useUserStore().getUserInfo()
-              await getUserRoutes(router)
-              return { ...to, replace: true }
-            } catch (e) {
-              console.error(e)
-              return false
-              // useUserStore().logout()
-            }
+        }
+        return
+      } else {
+        try {
+          await userStore.getUserInfo()
+          await getUserRoutes(router)
+          if (noLoginList.includes(to.path)) {
+            return { path: window.sysConfig.BASE_URL }
+          }
+          return { ...to, replace: true }
+        } catch (error) {
+          if (!noLoginList.includes(to.path)) {
+            return `/login?redirect=${encodeURIComponent(to.fullPath)}`
           }
         }
-      } else if (!noLoginList.includes(to.path)) {
-        return `/login?redirect=${encodeURIComponent(to.fullPath)}` // 否则全部重定向到登录页
       }
     }
   })

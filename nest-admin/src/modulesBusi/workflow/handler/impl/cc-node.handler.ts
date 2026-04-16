@@ -34,26 +34,25 @@ export class CcNodeHandler implements INodeHandler {
     }
 
     try {
+      const messageSummary = this.getMessageSummary(context.variables, context.nodeId)
       await this.noticesService.add({
-        title: `【抄送】流程通知`,
-        content: `您被抄送关注以下流程：
-实例ID：${context.instanceId}
-节点：${context.nodeId}
-时间：${new Date().toISOString()}`,
+        title: messageSummary.title,
+        content: messageSummary.content,
         isActive: BoolNum.Yes,
         remark: `workflow_cc:${context.instanceId}:${context.nodeId}`,
         receiverIds: ccReceivers,
       });
       for (const receiverId of ccReceivers) {
         await this.messagesService.sendMessage({
-          title: '【待阅】流程抄送通知',
-          content: `您被抄送关注流程实例 ${context.instanceId}`,
+          title: messageSummary.title,
+          content: messageSummary.content,
           messageType: 'cc',
           sourceType: 'workflow_instance',
           sourceId: context.instanceId,
           receiverId,
           linkUrl: '',
           linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
+          extraData: messageSummary.extraData,
         })
       }
       console.log(`[CC] Sent to ${ccReceivers.length} CC receiver(s) for instance ${context.instanceId}`);
@@ -84,5 +83,27 @@ export class CcNodeHandler implements INodeHandler {
       },
       variables._businessData,
     )
+  }
+
+  private getMessageSummary(variables: Record<string, any>, nodeId: string) {
+    const businessData = variables?._businessData?.data || {}
+    const businessType = variables?._businessData?.businessType || ''
+    const businessTitle = businessData.name || businessData.title || variables?.businessKey || '业务对象'
+    const businessCode = businessData.code || businessData.id || ''
+    const businessLabel = `${businessTitle}${businessCode ? `（${businessCode}）` : ''}`
+    return {
+      title: `【待阅】流程抄送 - ${businessLabel}`,
+      content: `您被抄送关注以下审批事项。
+
+业务对象：${businessLabel}
+节点：${nodeId}
+时间：${new Date().toISOString()}`,
+      extraData: {
+        businessType,
+        businessTitle,
+        businessCode,
+        nodeName: nodeId,
+      },
+    }
   }
 }

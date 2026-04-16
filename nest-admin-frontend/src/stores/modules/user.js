@@ -1,5 +1,4 @@
 import { getOne } from '@/views/system/users/api'
-import { getToken, setToken, removeToken } from '@/utils/auth'
 
 const user = {
 	state: {
@@ -52,16 +51,7 @@ const user = {
 				this.user.roles = []
 				this.user.permissions = []
 
-				removeToken()
 				resolve()
-				// logout(state.token)
-				//   .then(() => {
-				//     removeToken()
-				//     resolve()
-				//   })
-				//   .catch((error) => {
-				//     reject(error)
-				//   })
 				location.href = window.sysConfig.BASE_URL
 			})
 		},

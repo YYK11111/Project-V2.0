@@ -6,15 +6,17 @@ import {
   HttpStatus,
   Post,
   Query,
+  Res,
   Request,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common'
+import { Response } from 'express'
 import { AuthGuard } from './auth.guard'
 import { AuthService, Public } from './auth.service'
 import { UsersService } from '../users/users.service'
 import { QueryListDto } from 'src/common/dto'
-import { encrypt } from 'src/common/utils/encrypt'
+import { hashPassword } from 'src/common/utils/password'
 import { CaptchaService } from '../common/captcha.service'
 
 @Controller('auth')
@@ -28,8 +30,8 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Request() req: Record<string, any>) {
-    return this.authService.login(req)
+  async login(@Request() req: Record<string, any>, @Res({ passthrough: true }) res: Response) {
+    return this.authService.login(req, res)
   }
 
   @Public()
@@ -41,14 +43,14 @@ export class AuthController {
     }
 
     let { name, password, email } = body
-    password = await encrypt(password)
+    password = await hashPassword(password)
 
-    return this.usersService.add({ name, password, email })
+    return this.usersService.add({ name, password, email, passwordVersion: 2 })
   }
 
   @Post('logout')
-  async logout(@Request() req: Record<string, any>) {
-    return this.authService.logout(req)
+  async logout(@Request() req: Record<string, any>, @Res({ passthrough: true }) res: Response) {
+    return this.authService.logout(req, false, res)
   }
 
   @Get('getLoginUser')
@@ -66,12 +68,13 @@ export class AuthController {
   }
 
   @Get('getOnlineUsers')
-  async getOnlineUsers(@Query() query: QueryListDto) {
+  async getOnlineUsers(@Request() req: Record<string, any>, @Query() query: QueryListDto) {
+    this.authService.ensureAdmin(req.user)
     return await this.authService.getOnlineUsers(query)
   }
 
   @Post('quit')
-  async quit(@Request() req: Record<string, any>) {
-    return this.authService.logout(req, true)
+  async quit(@Request() req: Record<string, any>, @Res({ passthrough: true }) res: Response) {
+    return this.authService.logout(req, true, res)
   }
 }

@@ -5,7 +5,6 @@ import { Between, FindManyOptions, Like, Raw, Repository, UpdateResult } from 't
 import { LoginLog } from './entity'
 import { QueryListDto, ResponseListDto } from 'src/common/dto'
 import { BaseService } from 'src/common/BaseService'
-import { decrypt } from 'src/common/utils/encrypt'
 import { getSystem, getBrowser } from 'src/common/utils/common'
 import dayjs from 'dayjs'
 import { HttpService } from '@nestjs/axios'
@@ -87,7 +86,6 @@ export class LoginLogsService extends BaseService<LoginLog, LoginLogDto> {
       session: dto.session,
       account: dto.account,
       createTime: dto.loginTime,
-      password: dto.password && (await decrypt(dto.password)),
       ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
       // address: req.hostname,
       browser: getBrowser(req.headers['user-agent']),

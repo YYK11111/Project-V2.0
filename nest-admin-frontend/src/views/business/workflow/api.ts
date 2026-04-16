@@ -1,10 +1,4 @@
 import request from '@/utils/request'
-import { useUserStore } from '@/stores/user'
-
-// 获取当前用户ID的辅助函数
-const getUserId = (): string => {
-  return useUserStore().id || ''
-}
 
 const normalizeTableData = (res: any) => {
   const payload = res?.data?.data || res?.data || {}
@@ -73,11 +67,9 @@ export function deleteWorkflowDefinition(id: string) {
 
 // 工作流实例 API
 export function startWorkflow(data: any) {
-  const userId = getUserId()
   return request({
     url: '/workflow/instances/start',
     method: 'post',
-    params: { userId },
     data,
   })
 }
@@ -99,80 +91,65 @@ export function getWorkflowInstances(params: any = {}) {
 
 // 工作流任务 API
 export function getMyTasks(params: any = {}) {
-  const userId = getUserId()
   return request({
     url: '/workflow/tasks/my',
     method: 'get',
-    params: { userId, ...params },
+    params,
   }).then(normalizeTableData)
 }
 
 export function completeTask(id: string, data: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/tasks/${id}/complete`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function transferTask(id: string, data: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/tasks/${id}/transfer`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function addSignTask(id: string, data: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/tasks/${id}/add-sign`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function withdrawWorkflow(instanceId: string, data?: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/instances/${instanceId}/withdraw`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function cancelWorkflowInstance(instanceId: string, data?: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/instances/${instanceId}/cancel`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function closeReturnedWorkflowInstance(instanceId: string, data?: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/instances/${instanceId}/close-returned`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
 
 export function resubmitReturnedWorkflowInstance(instanceId: string, data?: any) {
-  const userId = getUserId()
   return request({
     url: `/workflow/instances/${instanceId}/resubmit-returned`,
     method: 'post',
-    params: { userId },
     data,
   })
 }
@@ -188,6 +165,14 @@ export function getWorkflowInstanceTasks(instanceId: string) {
   return request({
     url: `/workflow/instances/${instanceId}/tasks`,
     method: 'get',
+  })
+}
+
+export function getMyHandledWorkflowHistory(params: any = {}) {
+  return request({
+    url: '/workflow/history/my-handled',
+    method: 'get',
+    params,
   })
 }
 

@@ -35,9 +35,11 @@ export class User extends BaseEntity {
   @BaseColumn({ length: 50, nullable: true, comment: '主题颜色HSL值，格式：h,s,l' })
   themeHsl: string
 
-  // AES:nestAdmin,123456
-  @BaseColumn({ length: 50, default: 's3wmd2VReF1IjZhK59gLBY0OjYlzjA==', comment: '密码' })
+  @BaseColumn({ length: 255, comment: '密码哈希' })
   password: string
+
+  @BaseColumn({ default: 2, comment: '密码版本，2 表示哈希密码' })
+  passwordVersion: number
 
   @BaseColumn({ comment: '头像地址' })
   avatar: string

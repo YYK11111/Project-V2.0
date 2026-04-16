@@ -22,6 +22,12 @@ const getSourceTypeLabel = (sourceType: string) => {
   return map[sourceType] || sourceType
 }
 
+const getMetaText = (row: any) => {
+  const starter = row.starterName ? `发起人：${row.starterName}` : ''
+  const nodeName = row.nodeName ? `节点：${row.nodeName}` : ''
+  return [starter, nodeName].filter(Boolean).join(' · ') || row.content || '-'
+}
+
 const loadMessages = async () => {
   const [countRes, recentRes] = await Promise.all([getUnreadCount(), getRecentMessages(10)])
   unread.value = countRes.data || countRes
@@ -29,7 +35,9 @@ const loadMessages = async () => {
 }
 
 const goMessage = async (row: any) => {
-  await markMessageRead(row.id)
+  if (row.messageType === 'cc') {
+    await markMessageRead(row.id)
+  }
   const query = row.linkParams || {}
   if (row.linkUrl) {
     router.push({ path: row.linkUrl, query })
@@ -61,33 +69,31 @@ onUnmounted(() => {
       <el-tabs v-model="activeTab" class="message-tabs">
         <el-tab-pane :label="`待办 (${unread.todo})`" name="todo">
           <div class="message-section">
-            <el-table v-if="messageData.todo.length" :data="messageData.todo" size="small" max-height="260">
-              <el-table-column prop="sourceType" label="业务对象" width="90">
-                <template #default="{ row }">{{ getSourceTypeLabel(row.sourceType) }}</template>
-              </el-table-column>
-              <el-table-column prop="title" label="标题" min-width="180">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="goMessage(row)">{{ row.title }}</el-button>
-                </template>
-              </el-table-column>
-              <el-table-column prop="createTime" label="时间" width="160" />
-            </el-table>
+            <div v-if="messageData.todo.length" class="message-list">
+              <button v-for="row in messageData.todo" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
+                <div class="message-item__header">
+                  <el-tag size="small" type="warning">{{ getSourceTypeLabel(row.businessType || row.sourceType) }}</el-tag>
+                  <span class="message-item__time">{{ row.createTime }}</span>
+                </div>
+                <div class="message-item__title">{{ row.title }}</div>
+                <div class="message-item__meta">{{ getMetaText(row) }}</div>
+              </button>
+            </div>
             <el-empty v-else description="暂无待办" :image-size="60" />
           </div>
         </el-tab-pane>
         <el-tab-pane :label="`待阅 (${unread.cc})`" name="cc">
           <div class="message-section">
-            <el-table v-if="messageData.cc.length" :data="messageData.cc" size="small" max-height="260">
-              <el-table-column prop="sourceType" label="业务对象" width="90">
-                <template #default="{ row }">{{ getSourceTypeLabel(row.sourceType) }}</template>
-              </el-table-column>
-              <el-table-column prop="title" label="标题" min-width="180">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="goMessage(row)">{{ row.title }}</el-button>
-                </template>
-              </el-table-column>
-              <el-table-column prop="createTime" label="时间" width="160" />
-            </el-table>
+            <div v-if="messageData.cc.length" class="message-list">
+              <button v-for="row in messageData.cc" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
+                <div class="message-item__header">
+                  <el-tag size="small" type="info">{{ getSourceTypeLabel(row.businessType || row.sourceType) }}</el-tag>
+                  <span class="message-item__time">{{ row.createTime }}</span>
+                </div>
+                <div class="message-item__title">{{ row.title }}</div>
+                <div class="message-item__meta">{{ getMetaText(row) }}</div>
+              </button>
+            </div>
             <el-empty v-else description="暂无待阅" :image-size="60" />
           </div>
         </el-tab-pane>
@@ -131,5 +137,54 @@ onUnmounted(() => {
 .message-footer {
   display: flex;
   justify-content: flex-end;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.message-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--el-bg-color);
+  cursor: pointer;
+}
+
+.message-item:hover {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-fill-color-light);
+}
+
+.message-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.message-item__time {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.message-item__title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.message-item__meta {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
 }
 </style>

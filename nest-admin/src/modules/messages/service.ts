@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { In, Like, Repository } from 'typeorm'
 import { BaseService } from 'src/common/BaseService'
 import { Message, MessageType } from './entity'
 import { MessageDto } from './dto'
 import { BoolNum } from 'src/common/type/base'
 import { WorkflowTask } from 'src/modulesBusi/workflow/entity/workflow-task.entity'
 import { WorkflowInstance } from 'src/modulesBusi/workflow/entity/workflow-instance.entity'
+import { QueryListDto } from 'src/common/dto'
 
 @Injectable()
 export class MessagesService extends BaseService<Message, MessageDto> {
@@ -53,7 +54,63 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     })
     return {
       todo: list.filter((item) => item.messageType === MessageType.todo && item.isActive === BoolNum.Yes).slice(0, limit),
-      cc: list.filter((item) => item.messageType === MessageType.cc).slice(0, limit),
+      cc: list.filter((item) => item.messageType === MessageType.cc && item.isRead === BoolNum.No).slice(0, limit),
+    }
+  }
+
+  async getMessageList(userId: string, query: QueryListDto) {
+    const pageNum = Number(query.pageNum || 1)
+    const pageSize = Number(query.pageSize || 10)
+    const messageType = String(query.messageType || '')
+    const scope = String(query.scope || 'current')
+    const keyword = String(query.keyword || '').trim()
+    const sourceType = String(query.sourceType || '').trim()
+
+    const where: Record<string, any> = {
+      receiverId: userId,
+      isDelete: null,
+    }
+
+    if (messageType) {
+      where.messageType = messageType
+    }
+    if (sourceType) {
+      where.sourceType = sourceType
+    }
+
+    if (messageType === MessageType.todo) {
+      if (scope === 'current') {
+        where.isActive = BoolNum.Yes
+      } else if (scope === 'history') {
+        where.isActive = BoolNum.No
+      }
+    }
+
+    if (messageType === MessageType.cc) {
+      if (scope === 'current') {
+        where.isRead = BoolNum.No
+      } else if (scope === 'history') {
+        where.isRead = BoolNum.Yes
+      }
+    }
+
+    const whereList = keyword
+      ? [
+          { ...where, title: Like(`%${keyword}%`) },
+          { ...where, content: Like(`%${keyword}%`) },
+        ]
+      : where
+
+    const [list, total] = await this.repository.findAndCount({
+      where: whereList as any,
+      order: { createTime: 'DESC' as any },
+      skip: (pageNum - 1) * pageSize,
+      take: pageSize,
+    })
+
+    return {
+      total,
+      list,
     }
   }
 

@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Post, Query, Req } from '@nestjs/common'
 import { MessagesService } from './service'
+import { QueryListDto } from 'src/common/dto'
 
 @Controller('system/messages')
 export class MessagesController {
@@ -16,6 +17,12 @@ export class MessagesController {
     const userId = req.user?.id || req.user?.name
     await this.service.ensureWorkflowTodoMessages()
     return this.service.getRecentMessages(userId, Number(limit || 10))
+  }
+
+  @Get('list')
+  async list(@Req() req: any, @Query() query: QueryListDto) {
+    const userId = req.user?.id || req.user?.name
+    return this.service.getMessageList(userId, query)
   }
 
   @Post('read/:id')

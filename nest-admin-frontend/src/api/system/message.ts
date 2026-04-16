@@ -8,6 +8,10 @@ export function getRecentMessages(limit = 10) {
   return request({ url: '/system/messages/recent', method: 'get', params: { limit } })
 }
 
+export function getMessageList(params: Record<string, any>) {
+  return request({ url: '/system/messages/list', method: 'get', params })
+}
+
 export function markMessageRead(id: string) {
   return request({ url: `/system/messages/read/${id}`, method: 'post' })
 }

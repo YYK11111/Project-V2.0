@@ -61,8 +61,6 @@
 <script setup>
 import Cookies from 'js-cookie'
 import { login, getCaptchaImage } from './api'
-import { encrypt, decrypt } from '@/utils/encrypt'
-import { setToken } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,11 +88,10 @@ watch(
 
 async function getCookie() {
   const account = Cookies.get('account')
-  const password = await decrypt(Cookies.get('password'))
   const rememberMe = Cookies.get('rememberMe')
   form.value = {
     account: account || form.value.account,
-    password: password || form.value.password,
+    password: form.value.password,
     rememberMe: !!rememberMe,
   }
 }
@@ -113,23 +110,16 @@ function submit() {
   formRef.value.validate().then(async () => {
     if (form.value.rememberMe) {
       Cookies.set('account', form.value.account, { expires: 30 })
-      Cookies.set('password', await encrypt(form.value.password), {
-        expires: 30,
-      })
       Cookies.set('rememberMe', form.value.rememberMe, {
         expires: 30,
       })
     } else {
       Cookies.remove('account')
-      Cookies.remove('password')
       Cookies.remove('rememberMe')
     }
-    let _form = JSON.parse(JSON.stringify(form.value))
-    _form.password = await encrypt(form.value.password)
     loading.value = true
-    login(_form)
-      .then(({ data }) => {
-        setToken(data.accessToken)
+    login({ ...form.value })
+      .then(() => {
         redirect.value ? router.push(redirect.value) : (location.href = window.sysConfig.BASE_URL)
       })
       .catch(() => getCaptchaImageFun())

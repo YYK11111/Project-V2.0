@@ -1,7 +1,6 @@
 // import { useUserStore } from '@/stores/user'
 // let userStore = useUserStore()
 import { getUserInfo, logout } from '@/views/system/login/api'
-import { getToken, setToken, removeToken } from '@/utils/auth'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -13,6 +12,26 @@ export const useUserStore = defineStore('user', {
     configParamInfo: {},
   }),
   actions: {
+    clearUserState() {
+      this.id = ''
+      this.name = ''
+      this.avatar = new URL('@/assets/image/profile.jpg', import.meta.url).href
+      this.roles = []
+      this.permissions = []
+      this.configParamInfo = {}
+    },
+
+    redirectToLogin(redirectPath) {
+      const baseUrl = window.sysConfig.BASE_URL
+      const loginUrl = redirectPath ? `${baseUrl}login?redirect=${encodeURIComponent(redirectPath)}` : `${baseUrl}login`
+      location.href = loginUrl
+    },
+
+    handleSessionExpired(redirectPath) {
+      this.clearUserState()
+      this.redirectToLogin(redirectPath)
+    },
+
     // 获取用户信息
     async getUserInfo() {
       try {
@@ -54,18 +73,15 @@ export const useUserStore = defineStore('user', {
 
     // 退出系统
     logout() {
-      this.roles = []
-      this.permissions = []
+      this.clearUserState()
 
       return logout()
         .then(() => {
-          removeToken()
           location.href = window.sysConfig.BASE_URL
         })
         .catch((error) => {
           console.error('Logout failed:', error)
           // 即使 API 失败也清除本地状态
-          removeToken()
           location.href = window.sysConfig.BASE_URL
         })
     },

@@ -7,13 +7,13 @@ import { ResponseListDto, QueryListDto } from 'src/common/dto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Dept } from '../depts/entities/dept.entity'
 import { Role } from '../roles/entity'
-import { decrypt, encrypt } from 'src/common/utils/encrypt'
 import { BaseService } from 'src/common/BaseService'
 import { DeptService } from '../depts/depts.service'
 import { HttpException } from '@nestjs/common'
 import { config } from 'config'
 import { SysFileService } from '../sys/file/service'
 import { BusinessType, FileStatus } from '../sys/file/entity'
+import { hashPassword, isPasswordHashed, verifyPassword } from 'src/common/utils/password'
 
 @Injectable()
 export class UsersService extends BaseService<User, CreateUserDto> {
@@ -31,6 +31,11 @@ export class UsersService extends BaseService<User, CreateUserDto> {
     const oldUser = createDto.id ? await this.getOne({ id: createDto.id }, false) : null
     const operatorPermissions = (createDto as any)._operatorPermissions || []
     const canManageAdmin = this.hasPermission(operatorPermissions, 'system/users/manageAdmin')
+
+    if (createDto.password && !isPasswordHashed(createDto.password)) {
+      createDto.password = await hashPassword(createDto.password)
+      createDto.passwordVersion = 2
+    }
 
     if (createDto.roleIds?.length && !canManageAdmin) {
       const adminRole = await this.usersRepository.manager.getRepository(Role).findOne({ where: { permissionKey: config.adminKey } })
@@ -142,11 +147,15 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       throw new Error('两次输入的密码不一致')
     } else {
       let user = await this.getOne({ id })
-      let _passwordOld = await decrypt(user.password)
-      if (_passwordOld !== passwordOld) {
+      const isMatch = await verifyPassword(passwordOld, user.password)
+      if (!isMatch) {
         throw new Error('旧密码不正确 ')
       }
-      let data = Object.assign(new User(), { id, password: await encrypt(passwordNew) })
+      let data = Object.assign(new User(), {
+        id,
+        password: await hashPassword(passwordNew),
+        passwordVersion: 2,
+      })
       return super.update(data)
     }
   }

@@ -18,9 +18,6 @@ export class LoginLog extends BaseEntity {
   @IsNotEmpty()
   account: string
 
-  @BaseColumn({ overLengthCut: true, comment: '登录密码' })
-  password: string
-
   @BaseColumn({ comment: 'ip地址' })
   ip: string
 

@@ -15,6 +15,11 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>()
+    if (this.isPublicRoute(request)) {
+      return true
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(config.isPublicKey, [
       context.getHandler(),
       context.getClass(),
@@ -24,8 +29,7 @@ export class AuthGuard implements CanActivate {
       return true
     }
 
-    const request = context.switchToHttp().getRequest()
-    const token = this.extractTokenFromHeader(request)
+    const token = this.extractToken(request)
     if (!token) {
       throw new UnauthorizedException()
     }
@@ -57,14 +61,36 @@ export class AuthGuard implements CanActivate {
     if (!isSuper && !requiredPermission && permissions.includes(api) && !payload.permissions?.includes(api)) {
       throw new HttpException('接口无权限', 403)
     }
-    await this.redisService.setRedisOnlineUser(request, payload)
+    const isOnline = await this.redisService.existsOnlineUser(payload.session)
+    if (!isOnline) {
+      throw new UnauthorizedException()
+    }
 
     return true
+  }
+
+  private extractToken(request: Request): string | undefined {
+    const cookieToken = this.extractTokenFromCookie(request)
+    if (cookieToken) {
+      return cookieToken
+    }
+    return this.extractTokenFromHeader(request)
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? []
     return type === 'Bearer' ? token : undefined
+  }
+
+  private extractTokenFromCookie(request: Request): string | undefined {
+    const cookieHeader = request.headers.cookie
+    if (!cookieHeader) {
+      return undefined
+    }
+
+    const cookies = cookieHeader.split(';').map((item) => item.trim())
+    const tokenCookie = cookies.find((item) => item.startsWith('admin_session='))
+    return tokenCookie ? decodeURIComponent(tokenCookie.slice('admin_session='.length)) : undefined
   }
 
   private resolvePermissionByRequest(request: Request): string | undefined {
@@ -290,5 +316,10 @@ export class AuthGuard implements CanActivate {
       }
     }
     return undefined
+  }
+
+  private isPublicRoute(request: Request): boolean {
+    const api = request.path.replace(config.apiBase, '').replace(/^\//g, '')
+    return ['system/common/getCaptchaImage', 'system/configs/list'].includes(api)
   }
 }
