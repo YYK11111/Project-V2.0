@@ -31,7 +31,7 @@ const getButtons = (row: any) => [
 
         <template #operation="{ selectedIds }">
           <div class="flexBetween">
-          <el-button v-if="canNoticeAdd" type="primary" @click="dialogRef?.action({ isActive: KEY_YES })">新增</el-button>
+          <el-button v-if="canNoticeAdd" type="primary" @click="dialogRef?.action({ isActive: KEY_YES })">新增公告</el-button>
           <el-button v-if="canNoticeDelete" :disabled="!selectedIds.length" @click="rctRef?.del(del)" type="danger">批量删除</el-button>
           </div>
         </template>
@@ -53,7 +53,7 @@ const getButtons = (row: any) => [
     <!--  dialog -->
       <BaDialog
         ref="dialogRef"
-        dynamicTitle="角色"
+        dynamicTitle="系统公告"
         :rules="rules"
         width="500"
         @confirm="(data) => { const isEdit = !!data.form.value?.id; if ((isEdit && !canNoticeUpdate) || (!isEdit && !canNoticeAdd)) return $sdk.msgWarning('当前操作没有权限'); dialogRef?.confirm(save, () => rctRef?.getList(1)) }">

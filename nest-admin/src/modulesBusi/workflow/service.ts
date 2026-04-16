@@ -14,7 +14,6 @@ import { NodeExecutionContext, NodeResult, NodeConfig, FlowConfig, Condition } f
 import { NodeType, ConditionOperator, InstanceStatus, TaskStatus, TaskAction, AssigneeType, MultiInstanceType, CompleteType, AssigneeEmptyAction } from './interface/node-type.enum';
 import { CreateWorkflowDefinitionDto, UpdateWorkflowDefinitionDto, StartWorkflowDto, CompleteTaskDto, TransferTaskDto, AddSignTaskDto, WithdrawWorkflowDto, CancelWorkflowDto } from './dto';
 import { CloseReturnedWorkflowDto, ResubmitReturnedWorkflowDto } from './dto';
-import { NoticesService } from '../../modules/notices/service';
 import { MessagesService } from '../../modules/messages/service';
 import { BoolNum } from '../../common/type/base';
 import { UsersService } from '../../modules/users/users.service';
@@ -37,8 +36,6 @@ export class WorkflowService {
     @InjectRepository(WorkflowBusinessConfig)
     private configRepo: Repository<WorkflowBusinessConfig>,
     private nodeHandlerFactory: NodeHandlerFactory,
-    @Inject(forwardRef(() => NoticesService))
-    private noticesService: NoticesService,
     private messagesService: MessagesService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
@@ -871,18 +868,9 @@ export class WorkflowService {
         nodeName: node.name,
         actionLabel: '待办',
       })
-      const noticeDto: any = {
-        title: messageSummary.todoTitle,
-        content: messageSummary.todoContent,
-        isActive: BoolNum.Yes,
-        remark: `workflow_task:${task.id}`,
-        receiverIds: [task.assigneeId],
-      };
-
-      await this.noticesService.add(noticeDto);
       await this.messagesService.sendMessage({
         title: messageSummary.todoTitle,
-        content: noticeDto.content,
+        content: messageSummary.todoContent,
         messageType: 'todo',
         sourceType: 'workflow_task',
         sourceId: task.id,
@@ -1292,21 +1280,43 @@ export class WorkflowService {
         .orderBy('latestTaskTime', 'DESC')
         .limit(100)
 
-      const taskRows = await taskQb.getRawMany<{ instanceId: string }>()
+      const taskRows = await taskQb.getRawMany<{ instanceId: string; latestTaskTime?: string }>()
       const instanceIds = taskRows.map((item) => item.instanceId).filter(Boolean)
       if (!instanceIds.length) {
         return []
       }
-
-      const instanceQb = this.instanceRepo
-        .createQueryBuilder('instance')
-        .where('instance.id IN (:...instanceIds)', { instanceIds })
-
-      if (status) {
-        instanceQb.andWhere('instance.status = :status', { status })
-      }
-
-      instances = await instanceQb.orderBy('instance.startTime', 'DESC').limit(100).getMany()
+      const placeholders = instanceIds.map(() => '?').join(', ')
+      const sql = `
+        SELECT
+          id,
+          create_time AS createTime,
+          create_user AS createUser,
+          update_time AS updateTime,
+          update_user AS updateUser,
+          definition_id AS definitionId,
+          definition_code AS definitionCode,
+          business_key AS businessKey,
+          starter_id AS starterId,
+          current_node_id AS currentNodeId,
+          variables,
+          status,
+          start_time AS startTime,
+          end_time AS endTime,
+          duration
+        FROM wf_instance
+        WHERE is_delete IS NULL
+          AND id IN (${placeholders})
+          ${status ? 'AND status = ?' : ''}
+      `
+      const rawInstances = await this.instanceRepo.query(sql, status ? [...instanceIds, status] : instanceIds)
+      const rankMap = new Map(instanceIds.map((id, index) => [String(id), index]))
+      instances = rawInstances
+        .map((item) => new WorkflowInstance(item))
+        .sort((left, right) => {
+          const leftRank = rankMap.get(String(left.id)) ?? Number.MAX_SAFE_INTEGER
+          const rightRank = rankMap.get(String(right.id)) ?? Number.MAX_SAFE_INTEGER
+          return leftRank - rightRank
+        })
     } else {
       const instanceQb = this.instanceRepo.createQueryBuilder('instance')
 

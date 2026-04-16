@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { INodeHandler } from '../../interface/node-handler.interface';
 import { NodeType, NodeExecutionContext, NodeResult, CcNodeProperties } from '../../interface/node.interface';
-import { NoticesService } from '../../../../modules/notices/service';
-import { BoolNum } from '../../../../common/type/base';
 import { WorkflowAssigneeResolverService } from '../../../../common/services/workflow-assignee-resolver.service';
 import { MessagesService } from '../../../../modules/messages/service';
 
@@ -14,7 +12,6 @@ export class CcNodeHandler implements INodeHandler {
   readonly nodeType = NodeType.CC;
 
   constructor(
-    private noticesService: NoticesService,
     private assigneeResolver: WorkflowAssigneeResolverService,
     private messagesService: MessagesService,
   ) {}
@@ -35,13 +32,6 @@ export class CcNodeHandler implements INodeHandler {
 
     try {
       const messageSummary = this.getMessageSummary(context.variables, context.nodeId)
-      await this.noticesService.add({
-        title: messageSummary.title,
-        content: messageSummary.content,
-        isActive: BoolNum.Yes,
-        remark: `workflow_cc:${context.instanceId}:${context.nodeId}`,
-        receiverIds: ccReceivers,
-      });
       for (const receiverId of ccReceivers) {
         await this.messagesService.sendMessage({
           title: messageSummary.title,
@@ -50,7 +40,7 @@ export class CcNodeHandler implements INodeHandler {
           sourceType: 'workflow_instance',
           sourceId: context.instanceId,
           receiverId,
-          linkUrl: '',
+          linkUrl: '/system/messageCenter/index',
           linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
           extraData: messageSummary.extraData,
         })

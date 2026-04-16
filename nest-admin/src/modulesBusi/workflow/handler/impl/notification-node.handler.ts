@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { INodeHandler } from '../../interface/node-handler.interface';
 import { NodeType, NodeExecutionContext, NodeResult, NotificationNodeProperties } from '../../interface/node.interface';
-import { NoticesService } from '../../../../modules/notices/service';
-import { BoolNum } from '../../../../common/type/base';
 import { WorkflowAssigneeResolverService } from '../../../../common/services/workflow-assignee-resolver.service';
 import { MessagesService } from '../../../../modules/messages/service';
 
@@ -14,7 +12,6 @@ export class NotificationNodeHandler implements INodeHandler {
   readonly nodeType = NodeType.NOTIFICATION;
 
   constructor(
-    private noticesService: NoticesService,
     private assigneeResolver: WorkflowAssigneeResolverService,
     private messagesService: MessagesService,
   ) {}
@@ -46,13 +43,6 @@ export class NotificationNodeHandler implements INodeHandler {
 
 业务对象：${businessLabel}
 节点：${context.nodeId}`.trim()
-      await this.noticesService.add({
-        title: normalizedTitle,
-        content: normalizedContent,
-        isActive: BoolNum.Yes,
-        remark: `workflow_notification:${context.instanceId}:${context.nodeId}`,
-        receiverIds: receivers,
-      });
       for (const receiverId of receivers) {
         await this.messagesService.sendMessage({
           title: normalizedTitle,
@@ -61,7 +51,7 @@ export class NotificationNodeHandler implements INodeHandler {
           sourceType: 'workflow_instance',
           sourceId: context.instanceId,
           receiverId,
-          linkUrl: '',
+          linkUrl: '/system/messageCenter/index',
           linkParams: { instanceId: context.instanceId, fromWorkflow: '1' },
           extraData: {
             businessType,
