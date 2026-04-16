@@ -68,7 +68,7 @@ const submitTransfer = async () => {
 const getBusinessRoute = (row: any) => {
   const businessId = String(row.businessKey || '').split('_').pop()
   const query = { id: businessId, taskId: row.id, instanceId: row.instanceId, fromWorkflow: '1' }
-  if (row.businessType === 'project') return { path: '/projectManage/detail', query }
+  if (row.businessType === 'project') return { path: '/projectManage/approval', query }
   if (row.businessType === 'change') return { path: '/changeManage/form', query }
   if (row.businessType === 'ticket') return { path: '/ticketManage/form', query }
   if (row.businessType === 'task') return { path: '/taskManage/form', query }

@@ -74,6 +74,12 @@ export const constantRoutes = [
         meta: { title: '文档表单' },
       },
       {
+        path: '/projectManage/approval',
+        component: () => import('@/views/business/projectManage/approval.vue'),
+        name: 'ProjectApprovalHidden',
+        meta: { title: '项目审批' },
+      },
+      {
         path: '/content/articleManage/aev',
         component: () => import('@/views/content/articleManage/aev.vue'),
         name: 'ArticleManageAevHidden',
@@ -84,6 +90,18 @@ export const constantRoutes = [
         component: () => import('@/views/content/articleManage/aev.vue'),
         name: 'ContentAevHidden',
         meta: { title: '文章编辑' },
+      },
+      {
+        path: '/content/articleManage/myBorrows',
+        component: () => import('@/views/content/articleManage/myBorrows.vue'),
+        name: 'ArticleMyBorrowHidden',
+        meta: { title: '我的借阅' },
+      },
+      {
+        path: '/content/articleManage/borrowApproval',
+        component: () => import('@/views/content/articleManage/borrowApproval.vue'),
+        name: 'ArticleBorrowApprovalHidden',
+        meta: { title: '借阅审批' },
       },
     ],
   },
