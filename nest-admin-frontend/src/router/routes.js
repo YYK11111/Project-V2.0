@@ -189,8 +189,14 @@ function transRouter(routesData, parentPath) {
       // 一级 menu 类型：始终使用 Layout 作为容器
       // 实际页面作为子路由，这样访问 /projectManage 时仍有侧边栏
       if (level == 1) {
-        // 一级菜单使用 Layout 作为容器
-        route.component = Layout
+        // 一级菜单使用 Layout 作为容器，并为有实际页面的菜单注入默认子路由，避免点击后空白
+        if (route.component && route.component !== '') {
+          routeComponent = loadView(route)
+          route.component = Layout
+          wrapRouteWithRouterView = true
+        } else {
+          route.component = Layout
+        }
       } else if (route.component && route.component !== '') {
         routeComponent = loadView(route)
         if (hasChildren) {
@@ -212,13 +218,23 @@ function transRouter(routesData, parentPath) {
       route.children = transRouter(route.children, route.path)
     }
 
+    const visibleChildren = (route.children || []).filter((child) => !child.isHidden && child.meta?.title)
+    if (
+      route.type === 'catalog' &&
+      visibleChildren.length === 1 &&
+      visibleChildren[0].meta?.title === route.meta?.title
+    ) {
+      route.meta.breadcrumb = false
+      route.redirect = visibleChildren[0].path
+    }
+
     if (wrapRouteWithRouterView && routeComponent) {
       route.children = [
         {
           path: '',
           component: routeComponent,
           name: `${route.name}-index`,
-          meta: { ...route.meta },
+          meta: { ...route.meta, breadcrumb: false },
           isHidden: true,
         },
         ...(route.children || []),

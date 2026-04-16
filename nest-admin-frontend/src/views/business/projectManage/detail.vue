@@ -354,7 +354,7 @@ function goToEdit() {
 }
 
 function goToCockpit() {
-  router.push({ path: '/projectManage/projectCockpit', query: { projectId } })
+  router.push({ path: '/cockpit', query: { projectId } })
 }
 
 function goToTab(tabName) {
