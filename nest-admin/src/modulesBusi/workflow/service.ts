@@ -1280,23 +1280,44 @@ export class WorkflowService {
    * 获取流程实例列表（支持筛选）
    */
   async listInstances(userId?: string, status?: string, mode: 'starter' | 'participant' = 'starter'): Promise<any[]> {
-    const where: any = {};
-
-    if (status) {
-      where.status = status;
-    }
-
     let instances: WorkflowInstance[] = []
+
     if (mode === 'participant' && userId) {
-      const tasks = await this.taskRepo.find({ where: { assigneeId: userId }, order: { createTime: 'DESC' } })
-      const instanceIds = Array.from(new Set(tasks.map((task) => task.instanceId))).filter(Boolean)
-      if (!instanceIds.length) return []
-      instances = await this.instanceRepo.find({ where: instanceIds.map((id) => ({ ...where, id })) as any, order: { startTime: 'DESC' }, take: 100 })
-    } else {
-      if (userId) {
-        where.starterId = userId;
+      const taskQb = this.taskRepo
+        .createQueryBuilder('task')
+        .select('task.instanceId', 'instanceId')
+        .addSelect('MAX(task.createTime)', 'latestTaskTime')
+        .where('task.assigneeId = :userId', { userId })
+        .groupBy('task.instanceId')
+        .orderBy('latestTaskTime', 'DESC')
+        .limit(100)
+
+      const taskRows = await taskQb.getRawMany<{ instanceId: string }>()
+      const instanceIds = taskRows.map((item) => item.instanceId).filter(Boolean)
+      if (!instanceIds.length) {
+        return []
       }
-      instances = await this.instanceRepo.find({ where, order: { startTime: 'DESC' }, take: 100 })
+
+      const instanceQb = this.instanceRepo
+        .createQueryBuilder('instance')
+        .where('instance.id IN (:...instanceIds)', { instanceIds })
+
+      if (status) {
+        instanceQb.andWhere('instance.status = :status', { status })
+      }
+
+      instances = await instanceQb.orderBy('instance.startTime', 'DESC').limit(100).getMany()
+    } else {
+      const instanceQb = this.instanceRepo.createQueryBuilder('instance')
+
+      if (userId) {
+        instanceQb.andWhere('instance.starterId = :userId', { userId })
+      }
+      if (status) {
+        instanceQb.andWhere('instance.status = :status', { status })
+      }
+
+      instances = await instanceQb.orderBy('instance.startTime', 'DESC').limit(100).getMany()
     }
 
     return Promise.all(instances.map((instance) => this.attachBusinessSummaryToInstance(instance)))

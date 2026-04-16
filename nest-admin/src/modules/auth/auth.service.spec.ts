@@ -31,6 +31,10 @@ describe('AuthService', () => {
     validateCaptcha: jest.fn(),
   }
 
+  const systemConfigsService = {
+    getSessionExpireMinutes: jest.fn(),
+  }
+
   const createService = () => {
     return new AuthService(
       usersService as any,
@@ -38,6 +42,7 @@ describe('AuthService', () => {
       jwtService as any,
       loginLogsService as any,
       redisService as any,
+      systemConfigsService as any,
       captchaService as any,
     )
   }
@@ -46,6 +51,7 @@ describe('AuthService', () => {
     jest.clearAllMocks()
     jest.spyOn(commonUtils, 'getIpAddress').mockResolvedValue('本地')
     captchaService.validateCaptcha.mockReturnValue('true')
+    systemConfigsService.getSessionExpireMinutes.mockResolvedValue(30)
     loginLogsService.createLog.mockResolvedValue({ session: 'signature' })
     redisService.setRedisOnlineUser.mockResolvedValue(undefined)
     redisService.delRedisOnlineUser.mockResolvedValue(undefined)

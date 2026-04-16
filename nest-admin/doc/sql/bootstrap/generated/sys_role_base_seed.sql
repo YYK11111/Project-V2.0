@@ -1,0 +1,1 @@
+INSERT INTO `sys_role` VALUES (1,'2026-04-15 13:13:16','system',NULL,NULL,NULL,'超级管理员','admin','self','1','1','系统超级管理员角色'),(2,'2026-04-15 13:13:16','system',NULL,NULL,NULL,'普通用户','user','self','1','2','普通用户角色');

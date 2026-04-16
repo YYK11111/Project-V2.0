@@ -7,3 +7,5 @@ SOURCE 01_schema.sql;
 SOURCE 02_base_data.sql;
 SOURCE 03_menu_and_permissions.sql;
 SOURCE 04_optional_modules.sql;
+
+-- 执行完成后可手动运行：SOURCE verify_system.sql;

@@ -27,9 +27,17 @@ function submit() {
     <div class="GcardTitle">系统配置</div>
     <el-form ref="formRef" label-position="right" :model="form" :rules="rules" label-width="80px">
       <BaInput v-model="form.systemName" label="系统名称" prop="systemName"></BaInput>
+      <BaInput v-model="form.browserTitle" label="标签页名称" prop="browserTitle"></BaInput>
+      <BaInput v-model="form.sessionExpireMinutes" label="有效时间" prop="sessionExpireMinutes" type="number">
+        <template #append>分钟</template>
+      </BaInput>
       <el-form-item label="系统logo" prop="systemLogo">
         <upload class="" v-model:fileUrl="form.systemLogo" type="image"></upload>
         <div class="Gtip">仅支持大小 2M 以内， png/jpg/svg 等图片类型</div>
+      </el-form-item>
+      <el-form-item label="标签页图标" prop="browserIcon">
+        <upload class="" v-model:fileUrl="form.browserIcon" type="image"></upload>
+        <div class="Gtip">建议使用正方形图标，支持 png/jpg/svg/ico</div>
       </el-form-item>
       <el-form-item label="">
         <el-button v-if="canConfigUpdate" type="primary" @click="submit()">保存</el-button>

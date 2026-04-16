@@ -8,6 +8,7 @@ import { AuthGuard } from './auth.guard'
 import { LoginLogsModule } from '../loginLogs/module'
 import { CommonModule } from '../common/common.module'
 import { RolesModule } from '../roles/module'
+import { SystenConfigsModule } from '../configs/module'
 // import { config } from 'config'
 
 @Module({
@@ -16,6 +17,7 @@ import { RolesModule } from '../roles/module'
     RolesModule,
     CommonModule,
     LoginLogsModule,
+    SystenConfigsModule,
     JwtModule.register({
       global: true,
       // secret: config.jwtSecret,

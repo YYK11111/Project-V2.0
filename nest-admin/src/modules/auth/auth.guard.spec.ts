@@ -15,6 +15,7 @@ describe('AuthGuard', () => {
   const redisService = {
     getPermissions: jest.fn(),
     existsOnlineUser: jest.fn(),
+    refreshOnlineUser: jest.fn(),
   }
 
   const createContext = (request: Record<string, any>): ExecutionContext => {
@@ -32,6 +33,7 @@ describe('AuthGuard', () => {
     reflector.getAllAndOverride.mockReturnValue(undefined)
     redisService.getPermissions.mockResolvedValue([])
     redisService.existsOnlineUser.mockResolvedValue(1)
+    redisService.refreshOnlineUser.mockResolvedValue(1)
   })
 
   it('从 Cookie 读取 token 并通过在线会话校验', async () => {
@@ -49,6 +51,7 @@ describe('AuthGuard', () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true)
     expect(jwtService.verifyAsync).toHaveBeenCalledWith('token-from-cookie', expect.any(Object))
     expect(redisService.existsOnlineUser).toHaveBeenCalledWith('token-from-cookie'.split('.').at(-1))
+    expect(redisService.refreshOnlineUser).toHaveBeenCalledWith('token-from-cookie'.split('.').at(-1))
     expect(request.user.id).toBe('user_1')
   })
 

@@ -4,6 +4,7 @@ import { LoginLogsService } from '../loginLogs/service'
 import { QueryListDto } from 'src/common/dto'
 import { MenusService } from '../menus/menus.service'
 import { BoolNum } from 'src/common/type/base'
+import { SystenConfigsService } from '../configs/service'
 
 @Injectable()
 export class RedisService {
@@ -11,6 +12,7 @@ export class RedisService {
   constructor(
     private loginLogsService: LoginLogsService,
     private menusService: MenusService,
+    private systemConfigsService: SystenConfigsService,
   ) {
     this.redis = new Redis({
       port: 6379, // Redis port
@@ -96,13 +98,19 @@ export class RedisService {
     return [data.slice(--pageNum * pageSize, pageSize), data.length]
   }
 
-  async setRedisOnlineUser(reqOrData, user: any = {}) {
+  async setRedisOnlineUser(reqOrData, user: any = {}, expireSeconds?: number) {
+    const ttl = expireSeconds || ((await this.systemConfigsService.getSessionExpireMinutes()) * 60)
     if (reqOrData.session) {
-      return await this.set(`user.online:${reqOrData?.session}`, reqOrData, 5 * 60)
+      return await this.set(`user.online:${reqOrData?.session}`, reqOrData, ttl)
     } else {
       let log = await this.loginLogsService.createLog(reqOrData, user, false)
-      return await this.set(`user.online:${user?.session}`, log, 5 * 60)
+      return await this.set(`user.online:${user?.session}`, log, ttl)
     }
+  }
+
+  async refreshOnlineUser(session: string) {
+    const ttl = (await this.systemConfigsService.getSessionExpireMinutes()) * 60
+    return await this.expire(`user.online:${session}`, ttl)
   }
 
   async delRedisOnlineUser(session) {

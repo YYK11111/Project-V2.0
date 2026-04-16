@@ -16,23 +16,13 @@
     </el-scrollbar> -->
 
     <div class="quick flexCenterBetween --MarginR">
-      <svg-icon class="right-icon menuItem" icon="AIkefu" @click="useAppStore().AIDrawer = true"></svg-icon>
+      <div class="menuItem topbar-icon-button" @click="useAppStore().AIDrawer = true">
+        <svg-icon class="right-icon" icon="AIkefu"></svg-icon>
+      </div>
       <MessageBell />
       <!-- v-if="useAppStore().sysConfig?.ai" -->
 
       <AIDrawer />
-
-      <el-tooltip content="源码地址" effect="dark" placement="bottom">
-        <div class="right-menu-item hover-effect">
-          <svg-icon class="right-icon" icon="gitee" @click="goto('https://gitee.com/hixinla/nest-admin')" />
-        </div>
-      </el-tooltip>
-
-      <el-tooltip content="文档手册" effect="dark" placement="bottom">
-        <div class="right-menu-item hover-effect">
-          <el-icon-reading class="el-icon-reading document right-icon" @click="goto('https://nestts.com/doc')" />
-        </div>
-      </el-tooltip>
 
       <!-- <el-tooltip content="需求墙" effect="dark" placement="bottom">
         <div class="right-menu-item hover-effect">
@@ -42,9 +32,9 @@
 
       <!-- <screenfull id="screenfull" class="right-menu-item hover-effect" /> -->
 
-      <div class="pointer" @click="dark = !dark">
-        <el-icon-Moon v-if="dark" class="el-icon-Moon right-icon mr5" />
-        <el-icon-Sunny v-else class="el-icon-Sunny right-icon mr5" />
+      <div class="pointer topbar-icon-button" @click="dark = !dark">
+        <el-icon-Moon v-if="dark" class="el-icon-Moon right-icon" />
+        <el-icon-Sunny v-else class="el-icon-Sunny right-icon" />
       </div>
 
       <el-dropdown class="avatar-container menuItem" trigger="hover">
@@ -162,9 +152,22 @@ function goto(url) {
 }
 .right-icon {
   font-size: 20px;
-  margin-right: 10px;
   cursor: pointer;
   color: var(--Color);
+}
+
+.topbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 6px;
+  border-radius: 6px;
+}
+
+.topbar-icon-button :deep(.right-icon) {
+  margin-right: 0;
 }
 //
 .TopBar {

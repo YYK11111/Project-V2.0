@@ -60,8 +60,8 @@ onUnmounted(() => {
 <template>
   <el-popover placement="bottom-end" :width="520" trigger="click" @show="loadMessages">
     <template #reference>
-      <el-badge :value="unread.total" :hidden="!unread.total" class="menuItem message-bell">
-        <el-icon-bell class="right-icon" />
+      <el-badge :value="unread.total" :hidden="!unread.total" class="menuItem message-bell topbar-icon-button">
+        <el-icon-bell class="right-icon message-bell__icon" />
       </el-badge>
     </template>
     <div class="message-popover">
@@ -107,7 +107,27 @@ onUnmounted(() => {
 
 <style scoped>
 .message-bell {
-  margin-right: 8px;
+  color: var(--Color);
+}
+
+.topbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 6px;
+  border-radius: 6px;
+}
+
+.message-bell__icon {
+  font-size: 20px;
+  color: currentColor;
+}
+
+.message-bell :deep(.el-badge__content) {
+  background-color: var(--Color);
+  border-color: var(--Color);
 }
 
 .message-popover {

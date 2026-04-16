@@ -353,6 +353,10 @@ function goToEdit() {
   router.push({ path: '/projectManage/form', query: { id: projectId } })
 }
 
+function goToCockpit() {
+  router.push({ path: '/projectManage/projectCockpit', query: { projectId } })
+}
+
 function goToTab(tabName) {
   activeTab.value = tabName
   syncQueryState()
@@ -453,6 +457,7 @@ function goToDetail(path, id, query = {}) {
   <div class="project-detail-page">
     <el-page-header @back="$router.back()" title="项目详情">
       <template #extra>
+        <el-button @click="goToCockpit">进入驾驶舱</el-button>
         <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
         <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         <el-button type="primary" @click="handleSubmitApproval" v-if="canProjectSubmitApproval && project.status === '1'">提交立项审批</el-button>

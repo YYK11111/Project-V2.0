@@ -1,0 +1,1 @@
+INSERT INTO `sys_dept` VALUES (1,'2026-04-15 15:24:09','admin',NULL,NULL,NULL,'总部',NULL,NULL);

@@ -7,6 +7,7 @@ import { RolesService } from '../roles/service'
 import { LoginLogsService } from '../loginLogs/service'
 import { BoolNum } from 'src/common/type/base'
 import { RedisService } from '../global/redis.service'
+import { SystenConfigsService } from '../configs/service'
 import dayjs from 'dayjs'
 import { CaptchaService } from '../common/captcha.service'
 import { getIpAddress } from '../../common/utils/common'
@@ -25,6 +26,7 @@ export class AuthService {
     private jwtService: JwtService,
     private loginLogsService: LoginLogsService,
     private redisService: RedisService,
+    private systemConfigsService: SystenConfigsService,
     private captchaService: CaptchaService,
   ) {}
   async login(req, res: Response): Promise<{ success: boolean }> {
@@ -75,9 +77,10 @@ export class AuthService {
       loginTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
       ...result,
     }
+    const sessionExpireMinutes = await this.systemConfigsService.getSessionExpireMinutes()
     let accessToken = await this.jwtService.signAsync(payload, {
       secret: config.jwtSecret,
-      expiresIn: config.jwtExpires,
+      expiresIn: `${sessionExpireMinutes}m`,
     })
 
     let log = await this.loginLogsService.createLog(req, {
@@ -87,8 +90,8 @@ export class AuthService {
       ...body,
     })
 
-    await this.redisService.setRedisOnlineUser(log)
-    this.setSessionCookie(res, accessToken)
+    await this.redisService.setRedisOnlineUser(log, undefined, sessionExpireMinutes * 60)
+    this.setSessionCookie(res, accessToken, sessionExpireMinutes)
 
     return {
       success: true,
@@ -131,13 +134,13 @@ export class AuthService {
     return sessionCookieName
   }
 
-  private setSessionCookie(res: Response, token: string) {
+  private setSessionCookie(res: Response, token: string, sessionExpireMinutes: number) {
     res.cookie(sessionCookieName, token, {
       httpOnly: true,
       sameSite: 'lax',
       secure: false,
       path: '/',
-      maxAge: dayjs().endOf('day').diff(dayjs(), 'millisecond'),
+      maxAge: sessionExpireMinutes * 60 * 1000,
     })
   }
 

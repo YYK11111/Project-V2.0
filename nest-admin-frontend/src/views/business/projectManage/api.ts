@@ -28,6 +28,10 @@ export function getDashboard(id) {
   return request({ url: `${baseUrl}/dashboard/${id}`, method: 'get' })
 }
 
+export function getCockpit(params) {
+  return request({ url: `${baseUrl}/cockpit`, method: 'get', params })
+}
+
 export function save(data) {
   return request({ url: `${baseUrl}/save`, method: 'post', data })
 }

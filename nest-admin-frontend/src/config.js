@@ -19,14 +19,39 @@ globalThis.sysConfig = {
   _mode: import.meta.env.MODE, // 前端打包模式
 }
 
+function resolveAssetUrl(url) {
+  if (!url) return ''
+  return url.includes('http') ? url : `${window.sysConfig.BASE_API}/static/${url}`
+}
+
+export function applyBrowserBranding({ browserTitle, browserIcon, systemName, systemLogo } = {}) {
+  const title = browserTitle || systemName || window.sysConfig.SYSTEM_NAME_ALL || window.sysConfig.SYSTEM_NAME
+  if (title) {
+    document.title = title
+  }
+
+  const iconUrl = resolveAssetUrl(browserIcon || systemLogo || window.sysConfig.BROWSER_ICON || window.sysConfig.LOGO)
+  if (!iconUrl) return
+
+  let favicon = document.querySelector('link[rel="icon"]')
+  if (!favicon) {
+    favicon = document.createElement('link')
+    favicon.setAttribute('rel', 'icon')
+    document.head.appendChild(favicon)
+  }
+  favicon.setAttribute('href', iconUrl)
+}
+
 // 主题回显
 const [h, s, l] = localStorage.hsl?.split(',')?.map((e) => e.trim()) || []
 if (h) {
   const style = document.documentElement.style
-  style.setProperty('--h', h)
-  style.setProperty('--s', s)
-  style.setProperty('--l', l)
+  style.setProperty('--H', h)
+  style.setProperty('--S', s)
+  style.setProperty('--L', l)
 }
+
+applyBrowserBranding()
 
 // 灰色主题
 // if (window.sysConfig.ENV === 'production') document.documentElement.style.filter = 'grayscale(100%)'

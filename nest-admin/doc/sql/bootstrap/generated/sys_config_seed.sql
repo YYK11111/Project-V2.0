@@ -1,0 +1,1 @@
+INSERT INTO `sys_config` (`id`,`create_time`,`create_user`,`update_time`,`update_user`,`is_delete`,`system_name`,`system_logo`,`browser_title`,`browser_icon`,`session_expire_minutes`) VALUES (1,'2026-04-15 13:50:15','NestAdmin','2026-04-15 13:50:23','NestAdmin',NULL,'YYK','default/2026-04-15/1776232213477-628089096.jpeg',NULL,NULL,'30');

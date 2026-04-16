@@ -1,0 +1,1 @@
+INSERT INTO `sys_user` VALUES (1,'2026-04-15 13:13:16','system','2026-04-15 16:02:05','admin',NULL,'NestAdmin','超级管理员',NULL,'s3wmd2VReF1IjZhK59gLBY0OjYlzjA==','avatar/2026-04-15/1776237860500-421490676.jpeg','admin@nestadmin.com','13800138000',NULL,1,'1');

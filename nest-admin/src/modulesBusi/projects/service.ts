@@ -459,4 +459,58 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       },
     }
   }
+
+  async getCockpit(query: QueryListDto): Promise<any> {
+    const projectListRes = await this.list(query)
+    const projects = projectListRes?.data || []
+    const selectedProjectId = String(query.projectId || projects[0]?.id || '')
+    const selectedProject = selectedProjectId ? await this.getDashboard(selectedProjectId) : null
+
+    const totalProjects = projects.length
+    const activeProjects = projects.filter((item) => ['2', '3', '4'].includes(String(item.status || ''))).length
+    const completedProjects = projects.filter((item) => String(item.status || '') === '6').length
+    const overdueProjects = projects.filter((item) => item.endDate && new Date(item.endDate).getTime() < Date.now() && String(item.status || '') !== '6').length
+    const budgetTotal = projects.reduce((sum, item) => sum + Number(item.budget || 0), 0)
+    const actualCostTotal = projects.reduce((sum, item) => sum + Number(item.actualCost || 0), 0)
+    const now = Date.now()
+    const overdueRanking = [...projects]
+      .filter((item) => item.endDate && new Date(item.endDate).getTime() < now && String(item.status || '') !== '6')
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
+      .slice(0, 5)
+    const laggingRanking = [...projects]
+      .filter((item) => String(item.status || '') !== '6')
+      .sort((a, b) => Number(a.progress || 0) - Number(b.progress || 0))
+      .slice(0, 5)
+    const costRiskRanking = [...projects]
+      .filter((item) => Number(item.actualCost || 0) > Number(item.budget || 0))
+      .sort((a, b) => (Number(b.actualCost || 0) - Number(b.budget || 0)) - (Number(a.actualCost || 0) - Number(a.budget || 0)))
+      .slice(0, 5)
+
+    return {
+      projectOptions: projects.map((item) => ({
+        id: item.id,
+        name: item.name,
+        status: item.status,
+        priority: item.priority,
+        progress: item.progress,
+        leader: item.leader,
+      })),
+      selectedProjectId,
+      summary: {
+        totalProjects,
+        activeProjects,
+        completedProjects,
+        overdueProjects,
+        budgetTotal,
+        actualCostTotal,
+        costVariance: actualCostTotal - budgetTotal,
+      },
+      rankings: {
+        overdueProjects: overdueRanking,
+        laggingProjects: laggingRanking,
+        costRiskProjects: costRiskRanking,
+      },
+      selectedProject,
+    }
+  }
 }

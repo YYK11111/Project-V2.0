@@ -11,4 +11,10 @@ export class SystenConfigsService extends BaseService<SystenConfig, SystenConfig
   constructor(@InjectRepository(SystenConfig) repository: Repository<SystenConfig>) {
     super(SystenConfig, repository)
   }
+
+  async getSessionExpireMinutes() {
+    const config = await this.repository.findOne({ where: { isDelete: null as any } as any, order: { createTime: 'DESC' as any } })
+    const value = Number(config?.sessionExpireMinutes || 0)
+    return Number.isFinite(value) && value > 0 ? value : 30
+  }
 }

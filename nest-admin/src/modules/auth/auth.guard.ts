@@ -65,6 +65,7 @@ export class AuthGuard implements CanActivate {
     if (!isOnline) {
       throw new UnauthorizedException()
     }
+    await this.redisService.refreshOnlineUser(payload.session)
 
     return true
   }

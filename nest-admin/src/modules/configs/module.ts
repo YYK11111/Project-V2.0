@@ -8,5 +8,6 @@ import { TypeOrmModule } from '@nestjs/typeorm'
   imports: [TypeOrmModule.forFeature([SystenConfig])],
   controllers: [SystenConfigsController],
   providers: [SystenConfigsService],
+  exports: [SystenConfigsService],
 })
 export class SystenConfigsModule {}

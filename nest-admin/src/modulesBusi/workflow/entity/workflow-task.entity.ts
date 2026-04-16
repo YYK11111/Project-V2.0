@@ -1,9 +1,13 @@
 import { BaseEntity, BaseColumn, MyEntity } from '../../../common/entity/BaseEntity';
+import { Index } from 'typeorm';
 
 /**
  * 工作流任务实体
  */
 @MyEntity('wf_task')
+@Index('idx_wf_task_assignee_create_time', ['assigneeId', 'createTime'])
+@Index('idx_wf_task_assignee_status_create_time', ['assigneeId', 'status', 'createTime'])
+@Index('idx_wf_task_instance_id', ['instanceId'])
 export class WorkflowTask extends BaseEntity {
   constructor(obj = {}) {
     super();

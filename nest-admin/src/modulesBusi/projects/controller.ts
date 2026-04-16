@@ -44,6 +44,11 @@ export class ProjectsController extends BaseController<Project, ProjectsService>
     return this.service.getDashboard(id)
   }
 
+  @Get('cockpit')
+  getCockpit(@Query() query: QueryListDto) {
+    return this.service.getCockpit(query)
+  }
+
   @Post(':id/submit-approval')
   async submitApproval(
     @Param('id') id: string,
