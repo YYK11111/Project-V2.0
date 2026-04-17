@@ -108,20 +108,6 @@ function submit() {
 function cancel() {
   router.back()
 }
-
-watch(
-  () => [route.query.id, route.query.action],
-  () => {
-    if (hasMilestoneId.value) {
-      getOne(route.query.id).then(({ data }) => {
-        form.value = data || {}
-      })
-    } else {
-      form.value = defaultForm()
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
