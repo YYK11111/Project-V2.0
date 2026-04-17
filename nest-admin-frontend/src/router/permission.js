@@ -1,5 +1,6 @@
 import { useAppStore } from '../stores/app'
 import { useUserStore } from '../stores/user'
+import stores from '@/stores'
 import { ElMessage as Message } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
@@ -19,6 +20,12 @@ export default function permission(router) {
     if (!(whiteList.includes(to.path) || to.meta.isOpen)) {
       const userStore = useUserStore()
       if (userStore.name) {
+        const appStore = stores()
+        const hasSidebarRoutes = Array.isArray(appStore.permission.sidebarRouters) && appStore.permission.sidebarRouters.length > 0
+        if (!hasSidebarRoutes) {
+          await getUserRoutes(router)
+          return { ...to, replace: true }
+        }
         if (noLoginList.includes(to.path)) {
           return { path: window.sysConfig.BASE_URL }
         }

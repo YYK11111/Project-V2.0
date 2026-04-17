@@ -1,6 +1,6 @@
 <template>
   <!-- <el-scrollbar class="nav-scrollbar"> -->
-  <el-menu :default-active="activeMenu" mode="vertical" @select="handleSelect">
+  <el-menu class="top-menu" :default-active="activeMenu" mode="horizontal" @select="handleSelect">
     <el-menu-item
       v-for="(item, index) in topMenus"
       :index="item.path"
@@ -17,6 +17,7 @@
 
 <script>
 import { isExternal } from '@/utils/validate'
+import stores from '@/stores'
 
 export default {
   data() {
@@ -30,32 +31,29 @@ export default {
     // 顶部显示菜单
     topMenus() {
       let topMenus = []
-      this.topbarRouters.map((menu) => {
-        if (menu.hidden !== true) {
-          menu.isShowChild = menu.children?.some?.((e) => !e.hidden)
+      stores().permission.topbarRouters.map((menu) => {
+        if (menu.isHidden !== true) {
+          menu.isShowChild = menu.children?.some?.((e) => !e.isHidden)
           topMenus.push(menu)
         }
       })
       return topMenus
     },
-    topbarRouters() {
-      // console.log(this.$store.permission.topbarRouters)
-      return this.$store.permission.topbarRouters
-    },
     // 激活的/高亮的一级菜单路径 eg：/drainageCode
     activeMenu() {
       const path = this.$route.path
+      if (!path) return ''
       let activePath = ''
       // 兼容微服务多级路径匹配eg：/microStore/*
       if (
         window.sysConfig.MICRO_APPS &&
         Object.values(window.sysConfig.MICRO_APPS).some((item) => location.pathname.startsWith(item.activeRule))
       ) {
-        activePath = path.match('/.+?/.+?/')[0].slice(0, -1) // eg: /a/b
+        activePath = path.match('/.+?/.+?/')?.[0]?.slice(0, -1) || '' // eg: /a/b
       } else {
-        activePath = path.match(/\/[^\/]+/)[0] // eg: /a
+        activePath = path.match(/\/[^\/]+/)?.[0] || '' // eg: /a
       }
-      this.activeRoutes(activePath)
+      activePath && this.activeRoutes(activePath)
       return activePath
     },
   },
@@ -81,10 +79,9 @@ export default {
     },
     // 当前激活的侧边栏菜单
     activeRoutes(path) {
-      let activeRoute = this.topbarRouters.find((e) => e.path == path)
+      let activeRoute = stores().permission.topbarRouters.find((e) => e.path == path)
       let routes = (activeRoute && activeRoute.children) || []
-      this.$store.permission.sidebarRouters = routes
-      this.$store.permission.sidebarRouters.parentRoute = activeRoute
+      stores().permission.sidebarRouters = routes
       return routes
     },
     mouseenter(item, index) {
@@ -108,16 +105,21 @@ export default {
 //     white-space: nowrap;
 //   }
 // }
-.el-menu {
+.top-menu {
   background-color: initial;
   border: none;
-  flex: 1 1 1200px;
+  flex: 1 1 auto;
+  min-width: 0;
   z-index: 0;
   height: auto;
-  margin: 20px 0;
+  margin: 8px 16px;
   overflow: auto;
+  display: flex;
+  align-items: center;
   & > .el-menu-item {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     height: 65px;
     line-height: 1 !important;
     text-align: center;
@@ -127,7 +129,6 @@ export default {
     margin: 0 4px !important;
     border: 0;
     padding: 0px !important;
-    float: none;
     .svg-icon {
       font-size: 26px;
       margin-bottom: 5px;
@@ -156,6 +157,11 @@ export default {
         color: var(--Color, #fff);
       }
     }
+  }
+
+  &::before,
+  &::after {
+    display: none;
   }
 
   & > .el-menu-item.is-active,

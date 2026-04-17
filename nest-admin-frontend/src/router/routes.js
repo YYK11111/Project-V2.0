@@ -1,6 +1,6 @@
 /* Layout */
 import { useUserStore } from '../stores/user'
-import { useMenusStore } from '../stores/menus'
+import stores from '@/stores'
 import { RouterView } from 'vue-router'
 import { h } from 'vue'
 import Layout from '@/layout/index.vue'
@@ -169,6 +169,83 @@ export const constantRoutes = [
 
 import { getLoginUserMenus } from '@/views/system/roles/api'
 
+function flattenRouteTree(routes = []) {
+  return routes.flatMap((route) => [route, ...flattenRouteTree(route.children || [])])
+}
+
+function getConstantHiddenPaths() {
+  return new Set(
+    flattenRouteTree(constantRoutes)
+      .filter((route) => route.isHidden && typeof route.path === 'string' && route.path.startsWith('/'))
+      .map((route) => route.path),
+  )
+}
+
+function createMenuDiagnostics() {
+  return {
+    missingComponents: [],
+    duplicatePathKeys: [],
+    emptyCatalogs: [],
+    emptyMenus: [],
+    hiddenRouteConflicts: [],
+  }
+}
+
+function reportMenuDiagnostics(routes = [], diagnostics = createMenuDiagnostics()) {
+  const flattenedRoutes = flattenRouteTree(routes)
+  const routeKeyMap = new Map()
+  const constantHiddenPaths = getConstantHiddenPaths()
+
+  flattenedRoutes.forEach((route) => {
+    const routeKey = `${route.type || 'unknown'}::${route.path || ''}::${route.componentKey || ''}`
+    const sameRouteList = routeKeyMap.get(routeKey) || []
+    sameRouteList.push(route)
+    routeKeyMap.set(routeKey, sameRouteList)
+
+    const visibleChildren = (route.children || []).filter((child) => !child.isHidden)
+    if (route.type === 'catalog' && !route.isHidden && visibleChildren.length === 0 && !route.componentKey) {
+      diagnostics.emptyCatalogs.push({ path: route.path, title: route.meta?.title })
+    }
+    if (route.type === 'menu' && !route.isHidden && visibleChildren.length === 0 && !route.componentKey) {
+      diagnostics.emptyMenus.push({ path: route.path, title: route.meta?.title })
+    }
+    if (route.isHidden && constantHiddenPaths.has(route.path)) {
+      diagnostics.hiddenRouteConflicts.push({ path: route.path, title: route.meta?.title })
+    }
+  })
+
+  diagnostics.duplicatePathKeys = [...routeKeyMap.entries()]
+    .filter(([, sameRouteList]) => sameRouteList.length > 1)
+    .map(([routeKey, sameRouteList]) => ({
+      routeKey,
+      paths: sameRouteList.map((route) => route.path),
+      titles: sameRouteList.map((route) => route.meta?.title || route.name),
+    }))
+
+  const hasIssues = Object.values(diagnostics).some((items) => items.length > 0)
+  if (!hasIssues) return
+
+  console.groupCollapsed('[菜单体检] 检测到可疑菜单配置')
+  if (diagnostics.missingComponents.length) {
+    console.warn('缺失组件', diagnostics.missingComponents)
+  }
+  if (diagnostics.duplicatePathKeys.length) {
+    console.warn('重复路由键', diagnostics.duplicatePathKeys)
+  }
+  if (diagnostics.emptyCatalogs.length) {
+    console.warn('空目录菜单', diagnostics.emptyCatalogs)
+  }
+  if (diagnostics.emptyMenus.length) {
+    console.warn('空页面菜单', diagnostics.emptyMenus)
+  }
+  if (diagnostics.hiddenRouteConflicts.length) {
+    console.warn('与常量隐藏路由重复的数据库隐藏菜单', diagnostics.hiddenRouteConflicts)
+  }
+  console.groupEnd()
+}
+
+let currentMenuDiagnostics = createMenuDiagnostics()
+
 function sortMenuTreeByOrder(routes = []) {
   return [...routes]
     .sort((left, right) => {
@@ -198,11 +275,10 @@ export function getUserRoutes(router) {
       })
       return Promise.reject()
     }
+    currentMenuDiagnostics = createMenuDiagnostics()
     const userRoutes = transRouter(sortMenuTreeByOrder(data))
+    reportMenuDiagnostics(userRoutes, currentMenuDiagnostics)
     console.log('=== Generated Routes ===', JSON.stringify(userRoutes, null, 2))
-    useMenusStore().addRoutes = userRoutes
-    useMenusStore().routes = userRoutes.concat(constantRoutes)
-    useMenusStore().topbarRouters = useMenusStore().routes.filter((e) => !e.isHidden)
     // 设置首页重定向 - 确保第一个路由存在
     if (userRoutes && userRoutes.length > 0) {
       const firstRoute = userRoutes[0]
@@ -211,8 +287,19 @@ export function getUserRoutes(router) {
         rootRoute.redirect = firstRoute.path
       }
     }
-    userRoutes.forEach((e) => router.addRoute(e))
-    router.addRoute({ path: '/:path(.*)*', redirect: '/404', isHidden: true })
+    userRoutes.forEach((route) => {
+      if (!router.hasRoute(route.name)) {
+        router.addRoute(route)
+      }
+    })
+    if (!router.getRoutes().some((route) => route.path === '/:path(.*)*')) {
+      router.addRoute({ path: '/:path(.*)*', redirect: '/404', isHidden: true })
+    }
+    const appStore = stores()
+    appStore.permission.addRoutes = userRoutes
+    appStore.permission.routes = constantRoutes.concat(userRoutes)
+    appStore.permission.topbarRouters = appStore.permission.routes.filter((route) => !route.isHidden)
+    appStore.permission.sidebarRouters = userRoutes.filter((route) => !route.isHidden)
 
     return userRoutes
   })
@@ -233,22 +320,15 @@ function transRouter(routesData, parentPath) {
       let path = route.path
       // 判断 path 是否已经是绝对路径
       if (/^(\/|http)/.test(path)) {
-        // 绝对路径，直接使用
         route.path = path
       } else if (path.includes('/')) {
-        // 如果 path 中包含 '/'，说明可能是 'projectManage/form' 这种格式
-        // 需要检查是否已经包含了父路径
-        const parentPathName = parentPath.split('/').pop() // 获取父路径的最后一段，如 'projectManage'
+        const parentPathName = parentPath.split('/').pop()
         if (path.startsWith(parentPathName + '/')) {
-          // 已经包含了父路径前缀，说明数据库存储的是完整路径
-          // 直接使用，不需要再拼接
           route.path = '/' + path
         } else {
-          // 不包含父路径前缀，正常拼接
           route.path = parentPath + '/' + path
         }
       } else {
-        // 纯相对路径，正常拼接
         route.path = parentPath + '/' + path
       }
     } else {
@@ -257,8 +337,13 @@ function transRouter(routesData, parentPath) {
     }
 
     route.name = route.path?.replace(/[/:]/g, '-')?.replace(/^-+/, '') || route.component?.replace(/\//g, '-')
+    route.componentKey = route.component
 
+    const visibleChildrenBeforeTransform = Array.isArray(route.children)
+      ? route.children.filter((child) => !child.isHidden)
+      : []
     const hasChildren = Array.isArray(route.children) && route.children.length > 0
+    const hasVisibleChildren = visibleChildrenBeforeTransform.length > 0
     let routeComponent = null
     let wrapRouteWithRouterView = false
 
@@ -288,7 +373,7 @@ function transRouter(routesData, parentPath) {
         }
       } else if (route.component && route.component !== '') {
         routeComponent = loadView(route)
-        if (hasChildren) {
+        if (hasVisibleChildren) {
           route.component = routerView
           wrapRouteWithRouterView = true
         } else {
@@ -330,12 +415,25 @@ function transRouter(routesData, parentPath) {
       ]
     }
 
-    // 设置 redirect：一级目录有可见子菜单时重定向到第一个子菜单
-    if (route.type === 'catalog' && level === 1 && route.children?.length > 0) {
-      const visibleChild = route.children.find(c => !c.isHidden)
+    // 设置 redirect：目录型菜单有可见子菜单时重定向到第一个子菜单，避免点击后落到空容器页
+    if (route.type === 'catalog' && route.children?.length > 0) {
+      const visibleChild = route.children.find((child) => !child.isHidden)
       if (visibleChild) {
         route.redirect = visibleChild.path
       }
+    }
+
+    const visibleChildrenAfterTransform = (route.children || []).filter((child) => !child.isHidden)
+    const hasUsableChildren = visibleChildrenAfterTransform.length > 0
+    const hasUsableComponent = Boolean(route.component && route.component !== routerView)
+    if (route.type === 'catalog' && !hasUsableChildren && !hasUsableComponent) {
+      route.isHidden = true
+      route.meta.isHidden = true
+    }
+
+    if (route.type === 'menu' && !hasUsableChildren && !routeComponent && level > 1) {
+      route.isHidden = true
+      route.meta.isHidden = true
     }
 
     return true
@@ -347,17 +445,30 @@ function transRouter(routesData, parentPath) {
 const modules = import.meta.glob('../views/**/*.vue')
 export const loadView = (route) => {
   let res
+  const componentCandidates = [route.component, route.component?.replace(/^\//, ''), route.component?.replace(/\.vue$/, '')]
+    .filter(Boolean)
+
   for (const path in modules) {
     const dir = path.split('views/')[1].split('.vue')[0]
-    if (dir === route.component) {
+    if (componentCandidates.includes(dir)) {
       res = modules[path]
       let routeNames = {
         'systemMonitor/loginLog/index': 'loginLog',
         'systemMonitor/onlineUser/index': 'onlineUser',
       }
-      routeNames[route.component] && (route.name = routeNames[route.component])
+      componentCandidates.forEach((candidate) => {
+        routeNames[candidate] && (route.name = routeNames[candidate])
+      })
       break
     }
+  }
+  if (!res) {
+    currentMenuDiagnostics.missingComponents.push({
+      title: route.meta?.title,
+      path: route.path,
+      component: route.componentKey || route.component,
+    })
+    console.error(`[菜单配置错误] 未找到组件: ${route.component}, path: ${route.path}`)
   }
   return (
     res || {

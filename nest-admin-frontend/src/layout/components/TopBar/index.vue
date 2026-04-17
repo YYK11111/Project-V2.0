@@ -69,11 +69,8 @@ import Breadcrumb from '../Breadcrumb.vue'
 import { useUserStore } from '@/stores/user'
 const { avatar, name, logout } = useUserStore()
 import Settings from './Settings.vue'
-import { isExternal } from '@/utils/validate'
-import { mapState } from 'pinia'
 import { useAppStore } from '@/stores/app'
 
-import TopMenu from './TopMenu.vue'
 import AIDrawer from './AIDrawer/index.vue'
 import MessageBell from './MessageBell.vue'
 import { useDark, useToggle } from '@vueuse/core'
@@ -99,34 +96,6 @@ async function logoutFn() {
 function goto(url) {
   window.open(url)
 }
-
-// export default {
-//   data() {
-//     return {
-//       setting: false,
-//     }
-//   },
-//   components: {
-//     Logo,
-//     TopMenu,
-//     Settings,
-//     AIDrawer,
-//   },
-//   computed: {
-//     ...mapState(stores, ['avatar', 'name', 'permission_routes']),
-//   },
-//   mounted() {},
-//   methods: {
-
-//     goLink(path) {
-//       if (!isExternal(path)) {
-//         this.$router.push({ path })
-//       } else {
-//         window.open(path, '_blank')
-//       }
-//     },
-//   },
-// }
 </script>
 
 <style lang="scss" scoped>
@@ -170,14 +139,24 @@ function goto(url) {
   margin-right: 0;
 }
 //
-.TopBar {
+  .TopBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   overflow: hidden;
   position: relative;
   color: var(--FontBlack);
   box-shadow: 0px 1px 0px 0px var(--ColorLight9);
+
+  > :first-child {
+    flex: 0 0 auto;
+  }
+
+  > :nth-child(2) {
+    flex: 0 0 auto;
+  }
+
   .errLog-container {
     display: inline-block;
     vertical-align: top;

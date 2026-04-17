@@ -19,25 +19,20 @@
 <script>
 import path from 'path-browserify'
 import { mapState } from 'pinia'
-import { useMenusStore } from '@/stores/menus'
 import Logo from '../Logo'
+import stores from '@/stores'
 
 import SidebarItem from './SidebarItem'
 
 export default {
   components: { SidebarItem, Logo },
   computed: {
-    // ...mapState(['settings']),
-    ...mapState(useMenusStore, ['routes']),
+    ...mapState(stores, {
+      sidebarRouters: (state) => state.permission.sidebarRouters,
+    }),
     activeMenu() {
       const route = this.$route
       const { meta, path } = route
-      // setTimeout(() => {
-      //   this.$store.app.showMenuIndex = this.$store.app.currentMenuIndex = this.topMenus.findIndex((e) =>
-      //     path.startsWith(e.path),
-      //   )
-      // }, 100)
-      // if set path, the sidebar will highlight the path you set
       if (meta.activeMenu) {
         return meta.activeMenu
       } else if (route.meta.isHidden) {
@@ -49,17 +44,12 @@ export default {
       // return !this.sidebar.opened
       return false
     },
-    topMenus() {
-      return this.topbarRouters.filter((e) => !e.isHidden)
+    routes() {
+      return (this.sidebarRouters || []).filter((route) => !route.isHidden)
     },
   },
   data() {
     return { openeds: [], current: 0 }
-  },
-  mounted() {
-    // this.$nextTick(() => {
-    //   console.log(this.topbarRouters)
-    // })
   },
   methods: {
     open(v) {

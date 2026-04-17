@@ -30,16 +30,14 @@ export default {
   },
   mixins: [],
   computed: {
-    //  ...mapGetters(['sidebar', 'avatar', 'device']),
     ...mapState(stores, {
       sidebar: (state) => state.app.sidebar,
       device: (state) => state.app.device,
       showSettings: (state) => state.settings.showSettings,
-      // needTagsView: (state) => state.settings.tagsView,
-      // fixedHeader: (state) => state.settings.fixedHeader,
+      sidebarRouters: (state) => state.permission.sidebarRouters,
     }),
     visiableSidebarRouters() {
-      let visibleRoutes = this.$store.sidebarRouters.filter((e) => !e.hidden)
+      let visibleRoutes = (this.sidebarRouters || []).filter((e) => !e.isHidden)
       return visibleRoutes && visibleRoutes.length
     },
     isSidebar() {
