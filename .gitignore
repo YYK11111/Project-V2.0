@@ -22,3 +22,15 @@ logs/
 
 # Build outputs
 dist/
+
+# Local tool state
+.opencode/
+.lingma/
+
+# Runtime uploads
+nest-admin/upload/default/
+nest-admin/upload/avatar/
+
+# Generated types / local backups
+nest-admin-frontend/components.d.ts
+nest-admin/doc/sql/backup_*.sql

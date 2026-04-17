@@ -9,23 +9,26 @@ const messageData = ref<{ todo: any[]; cc: any[] }>({ todo: [], cc: [] })
 const activeTab = ref('todo')
 let timer: ReturnType<typeof setInterval> | null = null
 
-const getSourceTypeLabel = (sourceType: string) => {
-  const map: Record<string, string> = {
-    project: '项目',
-    task: '任务',
-    ticket: '工单',
-    change: '变更',
-    customer: '客户',
-    workflow_task: '待办',
-    workflow_instance: '流程',
-  }
-  return map[sourceType] || sourceType
+const getMetaText = (row: any) => {
+  const starterText = `发起人：${row.starterName || '-'}`
+  const timeText = row.createTime || '-'
+  return `${starterText}  |  ${timeText}`
 }
 
-const getMetaText = (row: any) => {
-  const starter = row.starterName ? `发起人：${row.starterName}` : ''
-  const nodeName = row.nodeName ? `节点：${row.nodeName}` : ''
-  return [starter, nodeName].filter(Boolean).join(' · ') || row.content || '-'
+const getMessageRoute = (row: any) => {
+  const query = row.linkParams || {}
+  const isProjectWorkflowTodo =
+    (row.businessType === 'project' || row.sourceType === 'workflow_task')
+    && query.fromWorkflow === '1'
+    && query.taskId
+    && query.id
+
+  if (isProjectWorkflowTodo && row.linkUrl === '/projectManage/detail') {
+    return { path: '/projectManage/approval', query }
+  }
+
+  if (!row.linkUrl) return null
+  return { path: row.linkUrl, query }
 }
 
 const loadMessages = async () => {
@@ -38,9 +41,9 @@ const goMessage = async (row: any) => {
   if (row.messageType === 'cc') {
     await markMessageRead(row.id)
   }
-  const query = row.linkParams || {}
-  if (row.linkUrl) {
-    router.push({ path: row.linkUrl, query })
+  const target = getMessageRoute(row)
+  if (target) {
+    router.push(target)
   }
   await loadMessages()
 }
@@ -58,7 +61,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-popover placement="bottom-end" :width="520" trigger="click" @show="loadMessages">
+  <el-popover placement="bottom-end" :width="420" trigger="click" @show="loadMessages">
     <template #reference>
       <el-badge :value="unread.total" :hidden="!unread.total" class="menuItem message-bell topbar-icon-button">
         <el-icon-bell class="right-icon message-bell__icon" />
@@ -71,10 +74,6 @@ onUnmounted(() => {
           <div class="message-section">
             <div v-if="messageData.todo.length" class="message-list">
               <button v-for="row in messageData.todo" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
-                <div class="message-item__header">
-                  <el-tag size="small" type="warning">{{ getSourceTypeLabel(row.businessType || row.sourceType) }}</el-tag>
-                  <span class="message-item__time">{{ row.createTime }}</span>
-                </div>
                 <div class="message-item__title">{{ row.title }}</div>
                 <div class="message-item__meta">{{ getMetaText(row) }}</div>
               </button>
@@ -86,10 +85,6 @@ onUnmounted(() => {
           <div class="message-section">
             <div v-if="messageData.cc.length" class="message-list">
               <button v-for="row in messageData.cc" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
-                <div class="message-item__header">
-                  <el-tag size="small" type="info">{{ getSourceTypeLabel(row.businessType || row.sourceType) }}</el-tag>
-                  <span class="message-item__time">{{ row.createTime }}</span>
-                </div>
                 <div class="message-item__title">{{ row.title }}</div>
                 <div class="message-item__meta">{{ getMetaText(row) }}</div>
               </button>
@@ -133,7 +128,7 @@ onUnmounted(() => {
 .message-popover {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .message-title {
@@ -147,11 +142,11 @@ onUnmounted(() => {
 }
 
 .message-tabs :deep(.el-tabs__header) {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .message-section :deep(.el-empty) {
-  padding: 12px 0;
+  padding: 8px 0;
 }
 
 .message-footer {
@@ -162,8 +157,8 @@ onUnmounted(() => {
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
+  gap: 6px;
+  max-height: 240px;
   overflow-y: auto;
 }
 
@@ -171,8 +166,8 @@ onUnmounted(() => {
   width: 100%;
   text-align: left;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 6px;
+  padding: 8px 10px;
   background: var(--el-bg-color);
   cursor: pointer;
 }
@@ -182,29 +177,23 @@ onUnmounted(() => {
   background: var(--el-fill-color-light);
 }
 
-.message-item__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.message-item__time {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
 .message-item__title {
   font-weight: 600;
   color: var(--el-text-color-primary);
-  margin-bottom: 4px;
-  line-height: 1.5;
+  margin-bottom: 1px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
 }
 
 .message-item__meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--el-text-color-secondary);
-  line-height: 1.5;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
