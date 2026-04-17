@@ -53,6 +53,29 @@ const flatCatalogs = computed(() => {
   return result
 })
 
+const activeFilterChips = computed(() => {
+  const chips: string[] = []
+  if (query.keyword) chips.push(`关键词：${query.keyword}`)
+  if (activeCatalogName.value) chips.push(`分类：${activeCatalogName.value}`)
+  if (query.knowledgeType) chips.push(`知识类型：${knowledgeTypes.value[query.knowledgeType] || query.knowledgeType}`)
+  if (query.tagIds?.length) {
+    const selectedTags = tags.value.filter((item: any) => query.tagIds.includes(String(item.id))).map((item: any) => item.name)
+    if (selectedTags.length) chips.push(`标签：${selectedTags.join('、')}`)
+  }
+  if (query.sortBy) {
+    const sortLabelMap = {
+      latest: '最近更新',
+      authority: '权威优先',
+      aiPreferred: 'AI优先',
+      weight: '检索权重',
+    }
+    chips.push(`排序：${sortLabelMap[query.sortBy] || query.sortBy}`)
+  }
+  return chips
+})
+
+const topResult = computed(() => resultList.value[0])
+
 function syncQueryFromRoute() {
   query.keyword = String(route.query.keyword || '')
   query.catalogId = String(route.query.catalogId || '')
@@ -140,36 +163,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="knowledge-search-page" v-loading="loading">
-    <div class="knowledge-search-header Gcard">
-      <div class="knowledge-search-header__title">知识搜索</div>
-      <div class="knowledge-search-form">
-        <el-input v-model="query.keyword" placeholder="搜索知识标题、摘要、关键词" clearable @keyup.enter="search" />
-        <el-select v-model="query.catalogId" clearable placeholder="分类">
-          <el-option v-for="item in flatCatalogs" :key="item.id" :label="item.displayName" :value="String(item.id)" />
-        </el-select>
-        <el-select v-model="query.knowledgeType" clearable placeholder="知识类型">
-          <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key" />
-        </el-select>
-        <el-select v-model="query.tagIds" multiple filterable collapse-tags collapse-tags-tooltip clearable placeholder="标签">
-          <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="String(item.id)" />
-        </el-select>
-        <el-select v-model="query.sortBy" clearable placeholder="排序方式">
-          <el-option label="最近更新" value="latest" />
-          <el-option label="权威优先" value="authority" />
-          <el-option label="AI优先" value="aiPreferred" />
-          <el-option label="检索权重" value="weight" />
-        </el-select>
-        <el-button type="primary" @click="search">搜索</el-button>
-        <el-button @click="reset">重置</el-button>
-      </div>
-      <div class="knowledge-search-summary">
-        <span>共找到 <strong>{{ total }}</strong> 条知识</span>
-        <span v-if="activeCatalogName">分类：{{ activeCatalogName }}</span>
+  <div class="knowledge-search-page km-page" v-loading="loading">
+    <div class="knowledge-search-hero Gcard km-hero">
+      <div class="knowledge-search-hero__eyebrow km-hero__eyebrow">知识搜索</div>
+      <div class="knowledge-search-hero__title km-hero__title">按目录、标签和排序方式快速锁定可复用知识</div>
+      <div class="knowledge-search-hero__desc km-hero__desc">先用关键词缩小范围，再结合分类、知识类型和标签逐步过滤，让高价值知识更快浮出水面。</div>
+
+      <div class="knowledge-search-panel">
+        <div class="knowledge-search-panel__header">
+          <div>
+            <div class="knowledge-search-panel__title">筛选条件</div>
+            <div class="knowledge-search-panel__desc">推荐先输入关键词，再按分类和标签继续收敛。</div>
+          </div>
+          <div class="knowledge-search-panel__actions">
+            <el-button type="primary" @click="search">搜索</el-button>
+            <el-button @click="reset">重置</el-button>
+          </div>
+        </div>
+
+        <div class="knowledge-search-form">
+          <el-input v-model="query.keyword" placeholder="搜索知识标题、摘要、关键词" clearable @keyup.enter="search" />
+          <el-select v-model="query.catalogId" clearable placeholder="分类">
+            <el-option v-for="item in flatCatalogs" :key="item.id" :label="item.displayName" :value="String(item.id)" />
+          </el-select>
+          <el-select v-model="query.knowledgeType" clearable placeholder="知识类型">
+            <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key" />
+          </el-select>
+          <el-select v-model="query.tagIds" multiple filterable collapse-tags collapse-tags-tooltip clearable placeholder="标签">
+            <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="String(item.id)" />
+          </el-select>
+          <el-select v-model="query.sortBy" clearable placeholder="排序方式">
+            <el-option label="最近更新" value="latest" />
+            <el-option label="权威优先" value="authority" />
+            <el-option label="AI优先" value="aiPreferred" />
+            <el-option label="检索权重" value="weight" />
+          </el-select>
+        </div>
+
+        <div class="knowledge-search-summary">
+          <div class="knowledge-search-summary__chips">
+            <el-tag v-for="item in activeFilterChips" :key="item" effect="plain">{{ item }}</el-tag>
+            <span v-if="!activeFilterChips.length" class="knowledge-search-summary__placeholder">当前未设置额外筛选条件</span>
+          </div>
+          <div class="knowledge-search-summary__count">
+            共找到 <strong>{{ total }}</strong> 条知识
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="knowledge-search-result Gcard">
+    <div v-if="topResult" class="knowledge-search-highlight Gcard km-panel">
+      <div class="knowledge-search-highlight__header">
+        <div>
+          <div class="knowledge-search-highlight__eyebrow">优先结果</div>
+          <div class="knowledge-search-highlight__title">{{ topResult.title }}</div>
+          <div class="knowledge-search-highlight__meta">
+            <span>{{ topResult.catalog?.name || '-' }}</span>
+            <span>{{ knowledgeTypes[topResult.knowledgeType] || '-' }}</span>
+            <span>{{ visibilityTypes[topResult.visibilityType] || '-' }}</span>
+            <span>{{ topResult.updateTime || '-' }}</span>
+          </div>
+        </div>
+        <el-button type="primary" plain @click="goDetail(topResult)">查看详情</el-button>
+      </div>
+      <div class="knowledge-search-highlight__summary">
+        {{ topResult.hasAccess === false ? '当前知识受限，暂无查看权限' : topResult.summary || topResult.desc || '暂无摘要' }}
+      </div>
+    </div>
+
+    <div class="knowledge-search-result Gcard km-panel">
+      <div class="knowledge-search-result__header km-panel__header">
+        <div>
+          <div class="knowledge-search-result__title km-panel__title">搜索结果</div>
+          <div class="knowledge-search-result__desc km-panel__desc">按当前筛选条件返回的知识列表，优先浏览标题、摘要和标签是否准确。</div>
+        </div>
+      </div>
       <div v-if="resultList.length" class="result-list">
         <button v-for="item in resultList" :key="item.id" type="button" class="result-card" @click="goDetail(item)">
           <div class="result-card__title">{{ item.title }}</div>
@@ -204,69 +272,146 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-.knowledge-search-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.knowledge-search-highlight__eyebrow {
+  color: color-mix(in srgb, var(--Color) 80%, #22304a);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
 }
 
-.knowledge-search-header__title {
-  font-size: 24px;
-  font-weight: 700;
+.knowledge-search-hero__title {
+  max-width: 16ch;
+}
+
+.knowledge-search-hero__desc {
+  max-width: 66ch;
+  margin-bottom: 24px;
+}
+
+.knowledge-search-panel {
+  padding: 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
+}
+
+.knowledge-search-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.knowledge-search-panel__actions {
+  display: flex;
+  gap: 10px;
 }
 
 .knowledge-search-form {
   display: grid;
-  grid-template-columns: 2fr repeat(4, minmax(0, 1fr)) auto auto;
-  gap: 12px;
-  margin-bottom: 12px;
+  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .knowledge-search-summary {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 16px;
   color: var(--el-text-color-secondary);
 }
 
-.result-list {
+.knowledge-search-summary__chips {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.result-card {
-  text-align: left;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
-  cursor: pointer;
+.knowledge-search-summary__placeholder {
+  font-size: 13px;
 }
 
-.result-card:hover {
-  border-color: var(--Color);
+.knowledge-search-summary__count {
+  white-space: nowrap;
 }
 
-.result-card__title {
+.knowledge-search-summary__count strong {
+  color: var(--el-text-color-primary);
   font-size: 18px;
-  font-weight: 600;
+}
+
+.knowledge-search-highlight {
+  background: color-mix(in srgb, var(--Color) 3%, #ffffff);
+}
+
+.knowledge-search-highlight__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.knowledge-search-highlight__title {
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 700;
   margin-bottom: 8px;
 }
 
+.knowledge-search-highlight__meta,
 .result-card__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.knowledge-search-highlight__summary {
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+}
+
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.result-card {
+  text-align: left;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  padding: 18px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.result-card:hover {
+  border-color: color-mix(in srgb, var(--Color) 36%, var(--el-border-color));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.result-card__title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.45;
   margin-bottom: 8px;
 }
 
 .result-card__summary {
   line-height: 1.8;
   color: var(--el-text-color-regular);
-  margin-bottom: 10px;
+  margin: 10px 0 12px;
 }
 
 .result-card__tags {
@@ -278,12 +423,34 @@ onMounted(() => {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
 @media (max-width: 1200px) {
   .knowledge-search-form {
     grid-template-columns: 1fr;
+  }
+
+  .knowledge-search-panel__header,
+  .knowledge-search-summary,
+  .knowledge-search-highlight__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .knowledge-search-panel,
+  .knowledge-search-highlight {
+    padding: 18px;
+  }
+
+  .knowledge-search-hero__title {
+    max-width: none;
+  }
+
+  .knowledge-search-panel__actions {
+    width: 100%;
   }
 }
 </style>

@@ -135,7 +135,13 @@ catalog.getTrees()
 </script>
 
 <template>
-  <div class="knowledge-manage-page">
+  <div class="knowledge-manage-page km-page">
+    <div class="knowledge-manage-hero Gcard km-hero">
+      <div class="knowledge-manage-hero__eyebrow km-hero__eyebrow">知识治理</div>
+      <div class="knowledge-manage-hero__title km-hero__title">统一维护知识条目、分类目录与标签体系</div>
+      <div class="knowledge-manage-hero__desc km-hero__desc">在同一个后台完成知识沉淀、分类治理、标签维护和 AI 检索能力运营，保证内容结构清晰、权限可控、检索质量稳定。</div>
+    </div>
+
     <el-tabs v-model="activeTab" class="knowledge-manage-tabs">
       <el-tab-pane label="知识列表" name="articles">
         <RequestChartTable ref="rctRef" :isCreateRequest="false" :params="params" :request="getList">
@@ -158,7 +164,7 @@ catalog.getTrees()
         </template>
 
         <template #operation="{ selectedIds }">
-          <div class="flexBetween">
+          <div class="knowledge-manage-actions">
             <el-button @click="$router.push('/content/articleManage/home')">知识首页</el-button>
             <el-button v-if="canAiDebug" @click="$router.push('/content/articleManage/aiRetrieveDebug')">AI检索调试</el-button>
             <el-button v-if="canArticleAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/content/aev')">新增</el-button>
@@ -255,15 +261,19 @@ catalog.getTrees()
       </el-tab-pane>
 
       <el-tab-pane label="分类治理" name="catalogs">
-        <div class="Gcard" v-loading="catalog.loading">
-          <div class="title mb20">
-            <div class="title-name">分类治理</div>
-            <span @click="catalog.add({ id: '0' })" class="hoverColor pointer">
-              <el-icon-plus class="el-icon-plus"></el-icon-plus>
-              新增
-            </span>
+        <div class="knowledge-panel Gcard km-panel" v-loading="catalog.loading">
+          <div class="knowledge-panel__header km-panel__header">
+            <div>
+              <div class="knowledge-panel__title km-panel__title">分类治理</div>
+              <div class="knowledge-panel__desc km-panel__desc">维护知识目录结构、分类管理员和默认可见范围。</div>
+            </div>
+            <el-button type="primary" plain @click="catalog.add({ id: '0' })">
+              <el-icon-plus class="mr6"></el-icon-plus>
+              新增分类
+            </el-button>
           </div>
           <el-tree
+            class="knowledge-catalog-tree"
             node-key="id"
             :current-node-key="params.catalogId"
             highlight-current
@@ -273,9 +283,9 @@ catalog.getTrees()
             :default-expand-all="true"
             @node-click="(data) => (params.catalogId = data.id)">
             <template #default="{ node, data }">
-              <div class="flexBetween flexAuto">
-                <div>{{ node.label }}</div>
-                <div>
+              <div class="knowledge-catalog-tree__node">
+                <div class="knowledge-catalog-tree__label">{{ node.label }}</div>
+                <div class="knowledge-catalog-tree__actions">
                   <el-icon-plus class="hoverColor" @click.stop="catalog.add(data)" title="新增"></el-icon-plus>
                   <el-icon-EditPen class="hoverColor" @click.stop="catalog.edit(data)" title="编辑"></el-icon-EditPen>
                   <el-icon-delete class="hoverColor" @click.stop="catalog.del(data, node)" title="删除"></el-icon-delete>
@@ -287,17 +297,23 @@ catalog.getTrees()
       </el-tab-pane>
 
       <el-tab-pane label="标签治理" name="tags">
-        <div class="Gcard">
-          <div class="title mb20">
-            <div class="title-name">标签治理</div>
-            <span @click="openTagDialog()" class="hoverColor pointer">
-              <el-icon-plus class="el-icon-plus"></el-icon-plus>
-              新增
-            </span>
+        <div class="knowledge-panel Gcard km-panel">
+          <div class="knowledge-panel__header km-panel__header">
+            <div>
+              <div class="knowledge-panel__title km-panel__title">标签治理</div>
+              <div class="knowledge-panel__desc km-panel__desc">收敛高频主题标签，避免语义重复与命名混乱。</div>
+            </div>
+            <el-button type="primary" plain @click="openTagDialog()">
+              <el-icon-plus class="mr6"></el-icon-plus>
+              新增标签
+            </el-button>
           </div>
           <div class="tag-panel">
             <div v-for="item in tags" :key="item.id" class="tag-panel__item">
-              <el-tag :color="item.color || undefined" :style="item.color ? { color: '#fff', borderColor: item.color } : undefined">{{ item.name }}</el-tag>
+              <div class="tag-panel__main">
+                <el-tag :color="item.color || undefined" :style="item.color ? { color: '#fff', borderColor: item.color } : undefined">{{ item.name }}</el-tag>
+                <span v-if="item.remark" class="tag-panel__remark">{{ item.remark }}</span>
+              </div>
               <div class="tag-panel__actions">
                 <el-icon-edit-pen class="hoverColor" @click="openTagDialog(item)" />
                 <el-icon-delete class="hoverColor" @click="removeTag(item)" />
@@ -358,14 +374,18 @@ catalog.getTrees()
 </template>
 
 <style lang="scss" scoped>
-.knowledge-manage-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .knowledge-manage-tabs :deep(.el-tabs__content) {
   padding-top: 8px;
+}
+
+.knowledge-manage-tabs :deep(.el-tabs__item) {
+  height: 40px;
+}
+
+.knowledge-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .title-name {
@@ -388,14 +408,30 @@ catalog.getTrees()
 .tag-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tag-panel__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.tag-panel__main {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.tag-panel__remark {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .tag-panel__actions {
@@ -404,7 +440,53 @@ catalog.getTrees()
   color: var(--el-text-color-secondary);
 }
 
+.knowledge-catalog-tree :deep(.el-tree-node__content) {
+  height: auto;
+  padding: 6px 0;
+}
+
+.knowledge-catalog-tree__node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.knowledge-catalog-tree__node:hover {
+  background: #f8fafc;
+  border-color: var(--el-border-color-lighter);
+}
+
+.knowledge-catalog-tree__label {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.knowledge-catalog-tree__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--el-text-color-secondary);
+}
+
+.mr6 {
+  margin-right: 6px;
+}
+
 .ml4 {
   margin-left: 4px;
+}
+
+@media (max-width: 768px) {
+  .knowledge-panel__header,
+  .tag-panel__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

@@ -30,34 +30,70 @@ const statusTypeMap = {
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getMyArticleBorrows">
-      <template #query="{ query }">
-        <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
-        <BaSelect v-model="query.status" label="状态" prop="status">
-          <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-      </template>
-      <template #table>
-        <el-table-column label="知识标题" min-width="220">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="goArticle(row)">{{ row.article?.title || '-' }}</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="分类" width="140">
-          <template #default="{ row }">{{ row.article?.catalog?.name || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="statusTypeMap[row.status] || 'info'" size="small">{{ statusMap[row.status] || row.status }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="申请理由" prop="applyReason" min-width="220" :show-overflow-tooltip="true" />
-        <el-table-column label="借阅时长(天)" prop="requestedDays" width="120" />
-        <el-table-column label="借阅开始" prop="borrowStartTime" width="180" />
-        <el-table-column label="借阅结束" prop="borrowEndTime" width="180" />
-        <el-table-column label="审批时间" prop="approvedAt" width="180" />
-      </template>
-    </RequestChartTable>
+  <div class="knowledge-borrows-page km-page">
+    <div class="knowledge-borrows-hero Gcard km-hero">
+      <div class="knowledge-borrows-hero__eyebrow km-hero__eyebrow">我的借阅</div>
+      <div class="knowledge-borrows-hero__title km-hero__title">跟踪借阅申请进度、有效期和已获批知识</div>
+      <div class="knowledge-borrows-hero__desc km-hero__desc">在这里查看自己的借阅记录，重点关注审批状态、借阅时长和到期时间，避免影响后续知识使用。</div>
+      <div class="knowledge-borrows-statuses">
+        <div v-for="(label, key) in statusMap" :key="key" class="knowledge-borrows-statuses__item">
+          <el-tag :type="statusTypeMap[key] || 'info'" size="small">{{ label }}</el-tag>
+        </div>
+      </div>
+    </div>
+
+    <div class="knowledge-borrows-panel Gcard km-panel">
+      <div class="knowledge-borrows-panel__header km-panel__header">
+        <div>
+          <div class="knowledge-borrows-panel__title km-panel__title">借阅记录</div>
+          <div class="knowledge-borrows-panel__desc km-panel__desc">按关键词或状态筛选借阅申请，快速定位待处理或即将到期的记录。</div>
+        </div>
+      </div>
+
+      <RequestChartTable ref="rctRef" :params="params" :request="getMyArticleBorrows">
+        <template #query="{ query }">
+          <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
+          <BaSelect v-model="query.status" label="状态" prop="status">
+            <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+        </template>
+        <template #table>
+          <el-table-column label="知识标题" min-width="220">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="goArticle(row)">{{ row.article?.title || '-' }}</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="分类" width="140">
+            <template #default="{ row }">{{ row.article?.catalog?.name || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag :type="statusTypeMap[row.status] || 'info'" size="small">{{ statusMap[row.status] || row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="申请理由" prop="applyReason" min-width="220" :show-overflow-tooltip="true" />
+          <el-table-column label="借阅时长(天)" prop="requestedDays" width="120" />
+          <el-table-column label="借阅开始" prop="borrowStartTime" width="180" />
+          <el-table-column label="借阅结束" prop="borrowEndTime" width="180" />
+          <el-table-column label="审批时间" prop="approvedAt" width="180" />
+        </template>
+      </RequestChartTable>
+    </div>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.knowledge-borrows-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.knowledge-borrows-statuses__item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
+}
+
+</style>
