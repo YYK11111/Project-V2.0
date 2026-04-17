@@ -120,7 +120,7 @@ function submit() {
     loading.value = true
     login({ ...form.value })
       .then(() => {
-        redirect.value ? router.push(redirect.value) : (location.href = window.sysConfig.BASE_URL)
+        redirect.value ? router.push(redirect.value) : router.push('/')
       })
       .catch(() => getCaptchaImageFun())
       .finally(() => (loading.value = false))

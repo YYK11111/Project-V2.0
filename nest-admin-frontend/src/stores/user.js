@@ -77,12 +77,12 @@ export const useUserStore = defineStore('user', {
 
       return logout()
         .then(() => {
-          location.href = window.sysConfig.BASE_URL
+          location.replace('/')
         })
         .catch((error) => {
           console.error('Logout failed:', error)
           // 即使 API 失败也清除本地状态
-          location.href = window.sysConfig.BASE_URL
+          location.replace('/')
         })
     },
   },

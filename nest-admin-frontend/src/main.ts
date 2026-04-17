@@ -1,6 +1,16 @@
 import './config.js'
 import 'normalize.css/normalize.css'
 
+declare global {
+  interface Window {
+    __INITIAL_APP_URL__?: string
+  }
+
+  var __INITIAL_APP_URL__: string | undefined
+}
+
+globalThis.__INITIAL_APP_URL__ = `${window.location.pathname}${window.location.search}${window.location.hash}`
+
 // 主题颜色初始化已移至 user store 中管理
 
 import { useDark } from '@vueuse/core'

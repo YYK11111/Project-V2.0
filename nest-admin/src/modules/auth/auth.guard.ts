@@ -148,6 +148,11 @@ export class AuthGuard implements CanActivate {
       ['POST', /^system\/configs\/save$/, 'system/configs/update'],
       ['PUT', /^system\/configs\/update$/, 'system/configs/update'],
 
+      ['GET', /^system\/messages\/unread-count$/, 'system/messages/list'],
+      ['GET', /^system\/messages\/recent$/, 'system/messages/list'],
+      ['GET', /^system\/messages\/list$/, 'system/messages/list'],
+      ['POST', /^system\/messages\/read\/[^/]+$/, 'system/messages/list'],
+
       ['GET', /^business\/projects\/list$/, 'business/projects/list'],
       ['GET', /^business\/projects\/getOne\/[^/]+$/, 'business/projects/getOne'],
       ['POST', /^business\/projects\/add$/, 'business/projects/add'],

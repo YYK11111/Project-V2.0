@@ -28,20 +28,34 @@ const routerView = {
 // 公共路由
 export const constantRoutes = [
   {
-    path: '/',
+    path: '/login',
     component: () => import('@/layout/visitor'),
     isHidden: true,
     children: [
       {
-        path: '/login',
+        path: '',
         component: () => import('@/views/system/login'),
       },
+    ],
+  },
+  {
+    path: '/register',
+    component: () => import('@/layout/visitor'),
+    isHidden: true,
+    children: [
       {
-        path: '/register',
+        path: '',
         component: () => import('@/views/system/login/register'),
       },
+    ],
+  },
+  {
+    path: '/forgetPassword',
+    component: () => import('@/layout/visitor'),
+    isHidden: true,
+    children: [
       {
-        path: '/forgetPassword',
+        path: '',
         component: () => import('@/views/system/login/register'),
         meta: {
           isOpen: true,
@@ -279,14 +293,6 @@ export function getUserRoutes(router) {
     const userRoutes = transRouter(sortMenuTreeByOrder(data))
     reportMenuDiagnostics(userRoutes, currentMenuDiagnostics)
     console.log('=== Generated Routes ===', JSON.stringify(userRoutes, null, 2))
-    // 设置首页重定向 - 确保第一个路由存在
-    if (userRoutes && userRoutes.length > 0) {
-      const firstRoute = userRoutes[0]
-      const rootRoute = router.getRoutes().find((e) => e.path == '/')
-      if (rootRoute && firstRoute) {
-        rootRoute.redirect = firstRoute.path
-      }
-    }
     userRoutes.forEach((route) => {
       if (!router.hasRoute(route.name)) {
         router.addRoute(route)
