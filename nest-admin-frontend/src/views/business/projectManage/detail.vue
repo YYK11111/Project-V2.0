@@ -1,12 +1,10 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
-import { getDashboard, getStatus, getPriority, getProjectType, submitApproval, submitClose } from './api'
+import { getDashboard, getStatus, getPriority, getProjectType, submitClose } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
-import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { checkPermi } from '@/utils/permission'
-import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ChartPie from '@/components/ChartPie.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
@@ -15,10 +13,7 @@ import ViewUser from '@/components/view/ViewUser.vue'
 
 const route = useRoute()
 const router = useRouter()
-const projectId = String(route.query.id || '')
-const workflowTaskId = computed(() => String(route.query.taskId || ''))
-const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
-const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
+const projectId = computed(() => String(route.query.id || ''))
 
 const project = ref({})
 const statusMap = ref({})
@@ -39,15 +34,12 @@ const milestoneFilter = ref('all')
 const riskFilter = ref('all')
 const changeFilter = ref('all')
 const sprintFilter = ref('all')
-const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const canProjectSubmitClose = computed(() => checkPermi(['business/projects/submitClose']))
-const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
-const workflowPanelRef = ref()
 
 const today = computed(() => new Date())
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
-const completedTaskStatuses = ['3', '4']
+const completedTaskStatuses = ['3']
 const resolvedTicketStatuses = ['3', '4']
 const closedRiskStatuses = ['4', '5']
 const dueSoonDays = 7
@@ -286,13 +278,28 @@ watch(
   }
 )
 
+watch(
+  () => route.query.id,
+  async () => {
+    await reloadCurrent()
+  },
+)
+
+watch(
+  () => route.query.id,
+  async () => {
+    await reloadCurrent()
+  },
+)
+
 async function reloadCurrent() {
+  if (!projectId.value) return
   const [statusRes, priorityRes, projectTypeRes, customerRes, dashboardRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
-    getDashboard(projectId),
+    getDashboard(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -308,23 +315,9 @@ async function reloadCurrent() {
   sprints.value = dashboard.value.sprints || []
 }
 
-function handleSubmitApproval() {
-  if (!canProjectSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
-  const request = canCloseReturnedInstance.value
-    ? resubmitReturnedWorkflowInstance(project.value.workflowInstanceId, { comment: '发起人重新提交审批' })
-    : submitApproval(projectId)
-  request.then(() => {
-    $sdk.msgSuccess('提交成功，请等待审批')
-    reloadCurrent()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }).catch(e => {
-    $sdk.msgError(e.message || '提交失败')
-  })
-}
-
 function handleSubmitClose() {
   if (!canProjectSubmitClose.value) return $sdk.msgWarning('当前操作没有权限')
-  submitClose(projectId).then(() => {
+  submitClose(projectId.value).then(() => {
     $sdk.msgSuccess('结项申请已提交')
     reloadCurrent()
   }).catch(e => {
@@ -332,29 +325,13 @@ function handleSubmitClose() {
   })
 }
 
-async function handleCloseReturnedInstance() {
-  const { value } = await ElMessageBox.prompt('结束后实例将进入已取消状态，业务对象将同步更新为最终驳回态。', '结束退回实例', {
-    confirmButtonText: '确认结束',
-    cancelButtonText: '取消',
-    inputPlaceholder: '请输入结束原因（选填）',
-    inputType: 'textarea',
-  })
-  await closeReturnedWorkflowInstance(project.value.workflowInstanceId, { reason: value || '发起人确认结束退回实例' })
-  $sdk.msgSuccess('退回实例已结束')
-  await reloadCurrent()
-}
-
-function scrollToWorkflowPanel() {
-  workflowPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
 function goToEdit() {
-  if (!projectId) return
-  router.push({ path: '/projectManage/form', query: { id: projectId } })
+  if (!projectId.value) return
+  router.push({ path: '/projectManage/form', query: { id: projectId.value } })
 }
 
 function goToCockpit() {
-  router.push({ path: '/cockpit', query: { projectId } })
+  router.push({ path: '/cockpit', query: { projectId: projectId.value } })
 }
 
 function goToTab(tabName) {
@@ -394,7 +371,7 @@ function applyQueryState() {
 function syncQueryState() {
   const nextQuery = {
     ...route.query,
-    id: projectId,
+    id: projectId.value,
   }
 
   if (activeTab.value && activeTab.value !== 'overview') nextQuery.tab = activeTab.value
@@ -458,38 +435,9 @@ function goToDetail(path, id, query = {}) {
     <el-page-header @back="$router.back()" title="项目详情">
       <template #extra>
         <el-button @click="goToCockpit">进入驾驶舱</el-button>
-        <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-        <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-        <el-button type="primary" @click="handleSubmitApproval" v-if="canProjectSubmitApproval && project.status === '1'">提交立项审批</el-button>
         <el-button type="warning" @click="handleSubmitClose" v-if="canProjectSubmitClose && project.status === '3'">提交结项申请</el-button>
       </template>
     </el-page-header>
-
-    <el-alert
-      v-if="project.approvalStatus === '3'"
-      :title="String(project.currentNodeName || '').includes('退回发起人') ? '项目审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '项目审批已驳回，请根据意见调整后重新提交。'"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="mt20"
-    >
-      <template #default>
-        <div class="top-alert-actions">
-          <el-button type="primary" size="small" @click="goToEdit">去编辑</el-button>
-          <el-button v-if="canProjectSubmitApproval && project.status === '1'" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
-          <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-        </div>
-      </template>
-    </el-alert>
-
-    <el-alert
-      v-else-if="project.approvalStatus === '2'"
-      title="项目审批已通过，请按当前项目状态继续推进执行或结项。"
-      type="success"
-      :closable="false"
-      show-icon
-      class="mt20"
-    />
 
     <div class="project-hero mt20">
       <div class="project-hero__main">
@@ -683,7 +631,12 @@ function goToDetail(path, id, query = {}) {
               <div class="panel-progress-list">
                 <div class="panel-progress-item">
                   <div class="panel-progress-item__header">
-                    <span>总体进度</span>
+                    <span class="panel-progress-item__label">
+                      总体进度
+                      <el-tooltip content="按项目下已完成任务数 / 总任务数自动计算" placement="top">
+                        <el-icon class="panel-progress-item__tip"><QuestionFilled /></el-icon>
+                      </el-tooltip>
+                    </span>
                     <span>{{ project.progress || 0 }}%</span>
                   </div>
                   <el-progress :percentage="project.progress || 0" :stroke-width="10" />
@@ -912,7 +865,7 @@ function goToDetail(path, id, query = {}) {
           </el-table-column>
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/taskManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/taskManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -969,7 +922,7 @@ function goToDetail(path, id, query = {}) {
           <el-table-column prop="createTime" label="创建时间" width="180" />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/ticketManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/ticketManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1043,7 +996,7 @@ function goToDetail(path, id, query = {}) {
           </el-table-column>
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/milestoneManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/milestoneManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1102,7 +1055,7 @@ function goToDetail(path, id, query = {}) {
           <el-table-column prop="mitigation" label="应对措施" min-width="180" show-overflow-tooltip />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/riskManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/riskManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1153,7 +1106,7 @@ function goToDetail(path, id, query = {}) {
           <el-table-column prop="scheduleImpact" label="进度影响(天)" width="110" />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/changeManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/changeManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1203,17 +1156,13 @@ function goToDetail(path, id, query = {}) {
           </el-table-column>
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/sprintManage/form', row.id)">查看</el-button>
+              <el-button link type="primary" @click="goToDetail('/sprintManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>
 
-    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-      <div class="workflow-panel-section__header">审批操作区</div>
-      <WorkflowApprovalPanel :task-id="workflowTaskId" :instance-id="workflowInstanceId" :node-name="project.currentNodeName" @approved="reloadCurrent" />
-    </div>
   </div>
 </template>
 
@@ -1429,6 +1378,18 @@ function goToDetail(path, id, query = {}) {
   margin-bottom: 8px;
   font-size: 13px;
   color: var(--el-text-color-regular);
+}
+
+.panel-progress-item__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-progress-item__tip {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  cursor: help;
 }
 
 .cost-grid {

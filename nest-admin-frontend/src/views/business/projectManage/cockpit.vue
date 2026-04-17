@@ -70,7 +70,6 @@ async function loadCockpit() {
 function handleProjectChange(value) {
   projectId.value = String(value || '')
   router.replace({ path: route.path, query: { ...route.query, projectId: projectId.value } })
-  loadCockpit()
 }
 
 function goToProjectDetail() {
@@ -87,9 +86,14 @@ onMounted(() => {
   loadCockpit()
 })
 
-watch(() => route.query.projectId, (value) => {
-  projectId.value = String(value || '')
-})
+watch(
+  () => route.query.projectId,
+  (value, oldValue) => {
+    projectId.value = String(value || '')
+    if (value === oldValue) return
+    loadCockpit()
+  },
+)
 </script>
 
 <template>
@@ -102,7 +106,7 @@ watch(() => route.query.projectId, (value) => {
         <el-select v-model="projectId" placeholder="选择项目" style="width: 260px" @change="handleProjectChange" clearable>
           <el-option v-for="item in projectOptions" :key="item.id" :label="item.name" :value="String(item.id)" />
         </el-select>
-        <el-button type="primary" :disabled="!projectId" @click="goToProjectDetail">查看项目详情</el-button>
+        <el-button type="primary" :disabled="!projectId" @click="goToProjectDetail">项目详情</el-button>
       </template>
     </el-page-header>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, del } from './api'
 import { getList as getProjectList } from '../projectManage/api'
@@ -69,6 +69,20 @@ onMounted(async () => {
   statusMap.value = statusRes.data || {}
   projectMap.value = (projectRes.list || []).reduce((acc, p) => { acc[p.id] = p.name; return acc }, {})
 })
+
+watch(
+  () => route.query.projectId,
+  (value) => {
+    params.value.projectId = value || ''
+    rctRef.value?.getList?.(1)
+  },
+)
+
+const getButtons = (row) => [
+  { key: 'view', label: '详情', onClick: () => handleView(row) },
+  canSprintUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canSprintDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+]
 </script>
 
 <template>
@@ -98,11 +112,7 @@ onMounted(async () => {
     </template>
 
     <template #tableOperation="{ row }">
-      <TableOperation :buttons="[
-        { key: 'view', label: '查看', onClick: () => handleView(row) },
-        { key: 'edit', label: '修改', disabled: !canSprintUpdate.value, onClick: () => handleEdit(row) },
-        { key: 'delete', label: '删除', danger: true, disabled: !canSprintDelete.value, onClick: () => handleDel(row) },
-      ]" :row="row" />
+      <TableOperation :buttons="getButtons(row)" :row="row" />
     </template>
   </RequestChartTable>
 </template>

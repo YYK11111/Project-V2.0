@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, getType, approve, reject, del, submitApproval } from './api'
 import { getList as getProjectList } from '../projectManage/api'
@@ -71,6 +71,13 @@ const handleSubmitApproval = async (row) => {
 
 const canSubmitChangeApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
+const getButtons = (row) => [
+  { key: 'view', label: '详情', onClick: () => handleView(row) },
+  canChangeSubmitApproval.value && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  canChangeUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canChangeDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+]
+
 const getStatusType = (status) => {
   const map = { '1': 'info', '2': 'warning', '3': 'success', '4': 'danger', '5': 'primary' }
   return map[status] || 'info'
@@ -87,6 +94,14 @@ onMounted(async () => {
   typeMap.value = typeRes.data || {}
   projectMap.value = (projectRes.list || []).reduce((acc, p) => { acc[p.id] = p.name; return acc }, {})
 })
+
+watch(
+  () => route.query.projectId,
+  (value) => {
+    params.value.projectId = value || ''
+    rctRef.value?.getList?.(1)
+  },
+)
 </script>
 
 <template>
@@ -134,12 +149,7 @@ onMounted(async () => {
     </template>
 
     <template #tableOperation="{ row }">
-      <TableOperation :buttons="[
-        { key: 'view', label: '查看', onClick: () => handleView(row) },
-        { key: 'submit', label: '提交审批', type: 'warning', disabled: !canChangeSubmitApproval.value || !canSubmitChangeApproval(row), onClick: () => handleSubmitApproval(row) },
-        { key: 'edit', label: '修改', disabled: !canChangeUpdate.value, onClick: () => handleEdit(row) },
-        { key: 'delete', label: '删除', danger: true, disabled: !canChangeDelete.value, onClick: () => handleDel(row) },
-      ]" :row="row" />
+      <TableOperation :buttons="getButtons(row)" :row="row" />
     </template>
   </RequestChartTable>
 </template>

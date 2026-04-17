@@ -180,9 +180,9 @@ const removeTrigger = (row: any, triggerEvent: string) => {
 }
 
 const getButtons = (row: any) => [
-  { key: 'edit', label: '新增/编辑规则', disabled: !canWorkflowConfigUpdate.value, onClick: () => openDialog(row) },
-  { key: 'delete', label: '删除对象配置', danger: true, disabled: !canWorkflowConfigDelete.value, onClick: () => handleDelete(row) },
-]
+  canWorkflowConfigUpdate.value ? { key: 'edit', label: '新增/编辑规则', onClick: () => openDialog(row) } : null,
+  canWorkflowConfigDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDelete(row) } : null,
+].filter(Boolean)
 </script>
 
 <template>
@@ -197,9 +197,9 @@ const getButtons = (row: any) => [
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
           <div>
-            <el-button v-if="canWorkflowConfigAdd" type="primary" @click="openDialog()">新建自动触发配置</el-button>
+            <el-button v-if="canWorkflowConfigAdd" type="primary" @click="openDialog()">新增自动触发配置</el-button>
           </div>
-          <el-button v-if="canWorkflowConfigDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteBusinessConfig)" type="danger">批量删除对象配置</el-button>
+          <el-button v-if="canWorkflowConfigDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteBusinessConfig)" type="danger">批量删除</el-button>
         </div>
       </template>
 

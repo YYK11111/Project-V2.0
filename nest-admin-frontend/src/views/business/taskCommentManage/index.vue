@@ -89,7 +89,7 @@ function isCurrentUserComment(row: any) {
 
 const getButtons = (row: any) => [
   ...(canTaskCommentUpdate.value && isCurrentUserComment(row)
-    ? [{ key: 'edit', label: '编辑', type: 'primary', onClick: () => handleEditComment(row) }]
+    ? [{ key: 'edit', label: '修改', type: 'primary', onClick: () => handleEditComment(row) }]
     : []),
   ...(canTaskCommentDelete.value && isCurrentUserComment(row)
     ? [{ key: 'delete', label: '删除', danger: true, onClick: () => handleDeleteComment(row) }]
@@ -107,7 +107,7 @@ const getButtons = (row: any) => [
 
       <template #operation>
         <div class="flexBetween">
-          <el-button v-if="canTaskCommentAdd" type="primary" @click="handleAddComment">添加评论</el-button>
+          <el-button v-if="canTaskCommentAdd" type="primary" @click="handleAddComment">新增评论</el-button>
         </div>
       </template>
 

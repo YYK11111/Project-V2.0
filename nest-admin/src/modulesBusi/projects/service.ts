@@ -128,7 +128,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       await this.syncMilestones(saved.id, milestones, milestoneRepository)
       await this.associateFilesInTransaction(manager, saved.id, attachments)
 
-      return result
+      return projectRepository.findOne({
+        where: { id: saved.id } as any,
+        relations: ['leader', 'customer'],
+      })
     })
   }
 
@@ -165,6 +168,50 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return `${prefix}${seq.toString().padStart(4, '0')}`
   }
 
+  async calculateProjectProgress(projectId: string): Promise<number> {
+    const totalTasks = await this.taskRepository.count({
+      where: { projectId, isDelete: null as any } as any,
+    })
+    const completedTasks = await this.taskRepository.count({
+      where: {
+        projectId,
+        status: TaskStatus.completed,
+        isDelete: null as any,
+      } as any,
+    })
+    return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+  }
+
+  async recalculateProjectProgress(projectId: string): Promise<number> {
+    if (!projectId) return 0
+    const progress = await this.calculateProjectProgress(projectId)
+    await this.repository.update(projectId, { progress } as any)
+    return progress
+  }
+
+  async recalculateProjectProgressBatch(projectIds?: string[]) {
+    let targetProjectIds = Array.from(new Set((projectIds || []).filter(Boolean).map((id) => String(id))))
+
+    if (!targetProjectIds.length) {
+      const projects = await this.repository.find({
+        where: { isDelete: null as any } as any,
+        select: ['id'] as any,
+      })
+      targetProjectIds = projects.map((item) => String(item.id)).filter(Boolean)
+    }
+
+    const results: Array<{ projectId: string; progress: number }> = []
+    for (const projectId of targetProjectIds) {
+      const progress = await this.recalculateProjectProgress(projectId)
+      results.push({ projectId, progress })
+    }
+
+    return {
+      total: results.length,
+      results,
+    }
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<Project>> {
     let { name, code, status, priority, leaderId, isArchived, projectType } = query as QueryListDto & { projectType?: string }
     let queryOrm: FindManyOptions = {
@@ -191,6 +238,12 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isError,
     )
     if (!project) return project
+
+    const calculatedProgress = await this.calculateProjectProgress(project.id)
+    if (Number(project.progress || 0) !== calculatedProgress) {
+      project.progress = calculatedProgress
+      await this.repository.update(project.id, { progress: calculatedProgress } as any)
+    }
 
     const members = await this.projectMemberRepository.find({
       where: { projectId: project.id, isActive: '1' },
@@ -327,7 +380,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     const totalDocuments = await this.documentRepository.count({ where: { projectId: id } })
     
     // 计算进度
-    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+    const progress = await this.calculateProjectProgress(id)
     
     return {
       projectId: project.id,
@@ -384,6 +437,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         const diff = getDayDiff(item.endDate)
         return !isTaskCompleted(item) && diff !== null && diff >= 0 && diff <= dueSoonDays
       }).length,
+      completionRate: tasks.length > 0 ? Math.round((tasks.filter(isTaskCompleted).length / tasks.length) * 100) : 0,
     }
 
     const ticketSummary = {
@@ -415,6 +469,13 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         return item.status !== MilestoneStatus.completed && diff !== null && diff >= 0 && diff <= dueSoonDays
       }).length,
       overdue: milestones.filter((item) => item.status !== MilestoneStatus.completed && (getDayDiff(item.dueDate) ?? 1) < 0).length,
+      completionRate: milestones.length > 0 ? Math.round((milestones.filter((item) => item.status === MilestoneStatus.completed).length / milestones.length) * 100) : 0,
+    }
+
+    const projectProgress = taskSummary.completionRate
+    if (project?.id && Number(project.progress || 0) !== projectProgress) {
+      project.progress = projectProgress
+      await this.repository.update(project.id, { progress: projectProgress } as any)
     }
 
     const sprintSummary = {

@@ -11,6 +11,8 @@ import { SysFileService } from 'src/modules/sys/file/service'
 import { SaveDto } from 'src/common/dto'
 import { User } from 'src/modules/users/entities/user.entity'
 import { TaskComment } from '../task-comments/entity'
+import { ProjectsService } from '../projects/service'
+import { BoolNum } from 'src/common/type/base'
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -21,8 +23,16 @@ export class TasksService extends BaseService<Task, TaskDto> {
     @InjectRepository(TaskComment) private taskCommentRepository: Repository<TaskComment>,
     @InjectRepository(User) private userRepository: Repository<User>,
     private readonly sysFileService: SysFileService,
+    private readonly projectsService: ProjectsService,
   ) {
     super(Task, repository)
+  }
+
+  private async recalculateProjectProgressByIds(projectIds: Array<string | null | undefined>) {
+    const normalizedProjectIds = Array.from(new Set(projectIds.filter(Boolean).map((id) => String(id))))
+    for (const projectId of normalizedProjectIds) {
+      await this.projectsService.recalculateProjectProgress(projectId)
+    }
   }
 
   private normalizeTaskPayload(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
@@ -61,6 +71,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
 
   async save(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
     this.normalizeTaskPayload(dto)
+    const originalTask = dto.id ? await this.repository.findOne({ where: { id: String(dto.id) } as any, select: ['id', 'projectId'] as any }) : null
     if (!dto.id && !dto.code) {
       dto.code = await this.generateTaskCode()
     }
@@ -87,6 +98,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
       }
     }
 
+    const saved = Array.isArray(result) ? result[0] : result
+    await this.recalculateProjectProgressByIds([originalTask?.projectId, saved?.projectId])
+
     return result
   }
 
@@ -112,11 +126,15 @@ export class TasksService extends BaseService<Task, TaskDto> {
       }
     }
 
+    const saved = Array.isArray(result) ? result[0] : result
+    await this.recalculateProjectProgressByIds([saved?.projectId])
+
     return result
   }
 
   async update(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
     this.normalizeTaskPayload(dto)
+    const originalTask = await this.repository.findOne({ where: { id: String(dto.id) } as any, select: ['id', 'projectId'] as any })
     const attachments = dto.attachments
     delete dto.attachments
 
@@ -132,6 +150,20 @@ export class TasksService extends BaseService<Task, TaskDto> {
       })
     }
 
+    const saved = Array.isArray(result) ? result[0] : result
+    await this.recalculateProjectProgressByIds([originalTask?.projectId, saved?.projectId])
+
+    return result
+  }
+
+  async del(ids: string[] | string, updateUser?: string, permissions: string[] = [], operatorName?: string) {
+    const normalizedIds = typeof ids === 'string' ? ids.split(',') : ids
+    const tasks = await this.repository.find({
+      where: normalizedIds.map((id) => ({ id: String(id), isDelete: null as any })) as any,
+      select: ['id', 'projectId'] as any,
+    })
+    const result = await super.del(ids, updateUser, permissions, operatorName)
+    await this.recalculateProjectProgressByIds(tasks.map((item) => item.projectId))
     return result
   }
 
@@ -323,7 +355,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
    */
   async getKanbanData(projectId: string): Promise<any[]> {
     const tasks = await this.repository.find({
-      where: { projectId },
+      where: { projectId, isDelete: BoolNum.No as any } as any,
       relations: ['leader'],
     })
 

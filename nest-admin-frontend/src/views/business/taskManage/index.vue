@@ -51,13 +51,13 @@ function isRowAttentionNeeded(row) {
 const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
   { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
   { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
-  { key: 'edit', label: '修改', disabled: !canTaskUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') },
-  { key: 'submitApproval', label: '提交审批', type: 'warning', disabled: !canTaskSubmitApproval.value || !canSubmitTaskApproval(row), onClick: () => handleSubmitApproval(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canTaskDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  canTaskUpdate.value ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
+  canTaskSubmitApproval.value && canSubmitTaskApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  canTaskDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>

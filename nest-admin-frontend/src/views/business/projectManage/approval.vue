@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getStatus, getPriority, getProjectType } from './api'
+import { getOne, getStatus, getPriority, getProjectType, submitApproval } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
-import { getWorkflowInstance } from '@/views/business/workflow/api'
+import { closeReturnedWorkflowInstance, getWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
+import { checkPermi } from '@/utils/permission'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
@@ -15,10 +17,14 @@ import ViewUser from '@/components/view/ViewUser.vue'
 const route = useRoute()
 const router = useRouter()
 
-const projectId = String(route.query.id || '')
+const projectId = computed(() => String(route.query.id || ''))
 const workflowTaskId = computed(() => String(route.query.taskId || ''))
-const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
+const workflowInstanceId = computed(() => String(route.query.instanceId || project.value?.workflowInstanceId || ''))
 const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
+const approvalRetryFailed = computed(() => route.query.approvalFailed === '1')
+const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
+const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
+const retryApprovalLoading = ref(false)
 
 const memberRoleOptions = {
   '1': '项目经理',
@@ -54,6 +60,10 @@ const workflowInstance = ref(null)
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
+const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
+const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
+const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
+const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
 
 function getApprovalType(status) {
   if (status === '2') return 'success'
@@ -63,19 +73,19 @@ function getApprovalType(status) {
 }
 
 async function reloadCurrent() {
+  if (!projectId.value) return
   const [statusRes, priorityRes, projectTypeRes, customerRes, projectRes, workflowRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
-    getOne(projectId),
+    getOne(projectId.value),
     workflowInstanceId.value ? getWorkflowInstance(workflowInstanceId.value) : Promise.resolve({ data: null }),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
   projectTypeMap.value = projectTypeRes.data || {}
   customerList.value = customerRes.list || []
-  workflowInstance.value = workflowRes.data || null
   project.value = {
     attachments: [],
     members: [],
@@ -84,17 +94,78 @@ async function reloadCurrent() {
     members: projectRes.data?.members || [],
     milestones: projectRes.data?.milestones || [],
   }
+  workflowInstance.value = workflowRes.data || null
+
+  if (!workflowInstance.value && project.value?.workflowInstanceId) {
+    const fallbackWorkflowRes = await getWorkflowInstance(project.value.workflowInstanceId)
+    workflowInstance.value = fallbackWorkflowRes.data || null
+  }
 }
 
-function goToProjectDetail() {
-  router.push({ path: '/projectManage/detail', query: { id: projectId } })
+function goToEdit() {
+  router.push({ path: '/projectManage/form', query: { id: projectId.value } })
 }
 
 function scrollToWorkflowPanel() {
   workflowPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function clearApprovalFailedFlag() {
+  if (!approvalRetryFailed.value) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.approvalFailed
+  router.replace({ path: route.path, query: nextQuery })
+}
+
+function handleRetryApproval() {
+  if (!canProjectSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  retryApprovalLoading.value = true
+  submitApproval(projectId).then(() => {
+    $sdk.msgSuccess('立项审批提交成功')
+    clearApprovalFailedFlag()
+    reloadCurrent()
+  }).catch((e) => {
+    $sdk.msgError(e.message || '重新发起立项审批失败')
+  }).finally(() => {
+    retryApprovalLoading.value = false
+  })
+}
+
+function handleSubmitApproval() {
+  if (!canProjectSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  const request = canCloseReturnedInstance.value
+    ? resubmitReturnedWorkflowInstance(project.value.workflowInstanceId, { comment: '发起人重新提交审批' })
+    : submitApproval(projectId)
+  request.then(() => {
+    $sdk.msgSuccess('立项审批提交成功')
+    clearApprovalFailedFlag()
+    reloadCurrent()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }).catch((e) => {
+    $sdk.msgError(e.message || '提交失败')
+  })
+}
+
+async function handleCloseReturnedInstance() {
+  const { value } = await ElMessageBox.prompt('结束后实例将进入已取消状态，业务对象将同步更新为最终驳回态。', '结束退回实例', {
+    confirmButtonText: '确认结束',
+    cancelButtonText: '取消',
+    inputPlaceholder: '请输入结束原因（选填）',
+    inputType: 'textarea',
+  })
+  await closeReturnedWorkflowInstance(project.value.workflowInstanceId, { reason: value || '发起人确认结束退回实例' })
+  $sdk.msgSuccess('退回实例已结束')
+  await reloadCurrent()
+}
+
 reloadCurrent()
+
+watch(
+  () => [route.query.id, route.query.taskId, route.query.instanceId, route.query.fromWorkflow, route.query.approvalFailed],
+  () => {
+    reloadCurrent()
+  },
+)
 </script>
 
 <template>
@@ -102,11 +173,62 @@ reloadCurrent()
     <div class="mb20">
       <el-page-header @back="$router.back()" title="项目审批">
         <template #extra>
-          <el-button @click="goToProjectDetail">查看完整项目详情</el-button>
+          <el-button v-if="isApprovalRejected && canEditProject" @click="goToEdit">去编辑项目</el-button>
+          <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
           <el-button v-if="fromWorkflow && workflowTaskId" type="primary" @click="scrollToWorkflowPanel">跳转审批区</el-button>
         </template>
       </el-page-header>
     </div>
+
+    <el-alert
+      v-if="approvalRetryFailed"
+      title="项目已保存，但立项审批发起失败，请确认流程配置后重试。"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="mb20"
+    >
+      <template #default>
+        <div class="top-alert-actions">
+          <el-button v-if="canProjectSubmitApproval && project.status === '1'" type="warning" size="small" :loading="retryApprovalLoading" @click="handleRetryApproval">重试发起立项审批</el-button>
+        </div>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="isApprovalRejected"
+      :title="canCloseReturnedInstance ? '项目审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '项目审批已驳回，请根据意见调整后重新提交。'"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="mb20"
+    >
+      <template #default>
+        <div class="top-alert-actions">
+          <el-button v-if="canEditProject" type="primary" size="small" @click="goToEdit">去编辑项目</el-button>
+          <el-button v-if="canCloseReturnedInstance && canProjectSubmitApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交立项审批</el-button>
+          <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
+        </div>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="isApprovalPassed"
+      title="项目审批已通过，请按当前项目状态继续推进执行或结项。"
+      type="success"
+      :closable="false"
+      show-icon
+      class="mb20"
+    />
+
+    <el-alert
+      v-else-if="isApprovalRunning"
+      title="项目立项审批进行中，请在本页查看流程状态与审批处理进展。"
+      type="info"
+      :closable="false"
+      show-icon
+      class="mb20"
+    />
 
     <div class="approval-sections">
       <section class="section-card section-card--summary">
@@ -345,6 +467,10 @@ reloadCurrent()
   min-height: 100%;
 }
 
+.mb20 {
+  margin-bottom: 20px;
+}
+
 .approval-sections {
   display: flex;
   flex-direction: column;
@@ -409,5 +535,11 @@ reloadCurrent()
 
 .section-card--content :deep(.el-form-item:last-child) {
   margin-bottom: 0;
+}
+
+.top-alert-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

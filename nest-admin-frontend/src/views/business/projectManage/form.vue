@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
-import { getOne, save, update, getStatus, getPriority, getProjectType } from './api'
+import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { checkPermi } from '@/utils/permission'
 import UserSelect from '@/components/UserSelect.vue'
@@ -57,6 +57,27 @@ const defaultMilestone = (sort = 0) => ({
   sort,
 })
 
+function createDefaultForm() {
+  return {
+    name: '',
+    code: '',
+    leaderId: '',
+    startDate: '',
+    endDate: '',
+    status: '1',
+    projectType: '1',
+    priority: '2',
+    description: '',
+    attachments: [],
+    customerId: null,
+    budget: 0,
+    actualCost: 0,
+    progress: 0,
+    members: [defaultMember(10)],
+    milestones: createMilestonesByType('1'),
+  }
+}
+
 const milestoneTemplates = {
   '1': [
     '项目启动', '需求调研完成', '实施方案确认', '系统配置完成', '联调完成', '培训完成', 'UAT完成', '上线完成', '验收完成', '结项完成'
@@ -79,24 +100,7 @@ function createMilestonesByType(projectType) {
 
 const formRef = ref()
 const milestonesManuallyEdited = ref(false)
-const form = ref({
-  name: '',
-  code: '',
-  leaderId: '',
-  startDate: '',
-  endDate: '',
-  status: '1',
-  projectType: '1',
-  priority: '2',
-  description: '',
-  attachments: [],
-  customerId: null,
-  budget: 0,
-  actualCost: 0,
-  progress: 0,
-  members: [defaultMember(10)],
-  milestones: createMilestonesByType('1'),
-})
+const form = ref(createDefaultForm())
 
 const rules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
@@ -110,6 +114,10 @@ const isView = computed(() => route.query.action === 'view')
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
+const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
+const canEditCurrentProject = computed(() => String(form.value.status || '') !== '3')
+const saveLoading = ref(false)
+const approvalLoading = ref(false)
 
 const status = ref({})
 const priority = ref({})
@@ -152,21 +160,38 @@ watch(
   },
 )
 
-if (isEdit.value || isView.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = {
-      attachments: [],
-      members: [],
-      milestones: [],
-      ...data,
-      budget: data.budget || 0,
-      actualCost: data.actualCost || 0,
-      progress: data.progress || 0,
-      members: (data.members || []).length ? data.members : [defaultMember(10)],
-      milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
-    }
-  })
+async function loadProject() {
+  milestonesManuallyEdited.value = false
+  if (!(isEdit.value || isView.value)) {
+    form.value = createDefaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  if (isEdit.value && String(data?.status || '') === '3') {
+    $sdk.msgWarning('执行中的项目不允许编辑')
+    router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })
+    return
+  }
+  form.value = {
+    attachments: [],
+    members: [],
+    milestones: [],
+    ...data,
+    budget: data.budget || 0,
+    actualCost: data.actualCost || 0,
+    progress: data.progress || 0,
+    members: (data.members || []).length ? data.members : [defaultMember(10)],
+    milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
+  }
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadProject()
+  },
+  { immediate: true },
+)
 
 function resequenceMembers() {
   form.value.members = form.value.members.map((item, index) => ({
@@ -236,8 +261,32 @@ function normalizeSubmitPayload() {
   }
 }
 
-function submit() {
+function persistProject(payload, api) {
+  return api(payload).then((res) => {
+    const savedProjectId = String(res?.id || res?.data?.id || payload.id || '')
+    if (!savedProjectId) {
+      throw new Error('项目保存成功，但未获取到项目ID，无法继续处理')
+    }
+    form.value.id = savedProjectId
+    if (!isEdit.value) {
+      router.replace({ path: '/projectManage/form', query: { id: savedProjectId } })
+    }
+    return savedProjectId
+  })
+}
+
+function launchProjectApproval(savedProjectId) {
+  return submitApproval(savedProjectId)
+}
+
+function saveProject(triggerApproval = false) {
   if ((isEdit.value && !canProjectUpdate.value) || (!isEdit.value && !canProjectAdd.value)) {
+    return $sdk.msgWarning('当前操作没有权限')
+  }
+  if (isEdit.value && !canEditCurrentProject.value) {
+    return $sdk.msgWarning('执行中的项目不允许编辑')
+  }
+  if (triggerApproval && !canProjectSubmitApproval.value) {
     return $sdk.msgWarning('当前操作没有权限')
   }
 
@@ -251,11 +300,43 @@ function submit() {
       return $sdk.msgWarning('请至少维护一条里程碑')
     }
     const api = isEdit.value ? update : save
-    api(payload).then(() => {
-      $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
-      router.back()
-    })
+    if (triggerApproval) {
+      approvalLoading.value = true
+    } else {
+      saveLoading.value = true
+    }
+    persistProject(payload, api)
+      .then(async (savedProjectId) => {
+        if (triggerApproval) {
+          try {
+            await launchProjectApproval(savedProjectId)
+            $sdk.msgSuccess('立项审批提交成功')
+            router.push({ path: '/projectManage/approval', query: { id: savedProjectId } })
+          } catch (error) {
+            $sdk.msgWarning('项目已保存，立项审批发起失败，请在审批页重试')
+            router.push({ path: '/projectManage/approval', query: { id: savedProjectId, approvalFailed: '1' } })
+          }
+        } else {
+          $sdk.msgSuccess(isEdit.value ? '暂存成功' : '新建项目已暂存')
+          router.back()
+        }
+      })
+      .catch((error) => {
+        $sdk.msgError(error?.message || '项目保存失败')
+      })
+      .finally(() => {
+        saveLoading.value = false
+        approvalLoading.value = false
+      })
   })
+}
+
+function submit() {
+  saveProject(false)
+}
+
+function submitProjectApproval() {
+  saveProject(true)
 }
 
 function cancel() {
@@ -266,7 +347,7 @@ function cancel() {
 <template>
   <div class="Gcard project-form-page">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '查看项目' : isEdit ? '编辑项目' : '新增项目'" />
+      <el-page-header @back="$router.back()" :title="isView ? '项目详情' : isEdit ? '编辑项目' : '新增项目'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -368,8 +449,10 @@ function cancel() {
             </el-row>
 
             <el-form-item label="进度(%)" class="basic-info-progress-item">
-              <ViewField v-if="isView" :value="form.progress" />
-              <el-slider v-else v-model="form.progress" :min="0" :max="100" show-input />
+              <div class="progress-readonly-field">
+                <ViewField :value="form.progress" />
+                <div class="progress-readonly-field__tip">项目进度由任务完成率自动计算</div>
+              </div>
             </el-form-item>
         </section>
 
@@ -538,7 +621,22 @@ function cancel() {
       </div>
 
       <el-form-item class="footer-actions">
-        <el-button v-if="!isView && (isEdit ? canProjectUpdate : canProjectAdd)" type="primary" @click="submit">提交</el-button>
+        <el-button
+          v-if="!isView && (isEdit ? canProjectUpdate : canProjectAdd)"
+          type="primary"
+          :loading="saveLoading"
+          :disabled="approvalLoading"
+          @click="submit">
+          暂存
+        </el-button>
+        <el-button
+          v-if="!isView && canProjectSubmitApproval && form.status === '1'"
+          type="warning"
+          :loading="approvalLoading"
+          :disabled="saveLoading"
+          @click="submitProjectApproval">
+          发起项目立项审批
+        </el-button>
         <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
       </el-form-item>
     </el-form>
@@ -585,6 +683,17 @@ function cancel() {
 
 .section-card--table .table-wrapper {
   margin-top: 4px;
+}
+
+.progress-readonly-field {
+  width: 100%;
+}
+
+.progress-readonly-field__tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
 }
 
 .section-card--content .section-header {

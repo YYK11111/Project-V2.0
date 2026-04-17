@@ -149,9 +149,9 @@ function handleRemoveMember(row: any) {
 }
 
 const getButtons = (row: any) => [
-  { key: 'edit', label: '编辑', disabled: !canProjectMemberUpdate.value, onClick: () => handleEditMember(row) },
-  { key: 'remove', label: '移除', danger: true, disabled: !canProjectMemberDelete.value, show: row.isActive === '1', onClick: () => handleRemoveMember(row) },
-]
+  canProjectMemberUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEditMember(row) } : null,
+  canProjectMemberDelete.value && row.isActive === '1' ? { key: 'remove', label: '移除', danger: true, onClick: () => handleRemoveMember(row) } : null,
+].filter(Boolean)
 
 const getRoleLabel = (role: string) => roles.value[role] || role || '-'
 
@@ -241,7 +241,7 @@ onMounted(() => {
 
       <template #operation="{ selectedIds }">
         <div v-if="viewMode === 'member'" class="flexBetween">
-          <el-button v-if="canProjectMemberAdd" type="primary" @click="handleAddMember">添加成员</el-button>
+          <el-button v-if="canProjectMemberAdd" type="primary" @click="handleAddMember">新增成员</el-button>
           <el-button v-if="canProjectMemberDelete" :disabled="!selectedIds.length" @click="handleBatchRemove(selectedIds)" type="danger">批量移除</el-button>
         </div>
       </template>
@@ -315,7 +315,7 @@ onMounted(() => {
           </el-table-column>
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToProject(row)">查看项目</el-button>
+              <el-button link type="primary" @click="goToProject(row)">项目详情</el-button>
             </template>
           </el-table-column>
         </template>

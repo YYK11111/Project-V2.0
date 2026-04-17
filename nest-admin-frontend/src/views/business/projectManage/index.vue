@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
-import { getList, getStatus, getPriority, getProjectType, del, archive } from './api'
+import { QuestionFilled } from '@element-plus/icons-vue'
+import { getList, getStatus, getPriority, getProjectType, del, archive, recalculateProgress } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
@@ -18,6 +19,19 @@ const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectDelete = computed(() => checkPermi(['business/projects/delete']))
 const canProjectArchive = computed(() => checkPermi(['business/projects/archive']))
+const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
+const recalculatingProgress = ref(false)
+
+function canEditProject(row) {
+  return canProjectUpdate.value && String(row.status || '') !== '3'
+}
+
+function canEnterApprovalPage(row) {
+  return canProjectSubmitApproval.value && (
+    String(row.status || '') === '1'
+    || ['1', '3'].includes(String(row.approvalStatus || '0'))
+  )
+}
 
 function handleArchive(row) {
   if (!canProjectArchive.value) return $sdk.msgWarning('当前操作没有权限')
@@ -29,12 +43,27 @@ function handleArchive(row) {
   })
 }
 
+function handleRecalculateAllProgress() {
+  if (!canProjectUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  $sdk.confirm('确定要重算全部项目进度吗？系统会按项目下已完成任务数 / 总任务数重新计算。').then(() => {
+    recalculatingProgress.value = true
+    recalculateProgress().then((res) => {
+      const total = Number(res?.data?.total || res?.total || 0)
+      $sdk.msgSuccess(`已完成 ${total} 个项目的进度重算`)
+      rctRef.value.getList()
+    }).finally(() => {
+      recalculatingProgress.value = false
+    })
+  })
+}
+
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') },
-  { key: 'edit', label: '修改', disabled: !canProjectUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') },
-  { key: 'archive', label: '归档', type: 'success', disabled: !canProjectArchive.value, onClick: () => handleArchive(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canProjectDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') },
+  canEditProject(row) ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
+  canEnterApprovalPage(row) ? { key: 'approval', label: '立项审批', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
+  canProjectArchive.value ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
+  canProjectDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
@@ -59,7 +88,10 @@ const getButtons = (row) => [
 
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canProjectAdd" type="primary" @click="rctRef.goRoute(null, '/projectManage/form')">新增项目</el-button>
+          <div class="operation-left">
+            <el-button v-if="canProjectAdd" type="primary" @click="rctRef.goRoute(null, '/projectManage/form')">新增项目</el-button>
+            <el-button v-if="canProjectUpdate" :loading="recalculatingProgress" @click="handleRecalculateAllProgress">重算全部进度</el-button>
+          </div>
           <el-button v-if="canProjectDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
@@ -97,7 +129,15 @@ const getButtons = (row) => [
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="进度" prop="progress" width="120">
+        <el-table-column prop="progress" width="120">
+          <template #header>
+            <span class="progress-column-label">
+              进度
+              <el-tooltip content="按项目下已完成任务数 / 总任务数自动计算" placement="top">
+                <el-icon class="progress-column-label__tip"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">
             <el-progress :percentage="row.progress || 0" :stroke-width="8" />
           </template>
@@ -117,3 +157,23 @@ const getButtons = (row) => [
     </RequestChartTable>
   </div>
 </template>
+
+<style scoped>
+.operation-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-column-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress-column-label__tip {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  cursor: help;
+}
+</style>

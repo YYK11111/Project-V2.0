@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, getLevel, getCategory, resolve, del } from './api'
 import { getList as getProjectList } from '../projectManage/api'
@@ -98,10 +98,6 @@ const handleRiskClick = (risk) => {
   router.push(`${getFormPath()}?id=${risk.id}`)
 }
 
-const getButtons = (row) => [
-  { key: 'resolve', label: '解决', type: 'primary', show: canRiskUpdate.value && row.status !== '4' && row.status !== '5', onClick: () => handleResolve(row) },
-]
-
 onMounted(async () => {
   const [statusRes, levelRes, categoryRes, projectRes] = await Promise.all([
     getStatus(), getLevel(), getCategory(), getProjectList({ pageNum: 1, pageSize: 1000 })
@@ -111,6 +107,21 @@ onMounted(async () => {
   categoryMap.value = categoryRes.data || {}
   projectMap.value = (projectRes.list || []).reduce((acc, p) => { acc[p.id] = p.name; return acc }, {})
 })
+
+watch(
+  () => route.query.projectId,
+  (value) => {
+    params.value.projectId = value || ''
+    rctRef.value?.getList?.(1)
+  },
+)
+
+const getButtons = (row) => [
+  { key: 'view', label: '详情', onClick: () => handleView(row) },
+  canRiskUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canRiskUpdate.value && row.status !== '4' && row.status !== '5' ? { key: 'resolve', label: '解决', type: 'primary', onClick: () => handleResolve(row) } : null,
+  canRiskDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+]
 </script>
 
 <template>
@@ -143,12 +154,7 @@ onMounted(async () => {
     </template>
 
     <template #tableOperation="{ row }">
-      <TableOperation :buttons="[
-        { key: 'view', label: '查看', onClick: () => handleView(row) },
-        { key: 'edit', label: '修改', disabled: !canRiskUpdate.value, onClick: () => handleEdit(row) },
-        { key: 'resolve', label: '解决', type: 'primary', show: canRiskUpdate.value && row.status !== '4' && row.status !== '5', onClick: () => handleResolve(row) },
-        { key: 'delete', label: '删除', danger: true, disabled: !canRiskDelete.value, onClick: () => handleDel(row) },
-      ]" :row="row" />
+      <TableOperation :buttons="getButtons(row)" :row="row" />
     </template>
   </RequestChartTable>
 

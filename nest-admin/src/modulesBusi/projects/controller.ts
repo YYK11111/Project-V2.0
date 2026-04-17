@@ -49,6 +49,17 @@ export class ProjectsController extends BaseController<Project, ProjectsService>
     return this.service.getCockpit(query)
   }
 
+  @Post('recalculate-progress')
+  recalculateProgress(@Body() body: { projectIds?: string[] }) {
+    return this.service.recalculateProjectProgressBatch(body?.projectIds)
+  }
+
+  @Post(':id/recalculate-progress')
+  async recalculateSingleProgress(@Param('id') id: string) {
+    const progress = await this.service.recalculateProjectProgress(id)
+    return { projectId: id, progress }
+  }
+
   @Post(':id/submit-approval')
   async submitApproval(
     @Param('id') id: string,

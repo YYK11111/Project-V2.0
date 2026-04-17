@@ -1110,6 +1110,7 @@ export class WorkflowService {
     delete instance.variables._returnedByTaskId
     delete instance.variables._returnedComment
     await this.instanceRepo.save(instance)
+    await this.messagesService.deactivateWorkflowInstanceCcMessages(instance.id, userId)
 
     await this.workflowIntegrationService.handleResubmitReturnedInstance(instance.id, {
       businessKey: instance.businessKey,
@@ -1390,7 +1391,7 @@ export class WorkflowService {
 
   private getBusinessRoute(businessKey: string) {
     const businessType = String(businessKey || '').split('_')[0]
-    if (businessType === 'project') return '/projectManage/detail'
+    if (businessType === 'project') return '/projectManage/approval'
     if (businessType === 'change') return '/changeManage/form'
     if (businessType === 'ticket') return '/ticketManage/form'
     if (businessType === 'task') return '/taskManage/form'

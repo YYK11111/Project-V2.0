@@ -198,8 +198,8 @@ function getTypeTag(type) {
       </el-table-column>
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleView(row)">查看</el-button>
-          <el-button v-if="canStoryUpdate" link type="primary" @click="handleEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click="handleView(row)">详情</el-button>
+          <el-button v-if="canStoryUpdate" link type="primary" @click="handleEdit(row)">修改</el-button>
           <el-button v-if="canStoryDelete" link type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>

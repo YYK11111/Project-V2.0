@@ -20,11 +20,11 @@ const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflo
 const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/instances/cancel']))
 
 const getButtons = (row: any) => [
-  { key: 'detail', label: '详情', disabled: !canWorkflowInstanceGetOne.value, onClick: () => viewDetail(row) },
-  { key: 'closeReturned', label: '结束退回实例', type: 'danger', show: canWorkflowInstanceCloseReturned.value && row.status === '1' && row.starterId === currentUserId && row.variables?._returnedToStarter, onClick: () => handleCloseReturned(row) },
-  { key: 'cancel', label: '终止', type: 'warning', show: canWorkflowInstanceCancel.value && row.status === '1', onClick: () => handleCancel(row) },
-  { key: 'withdraw', label: '撤回', danger: true, show: canWorkflowInstanceWithdraw.value && row.status === '1' && row.starterId === currentUserId, onClick: () => handleWithdraw(row) },
-]
+  canWorkflowInstanceGetOne.value ? { key: 'detail', label: '详情', onClick: () => viewDetail(row) } : null,
+  canWorkflowInstanceCloseReturned.value && row.status === '1' && row.starterId === currentUserId && row.variables?._returnedToStarter ? { key: 'closeReturned', label: '结束退回实例', type: 'danger', onClick: () => handleCloseReturned(row) } : null,
+  canWorkflowInstanceCancel.value && row.status === '1' ? { key: 'cancel', label: '终止', type: 'warning', onClick: () => handleCancel(row) } : null,
+  canWorkflowInstanceWithdraw.value && row.status === '1' && row.starterId === currentUserId ? { key: 'withdraw', label: '撤回', danger: true, onClick: () => handleWithdraw(row) } : null,
+].filter(Boolean)
 
 const detailVisible = ref(false)
 const detailTab = ref('info')

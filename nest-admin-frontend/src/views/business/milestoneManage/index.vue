@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, del } from './api'
 import { getList as getProjectList } from '../projectManage/api'
@@ -69,10 +69,24 @@ onMounted(async () => {
   }, {})
 })
 
+watch(
+  () => route.query.projectId,
+  (value) => {
+    params.value.projectId = value || ''
+    rctRef.value?.getList?.(1)
+  },
+)
+
 const getStatusType = (status) => {
   const map = { '1': 'info', '2': 'success', '3': 'danger', '4': '' }
   return map[status] || 'info'
 }
+
+const getButtons = (row) => [
+  { key: 'view', label: '详情', onClick: () => handleView(row) },
+  canMilestoneUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canMilestoneDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+]
 </script>
 
 <template>
@@ -101,11 +115,7 @@ const getStatusType = (status) => {
     </template>
 
     <template #tableOperation="{ row }">
-      <TableOperation :buttons="[
-        { key: 'view', label: '查看', onClick: () => handleView(row) },
-        { key: 'edit', label: '修改', disabled: !canMilestoneUpdate.value, onClick: () => handleEdit(row) },
-        { key: 'delete', label: '删除', danger: true, disabled: !canMilestoneDelete.value, onClick: () => handleDel(row) },
-      ]" :row="row" />
+      <TableOperation :buttons="getButtons(row)" :row="row" />
     </template>
   </RequestChartTable>
 </template>

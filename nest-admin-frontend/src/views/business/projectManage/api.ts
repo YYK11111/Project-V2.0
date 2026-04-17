@@ -67,3 +67,7 @@ export function submitApproval(id) {
 export function submitClose(id) {
   return request({ url: `${baseUrl}/${id}/submit-close`, method: 'post' })
 }
+
+export function recalculateProgress(projectIds) {
+  return request({ url: `${baseUrl}/recalculate-progress`, method: 'post', data: { projectIds } })
+}

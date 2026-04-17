@@ -125,12 +125,12 @@ const getTriggerEventType = (event: string) => triggerEventTypeMap[event] || 'in
 
 const getButtons = (row: any) => [
   { key: 'design', label: '设计', onClick: () => router.push({ path: '/workflow/designer', query: { id: row.id } }) },
-  { key: 'edit', label: '修改', disabled: !canWorkflowUpdate.value, onClick: () => dialogRef.value.action(row) },
-  { key: 'publish', label: row.isActive !== '1' ? '发布' : '停用', disabled: !canWorkflowPublish.value, type: row.isActive !== '1' ? 'success' : 'info', onClick: () => row.isActive !== '1' ? handlePublish(row) : handleUnpublish(row) },
-  { key: 'start', label: '发起', type: 'warning', disabled: !canWorkflowStart.value, onClick: () => handleStart(row) },
-  { key: 'copy', label: '复制', type: 'info', disabled: !canWorkflowCopy.value, onClick: () => handleCopy(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canWorkflowDelete.value, onClick: () => rctRef.value.del(deleteWorkflowDefinition, row.id) },
-]
+  canWorkflowUpdate.value ? { key: 'edit', label: '修改', onClick: () => dialogRef.value.action(row) } : null,
+  canWorkflowPublish.value ? { key: 'publish', label: row.isActive !== '1' ? '发布' : '停用', type: row.isActive !== '1' ? 'success' : 'info', onClick: () => row.isActive !== '1' ? handlePublish(row) : handleUnpublish(row) } : null,
+  canWorkflowStart.value ? { key: 'start', label: '发起', type: 'warning', onClick: () => handleStart(row) } : null,
+  canWorkflowCopy.value ? { key: 'copy', label: '复制', type: 'info', onClick: () => handleCopy(row) } : null,
+  canWorkflowDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(deleteWorkflowDefinition, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
@@ -145,7 +145,7 @@ const getButtons = (row: any) => [
       </template>
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
-          <el-button v-if="canWorkflowAdd" type="primary" @click="dialogRef.action()">新建流程</el-button>
+          <el-button v-if="canWorkflowAdd" type="primary" @click="dialogRef.action()">新增流程</el-button>
           <el-button v-if="canWorkflowDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteWorkflowDefinition)" type="danger">批量删除</el-button>
         </div>
       </template>

@@ -29,11 +29,11 @@ async function handleSubmitApproval(row) {
 const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
-  { key: 'edit', label: '修改', disabled: !canTicketUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') },
-  { key: 'submitApproval', label: '提交审批', type: 'warning', disabled: !canTicketSubmitApproval.value || !canSubmitTicketApproval(row), onClick: () => handleSubmitApproval(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canTicketDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
+  canTicketUpdate.value ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
+  canTicketSubmitApproval.value && canSubmitTicketApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  canTicketDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
