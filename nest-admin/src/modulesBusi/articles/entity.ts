@@ -4,6 +4,9 @@ import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne } from 'ty
 import { BoolNum } from 'src/common/type/base'
 import { ArticleCatalog } from '../articleCatalogs/entity'
 import dayjs from 'dayjs'
+import { User } from 'src/modules/users/entities/user.entity'
+import { ArticleTag } from '../articleTags/entity'
+import { KnowledgeType, VisibilityType, knowledgeTypeMap, visibilityTypeMap } from './constants'
 
 export enum Status {
   draft = '0',
@@ -39,6 +42,9 @@ export class Article extends BaseEntity {
   @BaseColumn({})
   desc: string
 
+  @BaseColumn({ nullable: true, comment: '摘要' })
+  summary: string
+
   @ManyToOne((type) => ArticleCatalog, (catalog) => catalog.article)
   @JoinColumn({ name: 'catalog_id' })
   catalog: ArticleCatalog
@@ -51,6 +57,72 @@ export class Article extends BaseEntity {
 
   @BaseColumn({})
   content: string
+
+  @BaseColumn({ type: 'longtext', nullable: true, name: 'contentText', comment: '纯文本内容' })
+  contentText: string
+
+  @Column({ type: 'json', nullable: true, comment: '内容切片' })
+  contentChunks: Array<{
+    order: number
+    title: string
+    text: string
+    summary: string
+  }>
+
+  @BaseColumn({ type: 'enum', enum: KnowledgeType, default: KnowledgeType.guide, comment: '知识类型' })
+  knowledgeType: KnowledgeType
+
+  @BaseColumn({ nullable: true, name: 'keywords', comment: '关键词' })
+  keywords: string
+
+  @BaseColumn({ type: 'int', default: 1, comment: '检索权重' })
+  retrievalWeight: number
+
+  @BaseColumn({ default: '0', comment: '是否优先用于AI：1是 0否' })
+  aiPreferred: string
+
+  @BaseColumn({ default: '0', comment: '是否权威知识：1是 0否' })
+  authorityLevel: string
+
+  @BaseColumn({ default: 'pending', comment: '向量化状态' })
+  embeddingStatus: string
+
+  @BaseColumn({ type: 'int', default: 1, comment: '向量版本号' })
+  embeddingVersion: number
+
+  @BaseColumn({ nullable: true, name: 'authorId', comment: '作者ID' })
+  authorId: string
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'authorId' })
+  author: User
+
+  @BaseColumn({ nullable: true, name: 'maintainerId', comment: '维护人ID' })
+  maintainerId: string
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'maintainerId' })
+  maintainer: User
+
+  @BaseColumn({ type: 'enum', enum: VisibilityType, default: VisibilityType.public, comment: '可见范围' })
+  visibilityType: VisibilityType
+
+  @BaseColumn({ type: 'simple-array', nullable: true, name: 'visibleRoleIds', comment: '可见角色ID列表' })
+  visibleRoleIds: string[]
+
+  @BaseColumn({ type: 'simple-array', nullable: true, name: 'visibleUserIds', comment: '可见用户ID列表' })
+  visibleUserIds: string[]
+
+  @BaseColumn({ default: 1, comment: '版本号' })
+  versionNo: number
+
+  @ManyToMany(() => ArticleTag, (tag) => tag.articles, { cascade: true })
+  @JoinTable({
+    name: 'busi_article_tag_relation',
+    joinColumn: { name: 'articleId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+  })
+  tags: ArticleTag[]
 
   @BaseColumn({ length: 8, default: '1', comment: '排序' })
   order: string

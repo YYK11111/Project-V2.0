@@ -1,7 +1,7 @@
 SET NAMES utf8mb4;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '消息中心', 'messageCenter', 'system/messageCenter/index', 'menu', NULL, '16', 'Bell', '0', '1', NULL, 'system/messages/list', NOW(), 'system', 'system'
+SELECT '消息中心', 'messageCenter', 'system/messageCenter/index', 'menu', NULL, '16', 'chat-dot-round', '0', '1', NULL, 'system/messages/list', NOW(), 'system', 'system'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'system/messageCenter/index' AND is_delete IS NULL);
 
 UPDATE sys_menu
@@ -11,7 +11,7 @@ SET name = '消息中心',
     type = 'menu',
     parent_id = NULL,
     permissionKey = 'system/messages/list',
-    icon = 'Bell',
+    icon = 'chat-dot-round',
     is_delete = NULL
 WHERE component = 'system/messageCenter/index';
 
@@ -29,6 +29,12 @@ WHERE path = 'index'
   AND is_delete IS NULL;
 
 SET @message_center_id := (SELECT id FROM sys_menu WHERE component = 'system/messageCenter/index' AND is_delete IS NULL ORDER BY id LIMIT 1);
+
+UPDATE sys_menu
+SET parent_id = @message_center_id,
+    is_delete = NULL
+WHERE @message_center_id IS NOT NULL
+  AND permissionKey IN ('system/messages/markRead', 'system/messages/markAllRead', 'system/messages/delete');
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
 SELECT '标记已读', 'mark-read', '', 'button', @message_center_id, '2', '', '1', '1', NULL, 'system/messages/markRead', NOW(), 'system', 'system'

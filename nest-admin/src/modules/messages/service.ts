@@ -127,6 +127,27 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     )
   }
 
+  async deactivateWorkflowInstanceCcMessages(instanceIds: string[] | string, receiverId?: string) {
+    const ids = (Array.isArray(instanceIds) ? instanceIds : [instanceIds]).filter(Boolean).map((id) => String(id))
+    if (!ids.length) return
+
+    const where: Record<string, any> = {
+      sourceType: 'workflow_instance',
+      sourceId: In(ids) as any,
+      messageType: MessageType.cc,
+      isDelete: null as any,
+    }
+
+    if (receiverId) {
+      where.receiverId = receiverId
+    }
+
+    await this.repository.update(
+      where as any,
+      { isActive: BoolNum.No as any, isRead: BoolNum.Yes as any, readTime: new Date().toISOString() } as any,
+    )
+  }
+
   async deactivateInactiveWorkflowTaskMessages() {
     const activeTodoMessages = await this.repository.find({
       where: { sourceType: 'workflow_task', messageType: MessageType.todo, isActive: BoolNum.Yes, isDelete: null as any } as any,
@@ -175,7 +196,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
 
   private getBusinessRoute(businessKey: string) {
     const businessType = String(businessKey || '').split('_')[0]
-    if (businessType === 'project') return '/projectManage/detail'
+    if (businessType === 'project') return '/projectManage/approval'
     if (businessType === 'change') return '/changeManage/form'
     if (businessType === 'ticket') return '/ticketManage/form'
     if (businessType === 'task') return '/taskManage/form'

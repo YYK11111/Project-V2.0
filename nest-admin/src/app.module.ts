@@ -16,6 +16,8 @@ import { LoginLogsModule } from './modules/loginLogs/module'
 import { GlobalModule } from './modules/global/global.module'
 import { ArticlesModule } from './modulesBusi/articles/module'
 import { ArticleCatalogsModule } from './modulesBusi/articleCatalogs/module'
+import { ArticleTagsModule } from './modulesBusi/articleTags/module'
+import { ArticleBorrowsModule } from './modulesBusi/articleBorrows/module'
 import { ProjectsModule } from './modulesBusi/projects/module'
 import { ProjectMembersModule } from './modulesBusi/project-members/module'
 import { TasksBusiModule } from './modulesBusi/tasks/module'
@@ -56,6 +58,8 @@ import { MessagesModule } from './modules/messages/module'
     GlobalModule,
     ArticlesModule,
     ArticleCatalogsModule,
+    ArticleTagsModule,
+    ArticleBorrowsModule,
     ProjectsModule,
     ProjectMembersModule,
     TasksBusiModule,

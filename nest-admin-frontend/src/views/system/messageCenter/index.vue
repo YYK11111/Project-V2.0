@@ -44,7 +44,7 @@ const getSummaryText = (row: any) => {
   if (activeTab.value === 'ccHistory') {
     return row.content || '已阅消息'
   }
-  return row.content || '无摘要'
+  return row.starterName || '-'
 }
 
 const getTimeLabel = computed(() => {
@@ -64,6 +64,23 @@ const getSourceTypeLabel = (sourceType: string) => {
     workflow_instance: '流程',
   }
   return map[sourceType] || sourceType || '-'
+}
+
+const getMessageRoute = (row: any) => {
+  const queryParams = row.linkParams || {}
+  const normalizedLinkUrl = row.linkUrl === '/system/messageCenter/index' ? '/messageCenter' : row.linkUrl
+  const isProjectWorkflowTodo =
+    (row.businessType === 'project' || row.sourceType === 'workflow_task')
+    && queryParams.fromWorkflow === '1'
+    && queryParams.taskId
+    && queryParams.id
+
+  if (isProjectWorkflowTodo && normalizedLinkUrl === '/projectManage/detail') {
+    return { path: '/projectManage/approval', query: queryParams }
+  }
+
+  if (!normalizedLinkUrl) return null
+  return { path: normalizedLinkUrl, query: queryParams }
 }
 
 const isHistoryTab = computed(() => activeTab.value === 'todoHistory' || activeTab.value === 'ccHistory')
@@ -105,9 +122,9 @@ const goMessage = async (row: any) => {
   if (activeTab.value === 'ccCurrent') {
     await markMessageRead(row.id)
   }
-  const queryParams = row.linkParams || {}
-  if (row.linkUrl) {
-    await router.push({ path: row.linkUrl, query: queryParams })
+  const target = getMessageRoute(row)
+  if (target) {
+    await router.push(target)
   }
   if (activeTab.value === 'ccCurrent') {
     await reload()
@@ -143,34 +160,25 @@ onMounted(() => {
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane v-for="(item, key) in tabConfig" :key="key" :label="item.label" :name="key">
-          <el-table :data="listData" border v-loading="loading">
-            <el-table-column prop="businessType" label="业务对象" width="100">
-              <template #default="{ row }">{{ getSourceTypeLabel(row.businessType || row.sourceType) }}</template>
-            </el-table-column>
-            <el-table-column prop="businessCode" label="业务编号" width="160" :show-overflow-tooltip="true">
-              <template #default="{ row }">{{ row.businessCode || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="title" label="标题" min-width="240">
+            <el-table :data="listData" border v-loading="loading">
+            <el-table-column prop="title" label="标题" min-width="200">
               <template #default="{ row }">
                 <el-button link type="primary" @click="goMessage(row)">{{ row.title || row.businessTitle || '-' }}</el-button>
               </template>
             </el-table-column>
-            <el-table-column prop="starterName" label="发起人" width="120">
+            <el-table-column prop="starterName" label="发起人" width="110">
               <template #default="{ row }">{{ row.starterName || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="nodeName" label="节点" min-width="160">
-              <template #default="{ row }">{{ row.nodeName || '-' }}</template>
             </el-table-column>
             <el-table-column v-if="activeTab === 'todoHistory'" prop="actionText" label="处理结果" width="120">
               <template #default="{ row }">
                 <el-tag :type="getActionTagType(row.actionText)" size="small">{{ row.actionText || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="content" label="摘要/意见" min-width="260" :show-overflow-tooltip="true">
+            <el-table-column v-if="isHistoryTab" prop="content" label="摘要/意见" min-width="260" :show-overflow-tooltip="true">
               <template #default="{ row }">{{ getSummaryText(row) }}</template>
             </el-table-column>
             <el-table-column v-if="activeTab === 'ccHistory'" prop="readTime" label="阅读时间" width="180" />
-            <el-table-column prop="createTime" :label="getTimeLabel" width="180" />
+            <el-table-column prop="createTime" :label="activeTab === 'todoCurrent' || activeTab === 'ccCurrent' ? '发起时间' : getTimeLabel" width="168" />
           </el-table>
 
           <div class="pagination-wrap">
@@ -206,10 +214,16 @@ onMounted(() => {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .message-center-page :deep(.el-table .cell) {
-  line-height: 1.5;
+  line-height: 1.35;
+  font-size: 13px;
+}
+
+.message-center-page :deep(.el-table td),
+.message-center-page :deep(.el-table th) {
+  padding: 8px 0;
 }
 </style>

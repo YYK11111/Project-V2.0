@@ -35,14 +35,29 @@ WHERE component = 'content/articleManage/aev'
   AND is_delete IS NULL;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '我的借阅', 'myBorrows', 'content/articleManage/myBorrows.vue', 'menu', @content_center_id, '20', 'Tickets', '0', '1', NULL, 'business/articleBorrows/my', NOW(), 'system', 'system'
+SELECT '知识首页', '/content/articleManage/home', 'content/articleManage/home', 'menu', @content_center_id, '20', 'House', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
 WHERE @content_center_id IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = 'myBorrows' AND parent_id = @content_center_id AND is_delete IS NULL);
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/home' AND parent_id = @content_center_id AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '借阅审批', 'borrowApproval', 'content/articleManage/borrowApproval.vue', 'menu', @content_center_id, '21', 'Checked', '0', '1', NULL, 'business/articleBorrows/pending', NOW(), 'system', 'system'
+SELECT '知识搜索', '/content/articleManage/search', 'content/articleManage/search', 'menu', @content_center_id, '21', 'Search', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
 WHERE @content_center_id IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = 'borrowApproval' AND parent_id = @content_center_id AND is_delete IS NULL);
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/search' AND parent_id = @content_center_id AND is_delete IS NULL);
+
+INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
+SELECT '后台管理', '/content/articleManage/manage', 'content/articleManage/index', 'menu', @content_center_id, '22', 'SetUp', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
+WHERE @content_center_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/manage' AND parent_id = @content_center_id AND is_delete IS NULL);
+
+INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
+SELECT '我的借阅', '/content/articleManage/myBorrows', 'content/articleManage/myBorrows', 'menu', @content_center_id, '23', 'Tickets', '0', '1', NULL, 'business/articleBorrows/my', NOW(), 'system', 'system'
+WHERE @content_center_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/myBorrows' AND parent_id = @content_center_id AND is_delete IS NULL);
+
+INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
+SELECT '借阅审批', '/content/articleManage/borrowApproval', 'content/articleManage/borrowApproval', 'menu', @content_center_id, '24', 'Checked', '0', '1', NULL, 'business/articleBorrows/pending', NOW(), 'system', 'system'
+WHERE @content_center_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/borrowApproval' AND parent_id = @content_center_id AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
 SELECT '查看全部知识', 'view-all', '', 'button', @content_center_id, '30', '', '1', '1', NULL, 'content/articles/viewAll', NOW(), 'system', 'system'
@@ -97,7 +112,7 @@ WHERE role.permissionKey = 'admin'
   AND role.is_delete IS NULL
   AND (
     menu.component = 'content/articleManage/index'
-    OR menu.path IN ('myBorrows', 'borrowApproval')
+    OR menu.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows', '/content/articleManage/borrowApproval')
     OR menu.permissionKey IN (
       'business/articles/list',
       'business/articles/add',

@@ -2,9 +2,9 @@
 // @ts-nocheck
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowRight } from '@element-plus/icons-vue'
 import { articleTagApi, getKnowledgeTypes, getList } from './api'
 import { getTrees } from './api.catalog'
-import KnowledgeNav from './components/KnowledgeNav.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -86,7 +86,6 @@ onMounted(() => {
 
 <template>
   <div class="knowledge-home-page" v-loading="loading">
-    <KnowledgeNav />
     <div class="knowledge-home-hero Gcard">
       <div class="knowledge-home-hero__content">
         <div class="knowledge-home-hero__eyebrow">知识中心</div>
@@ -145,7 +144,7 @@ onMounted(() => {
           <div class="catalog-list">
             <button v-for="item in flatCatalogs" :key="item.id" type="button" class="catalog-list__item" @click="useCatalog(item.id)">
               <span>{{ item.displayName }}</span>
-              <el-icon-arrow-right />
+              <el-icon><ArrowRight /></el-icon>
             </button>
           </div>
         </div>
