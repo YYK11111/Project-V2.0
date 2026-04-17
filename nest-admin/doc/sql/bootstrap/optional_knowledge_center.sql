@@ -35,17 +35,17 @@ WHERE component = 'content/articleManage/aev'
   AND is_delete IS NULL;
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '知识首页', '/content/articleManage/home', 'content/articleManage/home', 'menu', @content_center_id, '20', 'House', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
+SELECT '知识首页', '/content/articleManage/home', 'content/articleManage/home', 'menu', @content_center_id, '20', 'House', '0', '1', NULL, 'content/articles/home', NOW(), 'system', 'system'
 WHERE @content_center_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/home' AND parent_id = @content_center_id AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '知识搜索', '/content/articleManage/search', 'content/articleManage/search', 'menu', @content_center_id, '21', 'Search', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
+SELECT '知识搜索', '/content/articleManage/search', 'content/articleManage/search', 'menu', @content_center_id, '21', 'Search', '0', '1', NULL, 'content/articles/search', NOW(), 'system', 'system'
 WHERE @content_center_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/search' AND parent_id = @content_center_id AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '后台管理', '/content/articleManage/manage', 'content/articleManage/index', 'menu', @content_center_id, '22', 'SetUp', '0', '1', NULL, 'business/articles/list', NOW(), 'system', 'system'
+SELECT '后台管理', '/content/articleManage/manage', 'content/articleManage/index', 'menu', @content_center_id, '22', 'SetUp', '0', '1', NULL, 'content/articles/manage', NOW(), 'system', 'system'
 WHERE @content_center_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE path = '/content/articleManage/manage' AND parent_id = @content_center_id AND is_delete IS NULL);
 

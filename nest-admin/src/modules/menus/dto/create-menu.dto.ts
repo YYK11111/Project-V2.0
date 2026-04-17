@@ -45,7 +45,7 @@ export class CreateMenuDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(30)
+  @MaxLength(100)
   permissionKey?: string
 
   @IsOptional()

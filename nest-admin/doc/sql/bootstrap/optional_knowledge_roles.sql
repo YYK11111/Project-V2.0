@@ -33,7 +33,9 @@ WHERE r.permissionKey = 'knowledgeEditor'
   AND (
     m.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows')
     OR m.permissionKey IN (
-      'business/articles/list',
+      'content/articles/home',
+      'content/articles/search',
+      'content/articles/manage',
       'business/articles/getOne',
       'business/articles/add',
       'business/articles/update',
@@ -53,7 +55,9 @@ WHERE r.permissionKey = 'knowledgeCatalogAdmin'
   AND (
     m.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows', '/content/articleManage/borrowApproval')
     OR m.permissionKey IN (
-      'business/articles/list',
+      'content/articles/home',
+      'content/articles/search',
+      'content/articles/manage',
       'business/articles/getOne',
       'business/articles/add',
       'business/articles/update',
@@ -78,7 +82,9 @@ WHERE r.permissionKey = 'knowledgeAiOperator'
   AND (
     m.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows', '/content/articleManage/aiRetrieveDebug')
     OR m.permissionKey IN (
-      'business/articles/list',
+      'content/articles/home',
+      'content/articles/search',
+      'content/articles/manage',
       'business/articles/getOne',
       'business/articleBorrows/my',
       'content/articles/viewAll',

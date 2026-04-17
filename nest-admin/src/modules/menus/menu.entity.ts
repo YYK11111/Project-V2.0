@@ -80,8 +80,8 @@ export class Menu extends BaseEntity {
   // 权限字符
   @DbUnique
   @IsNotEmpty()
-  @MaxLength(30)
-  @BaseColumn()
+  @MaxLength(100)
+  @BaseColumn({ length: 100 })
   permissionKey: string
 
   @BaseColumn(boolNumColumn('隐藏', 'is_hidden'))
