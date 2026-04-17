@@ -2,13 +2,8 @@
 // @ts-nocheck
 import * as api from './api'
 import { getVisitedNumChart, getUserAreaList } from '@/views/systemMonitor/loginLog/api'
-import { getList } from '@/views/system/notices/api'
 import { useUserStore } from '@/stores/user'
 let userStore = useUserStore()
-
-import hljs from 'highlight.js'
-// import 'highlight.js/styles/default.min.css'
-import 'highlight.js/styles/dark.min.css'
 
 import RELEASE from '../../../RELEASE.md?raw'
 
@@ -33,12 +28,6 @@ greetingFun()
 const pannelList = ref([])
 api.getIndexCountData().then(({ data }) => {
   pannelList.value = [
-    {
-      title: 'Star量',
-      tips: 'Gitee Star 的数量',
-      value: data.stars,
-      link: 'https://gitee.com/hixinla/nest-admin',
-    },
     {
       title: '访问量-2026',
       tips: '2026年度登录成功的用户数量',
@@ -118,23 +107,9 @@ function dealDataTrend(data, series, xData) {
 
       <div class="gridCard --MarginT">
         <div class="Gcard flexCol stickyPadding">
-          <div class="GcardTitle stickyTop !top-(--Padding)">项目动态</div>
-          <ScrollLoadList ref="ScrollLoadList" :request="getList" keywords="title">
-            <template #item="{ item }">
-              <div class="list-item Gmargin-b flexBetween Gcard" style="background: var(--ColorLight10)">
-                <div class="title ellipsis">{{ item.content }}</div>
-                <div class="time">{{ item.createTime }}</div>
-              </div>
-            </template>
-          </ScrollLoadList>
+          <div class="GcardTitle stickyTop !top-(--Padding)">系统概览</div>
+          <div class="--FontBlack3 leading-7">当前首页仅保留用户概览、地区分布与访问趋势模块。</div>
         </div>
-      </div>
-    </div>
-
-    <div class="Gcard mt0 !overflow-auto stickyPadding">
-      <div class="GcardTitle stickyTop !top-(--Padding)">更新日志</div>
-      <div>
-        <pre v-html="hljs.highlight(RELEASE || '', { language: 'markdown' }).value"></pre>
       </div>
     </div>
   </div>
