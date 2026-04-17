@@ -23,10 +23,10 @@ const canInteractionUpdate = computed(() => checkPermi(['business/crm/interactio
 const canInteractionDelete = computed(() => checkPermi(['business/crm/interactions/delete']))
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/interactionManage/form') },
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canInteractionUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/interactionManage/form') },
-  { key: 'delete', label: '删除', danger: true, disabled: !canInteractionDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/interactionManage/form') },
+  canInteractionUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/interactionManage/form') } : null,
+  canInteractionDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>

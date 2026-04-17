@@ -23,10 +23,10 @@ const canContractUpdate = computed(() => checkPermi(['business/crm/contracts/upd
 const canContractDelete = computed(() => checkPermi(['business/crm/contracts/delete']))
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/contractManage/form') },
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canContractUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/contractManage/form') },
-  { key: 'delete', label: '删除', danger: true, disabled: !canContractDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/contractManage/form') },
+  canContractUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/contractManage/form') } : null,
+  canContractDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>

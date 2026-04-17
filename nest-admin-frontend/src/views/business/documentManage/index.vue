@@ -26,11 +26,11 @@ function handleUpgradeVersion(row) {
 }
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/documentManage/form') },
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canDocumentUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/documentManage/form') },
-  { key: 'upgrade', label: '升级版本', type: 'success', disabled: !canDocumentUpdate.value, onClick: () => handleUpgradeVersion(row) },
-  { key: 'delete', label: '删除', danger: true, disabled: !canDocumentDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/documentManage/form') },
+  canDocumentUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/documentManage/form') } : null,
+  canDocumentUpdate.value ? { key: 'upgrade', label: '升级版本', type: 'success', onClick: () => handleUpgradeVersion(row) } : null,
+  canDocumentDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>

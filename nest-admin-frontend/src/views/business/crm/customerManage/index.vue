@@ -33,11 +33,11 @@ async function handleSubmitApproval(row) {
 const canSubmitCustomerApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
-  { key: 'view', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
-  { key: 'submit', label: '提交审批', type: 'warning', disabled: !canCustomerSubmitApproval.value || !canSubmitCustomerApproval(row), onClick: () => handleSubmitApproval(row) },
-  { key: 'edit', label: '修改', type: 'primary', disabled: !canCustomerUpdate.value, onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') },
-  { key: 'delete', label: '删除', danger: true, disabled: !canCustomerDelete.value, onClick: () => rctRef.value.del(del, row.id) },
-]
+  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
+  canCustomerUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') } : null,
+  canCustomerSubmitApproval.value && canSubmitCustomerApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  canCustomerDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
