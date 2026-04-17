@@ -4,6 +4,8 @@ SET NAMES utf8mb4;
 SOURCE ../migrate_trigger_config_to_business_scene.sql;
 SOURCE ../wf_business_config.sql;
 SOURCE optional_message_center.sql;
+SOURCE optional_knowledge_center.sql;
+SOURCE optional_knowledge_roles.sql;
 SOURCE optional_project_cockpit.sql;
 SOURCE optional_content_document_labels.sql;
 SOURCE optional_notice_labels.sql;

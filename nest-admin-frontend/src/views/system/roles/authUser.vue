@@ -31,14 +31,15 @@ function getList(query: any) {
 
 function getButtons(row: any) {
   return [
-    {
-      key: 'cancel',
-      label: '取消授权',
-      danger: true,
-      disabled: !canAuthUserCancel.value,
-      onClick: () => cancelAuthUser(row),
-    },
-  ]
+    canAuthUserCancel.value
+      ? {
+          key: 'cancel',
+          label: '取消授权',
+          danger: true,
+          onClick: () => cancelAuthUser(row),
+        }
+      : null,
+  ].filter(Boolean)
 }
 
 function openSelectUser() {
@@ -82,7 +83,7 @@ function handleClose() {
       <template #operation="{ selectedIds }">
         <div class="flexBetween">
           <div>
-            <el-button v-if="canAuthUserSelect" type="primary" @click="openSelectUser">添加用户</el-button>
+            <el-button v-if="canAuthUserSelect" type="primary" @click="openSelectUser">新增用户</el-button>
             <el-button v-if="canAuthUserCancelAll" class="ml-10" type="danger" :disabled="!selectedIds.length" @click="cancelAuthUserAll(selectedIds)">
               批量取消授权
             </el-button>

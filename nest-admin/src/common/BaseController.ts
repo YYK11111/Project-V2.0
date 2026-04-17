@@ -20,6 +20,7 @@ export class BaseController<T, K> {
     }
     body._operatorPermissions = req.user.permissions || []
     body._operatorName = req.user.name
+    body._operatorId = req.user.id
     return this.service.save(body)
   }
 
@@ -30,6 +31,7 @@ export class BaseController<T, K> {
     body.createUser = req.user.name
     body._operatorPermissions = req.user.permissions || []
     body._operatorName = req.user.name
+    body._operatorId = req.user.id
     return this.service.add(body)
   }
 
@@ -40,6 +42,7 @@ export class BaseController<T, K> {
     body.updateUser = req.user.name
     body._operatorPermissions = req.user.permissions || []
     body._operatorName = req.user.name
+    body._operatorId = req.user.id
     return this.service.update(body)
   }
 

@@ -7,3 +7,4 @@ export const { getList, getOne, del, save } = $sdk.baseApi(serve)
 
 export const getTrees = (data) => get(`${serve}/getTrees`, data)
 export const getTypes = (data) => get(`${serve}/getTypes`, data)
+export const getDiagnostics = (data) => get(`${serve}/diagnostics`, data)

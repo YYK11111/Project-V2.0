@@ -157,32 +157,32 @@ END IF;
 
 -- 2. 创建一级菜单：项目管理 (catalog)
 INSERT INTO sys_menu (name, parent_id, type, path, component, icon, `order`, is_hidden, permission_key, create_time) 
-VALUES ('项目管理', @parent_id, 'catalog', 'project', '', 'project', 1, 0, 'business:project', NOW());
+VALUES ('项目管理', @parent_id, 'catalog', 'projectManage', '', 'project', 1, 0, 'business/projectManage', NOW());
 
 SET @project_catalog_id = LAST_INSERT_ID();
 
 -- 3. 创建二级菜单：项目列表 (catalog) - 路由容器
 INSERT INTO sys_menu (name, parent_id, type, path, component, icon, `order`, is_hidden, permission_key, create_time) 
-VALUES ('项目列表', @project_catalog_id, 'catalog', 'list', '', 'list', 1, 0, 'business:project:list', NOW());
+VALUES ('项目列表', @project_catalog_id, 'catalog', 'projectInfo', '', 'list', 1, 0, 'business/projectInfo', NOW());
 
 SET @project_list_catalog_id = LAST_INSERT_ID();
 
 -- 4. 创建三级菜单：项目列表页 (menu)
 INSERT INTO sys_menu (name, parent_id, type, path, component, icon, `order`, is_hidden, permission_key, create_time) 
-VALUES ('查看项目', @project_list_catalog_id, 'menu', 'index', 'business/projectManage/index', '', 1, 0, 'business:project:view', NOW());
+VALUES ('查看项目', @project_list_catalog_id, 'menu', 'index', 'business/projectManage/index', '', 1, 0, 'business/projects/getOne', NOW());
 
 SET @project_view_id = LAST_INSERT_ID();
 
 -- 5. 创建三级菜单：项目表单页 (menu, hidden)
 INSERT INTO sys_menu (name, parent_id, type, path, component, icon, `order`, is_hidden, permission_key, create_time) 
-VALUES ('编辑项目', @project_list_catalog_id, 'menu', 'form', 'business/projectManage/form', '', 2, 1, 'business:project:edit', NOW());
+VALUES ('编辑项目', @project_list_catalog_id, 'menu', 'form', 'business/projectManage/form', '', 2, 1, 'business/projects/update', NOW());
 
 -- 6. 创建按钮权限 (button)
 INSERT INTO sys_menu (name, parent_id, type, permission_key, `order`, is_hidden, create_time) 
 VALUES 
-  ('项目新增', @project_list_catalog_id, 'button', 'business:project:add', 3, 1, NOW()),
-  ('项目编辑', @project_list_catalog_id, 'button', 'business:project:update', 4, 1, NOW()),
-  ('项目删除', @project_list_catalog_id, 'button', 'business:project:delete', 5, 1, NOW());
+  ('项目新增', @project_list_catalog_id, 'button', 'business/projects/add', 3, 1, NOW()),
+  ('项目编辑', @project_list_catalog_id, 'button', 'business/projects/update', 4, 1, NOW()),
+  ('项目删除', @project_list_catalog_id, 'button', 'business/projects/delete', 5, 1, NOW());
 
 -- 7. 为超级管理员分配权限 (roleId=1)
 INSERT INTO sys_role_menu (roleId, menuId) 

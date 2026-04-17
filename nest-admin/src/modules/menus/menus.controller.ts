@@ -21,6 +21,11 @@ export class MenusController extends BaseController<Menu, MenusService> {
     return menuTypes
   }
 
+  @Get('diagnostics')
+  diagnostics() {
+    return this.service.getDiagnostics()
+  }
+
   @Get('treeselect')
   treeselect() {
     return this.service.treeselect()

@@ -58,15 +58,75 @@ CREATE TABLE `busi_article` (
   `is_delete` char(1) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '是否删除: NULL未删除，1删除',
   `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `desc` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `summary` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '摘要',
   `catalog_id` bigint DEFAULT NULL COMMENT '目录id',
   `thumb` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `content` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `content` text COLLATE utf8mb4_unicode_ci,
+  `contentText` longtext COLLATE utf8mb4_unicode_ci COMMENT '纯文本内容',
+  `contentChunks` json DEFAULT NULL COMMENT '内容切片',
   `order` varchar(8) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '1' COMMENT '排序',
   `status` enum('0','1','2','3') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '2' COMMENT '文章状态，默认已发布',
   `publish_time` datetime DEFAULT NULL COMMENT '定时发布时间',
+  `knowledgeType` enum('guide','faq','troubleshooting','spec','experience','template','product','delivery') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'guide' COMMENT '知识类型',
+  `keywords` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '关键词',
+  `retrievalWeight` int NOT NULL DEFAULT '1' COMMENT '检索权重',
+  `aiPreferred` char(1) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '0' COMMENT '是否优先用于AI：1是 0否',
+  `authorityLevel` char(1) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '0' COMMENT '是否权威知识：1是 0否',
+  `embeddingStatus` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT '向量化状态',
+  `embeddingVersion` int NOT NULL DEFAULT '1' COMMENT '向量版本号',
+  `authorId` bigint DEFAULT NULL COMMENT '作者ID',
+  `maintainerId` bigint DEFAULT NULL COMMENT '维护人ID',
+  `visibilityType` enum('public','role','specified') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'public' COMMENT '可见范围',
+  `visibleRoleIds` text COLLATE utf8mb4_unicode_ci COMMENT '可见角色ID列表',
+  `visibleUserIds` text COLLATE utf8mb4_unicode_ci COMMENT '可见用户ID列表',
+  `versionNo` int NOT NULL DEFAULT '1' COMMENT '版本号',
   PRIMARY KEY (`id`),
   KEY `FK_779981e648bdd5f860a77d89f70` (`catalog_id`),
-  CONSTRAINT `FK_779981e648bdd5f860a77d89f70` FOREIGN KEY (`catalog_id`) REFERENCES `busi_article_catalog` (`id`)
+  KEY `FK_busi_article_author` (`authorId`),
+  KEY `FK_busi_article_maintainer` (`maintainerId`),
+  CONSTRAINT `FK_779981e648bdd5f860a77d89f70` FOREIGN KEY (`catalog_id`) REFERENCES `busi_article_catalog` (`id`),
+  CONSTRAINT `FK_busi_article_author` FOREIGN KEY (`authorId`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `FK_busi_article_maintainer` FOREIGN KEY (`maintainerId`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `busi_article_tag`
+--
+
+DROP TABLE IF EXISTS `busi_article_tag`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `busi_article_tag` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `create_user` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '创建人',
+  `update_time` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `update_user` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '更新人',
+  `is_delete` char(1) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '是否删除: NULL未删除，1删除',
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `color` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '标签颜色',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+  `remark` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `busi_article_tag_relation`
+--
+
+DROP TABLE IF EXISTS `busi_article_tag_relation`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `busi_article_tag_relation` (
+  `articleId` bigint NOT NULL,
+  `tagId` bigint NOT NULL,
+  PRIMARY KEY (`articleId`,`tagId`),
+  KEY `IDX_busi_article_tag_relation_article` (`articleId`),
+  KEY `IDX_busi_article_tag_relation_tag` (`tagId`),
+  CONSTRAINT `FK_busi_article_tag_relation_article` FOREIGN KEY (`articleId`) REFERENCES `busi_article` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `FK_busi_article_tag_relation_tag` FOREIGN KEY (`tagId`) REFERENCES `busi_article_tag` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

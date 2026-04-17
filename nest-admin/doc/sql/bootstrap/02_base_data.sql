@@ -10,6 +10,8 @@ DELETE FROM sys_role;
 DELETE FROM sys_dept_closure;
 DELETE FROM sys_dept;
 DELETE FROM sys_config;
+DELETE FROM busi_article_tag_relation;
+DELETE FROM busi_article_tag;
 DELETE FROM sys_user WHERE id = 1;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -20,3 +22,4 @@ SOURCE generated/sys_user_role_seed.sql;
 SOURCE generated/sys_config_seed.sql;
 SOURCE generated/sys_dept_seed.sql;
 SOURCE generated/sys_dept_closure_seed.sql;
+SOURCE generated/busi_article_tag_seed.sql;

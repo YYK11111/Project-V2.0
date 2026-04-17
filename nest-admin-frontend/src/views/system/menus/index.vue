@@ -1,16 +1,54 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { getTrees, getTypes, save, del } from './api'
+import { getTrees, getTypes, getDiagnostics, save, del } from './api'
 import { yesOrNO } from '@/utils/dictionary'
 import { checkPermi } from '@/utils/permission'
 
 const isActive = { '1': '正常', '0': '停用' }
 const formDefault = { isHidden: '0', isActive: '1' }
 const rules = { name: [$sdk.ruleRequiredBlur], key: [$sdk.ruleRequiredBlur] }
+const riskOptions = {
+  redundantHiddenRoute: '重复隐藏路由',
+  missingComponent: '缺少组件',
+  emptyCatalog: '空目录',
+}
 const canMenuAdd = computed(() => checkPermi(['system/menus/add']))
 const canMenuUpdate = computed(() => checkPermi(['system/menus/update']))
 const canMenuDelete = computed(() => checkPermi(['system/menus/delete']))
 const canManageProtectedMenu = computed(() => checkPermi(['system/menus/manageProtected']))
+const diagnosticsData = ref({
+  missingComponentMenus: [],
+  emptyCatalogs: [],
+  duplicateSiblingPaths: [],
+  redundantHiddenRoutes: [],
+})
+const diagnosticsMap = ref({})
+
+const diagnosticsSummary = computed(() => {
+  const riskMap = diagnosticsMap.value || {}
+  const allRiskTexts = Object.values(riskMap).flat()
+  return {
+    total: Object.keys(riskMap).length,
+    redundantHiddenRoute: allRiskTexts.filter((item) => item.includes('重复')).length,
+    missingComponent: allRiskTexts.filter((item) => item.includes('缺少组件')).length,
+    emptyCatalog: allRiskTexts.filter((item) => item.includes('目录无可见子菜单') || item.includes('目录无子菜单')).length,
+    duplicateSiblingPath: allRiskTexts.filter((item) => item.includes('同级菜单')).length,
+  }
+})
+
+const diagnosticIssueList = computed(() => {
+  const data = diagnosticsData.value || {}
+  return [...(data.missingComponentMenus || []), ...(data.emptyCatalogs || []), ...(data.redundantHiddenRoutes || [])]
+})
+
+function getSeverityTagType(severity) {
+  if (severity === 'high') return 'danger'
+  return 'warning'
+}
+
+function getSeverityText(severity) {
+  return severity === 'high' ? '高' : '中'
+}
 
 function isAdmin(row) {
   return row.permissionKey === 'admin'
@@ -19,8 +57,73 @@ function isAdmin(row) {
 function canOperateProtectedMenu(row) {
   return !isAdmin(row) || canManageProtectedMenu.value
 }
+
+function buildDiagnosticsMap(data = {}) {
+  const nextMap = {}
+  ;(data.missingComponentMenus || []).forEach((item) => {
+    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
+  })
+  ;(data.emptyCatalogs || []).forEach((item) => {
+    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
+  })
+  ;(data.redundantHiddenRoutes || []).forEach((item) => {
+    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
+  })
+  ;(data.duplicateSiblingPaths || []).forEach((item) => {
+    ;(item.menuIds || []).forEach((menuId) => {
+      nextMap[menuId] = [...(nextMap[menuId] || []), '同级菜单下存在重复路由地址']
+    })
+  })
+  diagnosticsMap.value = nextMap
+}
+
+function loadDiagnostics() {
+  return getDiagnostics().then((data) => {
+    diagnosticsData.value = {
+      missingComponentMenus: data?.missingComponentMenus || [],
+      emptyCatalogs: data?.emptyCatalogs || [],
+      duplicateSiblingPaths: data?.duplicateSiblingPaths || [],
+      redundantHiddenRoutes: data?.redundantHiddenRoutes || [],
+    }
+    buildDiagnosticsMap(data || {})
+  })
+}
+
+function hasRisk(row, keyword) {
+  return (diagnosticsMap.value[row.id] || []).some((risk) => risk.includes(keyword))
+}
+
+function getRouteRiskText(row) {
+  const riskList = diagnosticsMap.value[row.id] || []
+  return riskList.length ? riskList.join('；') : '-'
+}
+
+function matchRiskFilter(row, riskType) {
+  if (!riskType) return true
+  if (riskType === 'redundantHiddenRoute') return hasRisk(row, '重复')
+  if (riskType === 'missingComponent') return hasRisk(row, '缺少组件')
+  if (riskType === 'emptyCatalog') return hasRisk(row, '目录无可见子菜单') || hasRisk(row, '目录无子菜单')
+  return true
+}
+
+function filterMenuTreeByRisk(rows, riskType) {
+  return (rows || [])
+    .map((row) => ({
+      ...row,
+      children: filterMenuTreeByRisk(row.children || [], riskType),
+    }))
+    .filter((row) => matchRiskFilter(row, riskType) || row.children?.length)
+}
+
+function dealMenuData(rows, resp) {
+  const riskType = resp?.config?.params?.riskType || ''
+  const filteredRows = filterMenuTreeByRisk(rows, riskType)
+  rows.splice(0, rows.length, ...filteredRows)
+}
+
 const menuTypes = ref([])
 getTypes().then(({ data }) => (menuTypes.value = data))
+loadDiagnostics()
 
 const trees = ref([{ id: '0', name: '主类目', children: [] }])
 function getTreesFun() {
@@ -30,11 +133,58 @@ getTreesFun()
 </script>
 <template>
   <div>
-    <RequestChartTable ref="rctRef" :request="getTrees">
+    <div class="menu-diagnostics-summary Gcard mb16">
+      <div class="summary-item">风险菜单：{{ diagnosticsSummary.total }}</div>
+      <div class="summary-item">重复隐藏路由：{{ diagnosticsSummary.redundantHiddenRoute }}</div>
+      <div class="summary-item">缺少组件：{{ diagnosticsSummary.missingComponent }}</div>
+      <div class="summary-item">空目录：{{ diagnosticsSummary.emptyCatalog }}</div>
+      <div class="summary-item">同级重复路由：{{ diagnosticsSummary.duplicateSiblingPath }}</div>
+    </div>
+
+    <div class="menu-diagnostics-panel Gcard mb16">
+      <div class="panel-title">菜单体检明细</div>
+      <div class="panel-description">
+        清理顺序建议：先处理重复隐藏路由和缺少组件，再处理同级重复路由，最后处理空目录。
+      </div>
+      <div v-if="diagnosticIssueList.length" class="diagnostic-list">
+        <div v-for="item in diagnosticIssueList" :key="`${item.reason}-${item.id}`" class="diagnostic-item">
+          <div class="diagnostic-main">
+            <el-tag type="warning">{{ item.reason }}</el-tag>
+            <el-tag :type="getSeverityTagType(item.severity)">级别 {{ getSeverityText(item.severity) }}</el-tag>
+            <span class="diagnostic-name">{{ item.name || '-' }}</span>
+            <span class="diagnostic-path">{{ item.path || '-' }}</span>
+          </div>
+          <div class="diagnostic-sub">ID: {{ item.id }} | 组件: {{ item.component || '-' }} | 类型: {{ item.type }}</div>
+          <div class="diagnostic-action">建议动作：{{ item.suggestion }}</div>
+        </div>
+      </div>
+      <div v-else class="diagnostic-empty">当前没有检测到风险菜单</div>
+
+      <div class="panel-subtitle">同级重复路由</div>
+      <div v-if="diagnosticsData.duplicateSiblingPaths.length" class="diagnostic-list">
+        <div v-for="item in diagnosticsData.duplicateSiblingPaths" :key="`${item.parentId}-${item.path}-${item.type}`" class="diagnostic-item duplicate-item">
+          <div class="diagnostic-main">
+            <el-tag type="danger">重复路由</el-tag>
+            <el-tag :type="getSeverityTagType(item.severity)">级别 {{ getSeverityText(item.severity) }}</el-tag>
+            <span class="diagnostic-path">父级: {{ item.parentId || '0' }}</span>
+            <span class="diagnostic-path">路径: {{ item.path || '-' }}</span>
+            <span class="diagnostic-path">类型: {{ item.type }}</span>
+          </div>
+          <div class="diagnostic-sub">菜单: {{ (item.menuNames || []).join('、') }} | ID: {{ (item.menuIds || []).join(', ') }}</div>
+          <div class="diagnostic-action">建议动作：{{ item.suggestion }}</div>
+        </div>
+      </div>
+      <div v-else class="diagnostic-empty">当前没有检测到同级重复路由</div>
+    </div>
+
+    <RequestChartTable ref="rctRef" :request="getTrees" :dealDataFun="dealMenuData">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="菜单名称" prop="name"></BaInput>
         <BaSelect v-model="query.type" label="菜单类型" prop="type" isAll>
           <el-option v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
+        </BaSelect>
+        <BaSelect v-model="query.riskType" label="配置风险" prop="riskType" isAll>
+          <el-option v-for="(value, key) in riskOptions" :key="key" :label="value" :value="key" />
         </BaSelect>
         <BaSelect v-model="query.isActive" label="是否启用" prop="isActive" isAll>
           <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
@@ -57,6 +207,12 @@ getTreesFun()
           <el-table-column prop="permissionKey" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
           <el-table-column prop="path" label="路由地址" :show-overflow-tooltip="true"></el-table-column>
           <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
+          <el-table-column label="配置风险" min-width="180">
+            <template #default="{ row }">
+              <el-tag v-if="getRouteRiskText(row) !== '-'" type="warning">{{ getRouteRiskText(row) }}</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="isHidden" label="是否隐藏">
             <template #default="{ row }">
               {{ yesOrNO[row.isHidden] }}
@@ -91,7 +247,7 @@ getTreesFun()
       dynamicTitle="菜单"
       :rules="rules"
       width="800"
-        @confirm="(data) => { const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) return $sdk.msgWarning('当前操作没有权限'); if (isAdmin(form) && !canManageProtectedMenu) return $sdk.msgWarning('当前操作没有权限'); $refs.dialogRef.confirm(save, () => $refs.rctRef.getList(1), getTreesFun()) }">
+        @confirm="(data) => { const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) return $sdk.msgWarning('当前操作没有权限'); if (isAdmin(form) && !canManageProtectedMenu) return $sdk.msgWarning('当前操作没有权限'); $refs.dialogRef.confirm(save, () => { $refs.rctRef.getList(1); getTreesFun(); loadDiagnostics() }) }">
       <template #form="{ form }">
         <el-form-item class="width100" label="上级菜单">
           <el-tree-select
@@ -333,6 +489,84 @@ export default {
 </script> -->
 
 <style lang="scss" scoped>
+.menu-diagnostics-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+}
+
+.summary-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--ColorLight9);
+  color: var(--FontBlack);
+}
+
+.menu-diagnostics-panel {
+  padding: 16px;
+}
+
+.panel-title,
+.panel-subtitle {
+  font-weight: 600;
+  color: var(--FontBlack);
+}
+
+.panel-subtitle {
+  margin-top: 16px;
+}
+
+.panel-description {
+  margin-top: 8px;
+  color: var(--FontBlack2);
+}
+
+.diagnostic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagnostic-item {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--ColorLight9);
+}
+
+.diagnostic-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.diagnostic-name {
+  font-weight: 600;
+  color: var(--FontBlack);
+}
+
+.diagnostic-path,
+.diagnostic-sub,
+.diagnostic-empty {
+  color: var(--FontBlack2);
+}
+
+.diagnostic-sub {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.diagnostic-action {
+  margin-top: 8px;
+  color: var(--Color);
+}
+
+.diagnostic-empty {
+  margin-top: 12px;
+}
+
 :deep() .BaDialog .dialogForm {
   max-width: none;
   display: flex;

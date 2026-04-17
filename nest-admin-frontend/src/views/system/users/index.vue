@@ -187,29 +187,36 @@ function isAdmin(row) {
   return row.roles?.some((e) => (e.permissionKey || e.roleKey) === 'admin')
 }
 
+function canOperateTargetUser(targetIsAdmin: boolean) {
+  return !targetIsAdmin || canManageAdminUser.value
+}
+
 const getButtons = (row: any) => {
   const targetIsAdmin = isAdmin(row)
   return [
-    {
-      key: 'edit',
-      label: '修改',
-      disabled: !canUserUpdate.value || (targetIsAdmin && !canManageAdminUser.value),
-      onClick: () => action('edit', row),
-    },
-    {
-      key: 'delete',
-      label: '删除',
-      danger: true,
-      disabled: !canUserDelete.value || (targetIsAdmin && !canManageAdminUser.value),
-      onClick: () => rctRef.value.del(del, row.id),
-    },
-    {
-      key: 'reset',
-      label: '重置密码',
-      disabled: !canUserResetPassword.value || (targetIsAdmin && !canManageAdminUser.value),
-      onClick: () => action('resetPassword', row),
-    },
-  ]
+    canUserUpdate.value && canOperateTargetUser(targetIsAdmin)
+      ? {
+          key: 'edit',
+          label: '修改',
+          onClick: () => action('edit', row),
+        }
+      : null,
+    canUserResetPassword.value && canOperateTargetUser(targetIsAdmin)
+      ? {
+          key: 'reset',
+          label: '重置密码',
+          onClick: () => action('resetPassword', row),
+        }
+      : null,
+    canUserDelete.value && canOperateTargetUser(targetIsAdmin)
+      ? {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          onClick: () => rctRef.value.del(del, row.id),
+        }
+      : null,
+  ].filter(Boolean)
 }
 </script>
 

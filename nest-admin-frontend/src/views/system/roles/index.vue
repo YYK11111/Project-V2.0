@@ -50,26 +50,29 @@ function getList(query: any) {
 function getButtons(row: any) {
   const protectedRole = row.permissionKey === 'admin'
   return [
-    {
-      key: 'edit',
-      label: '修改',
-      disabled: !canRoleUpdate.value || (protectedRole && !canManageAdminRole.value),
-      onClick: () => handleEdit(row),
-    },
-    {
-      key: 'delete',
-      label: '删除',
-      danger: true,
-      disabled: !canRoleDelete.value || (protectedRole && !canManageAdminRole.value),
-      onClick: () => rctRef.value?.del(delRole, row.id),
-    },
-    {
-      key: 'authUser',
-      label: '分配用户',
-      disabled: !canRoleAuthUser.value || (protectedRole && !canManageAdminRole.value),
-      onClick: () => router.push({ name: 'RoleAuthUser', params: { roleId: row.id } }),
-    },
-  ]
+    canRoleUpdate.value && (!protectedRole || canManageAdminRole.value)
+      ? {
+          key: 'edit',
+          label: '修改',
+          onClick: () => handleEdit(row),
+        }
+      : null,
+    canRoleAuthUser.value && (!protectedRole || canManageAdminRole.value)
+      ? {
+          key: 'authUser',
+          label: '分配用户',
+          onClick: () => router.push({ name: 'RoleAuthUser', params: { roleId: row.id } }),
+        }
+      : null,
+    canRoleDelete.value && (!protectedRole || canManageAdminRole.value)
+      ? {
+          key: 'delete',
+          label: '删除',
+          danger: true,
+          onClick: () => rctRef.value?.del(delRole, row.id),
+        }
+      : null,
+  ].filter(Boolean)
 }
 
 function setTreeExpanded(nodes: any[], expanded: boolean) {
