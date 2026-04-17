@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { getOne, save, update, getContractStatuses } from './api'
 import { getList as getCustomerList } from '../customerManage/api'
 import UserSelect from '@/components/UserSelect.vue'
@@ -52,11 +53,39 @@ const isReadonly = computed(() => isView.value)
 const canContractAdd = computed(() => checkPermi(['business/crm/contracts/add']))
 const canContractUpdate = computed(() => checkPermi(['business/crm/contracts/update']))
 
-if (hasContractId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { ...data }
-  })
+const defaultForm = () => ({
+  name: '',
+  code: '',
+  customerId: '',
+  opportunityId: null,
+  projectId: null,
+  amount: null,
+  receivedAmount: null,
+  signingDate: '',
+  startDate: '',
+  endDate: '',
+  status: '1',
+  ownerId: '',
+  contractFile: '',
+  remark: '',
+})
+
+async function loadContract() {
+  if (!hasContractId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = { ...data }
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadContract()
+  },
+  { immediate: true },
+)
 
 function submit() {
   if ((isEdit.value && !canContractUpdate.value) || (!isEdit.value && !canContractAdd.value)) {
@@ -81,7 +110,7 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看合同' : isEdit ? '编辑合同' : '新增合同'" />
+      <el-page-header @back="$router.back()" :title="isReadonly ? '合同详情' : isEdit ? '编辑合同' : '新增合同'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px">

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { getOne, save, update, getStatus, getType, getImpact, approve, reject, submitApproval } from './api'
@@ -62,17 +62,43 @@ const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId &&
 const workflowPanelRef = ref()
 const hasChangeId = computed(() => !!route.query.id)
 
-if (hasChangeId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = data || {}
-  })
+const defaultForm = () => ({
+  title: '',
+  projectId: '',
+  type: '6',
+  impact: '2',
+  status: '1',
+  description: '',
+  reason: '',
+  impactAnalysis: '',
+  attachments: [],
+  costImpact: 0,
+  scheduleImpact: 0,
+  requesterId: '',
+  approverId: '',
+  approvalComment: '',
+  sort: 0,
+})
+
+async function loadChange() {
+  if (!hasChangeId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = data || {}
 }
 
+watch(
+  () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
+  () => {
+    loadChange()
+  },
+  { immediate: true },
+)
+
 function reloadCurrent() {
-  if (!route.query.id) return
-  getOne(route.query.id).then(({ data }) => {
-    form.value = data || {}
-  })
+  loadChange()
 }
 
 async function handleApprove() {
@@ -149,7 +175,7 @@ function scrollToWorkflowPanel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看变更' : isEdit ? '编辑变更' : '新建变更'">
+      <el-page-header @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>

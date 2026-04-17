@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { getOne, save, update, getCustomerTypes, getCustomerLevels, getCustomerStatuses, submitApproval } from './api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { ElMessageBox } from 'element-plus'
@@ -69,6 +70,7 @@ getDeptTrees().then((res) => {
 })
 
 const isView = computed(() => route.query.action === 'view')
+const hasCustomerId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const workflowTaskId = computed(() => String(route.query.taskId || ''))
 const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
@@ -82,17 +84,45 @@ const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId &&
 const workflowPanelRef = ref()
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map(dept => [String(dept.id), dept.name])))
 
-if (route.query.id) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { ...data }
-  })
+const defaultForm = () => ({
+  name: '',
+  shortName: '',
+  code: '',
+  type: '1',
+  unifiedSocialCreditCode: '',
+  industry: '',
+  scale: '',
+  address: '',
+  contactPerson: '',
+  contactPhone: '',
+  contactEmail: '',
+  level: '2',
+  status: '1',
+  salesId: '',
+  deptId: '',
+  description: '',
+  customerValue: null,
+})
+
+async function loadCustomer() {
+  if (!hasCustomerId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = { ...data }
 }
 
+watch(
+  () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
+  () => {
+    loadCustomer()
+  },
+  { immediate: true },
+)
+
 function reloadCurrent() {
-  if (!route.query.id) return
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { ...data }
-  })
+  loadCustomer()
 }
 
 function submit() {
@@ -153,7 +183,7 @@ function scrollToWorkflowPanel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看客户' : isEdit ? '编辑客户' : '新增客户'">
+      <el-page-header @back="$router.back()" :title="isReadonly ? '客户详情' : isEdit ? '编辑客户' : '新增客户'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>

@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory, submitApproval } from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import { ElMessageBox } from 'element-plus'
@@ -90,25 +91,52 @@ const workflowPanelRef = ref()
 const hasTicketId = computed(() => !!route.query.id)
 const normalizedAttachments = computed(() => Array.isArray(form.value.attachments) ? form.value.attachments : [])
 
-if (hasTicketId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = {
-      ...data,
-      severity: data.severity || '3',
-      rootCauseCategory: data.rootCauseCategory || '',
-    }
-  })
+const defaultForm = () => ({
+  title: '',
+  type: '1',
+  projectId: '',
+  taskId: '',
+  submitterId: '',
+  handlerId: '',
+  status: '1',
+  priority: '2',
+  content: '',
+  attachments: [],
+  severity: '3',
+  stepsToReproduce: '',
+  expectedResult: '',
+  actualResult: '',
+  environment: '',
+  rootCause: '',
+  rootCauseCategory: '',
+  resolution: '',
+  foundInVersion: '',
+  fixedInVersion: '',
+})
+
+async function loadTicket() {
+  if (!hasTicketId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = {
+    ...data,
+    severity: data.severity || '3',
+    rootCauseCategory: data.rootCauseCategory || '',
+  }
 }
 
+watch(
+  () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
+  () => {
+    loadTicket()
+  },
+  { immediate: true },
+)
+
 function reloadCurrent() {
-  if (!route.query.id) return
-  getOne(route.query.id).then(({ data }) => {
-    form.value = {
-      ...data,
-      severity: data.severity || '3',
-      rootCauseCategory: data.rootCauseCategory || '',
-    }
-  })
+  loadTicket()
 }
 
 function submit() {
@@ -173,7 +201,7 @@ function scrollToWorkflowPanel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看工单' : isEdit ? '编辑工单' : '新增工单'">
+      <el-page-header @back="$router.back()" :title="isReadonly ? '工单详情' : isEdit ? '编辑工单' : '新增工单'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>

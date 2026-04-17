@@ -350,34 +350,58 @@ async function handleRemoveDependency(depId) {
   }
 }
 
-if (hasTaskId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { 
-      ...data,
-      estimatedHours: data.estimatedHours || 0,
-      actualHours: data.actualHours || 0,
-      remainingHours: data.remainingHours || 0,
-      storyPoints: data.storyPoints || 0,
-    }
-    loadDependencies()
-  })
+const defaultForm = () => ({
+  name: '',
+  projectId: '',
+  leaderId: '',
+  executorIds: [],
+  startDate: '',
+  endDate: '',
+  status: '1',
+  priority: '2',
+  progress: 0,
+  description: '',
+  attachments: [],
+  estimatedHours: 0,
+  actualHours: 0,
+  remainingHours: 0,
+  acceptanceCriteria: '',
+  storyPoints: 0,
+})
+
+async function loadTask() {
+  if (!hasTaskId.value) {
+    form.value = defaultForm()
+    dependencies.value = []
+    dependents.value = []
+    taskComments.value = []
+    timeLogs.value = []
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = {
+    ...data,
+    estimatedHours: data.estimatedHours || 0,
+    actualHours: data.actualHours || 0,
+    remainingHours: data.remainingHours || 0,
+    storyPoints: data.storyPoints || 0,
+  }
+  await loadDependencies()
   loadTaskComments()
   loadTimeLogs()
   loadSprintOptions()
 }
 
+watch(
+  () => [route.query.id, route.query.action, route.query.tab, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
+  () => {
+    loadTask()
+  },
+  { immediate: true },
+)
+
 function reloadCurrent() {
-  if (!route.query.id) return
-  return getOne(route.query.id).then(({ data }) => {
-    form.value = {
-      ...data,
-      estimatedHours: data.estimatedHours || 0,
-      actualHours: data.actualHours || 0,
-      remainingHours: data.remainingHours || 0,
-      storyPoints: data.storyPoints || 0,
-    }
-    loadDependencies()
-  })
+  return loadTask()
 }
 
 function submit() {
@@ -464,7 +488,7 @@ watch(hasTaskId, (value) => {
 <template>
   <div class="Gcard task-form-page">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看任务' : isEdit ? '编辑任务' : '新增任务'">
+      <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
         <template #extra>
           <el-button v-if="hasTaskId" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
           <el-button v-if="hasTaskId" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>

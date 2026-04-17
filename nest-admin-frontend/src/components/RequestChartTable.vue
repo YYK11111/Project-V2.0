@@ -78,6 +78,14 @@ export default defineComponent({
       type: String,
       default: '220',
     },
+    isSelection: {
+      type: Boolean,
+      default: false,
+    },
+    isSigleSelect: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {

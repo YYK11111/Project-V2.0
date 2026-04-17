@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -42,11 +42,33 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
 const canMilestoneUpdate = computed(() => checkPermi(['business/milestones/update']))
 
-if (hasMilestoneId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = data || {}
-  })
+const defaultForm = () => ({
+  name: '',
+  projectId: '',
+  description: '',
+  dueDate: '',
+  completedDate: '',
+  status: '1',
+  deliverables: [],
+  sort: 0,
+})
+
+async function loadMilestone() {
+  if (!hasMilestoneId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = data || {}
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadMilestone()
+  },
+  { immediate: true },
+)
 
 function handleInputConfirm() {
   if (inputValue.value) {
@@ -86,12 +108,26 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    if (hasMilestoneId.value) {
+      getOne(route.query.id).then(({ data }) => {
+        form.value = data || {}
+      })
+    } else {
+      form.value = defaultForm()
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '查看里程碑' : isEdit ? '编辑里程碑' : '新增里程碑'" />
+      <el-page-header @back="$router.back()" :title="isView ? '里程碑详情' : isEdit ? '编辑里程碑' : '新增里程碑'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

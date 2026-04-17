@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { getOne, save, update, getType } from './api'
 import UserSelect from '@/components/UserSelect.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -37,11 +38,32 @@ const isReadonly = computed(() => isView.value)
 const canDocumentAdd = computed(() => checkPermi(['business/documents/add']))
 const canDocumentUpdate = computed(() => checkPermi(['business/documents/update']))
 
-if (hasDocumentId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { ...data }
-  })
+const defaultForm = () => ({
+  name: '',
+  projectId: '',
+  type: '1',
+  content: '',
+  fileUrl: '',
+  version: '1.0',
+  uploaderId: '',
+})
+
+async function loadDocument() {
+  if (!hasDocumentId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = { ...data }
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadDocument()
+  },
+  { immediate: true },
+)
 
 function submit() {
   if ((isEdit.value && !canDocumentUpdate.value) || (!isEdit.value && !canDocumentAdd.value)) {
@@ -66,7 +88,7 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看文档' : isEdit ? '编辑文档' : '新增文档'" />
+      <el-page-header @back="$router.back()" :title="isReadonly ? '文档详情' : isEdit ? '编辑文档' : '新增文档'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

@@ -33,9 +33,7 @@ export default defineComponent({
         : '请输入' + (this.$attrs.label || this.$.parent?.props?.label || '')
     },
     requiredToRule() {
-      // console.log(this.$slots)
-
-      return this.required && [$sdk.ruleRequiredChange]
+      return this.required ? [$sdk.ruleRequiredChange] : undefined
     },
   },
 })

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus, getLevel, getCategory } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -49,11 +49,38 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
 
-if (hasRiskId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = data || {}
-  })
+const defaultForm = () => ({
+  name: '',
+  projectId: '',
+  category: '8',
+  level: '2',
+  status: '1',
+  description: '',
+  mitigation: '',
+  impactEstimate: 0,
+  ownerId: '',
+  identifiedDate: '',
+  dueDate: '',
+  resolvedDate: '',
+  sort: 0,
+})
+
+async function loadRisk() {
+  if (!hasRiskId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = data || {}
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadRisk()
+  },
+  { immediate: true },
+)
 
 function submit() {
   if ((isEdit.value && !canRiskUpdate.value) || (!isEdit.value && !canRiskAdd.value)) {
@@ -73,12 +100,26 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    if (hasRiskId.value) {
+      getOne(route.query.id).then(({ data }) => {
+        form.value = data || {}
+      })
+    } else {
+      form.value = defaultForm()
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '查看风险' : isEdit ? '编辑风险' : '新增风险'" />
+      <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

@@ -1,4 +1,5 @@
 <script setup>
+import { watch } from 'vue'
 import { getOne, save, update, getInteractionTypes } from './api'
 import { getList as getCustomerList } from '../customerManage/api'
 import { useUserStore } from '@/stores/user'
@@ -44,11 +45,33 @@ const isReadonly = computed(() => isView.value)
 const canInteractionAdd = computed(() => checkPermi(['business/crm/interactions/add']))
 const canInteractionUpdate = computed(() => checkPermi(['business/crm/interactions/update']))
 
-if (hasInteractionId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = { ...data }
-  })
+const defaultForm = () => ({
+  customerId: '',
+  interactionType: '1',
+  content: '',
+  interactionTime: '',
+  operatorId: userStore.id,
+  operatorName: userStore.nickname || userStore.name,
+  nextFollowTime: '',
+  attachments: [],
+})
+
+async function loadInteraction() {
+  if (!hasInteractionId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = { ...data }
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadInteraction()
+  },
+  { immediate: true },
+)
 
 function submit() {
   if ((isEdit.value && !canInteractionUpdate.value) || (!isEdit.value && !canInteractionAdd.value)) {
@@ -73,7 +96,7 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '查看互动记录' : isEdit ? '编辑互动记录' : '新增互动记录'" />
+      <el-page-header @back="$router.back()" :title="isReadonly ? '互动记录详情' : isEdit ? '编辑互动记录' : '新增互动记录'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

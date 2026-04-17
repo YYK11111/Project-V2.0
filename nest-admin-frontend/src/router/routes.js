@@ -373,7 +373,9 @@ function transRouter(routesData, parentPath) {
         }
       } else if (route.component && route.component !== '') {
         routeComponent = loadView(route)
-        if (hasVisibleChildren) {
+        // 只要存在子路由（哪怕都是隐藏的表单/详情页），父级就必须退化为 routerView 容器，
+        // 否则命中子路由时仍会停留在父级列表页。
+        if (hasChildren) {
           route.component = routerView
           wrapRouteWithRouterView = true
         } else {

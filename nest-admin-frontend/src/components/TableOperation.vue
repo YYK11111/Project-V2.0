@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 
 export interface OperationButton {
   key: string
@@ -11,8 +12,15 @@ export interface OperationButton {
   onClick?: (row: any) => void
 }
 
+function shouldRenderButton(button: OperationButton | null | undefined) {
+  if (!button) return false
+  if (button.show === false) return false
+  if (button.disabled) return false
+  return true
+}
+
 const props = withDefaults(defineProps<{
-  buttons: OperationButton[]
+  buttons: Array<OperationButton | null | undefined>
   row?: any
   rctRef?: any
   maxVisible?: number
@@ -20,13 +28,14 @@ const props = withDefaults(defineProps<{
   maxVisible: 3,
 })
 
+const normalizedButtons = computed(() => props.buttons.filter(shouldRenderButton) as OperationButton[])
+
 const visibleButtons = computed(() => {
-  return props.buttons.filter(btn => btn.show !== false).slice(0, props.maxVisible)
+  return normalizedButtons.value.slice(0, props.maxVisible)
 })
 
 const overflowButtons = computed(() => {
-  const shown = props.buttons.filter(btn => btn.show !== false)
-  return shown.slice(props.maxVisible)
+  return normalizedButtons.value.slice(props.maxVisible)
 })
 
 const handleClick = (btn: OperationButton) => {

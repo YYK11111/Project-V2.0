@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -44,11 +44,36 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canSprintUpdate = computed(() => checkPermi(['business/sprints/update']))
 
-if (hasSprintId.value) {
-  getOne(route.query.id).then(({ data }) => {
-    form.value = data || {}
-  })
+const defaultForm = () => ({
+  name: '',
+  projectId: '',
+  status: '1',
+  goal: '',
+  startDate: '',
+  endDate: '',
+  totalStoryPoints: 0,
+  completedStoryPoints: 0,
+  totalTaskCount: 0,
+  completedTaskCount: 0,
+  sort: 0,
+})
+
+async function loadSprint() {
+  if (!hasSprintId.value) {
+    form.value = defaultForm()
+    return
+  }
+  const { data } = await getOne(route.query.id)
+  form.value = data || {}
 }
+
+watch(
+  () => [route.query.id, route.query.action],
+  () => {
+    loadSprint()
+  },
+  { immediate: true },
+)
 
 function submit() {
   if ((isEdit.value && !canSprintUpdate.value) || (!isEdit.value && !canSprintAdd.value)) {
@@ -73,7 +98,7 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '查看Sprint' : isEdit ? '编辑Sprint' : '新建Sprint'" />
+      <el-page-header @back="$router.back()" :title="isView ? 'Sprint详情' : isEdit ? '编辑Sprint' : '新增Sprint'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

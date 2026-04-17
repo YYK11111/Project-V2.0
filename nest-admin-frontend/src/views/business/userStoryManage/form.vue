@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, getList, save, update, getStatus, getType } from './api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
@@ -79,6 +79,33 @@ function loadData() {
   })
 }
 
+watch(
+  () => [route.query.id, route.query.action],
+  async () => {
+    if (hasStoryId.value) {
+      loadData()
+    } else {
+      form.value = {
+        title: '',
+        description: '',
+        type: '2',
+        status: '1',
+        storyPoints: 0,
+        acceptanceCriteria: '',
+        priority: 0,
+        sprintId: null,
+        parentId: null,
+        assigneeId: null,
+        reporterId: null,
+        projectId: '',
+        estimatedDate: '',
+      }
+      parentStoryList.value = []
+    }
+  },
+  { immediate: true },
+)
+
 async function loadParentStories(projectId) {
   if (!projectId) {
     parentStoryList.value = []
@@ -116,7 +143,7 @@ function cancel() {
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '查看用户故事' : isEdit ? '编辑用户故事' : '新增用户故事'" />
+      <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">

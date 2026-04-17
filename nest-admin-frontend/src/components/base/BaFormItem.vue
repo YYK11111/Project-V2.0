@@ -20,7 +20,7 @@ export default {
 </script>
 
 <template>
-  <el-form-item class="BaFormItem" :rules="required && [$sdk.ruleRequiredChange]">
+  <el-form-item class="BaFormItem" :rules="required ? [$sdk.ruleRequiredChange] : undefined">
     <slot></slot>
   </el-form-item>
 </template>

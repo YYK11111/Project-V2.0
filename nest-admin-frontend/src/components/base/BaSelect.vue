@@ -37,7 +37,7 @@ export default defineComponent({
       class="BaSelect"
       clearable
       :placeholder="placeholderTransfer"
-      :empty-values="isAll && ['', null]"
+      :empty-values="isAll ? ['', null] : undefined"
       v-bind="Object.assign({}, $attrs, { style: '', class: '', id: '' })">
       <el-option v-if="isAll" label="全部" :value="undefined"></el-option>
       <slot></slot>
