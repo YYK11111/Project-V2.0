@@ -108,6 +108,9 @@ export class Risk extends BaseEntity {
   @BaseColumn({ type: "text", nullable: true, comment: "风险应对措施" })
   mitigation: string;
 
+  @BaseColumn({ type: "json", nullable: true, comment: "风险附件" })
+  attachments: string[];
+
   @BaseColumn({
     type: "decimal",
     precision: 5,

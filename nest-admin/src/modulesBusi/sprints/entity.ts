@@ -49,6 +49,9 @@ export class Sprint extends BaseEntity {
   @BaseColumn({ type: "text", nullable: true, comment: "Sprint目标" })
   goal: string;
 
+  @BaseColumn({ type: "json", nullable: true, comment: "Sprint附件" })
+  attachments: string[];
+
   @BaseColumn({ nullable: true, name: "owner_id", comment: "Sprint负责人ID" })
   ownerId: string;
 

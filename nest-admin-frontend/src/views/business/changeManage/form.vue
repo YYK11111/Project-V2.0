@@ -5,10 +5,12 @@ import { ElMessageBox } from 'element-plus'
 import { getOne, save, update, getStatus, getType, getImpact, approve, reject, publishKnowledge, submitApproval, confirmPlanImpact, confirmPlanImpactScope, applyPlanImpactTarget } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
@@ -287,8 +289,9 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="change-form-page">
+    <div class="Gcard change-form-shell">
+    <div class="change-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
@@ -324,6 +327,15 @@ function scrollToWorkflowPanel() {
     </el-alert>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
+      <div class="change-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护变更标题、归属项目、类型、影响程度和状态，先把变更基本上下文建立清楚。</div>
+          </div>
+        </div>
+        <div class="change-section-fields">
       <el-form-item label="变更标题" prop="title">
         <ViewField v-if="isReadonly" :value="form.title" />
         <el-input v-else v-model="form.title" placeholder="请输入变更标题" maxlength="200" show-word-limit />
@@ -369,6 +381,17 @@ function scrollToWorkflowPanel() {
       <el-form-item label="当前审批节点" v-if="hasChangeId && form.currentNodeName">
         <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
       </el-form-item>
+        </div>
+      </section>
+
+      <section v-if="hasChangeId" class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">计划影响与处理</div>
+            <div class="section-desc">查看整体处理状态、分项处理记录和确认历史，确保计划影响闭环可追踪。</div>
+          </div>
+        </div>
+        <div class="change-section-fields">
 
       <el-form-item label="计划影响处理" v-if="hasChangeId">
         <ViewTagField :text="String(form.planImpactConfirmed || '0') === '1' ? '已确认处理' : '待确认处理'" :type="String(form.planImpactConfirmed || '0') === '1' ? 'success' : 'warning'" />
@@ -417,6 +440,17 @@ function scrollToWorkflowPanel() {
         show-icon
         class="mb-16"
       />
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">变更分析</div>
+            <div class="section-desc">补充变更原因、影响分析和成本进度影响，便于评估实施范围与风险。</div>
+          </div>
+        </div>
+        <div class="change-section-fields">
       <el-form-item label="变更原因">
         <ViewField v-if="isReadonly" :value="form.reason" />
         <el-input v-else v-model="form.reason" type="textarea" :rows="2" placeholder="请输入变更原因" />
@@ -489,6 +523,17 @@ function scrollToWorkflowPanel() {
           <div v-if="Number(form.costImpact || 0) > 0">当前变更会带来 {{ Number(form.costImpact || 0) }} 的成本影响，建议同步关注预算偏差和相关交付范围。</div>
         </div>
       </el-alert>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">审批与附件</div>
+            <div class="section-desc">维护申请人、审批人、审批意见和变更附件，统一沉淀支撑材料。</div>
+          </div>
+        </div>
+        <div class="change-section-fields">
 
       <el-form-item label="申请人">
         <ViewUser v-if="isReadonly" :user="form.requester" />
@@ -505,18 +550,26 @@ function scrollToWorkflowPanel() {
         <el-input v-else v-model="form.approvalComment" type="textarea" :rows="2" />
       </el-form-item>
 
+      <el-form-item label="变更附件">
+        <ViewFileList v-if="isReadonly" :files="form.attachments || []" />
+        <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
+      </el-form-item>
+
       <el-form-item label="排序">
         <ViewField v-if="isReadonly" :value="form.sort" />
         <el-input-number v-else v-model="form.sort" :min="0" />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-form-item>
+      <el-form-item class="footer-actions">
         <el-button v-if="!isReadonly && (isEdit ? canChangeUpdate : canChangeAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
         <el-button v-if="!isReadonly && isEdit.value && canChangeUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
         <el-button v-if="!isWorkflowReadonly && isEdit.value && canChangeUpdate && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
         <el-button v-if="!isWorkflowReadonly && isEdit.value && canChangeUpdate && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
       </el-form-item>
+      </div>
     </el-form>
 
     <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
@@ -528,10 +581,64 @@ function scrollToWorkflowPanel() {
         @approved="reloadCurrent"
       />
     </div>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
+.change-form-page {
+  min-height: 100%;
+}
+
+.change-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.change-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.change-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.change-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.change-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
 .workflow-panel-section {
   margin-top: 20px;
   max-width: 800px;
@@ -550,6 +657,20 @@ function scrollToWorkflowPanel() {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .change-impact-alert__title {
@@ -609,5 +730,11 @@ function scrollToWorkflowPanel() {
   font-size: 13px;
   line-height: 1.7;
   color: var(--el-text-color-regular);
+}
+
+@media (max-width: 768px) {
+  .section-card {
+    padding: 18px;
+  }
 }
 </style>

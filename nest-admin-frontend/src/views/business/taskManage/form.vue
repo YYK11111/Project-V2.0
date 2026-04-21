@@ -594,32 +594,8 @@ watch(hasTaskId, (value) => {
 </script>
 
 <template>
-  <div class="task-form-page km-page">
-    <div class="task-form-hero Gcard km-hero">
-      <div class="task-form-hero__eyebrow km-hero__eyebrow">任务管理</div>
-      <div class="task-form-hero__title km-hero__title">{{ isReadonly ? '查看任务全量执行信息与协作记录' : isEdit ? '统一维护任务计划、执行信息与审批状态' : '创建新任务并补齐执行基础信息' }}</div>
-      <div class="task-form-hero__desc km-hero__desc">先完成任务归属、负责人和时间计划，再补齐执行说明、验收标准、附件、汇报与评论，让任务推进信息更清楚、更容易协作。</div>
-      <div class="task-form-hero__stats">
-        <div class="task-form-hero__stat">
-          <div class="task-form-hero__stat-label">当前模式</div>
-          <div class="task-form-hero__stat-value">{{ isReadonly ? '查看任务' : isEdit ? '编辑任务' : '新增任务' }}</div>
-        </div>
-        <div class="task-form-hero__stat">
-          <div class="task-form-hero__stat-label">任务状态</div>
-          <div class="task-form-hero__stat-value">{{ status[form.status] || '草稿' }}</div>
-        </div>
-        <div class="task-form-hero__stat">
-          <div class="task-form-hero__stat-label">当前进度</div>
-          <div class="task-form-hero__stat-value">{{ Number(form.progress || 0) }}%</div>
-        </div>
-        <div class="task-form-hero__stat">
-          <div class="task-form-hero__stat-label">协作记录</div>
-          <div class="task-form-hero__stat-value">{{ (timeLogs?.length || 0) + (taskComments?.length || 0) }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="Gcard km-panel task-form-shell">
+  <div class="task-form-page">
+    <div class="Gcard task-form-shell">
       <div class="task-form-shell__top">
         <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
           <template #extra>
@@ -843,7 +819,7 @@ watch(hasTaskId, (value) => {
           <div class="source-entity-inline">
             <ViewField :value="sourceEntity.title || sourceEntity.name || sourceStoryTitle || form.sourceId" />
             <el-button v-if="sourceEntity.type === 'story'" link type="primary" @click="router.push({ path: '/projectManage/userStoryManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看故事</el-button>
-            <el-button v-if="sourceEntity.type === 'risk'" link type="primary" @click="router.push({ path: '/riskManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看风险</el-button>
+            <el-button v-if="sourceEntity.type === 'risk'" link type="primary" @click="router.push({ path: '/projectManage/riskManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看风险</el-button>
             <el-button v-if="sourceEntity.type === 'ticket'" link type="primary" @click="router.push({ path: '/ticketManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看工单</el-button>
           </div>
         </el-form-item>
@@ -1113,42 +1089,8 @@ watch(hasTaskId, (value) => {
   padding: 0;
 }
 
-.task-form-hero__title {
-  max-width: none;
-}
-
-.task-form-hero__desc {
-  max-width: none;
-}
-
-.task-form-hero__stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.task-form-hero__stat {
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 14%, var(--el-border-color-lighter));
-  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
-}
-
-.task-form-hero__stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.task-form-hero__stat-value {
-  margin-top: 6px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
 .task-form-shell {
-  margin-top: 18px;
+  width: 100%;
 }
 
 .task-form-shell__top {
@@ -1471,10 +1413,6 @@ watch(hasTaskId, (value) => {
 }
 
 @media (max-width: 768px) {
-  .task-form-hero__stats {
-    grid-template-columns: 1fr;
-  }
-
   .task-section {
     padding: 18px;
     border-radius: 12px;
@@ -1490,10 +1428,6 @@ watch(hasTaskId, (value) => {
 }
 
 @media (max-width: 1080px) {
-  .task-form-hero__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

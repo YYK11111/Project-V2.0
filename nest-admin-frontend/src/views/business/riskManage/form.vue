@@ -3,9 +3,11 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus, getLevel, getCategory, publishKnowledge, convertToTask } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
@@ -28,6 +30,7 @@ const form = ref({
   identifiedDate: '',
   dueDate: '',
   resolvedDate: '',
+  attachments: [],
   sort: 0,
 })
 
@@ -65,6 +68,7 @@ const defaultForm = () => ({
   identifiedDate: '',
   dueDate: '',
   resolvedDate: '',
+  attachments: [],
   sort: 0,
 })
 
@@ -131,8 +135,9 @@ async function handleConvertToTask() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="risk-form-page">
+    <div class="Gcard risk-form-shell">
+    <div class="risk-form-shell__top">
       <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
         <template #extra>
           <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
@@ -143,6 +148,15 @@ async function handleConvertToTask() {
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
+      <div class="risk-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护风险名称、归属项目、等级状态和责任人，先把风险上下文建立完整。</div>
+          </div>
+        </div>
+        <div class="risk-section-fields">
       <el-form-item label="风险名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入风险名称" maxlength="200" show-word-limit />
@@ -174,21 +188,6 @@ async function handleConvertToTask() {
         </el-select>
       </el-form-item>
 
-      <el-form-item label="风险描述">
-        <ViewField v-if="isView" :value="form.description" />
-        <el-input v-else v-model="form.description" type="textarea" :rows="3" placeholder="请输入风险描述" />
-      </el-form-item>
-
-      <el-form-item label="应对措施">
-        <ViewField v-if="isView" :value="form.mitigation" />
-        <el-input v-else v-model="form.mitigation" type="textarea" :rows="3" placeholder="请输入应对措施" />
-      </el-form-item>
-
-      <el-form-item label="影响程度(%)">
-        <ViewField v-if="isView" :value="form.impactEstimate" />
-        <el-input-number v-else v-model="form.impactEstimate" :min="0" :max="100" />
-      </el-form-item>
-
       <el-form-item label="责任人">
         <ViewUser v-if="isView" :user="form.riskOwner" />
         <UserSelect v-else v-model="form.ownerId" placeholder="请选择责任人" clearable />
@@ -207,6 +206,47 @@ async function handleConvertToTask() {
       <el-form-item label="实际解决日期" v-if="isEdit.value">
         <el-date-picker v-model="form.resolvedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
       </el-form-item>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">风险分析</div>
+            <div class="section-desc">补充风险描述、应对措施和影响程度，便于后续跟踪与处理。</div>
+          </div>
+        </div>
+        <div class="risk-section-fields">
+
+      <el-form-item label="风险描述">
+        <ViewField v-if="isView" :value="form.description" />
+        <el-input v-else v-model="form.description" type="textarea" :rows="3" placeholder="请输入风险描述" />
+      </el-form-item>
+
+      <el-form-item label="应对措施">
+        <ViewField v-if="isView" :value="form.mitigation" />
+        <el-input v-else v-model="form.mitigation" type="textarea" :rows="3" placeholder="请输入应对措施" />
+      </el-form-item>
+
+      <el-form-item label="影响程度(%)">
+        <ViewField v-if="isView" :value="form.impactEstimate" />
+        <el-input-number v-else v-model="form.impactEstimate" :min="0" :max="100" />
+      </el-form-item>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">关联信息与附件</div>
+            <div class="section-desc">统一查看关联任务、附件材料和排序信息，减少处理过程中的信息缺口。</div>
+          </div>
+        </div>
+        <div class="risk-section-fields">
+      <el-form-item label="风险附件">
+        <ViewFileList v-if="isView" :files="form.attachments || []" />
+        <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
+      </el-form-item>
 
       <el-form-item label="关联任务" v-if="form.linkedTask">
         <div class="linked-task-inline">
@@ -219,11 +259,84 @@ async function handleConvertToTask() {
         <ViewField v-if="isView" :value="form.sort" />
         <el-input-number v-else v-model="form.sort" :min="0" />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-form-item v-if="!isView">
+      <el-form-item v-if="!isView" class="footer-actions">
         <el-button v-if="!isView && (isEdit ? canRiskUpdate : canRiskAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
       </el-form-item>
+      </div>
     </el-form>
+    </div>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.risk-form-page {
+  min-height: 100%;
+}
+
+.risk-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.risk-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.risk-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.risk-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
+.risk-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+</style>

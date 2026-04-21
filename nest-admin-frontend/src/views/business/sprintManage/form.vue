@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
@@ -30,6 +32,7 @@ const form = ref({
   completedStoryPoints: 0,
   totalTaskCount: 0,
   completedTaskCount: 0,
+  attachments: [],
   sort: 0,
 })
 
@@ -74,6 +77,7 @@ const defaultForm = () => ({
   completedStoryPoints: 0,
   totalTaskCount: 0,
   completedTaskCount: 0,
+  attachments: [],
   sort: 0,
 })
 
@@ -132,12 +136,23 @@ function cancel() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="sprint-form-page">
+    <div class="Gcard sprint-form-shell">
+    <div class="sprint-form-shell__top">
       <el-page-header @back="$router.back()" :title="isView ? 'Sprint详情' : isEdit ? '编辑Sprint' : '新增Sprint'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+      <div class="sprint-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护 Sprint 名称、归属项目、状态和时间范围，先把执行边界建立清楚。</div>
+          </div>
+        </div>
+
+        <div class="sprint-section-fields">
       <el-form-item label="Sprint名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入Sprint名称" maxlength="100" show-word-limit />
@@ -189,6 +204,18 @@ function cancel() {
         <ViewField v-if="isView" :value="form.healthScoreSnapshot" />
         <el-input-number v-else v-model="form.healthScoreSnapshot" :min="0" :max="100" :precision="2" style="width: 100%" />
       </el-form-item>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">执行指标与附件</div>
+            <div class="section-desc">统一查看变更提示、故事点和任务数统计，并维护 Sprint 附件。</div>
+          </div>
+        </div>
+
+        <div class="sprint-section-fields">
 
       <el-alert
         v-if="sprintImpactTips.length && !isView"
@@ -237,20 +264,96 @@ function cancel() {
         </el-col>
       </el-row>
 
+      <el-form-item label="Sprint附件">
+        <ViewFileList v-if="isView" :files="form.attachments || []" />
+        <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
+      </el-form-item>
+
       <el-form-item label="排序">
         <ViewField v-if="isView" :value="form.sort" />
         <el-input-number v-else v-model="form.sort" :min="0" />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-form-item v-if="!isView">
+      <el-form-item v-if="!isView" class="footer-actions">
         <el-button v-if="!isView && (isEdit ? canSprintUpdate : canSprintAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
       </el-form-item>
+      </div>
     </el-form>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.sprint-form-page {
+  min-height: 100%;
+}
+
+.sprint-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.sprint-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.sprint-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sprint-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
+.sprint-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
 .sprint-impact-alert__title {
   font-size: 14px;
   font-weight: 600;
@@ -262,5 +365,11 @@ function cancel() {
   gap: 6px;
   font-size: 13px;
   line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .section-card {
+    padding: 18px;
+  }
 }
 </style>

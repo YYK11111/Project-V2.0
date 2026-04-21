@@ -6,6 +6,7 @@ export type CreateMilestoneDto = {
   description?: string;
   dueDate?: string;
   completedDate?: string;
+  attachments?: string[];
   status?: string;
   taskCount?: number;
   completedTaskCount?: number;

@@ -13,6 +13,7 @@ export type CreateRiskDto = {
   identifiedDate?: string;
   dueDate?: string;
   resolvedDate?: string;
+  attachments?: string[];
   knowledgeLinked?: string;
   knowledgeArticleId?: string;
   sort?: number;

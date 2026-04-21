@@ -8,6 +8,7 @@ export type CreateSprintDto = {
   ownerId?: string;
   startDate?: string;
   endDate?: string;
+  attachments?: string[];
   delayReason?: string;
   changeImpactFlag?: string;
   healthScoreSnapshot?: number;

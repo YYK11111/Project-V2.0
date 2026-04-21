@@ -40,6 +40,9 @@ export class Milestone extends BaseEntity {
   @BaseColumn({ type: "text", nullable: true, comment: "里程碑描述" })
   description: string;
 
+  @BaseColumn({ type: "json", nullable: true, comment: "里程碑附件" })
+  attachments: string[];
+
   @BaseColumn({
     type: "datetime",
     transformer: {

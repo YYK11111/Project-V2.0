@@ -5,8 +5,10 @@ import { getOne, getList, save, update, getStatus, getType, getTaskDraft } from 
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
 import UserSelect from '@/components/UserSelect.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
@@ -29,6 +31,7 @@ const form = ref({
   reporterId: null,
   projectId: '',
   estimatedDate: '',
+  attachments: [],
 })
 
 const rules = {
@@ -99,6 +102,7 @@ watch(
         reporterId: null,
         projectId: '',
         estimatedDate: '',
+        attachments: [],
       }
       parentStoryList.value = []
     }
@@ -162,32 +166,8 @@ async function handleCreateTaskFromStory() {
 </script>
 
 <template>
-  <div class="story-form-page km-page">
-    <div class="story-form-hero Gcard km-hero">
-      <div class="story-form-hero__eyebrow km-hero__eyebrow">用户故事管理</div>
-      <div class="story-form-hero__title km-hero__title">{{ isView ? '查看用户故事的业务背景、排期归属与验收标准' : isEdit ? '统一维护用户故事信息、归属关系与交付要求' : '创建新用户故事并补齐计划与验收信息' }}</div>
-      <div class="story-form-hero__desc km-hero__desc">先完成故事标题、项目归属和负责人，再补齐故事点、优先级、描述与验收标准，让需求拆解更清楚、排期更顺畅、交付口径更一致。</div>
-      <div class="story-form-hero__stats">
-        <div class="story-form-hero__stat">
-          <div class="story-form-hero__stat-label">当前模式</div>
-          <div class="story-form-hero__stat-value">{{ isView ? '查看故事' : isEdit ? '编辑故事' : '新增故事' }}</div>
-        </div>
-        <div class="story-form-hero__stat">
-          <div class="story-form-hero__stat-label">故事状态</div>
-          <div class="story-form-hero__stat-value">{{ statusMap[form.status] || '待处理' }}</div>
-        </div>
-        <div class="story-form-hero__stat">
-          <div class="story-form-hero__stat-label">故事点</div>
-          <div class="story-form-hero__stat-value">{{ Number(form.storyPoints || 0) }}</div>
-        </div>
-        <div class="story-form-hero__stat">
-          <div class="story-form-hero__stat-label">优先级</div>
-          <div class="story-form-hero__stat-value">{{ Number(form.priority || 0) }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="Gcard km-panel story-form-shell">
+  <div class="story-form-page">
+    <div class="Gcard story-form-shell">
       <div class="story-form-shell__top">
         <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'">
           <template #extra>
@@ -314,6 +294,20 @@ async function handleCreateTaskFromStory() {
               </el-form-item>
             </div>
           </section>
+
+          <section class="section-card section-card--content">
+            <div class="section-header section-header--stack km-section-header">
+              <div>
+                <div class="section-title km-section-title">附件</div>
+                <div class="section-desc km-section-desc">补充故事原型、说明文档和评审材料，减少执行偏差。</div>
+              </div>
+            </div>
+
+            <el-form-item label="故事附件">
+              <ViewFileList v-if="isView" :files="form.attachments || []" />
+              <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
+            </el-form-item>
+          </section>
         </div>
 
         <el-form-item class="footer-actions">
@@ -330,39 +324,8 @@ async function handleCreateTaskFromStory() {
   padding: 0;
 }
 
-.story-form-hero__title,
-.story-form-hero__desc {
-  max-width: none;
-}
-
-.story-form-hero__stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.story-form-hero__stat {
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--el-color-primary) 14%, var(--el-border-color-lighter));
-  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
-}
-
-.story-form-hero__stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.story-form-hero__stat-value {
-  margin-top: 6px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
 .story-form-shell {
-  margin-top: 18px;
+  width: 100%;
 }
 
 .story-form-shell__top {
@@ -459,17 +422,7 @@ async function handleCreateTaskFromStory() {
   margin-left: 0;
 }
 
-@media (max-width: 1080px) {
-  .story-form-hero__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 768px) {
-  .story-form-hero__stats {
-    grid-template-columns: 1fr;
-  }
-
   .story-form-sections {
     gap: 18px;
   }

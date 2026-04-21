@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
@@ -32,6 +34,7 @@ const form = ref({
   phase: '',
   changeImpactFlag: '0',
   riskImpactFlag: '0',
+  attachments: [],
   sort: 0,
 })
 
@@ -79,6 +82,7 @@ const defaultForm = () => ({
   phase: '',
   changeImpactFlag: '0',
   riskImpactFlag: '0',
+  attachments: [],
   sort: 0,
 })
 
@@ -154,12 +158,23 @@ function cancel() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="milestone-form-page">
+    <div class="Gcard milestone-form-shell">
+    <div class="milestone-form-shell__top">
       <el-page-header @back="$router.back()" :title="isView ? '里程碑详情' : isEdit ? '编辑里程碑' : '新增里程碑'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+      <div class="milestone-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护里程碑名称、项目归属、责任人和计划时间，让关键交付节点边界清楚可见。</div>
+          </div>
+        </div>
+
+        <div class="milestone-section-fields">
       <el-form-item label="里程碑名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入里程碑名称" maxlength="100" show-word-limit />
@@ -232,6 +247,18 @@ function cancel() {
         <ViewField v-if="isView" :value="form.riskImpactFlag === '1' ? '是' : '否'" />
         <el-switch v-else v-model="form.riskImpactFlag" active-value="1" inactive-value="0" />
       </el-form-item>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">交付物与附件</div>
+            <div class="section-desc">统一维护交付物清单、里程碑附件和补充说明，方便后续执行对齐。</div>
+          </div>
+        </div>
+
+        <div class="milestone-section-fields">
 
       <el-form-item label="交付物清单">
         <div v-if="!isView">
@@ -249,12 +276,26 @@ function cancel() {
         </div>
       </el-form-item>
 
+      <el-form-item label="里程碑附件">
+        <ViewFileList v-if="isView" :files="form.attachments || []" />
+        <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
+      </el-form-item>
+
       <el-form-item label="排序">
         <ViewField v-if="isView" :value="form.sort" />
         <el-input-number v-else v-model="form.sort" :min="0" />
       </el-form-item>
+        </div>
+      </section>
 
       <template v-if="hasMilestoneId">
+        <section class="section-card">
+          <div class="section-header">
+            <div>
+              <div class="section-title">任务概况</div>
+              <div class="section-desc">查看关联任务数量、完成率和当前时间状态，辅助评估里程碑推进情况。</div>
+            </div>
+          </div>
         <el-divider content-position="left">任务概况</el-divider>
 
         <div class="milestone-summary-grid">
@@ -298,17 +339,87 @@ function cancel() {
           </el-table-column>
           <el-table-column prop="endDate" label="截止时间" width="120" />
         </el-table>
+        </section>
       </template>
 
-      <el-form-item v-if="!isView">
+      <el-form-item v-if="!isView" class="footer-actions">
         <el-button v-if="!isView && (isEdit ? canMilestoneUpdate : canMilestoneAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
       </el-form-item>
+      </div>
     </el-form>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.milestone-form-page {
+  min-height: 100%;
+}
+
+.milestone-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.milestone-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.milestone-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.milestone-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
+.milestone-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
 .input-new-tag {
   vertical-align: middle;
 }
@@ -353,6 +464,10 @@ function cancel() {
 }
 
 @media (max-width: 768px) {
+  .section-card {
+    padding: 18px;
+  }
+
   .milestone-summary-grid {
     grid-template-columns: 1fr;
   }

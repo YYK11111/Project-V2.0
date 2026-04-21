@@ -152,4 +152,7 @@ export class UserStory extends BaseEntity {
     comment: "实际完成日期",
   })
   completedDate: string;
+
+  @BaseColumn({ type: "json", nullable: true, comment: "故事附件" })
+  attachments: string[];
 }
