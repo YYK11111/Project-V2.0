@@ -2053,7 +2053,12 @@ function goToDetail(path, id, query = {}) {
   padding: 20px 24px;
   border: 1px solid var(--el-border-color-light);
   border-radius: 16px;
-  background: linear-gradient(135deg, #f8fbff 0%, #ffffff 55%, #f5f7ff 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--Color) 4%, var(--el-bg-color)) 0%,
+    var(--el-bg-color) 55%,
+    color-mix(in srgb, var(--el-color-primary) 4%, var(--el-fill-color-extra-light)) 100%
+  );
 }
 
 .project-hero__title-row {
@@ -2122,7 +2127,7 @@ function goToDetail(path, id, query = {}) {
   padding: 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, var(--el-bg-color) 88%, var(--el-fill-color-extra-light));
 }
 
 .hero-action-card__title {
@@ -2153,7 +2158,7 @@ function goToDetail(path, id, query = {}) {
   padding: 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, var(--el-bg-color) 88%, var(--el-fill-color-extra-light));
 }
 
 .hero-stat-card__label {
@@ -2226,18 +2231,18 @@ function goToDetail(path, id, query = {}) {
 }
 
 .project-alert-card--danger {
-  background: rgba(245, 108, 108, 0.08);
-  border-color: rgba(245, 108, 108, 0.24);
+  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-danger) 22%, var(--el-border-color-lighter));
 }
 
 .project-alert-card--warning {
-  background: rgba(230, 162, 60, 0.08);
-  border-color: rgba(230, 162, 60, 0.24);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-warning) 22%, var(--el-border-color-lighter));
 }
 
 .project-alert-card--info {
-  background: rgba(64, 158, 255, 0.08);
-  border-color: rgba(64, 158, 255, 0.22);
+  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-primary) 22%, var(--el-border-color-lighter));
 }
 
 .project-alert-card__header {
@@ -2277,7 +2282,7 @@ function goToDetail(path, id, query = {}) {
 }
 
 .focus-card--alert {
-  border-color: rgba(245, 108, 108, 0.24);
+  border-color: color-mix(in srgb, var(--el-color-danger) 22%, var(--el-border-color-lighter));
 }
 
 .focus-card__header {
@@ -2456,23 +2461,23 @@ function goToDetail(path, id, query = {}) {
 }
 
 .plan-alert-item--danger {
-  background: rgba(245, 108, 108, 0.08);
-  border-color: rgba(245, 108, 108, 0.24);
+  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-danger) 22%, var(--el-border-color-lighter));
 }
 
 .plan-alert-item--warning {
-  background: rgba(230, 162, 60, 0.08);
-  border-color: rgba(230, 162, 60, 0.24);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-warning) 22%, var(--el-border-color-lighter));
 }
 
 .plan-alert-item--info {
-  background: rgba(64, 158, 255, 0.08);
-  border-color: rgba(64, 158, 255, 0.22);
+  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-primary) 22%, var(--el-border-color-lighter));
 }
 
 .plan-alert-item--success {
-  background: rgba(103, 194, 58, 0.08);
-  border-color: rgba(103, 194, 58, 0.22);
+  background: color-mix(in srgb, var(--el-color-success) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-success) 22%, var(--el-border-color-lighter));
 }
 
 .plan-alert-item__title {
@@ -2523,7 +2528,7 @@ function goToDetail(path, id, query = {}) {
 .plan-milestone-item__date {
   padding: 10px 12px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--Color) 4%, #f8fafc);
+  background: color-mix(in srgb, var(--Color) 4%, var(--el-fill-color-extra-light));
   font-size: 13px;
   font-weight: 600;
   color: var(--el-text-color-primary);
@@ -2572,7 +2577,7 @@ function goToDetail(path, id, query = {}) {
 .plan-milestone-item__task-chip {
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(64, 158, 255, 0.08);
+  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
 }
 
 .plan-sprint-list {
@@ -2585,7 +2590,11 @@ function goToDetail(path, id, query = {}) {
   padding: 16px;
   border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  background: linear-gradient(
+    180deg,
+    var(--el-bg-color) 0%,
+    color-mix(in srgb, var(--el-bg-color) 88%, var(--el-fill-color-extra-light)) 100%
+  );
 }
 
 .plan-sprint-card__header {
@@ -2643,7 +2652,7 @@ function goToDetail(path, id, query = {}) {
 .plan-sprint-card__link-item {
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(64, 158, 255, 0.1);
+  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color));
   color: var(--el-color-primary);
   font-size: 12px;
 }
@@ -2723,7 +2732,7 @@ function goToDetail(path, id, query = {}) {
 }
 
 .cost-card--warning {
-  background: rgba(245, 108, 108, 0.08);
+  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-fill-color-extra-light));
 }
 
 .cost-card__label {
@@ -2799,8 +2808,8 @@ function goToDetail(path, id, query = {}) {
 .health-alert-item {
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(245, 108, 108, 0.16);
-  background: rgba(245, 108, 108, 0.06);
+  border: 1px solid color-mix(in srgb, var(--el-color-danger) 18%, var(--el-border-color-lighter));
+  background: color-mix(in srgb, var(--el-color-danger) 8%, var(--el-bg-color));
   font-size: 13px;
   line-height: 1.7;
   color: var(--el-text-color-regular);
@@ -2872,15 +2881,15 @@ function goToDetail(path, id, query = {}) {
   padding: 14px 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: #fff;
+  background: color-mix(in srgb, var(--el-bg-color) 90%, var(--el-fill-color-extra-light));
 }
 
 .tab-summary-card--warning {
-  background: rgba(230, 162, 60, 0.08);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
 }
 
 .tab-summary-card--danger {
-  background: rgba(245, 108, 108, 0.08);
+  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-bg-color));
 }
 
 .tab-summary-card span {
@@ -2947,7 +2956,11 @@ function goToDetail(path, id, query = {}) {
   margin-bottom: 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  background: linear-gradient(
+    180deg,
+    var(--el-bg-color) 0%,
+    color-mix(in srgb, var(--el-bg-color) 90%, var(--el-fill-color-extra-light)) 100%
+  );
 }
 
 .milestone-timeline-rail__header {
@@ -3045,7 +3058,11 @@ function goToDetail(path, id, query = {}) {
   padding: 14px 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  background: linear-gradient(
+    180deg,
+    var(--el-bg-color) 0%,
+    color-mix(in srgb, var(--el-bg-color) 90%, var(--el-fill-color-extra-light)) 100%
+  );
 }
 
 .knowledge-list__title {

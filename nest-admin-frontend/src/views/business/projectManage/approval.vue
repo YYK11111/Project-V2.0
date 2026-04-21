@@ -561,8 +561,8 @@ watch(
 
 .section-card {
   padding: 20px;
-  background: #fff;
-  border: 1px solid #ebeef5;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
 }
 
@@ -581,12 +581,12 @@ watch(
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-desc {
   margin-top: 4px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 

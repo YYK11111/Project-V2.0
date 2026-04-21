@@ -675,27 +675,51 @@ watch(
 }
 
 .summary-card--active {
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1), rgba(64, 158, 255, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-primary) 14%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-primary) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .summary-card--success {
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.12), rgba(103, 194, 58, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-success) 16%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-success) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .summary-card--alert {
-  background: linear-gradient(135deg, rgba(245, 108, 108, 0.12), rgba(245, 108, 108, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-danger) 16%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-danger) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .summary-card--health {
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.12), rgba(103, 194, 58, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-success) 16%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-success) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .summary-card--warning {
-  background: linear-gradient(135deg, rgba(230, 162, 60, 0.12), rgba(230, 162, 60, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-warning) 16%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-warning) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .summary-card--knowledge {
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(64, 158, 255, 0.03));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--el-color-primary) 16%, var(--el-bg-color)),
+    color-mix(in srgb, var(--el-color-primary) 4%, var(--el-fill-color-extra-light))
+  );
 }
 
 .project-hero-card {
@@ -828,18 +852,18 @@ watch(
 }
 
 .cockpit-alert-item--danger {
-  background: rgba(245, 108, 108, 0.08);
-  border-color: rgba(245, 108, 108, 0.24);
+  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-danger) 22%, var(--el-border-color-lighter));
 }
 
 .cockpit-alert-item--warning {
-  background: rgba(230, 162, 60, 0.08);
-  border-color: rgba(230, 162, 60, 0.24);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-warning) 22%, var(--el-border-color-lighter));
 }
 
 .cockpit-alert-item--info {
-  background: rgba(64, 158, 255, 0.08);
-  border-color: rgba(64, 158, 255, 0.22);
+  background: color-mix(in srgb, var(--el-color-primary) 10%, var(--el-bg-color));
+  border-color: color-mix(in srgb, var(--el-color-primary) 22%, var(--el-border-color-lighter));
 }
 
 .cockpit-alert-item__header {

@@ -1146,7 +1146,7 @@ function cancel() {
 
 .section-card {
   padding: 22px;
-  background: #fff;
+  background: var(--el-bg-color);
   border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
   border-radius: 14px;
   min-width: 0;
@@ -1220,14 +1220,14 @@ function cancel() {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   border: 1px solid var(--el-border-color-lighter);
 }
 
 .progress-readonly-field__tip {
   margin-top: 6px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.4;
 }
 
@@ -1267,7 +1267,7 @@ function cancel() {
 }
 
 .edit-table :deep(th.el-table__cell) {
-  background: color-mix(in srgb, var(--Color) 3%, #f8fafc);
+  background: color-mix(in srgb, var(--Color) 3%, var(--el-fill-color-extra-light));
   height: 34px;
   font-weight: 600;
   color: var(--el-text-color-primary);
