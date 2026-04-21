@@ -199,10 +199,12 @@ const rules = {
 const isView = computed(() => route.query.action === 'view')
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const isCreate = computed(() => !route.query.id && !isView.value)
+const isDraftMode = computed(() => isCreate.value || String(form.value.status || '') === '1')
+const isClosureMode = computed(() => !isCreate.value && String(form.value.status || '') !== '1')
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
-const canEditCurrentProject = computed(() => String(form.value.status || '') !== '3')
+const canEditCurrentProject = computed(() => isDraftMode.value)
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
 const fieldPermissionResult = ref(null)
@@ -601,7 +603,15 @@ function cancel() {
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="--FormItemContentMaxWidth: 100%;">
       <div class="project-sections">
-        <section v-if="canViewGroup('projectBasic') || canViewGroup('projectPlan') || canViewGroup('projectBusiness')" class="section-card section-card--basic">
+        <el-alert
+          v-if="!isCreate && isClosureMode && !isView"
+          type="info"
+          :closable="false"
+          show-icon
+          class="mb-16"
+          title="项目已立项，当前页面仅允许维护结项资料与复盘，项目主数据和基线计划已冻结。"
+        />
+        <section v-if="(canViewGroup('projectBasic') || canViewGroup('projectPlan') || canViewGroup('projectBusiness')) && isDraftMode" class="section-card section-card--basic">
           <div class="section-header section-header--stack km-section-header">
             <div>
               <div class="section-title km-section-title">基本信息</div>
@@ -641,7 +651,7 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan') && !isCreate && false" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目阶段">
                   <ViewField :value="form.phase" />
@@ -717,7 +727,7 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-row v-if="!isCreate" :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="计划开始" prop="planStartDate">
                   <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.planStartDate" />
@@ -745,16 +755,16 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-row :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="开始时间" prop="startDate">
-                  <ViewField v-if="isView" :value="form.startDate" />
+                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.startDate" />
                   <el-date-picker v-else v-model="form.startDate" type="date" placeholder="选择开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="结束时间" prop="endDate">
-                  <ViewField v-if="isView" :value="form.endDate" />
+                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.endDate" />
                   <el-date-picker v-else v-model="form.endDate" type="date" placeholder="选择结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
                 </el-form-item>
               </el-col>
@@ -762,28 +772,11 @@ function cancel() {
 
             <el-row v-if="canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="8">
-                <el-form-item label="状态">
-                  <ViewTagField v-if="isView" :text="status[form.status]" :type="form.status === '6' ? 'success' : form.status === '3' ? 'primary' : form.status === '4' ? 'warning' : form.status === '7' ? 'danger' : 'info'" />
-                  <el-select v-else v-model="form.status" placeholder="请选择状态" style="width: 100%" disabled>
-                    <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :xs="24" :sm="8">
                 <el-form-item label="项目预算">
                   <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.budget" />
                   <el-input-number v-else v-model="form.budget" :min="0" :precision="2" :step="1000" style="width: 100%" />
                 </el-form-item>
               </el-col>
-              <el-col :xs="24" :sm="8">
-                <el-form-item label="实际成本">
-                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.actualCost" />
-                  <el-input-number v-else v-model="form.actualCost" :min="0" :precision="2" :step="1000" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-row v-if="canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="8">
                 <el-form-item label="币种">
                   <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.currency" />
@@ -794,6 +787,9 @@ function cancel() {
                   </el-select>
                 </el-form-item>
               </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectBusiness') && false" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="8">
                 <el-form-item label="风险等级">
                   <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.riskLevel" />
@@ -839,7 +835,7 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-form-item label="进度(%)" class="basic-info-progress-item">
+            <el-form-item v-if="!isCreate" label="进度(%)" class="basic-info-progress-item">
               <div class="progress-readonly-field">
                 <ViewField :value="form.progress" />
                 <div class="progress-readonly-field__tip">项目进度由任务完成率自动计算</div>
@@ -854,7 +850,7 @@ function cancel() {
             </div>
         </section>
 
-        <section class="section-card section-card--table">
+        <section v-if="isDraftMode" class="section-card section-card--table">
           <div class="section-header km-section-header">
             <div>
               <div class="section-title km-section-title">项目成员</div>
@@ -917,7 +913,7 @@ function cancel() {
           </div>
         </section>
 
-        <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table" style="--FormItemContentMaxWidth: 100%;">
+        <section v-if="canViewGroup('projectPlan') && isDraftMode" class="section-card section-card--table" style="--FormItemContentMaxWidth: 100%;">
           <div class="section-header km-section-header section-header--stack">
             <div>
               <div class="section-title km-section-title">立项基线计划</div>
@@ -943,7 +939,7 @@ function cancel() {
           </div>
         </section>
 
-        <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table">
+        <section v-if="canViewGroup('projectPlan') && isDraftMode" class="section-card section-card--table">
           <div class="section-header km-section-header">
             <div>
               <div class="section-title km-section-title">里程碑计划</div>
@@ -1040,7 +1036,7 @@ function cancel() {
           </div>
         </section>
 
-        <section class="section-card section-card--content">
+        <section v-if="isDraftMode" class="section-card section-card--content">
           <div class="section-header section-header--stack km-section-header">
             <div>
               <div class="section-title km-section-title">项目描述与附件</div>
@@ -1059,7 +1055,7 @@ function cancel() {
           </el-form-item>
         </section>
 
-        <section v-if="!isCreate" class="section-card section-card--table">
+        <section v-if="!isCreate && canViewGroup('projectClosure')" class="section-card section-card--table">
           <div class="section-header km-section-header section-header--stack">
             <div>
               <div class="section-title km-section-title">结项资料与复盘</div>
@@ -1104,7 +1100,7 @@ function cancel() {
 
       <el-form-item class="footer-actions">
         <el-button
-          v-if="!isView && (isEdit ? canProjectUpdate : canProjectAdd)"
+          v-if="!isView && ((isEdit && isDraftMode && canProjectUpdate) || (isCreate && canProjectAdd))"
           type="primary"
           :loading="saveLoading"
           :disabled="approvalLoading"

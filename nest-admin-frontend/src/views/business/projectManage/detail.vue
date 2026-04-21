@@ -811,16 +811,8 @@ function goToDetail(path, id, query = {}) {
             <div class="project-meta-item__value">{{ phaseMap[project.phase] || project.phase || '-' }}</div>
           </div>
           <div class="project-meta-item">
-            <span class="project-meta-item__label">当前审批节点</span>
-            <div class="project-meta-item__value">{{ project.currentNodeName || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
             <span class="project-meta-item__label">项目发起人</span>
             <div class="project-meta-item__value">{{ project.creator?.nickname || project.creator?.name || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
-            <span class="project-meta-item__label">命中权限角色</span>
-            <div class="project-meta-item__value">{{ fieldPermissionResult?.projectRole?.roleLabel || '-' }}</div>
           </div>
           <div class="project-meta-item">
             <span class="project-meta-item__label">开始时间</span>
@@ -837,14 +829,6 @@ function goToDetail(path, id, query = {}) {
           <div class="project-meta-item">
             <span class="project-meta-item__label">计划结束</span>
             <div class="project-meta-item__value">{{ project.planEndDate || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
-            <span class="project-meta-item__label">实际开始</span>
-            <div class="project-meta-item__value">{{ project.actualStartDate || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
-            <span class="project-meta-item__label">实际结束</span>
-            <div class="project-meta-item__value">{{ project.actualEndDate || '-' }}</div>
           </div>
           <div class="project-meta-item">
             <span class="project-meta-item__label">业务线</span>
@@ -878,14 +862,6 @@ function goToDetail(path, id, query = {}) {
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">预算</div>
           <div class="hero-stat-card__value">{{ project.currency || 'CNY' }} {{ Number(project.budget || 0).toLocaleString() }}</div>
-        </div>
-        <div class="hero-stat-card">
-          <div class="hero-stat-card__label">实际成本</div>
-          <div class="hero-stat-card__value">{{ project.currency || 'CNY' }} {{ Number(project.actualCost || 0).toLocaleString() }}</div>
-        </div>
-        <div class="hero-stat-card">
-          <div class="hero-stat-card__label">累计工时</div>
-          <div class="hero-stat-card__value">{{ Number(project.spentHours || 0).toLocaleString() }}</div>
         </div>
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">总体进度</div>
@@ -2014,8 +1990,8 @@ function goToDetail(path, id, query = {}) {
         <el-card shadow="hover" class="mt16 panel-card plan-action-card">
           <div class="plan-action-card__header">
             <div>
-              <div class="plan-action-card__title">结项资料与复盘收口</div>
-              <div class="plan-action-card__desc">在提交结项审批前，先整理验收说明、交付清单、遗留问题和项目复盘，让结项审批建立在完整业务资料之上。</div>
+              <div class="plan-action-card__title">结项审批与沉淀动作</div>
+              <div class="plan-action-card__desc">在资料与佐证齐备后，从这里继续发起结项审批、维护执行凭证和沉淀知识。</div>
             </div>
             <div class="plan-action-card__actions">
               <el-button @click="goToEdit">去完善结项资料</el-button>
@@ -2050,6 +2026,15 @@ function goToDetail(path, id, query = {}) {
             <div class="closure-content">{{ project.closeReview || '暂未填写项目复盘' }}</div>
           </el-card>
         </div>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>结项佐证</template>
+          <div class="closure-evidence-grid">
+            <div class="closure-evidence-item"><span>上线记录</span><strong>{{ project.goLiveSummary?.successCount || 0 }} 条成功</strong></div>
+            <div class="closure-evidence-item"><span>验收单</span><strong>{{ project.acceptanceSummary?.passedCount || 0 }} 条通过</strong></div>
+            <div class="closure-evidence-item"><span>运维交接</span><strong>{{ project.handoverSummary?.confirmedCount || 0 }} 条确认</strong></div>
+          </div>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 

@@ -6,12 +6,12 @@ import { checkPermi } from '@/utils/permission'
 
 const activeTab = ref('basic')
 const fieldGroups = [
-  { code: 'projectBasic', label: '基础组' },
-  { code: 'projectMember', label: '成员组' },
-  { code: 'projectPlan', label: '计划组' },
-  { code: 'projectBusiness', label: '经营组' },
-  { code: 'projectClosure', label: '结项组' },
-  { code: 'projectKnowledge', label: '知识组' },
+  { code: 'projectBasic', label: '基础组', desc: '项目名称、类型、优先级、负责人、发起人、描述等基础字段' },
+  { code: 'projectMember', label: '成员组', desc: '项目成员集合权限，控制成员表格的显示与编辑' },
+  { code: 'projectPlan', label: '计划组', desc: '起止时间、基线计划、里程碑、计划时间等字段' },
+  { code: 'projectBusiness', label: '经营组', desc: '客户、预算、币种、业务线、行业、来源等经营字段' },
+  { code: 'projectClosure', label: '结项组', desc: '验收日期、验收说明、交付清单、遗留问题、项目复盘' },
+  { code: 'projectKnowledge', label: '知识组', desc: '控制知识页签和知识动作入口，不对应项目实体普通字段' },
 ]
 const matrixRows = [
   { roleKey: 'projectManager', roleLabel: '项目经理' },
@@ -328,7 +328,7 @@ function submit() {
                 </el-select>
               </el-form-item>
             </div>
-            <div class="field-permission-tip">第一版仅支持项目对象。配置结果将用于项目表单、详情页、审批页的显示与编辑态控制。</div>
+            <div class="field-permission-tip">第一版仅支持项目对象。配置结果将用于项目表单、详情页、审批页的显示与编辑态控制；创建态字段仍以页面内建规则为主，后端状态冻结规则优先生效。</div>
           </el-card>
 
           <el-card shadow="hover" class="field-permission-card mt16">
@@ -350,9 +350,11 @@ function submit() {
           <el-card shadow="hover" class="field-permission-card mt16">
             <template #header>规则说明</template>
             <div class="field-permission-rule-list">
-              <div>1. 审批中项目会额外收紧基础组、经营组、结项组为只读。</div>
-              <div>2. 已结项或已归档项目默认按只读处理。</div>
-              <div>3. 知识组仍需叠加知识权限体系，不建议在第一版做单字段例外配置。</div>
+              <div>1. 成员组用于控制成员集合的显示与编辑，不再混入基础组。</div>
+              <div>2. 计划组覆盖起止时间、基线计划与里程碑；项目立项后会进入只读冻结。</div>
+              <div>3. 审批中或已立项项目会额外收紧基础组、计划组、经营组和成员组为只读。</div>
+              <div>4. 已结项或已归档项目默认按只读处理。</div>
+              <div>5. 知识组只控制知识页签和知识动作入口，仍需叠加知识权限体系。</div>
             </div>
           </el-card>
         </div>

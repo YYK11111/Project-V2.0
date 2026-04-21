@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getStatus, getPriority, getProjectType, submitApproval } from './api'
+import { getOne, getStatus, getPriority, getProjectType, submitApproval, getFieldPermissions } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
@@ -58,9 +58,11 @@ const customerList = ref([])
 const deptMap = ref({})
 const workflowPanelRef = ref()
 const workflowInstance = ref(null)
+const fieldPermissionResult = ref(null)
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
+const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
 const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
@@ -74,9 +76,13 @@ function getApprovalType(status) {
   return 'info'
 }
 
+function canViewGroup(groupCode) {
+  return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
+}
+
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes, permissionRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
@@ -84,6 +90,7 @@ async function reloadCurrent() {
     getDeptTrees({}),
     getOne(projectId.value),
     workflowInstanceId.value ? getWorkflowInstance(workflowInstanceId.value) : Promise.resolve({ data: null }),
+    getFieldPermissions(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -107,6 +114,7 @@ async function reloadCurrent() {
     milestones: projectRes.data?.milestones || [],
   }
   workflowInstance.value = workflowRes.data || null
+  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
 
   if (!workflowInstance.value && project.value?.workflowInstanceId) {
     const fallbackWorkflowRes = await getWorkflowInstance(project.value.workflowInstanceId)
@@ -302,18 +310,8 @@ watch(
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="进度(%)">
-              <ViewField :value="project.progress" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="业务编号">
               <ViewField :value="workflowInstance?.businessCode || project.code || '-'" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="命中权限角色">
-              <ViewField :value="fieldPermissionResult?.projectRole?.roleLabel || '-'" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -323,7 +321,7 @@ watch(
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">基本信息</div>
-            <div class="section-desc">查看立项审批所需的项目基础属性、负责人、时间计划和预算信息。</div>
+            <div class="section-desc">仅展示立项审批所需的基础属性、基线计划和预算信息，去掉执行期字段。</div>
           </div>
         </div>
 
@@ -405,19 +403,6 @@ watch(
           </el-col>
         </el-row>
 
-        <el-row :gutter="20" class="basic-info-row">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="实际开始">
-              <ViewField :value="project.actualStartDate" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="实际结束">
-              <ViewField :value="project.actualEndDate" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
         <el-row :gutter="20" class="basic-info-row basic-info-row--last">
           <el-col :xs="24" :sm="12">
             <el-form-item label="项目预算">
@@ -425,34 +410,34 @@ watch(
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="实际成本">
-              <ViewField :value="project.actualCost" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
-          <el-col :xs="24" :sm="8">
             <el-form-item label="币种">
               <ViewField :value="project.currency" />
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
-            <el-form-item label="风险等级">
-              <ViewField :value="project.riskLevel" />
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last" v-if="canViewGroup('projectPlan')">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="主要交付物">
+              <ViewField :value="project.baselineDeliverables || '-'" />
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
-            <el-form-item label="质量等级">
-              <ViewField :value="project.qualityLevel" />
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="范围边界">
+              <ViewField :value="project.scopeBoundary || '-'" />
             </el-form-item>
           </el-col>
         </el-row>
 
-        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last" v-if="canViewGroup('projectPlan')">
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="计划说明">
+              <ViewField :value="project.baselinePlanNote || '-'" />
+            </el-form-item>
+          </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="累计工时">
-              <ViewField :value="project.spentHours" />
+            <el-form-item label="项目描述">
+              <ViewRichText :html="project.description || '-'" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -532,14 +517,10 @@ watch(
       <section v-if="canViewGroup('projectBasic')" class="section-card section-card--content">
         <div class="section-header section-header--stack">
           <div>
-            <div class="section-title">项目描述与附件</div>
-            <div class="section-desc">审批重点关注项目背景、范围说明和相关立项材料。</div>
+            <div class="section-title">项目附件</div>
+            <div class="section-desc">审批时核对立项附件和支撑材料是否齐全。</div>
           </div>
         </div>
-
-        <el-form-item label="项目描述">
-          <ViewRichText :html="project.description" />
-        </el-form-item>
 
         <el-form-item label="项目附件">
           <ViewFileList :files="project.attachments || []" />

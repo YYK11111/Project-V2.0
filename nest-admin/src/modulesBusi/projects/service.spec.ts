@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ProjectsService } from "./service";
 
 describe("ProjectsService closure guards", () => {
@@ -30,13 +30,35 @@ describe("ProjectsService closure guards", () => {
       { count: jest.fn(), find: jest.fn() } as any,
       { count: jest.fn(), find: jest.fn() } as any,
       { update: jest.fn() } as any,
-      { getProjectWorkspacePrefs: jest.fn(), getOne: jest.fn() } as any,
-      { getProjectFieldPermissions: jest.fn() } as any,
       { getOne: jest.fn() } as any,
+      {
+        getProjectFieldPermissions: jest.fn(),
+        getGroupFieldMap: jest.fn().mockReturnValue({
+          projectBasic: ["name", "code", "projectType", "priority", "description", "category", "tags", "departmentId", "leaderId", "creatorId"],
+          projectMember: ["members"],
+          projectPlan: ["startDate", "endDate", "planStartDate", "planEndDate", "actualStartDate", "actualEndDate", "phase", "phaseStartDate", "phaseEndDate", "baselinePlanNote", "scopeBoundary", "baselineDeliverables", "milestones"],
+          projectBusiness: ["customerId", "budget", "actualCost", "currency", "spentHours", "businessLine", "industry", "projectSource"],
+          projectClosure: ["closeSummary", "closeDeliverables", "closeOpenIssues", "closeReview", "acceptanceDate"],
+          projectKnowledge: [],
+        }),
+      } as any,
+      { getProjectWorkspacePrefs: jest.fn(), getOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
       { getRepository: jest.fn(), transaction: jest.fn() } as any,
     );
+
+    (service as any).projectFieldPermissionService = {
+      getProjectFieldPermissions: jest.fn(),
+      getGroupFieldMap: jest.fn().mockReturnValue({
+        projectBasic: ["name", "code", "projectType", "priority", "description", "category", "tags", "departmentId", "leaderId", "creatorId"],
+        projectMember: ["members"],
+        projectPlan: ["startDate", "endDate", "planStartDate", "planEndDate", "actualStartDate", "actualEndDate", "phase", "phaseStartDate", "phaseEndDate", "baselinePlanNote", "scopeBoundary", "baselineDeliverables", "milestones"],
+        projectBusiness: ["customerId", "budget", "actualCost", "currency", "spentHours", "businessLine", "industry", "projectSource"],
+        projectClosure: ["closeSummary", "closeDeliverables", "closeOpenIssues", "closeReview", "acceptanceDate"],
+        projectKnowledge: [],
+      }),
+    }
 
     return { service, repository };
   };
@@ -107,5 +129,25 @@ describe("ProjectsService closure guards", () => {
     await expect(service.archive("p1")).rejects.toThrow(
       new BadRequestException("归档前，请至少维护一条已确认的运维交接记录"),
     );
+  });
+
+  it("立项后不允许编辑项目基础字段", () => {
+    const { service } = createService();
+    expect(() =>
+      (service as any).assertProjectLifecycleEditable(
+        { status: "3" },
+        ["name"],
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
+  it("立项后不允许编辑里程碑集合", () => {
+    const { service } = createService();
+    expect(() =>
+      (service as any).assertProjectLifecycleEditable(
+        { status: "3" },
+        ["milestones"],
+      ),
+    ).toThrow(ForbiddenException);
   });
 });

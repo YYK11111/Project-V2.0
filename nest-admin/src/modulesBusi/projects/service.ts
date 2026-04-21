@@ -185,6 +185,41 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       .map(([groupCode]) => groupCode);
   }
 
+  private isProjectLifecycleLocked(project?: Project | null) {
+    if (!project) return false;
+    return String(project.status || "") !== ProjectStatus.draft;
+  }
+
+  private getLockedGroupsAfterApproval() {
+    return ["projectBasic", "projectPlan", "projectBusiness", "projectMember"];
+  }
+
+  private assertProjectLifecycleEditable(
+    originalProject: Project,
+    changedFields: string[],
+  ) {
+    if (!this.isProjectLifecycleLocked(originalProject)) return;
+    if (!changedFields.length) return;
+    const changedGroups = this.resolveChangedGroupCodes(changedFields);
+    const blockedGroups = changedGroups.filter((groupCode) =>
+      this.getLockedGroupsAfterApproval().includes(groupCode),
+    );
+    if (!blockedGroups.length) return;
+    throw new ForbiddenException({
+      message: `项目立项后不允许编辑字段组：${blockedGroups.join(", ")}`,
+      details: {
+        groups: blockedGroups,
+        fields: changedFields.filter((field) =>
+          blockedGroups.some((groupCode) =>
+            this.projectFieldPermissionService
+              .getGroupFieldMap()[groupCode]
+              ?.includes(field),
+          ),
+        ),
+      },
+    });
+  }
+
   private async assertProjectFieldEditPermission(
     projectId: string,
     operatorId: string,
@@ -316,20 +351,23 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         originalProject,
         dto as any,
       );
+      this.assertProjectLifecycleEditable(originalProject, changedFields);
       await this.assertProjectFieldEditPermission(
         dto.id,
         operatorId,
         changedFields,
       );
       if (members.length) {
+        this.assertProjectLifecycleEditable(originalProject, ["members"]);
         await this.assertProjectCollectionPermission(
           dto.id,
           operatorId,
-          "projectBasic",
+          "projectMember",
           "members",
         );
       }
       if (milestones.length) {
+        this.assertProjectLifecycleEditable(originalProject, ["milestones"]);
         await this.assertProjectCollectionPermission(
           dto.id,
           operatorId,

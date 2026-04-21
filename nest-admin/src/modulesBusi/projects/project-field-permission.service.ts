@@ -131,15 +131,24 @@ export class ProjectFieldPermissionService {
       approvalLocked: String(options.project?.approvalStatus || "") === "2",
       archivedReadonly: String(options.project?.isArchived || "") === "1",
       closedReadonly: String(options.project?.status || "") === "6",
+      lifecycleLocked: String(options.project?.status || "") !== "1",
     };
 
-    if (contextRules.approvalLocked) {
+    if (contextRules.approvalLocked || contextRules.lifecycleLocked) {
       baseGroups.projectBasic = this.minLevel(
         baseGroups.projectBasic,
         "readonly",
       );
+      baseGroups.projectPlan = this.minLevel(
+        baseGroups.projectPlan,
+        "readonly",
+      );
       baseGroups.projectBusiness = this.minLevel(
         baseGroups.projectBusiness,
+        "readonly",
+      );
+      baseGroups.projectMember = this.minLevel(
+        baseGroups.projectMember,
         "readonly",
       );
       baseGroups.projectClosure = this.minLevel(
