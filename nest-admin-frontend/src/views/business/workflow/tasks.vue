@@ -86,9 +86,15 @@ const viewInstanceDetail = (row: any) => {
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :params="params" :request="api.getMyTasks">
+  <div class="workflow-task-index-page">
+    <RequestChartTable ref="rctRef" class="workflow-task-index-panel" :params="params" :request="api.getMyTasks">
+      <template #operation>
+        <div class="workflow-task-index-operation">
+          <div class="workflow-task-index-operation__left"></div>
+        </div>
+      </template>
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="nodeName" label="任务名称" width="150" />
         <el-table-column prop="businessType" label="业务对象" width="100" />
         <el-table-column prop="businessTitle" label="业务标题" min-width="180" show-overflow-tooltip>
@@ -119,3 +125,45 @@ const viewInstanceDetail = (row: any) => {
     </BaDialog>
   </div>
 </template>
+
+<style scoped>
+.workflow-task-index-page {
+  min-height: 100%;
+}
+
+.workflow-task-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.workflow-task-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workflow-task-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workflow-task-index-panel :deep(.el-table__header-wrapper),
+.workflow-task-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .workflow-task-index-panel {
+    padding-top: 18px;
+  }
+
+  .workflow-task-index-operation,
+  .workflow-task-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

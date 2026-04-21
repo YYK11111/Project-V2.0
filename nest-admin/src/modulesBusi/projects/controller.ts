@@ -1,82 +1,169 @@
-import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common'
-import { ProjectsService } from './service'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { Project, projectStatusMap, priorityMap, projectTypeMap } from './entity'
-import { BaseController } from 'src/common/BaseController'
-import { WorkflowIntegrationService } from 'src/common/services/workflow-integration.service'
+import { Controller, Get, Post, Body, Param, Query, Req } from "@nestjs/common";
+import { ProjectsService } from "./service";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import {
+  Project,
+  projectStatusMap,
+  priorityMap,
+  projectTypeMap,
+} from "./entity";
+import { BaseController } from "src/common/BaseController";
+import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
+import { ProjectFieldPermissionService } from "./project-field-permission.service";
 
-@Controller('business/projects')
-export class ProjectsController extends BaseController<Project, ProjectsService> {
+@Controller("business/projects")
+export class ProjectsController extends BaseController<
+  Project,
+  ProjectsService
+> {
   constructor(
     readonly service: ProjectsService,
     private readonly workflowService: WorkflowIntegrationService,
+    private readonly projectFieldPermissionService: ProjectFieldPermissionService,
   ) {
-    super(service)
+    super(service);
   }
 
-  @Get('getStatus')
+  @Get("getStatus")
   getStatus() {
-    return projectStatusMap
+    return projectStatusMap;
   }
 
-  @Get('getPriority')
+  @Get("getPriority")
   getPriority() {
-    return priorityMap
+    return priorityMap;
   }
 
-  @Get('getProjectType')
+  @Get("getProjectType")
   getProjectType() {
-    return projectTypeMap
+    return projectTypeMap;
   }
 
-  @Post('archive/:id')
-  archive(@Param('id') id: string) {
-    return this.service.archive(id)
+  @Get("list")
+  async list(@Query() query: QueryListDto, @Req() req: any) {
+    query.pageNum ??= 1;
+    query.pageSize ??= 10;
+    return this.service.list({
+      ...query,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
   }
 
-  @Get('statistics/:id')
-  getStatistics(@Param('id') id: string) {
-    return this.service.getStatistics(id)
+  @Post("archive/:id")
+  async archive(@Param("id") id: string, @Req() req: any) {
+    await this.service.assertProjectPermission(id, req.user?.id, "archive");
+    return this.service.archive(id);
   }
 
-  @Get('dashboard/:id')
-  getDashboard(@Param('id') id: string) {
-    return this.service.getDashboard(id)
+  @Get("statistics/:id")
+  async getStatistics(@Param("id") id: string, @Req() req: any) {
+    await this.service.assertProjectPermission(id, req.user?.id, "view");
+    return this.service.getStatistics(id);
   }
 
-  @Get('cockpit')
-  getCockpit(@Query() query: QueryListDto) {
-    return this.service.getCockpit(query)
+  @Get("dashboard/:id")
+  async getDashboard(@Param("id") id: string, @Req() req: any) {
+    const permissionContext = await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "view",
+    );
+    const dashboard = await this.service.getDashboard(id);
+    return {
+      ...dashboard,
+      permissionContext: {
+        role: permissionContext.role,
+        isManager: permissionContext.isManager,
+        isDeliveryManager: permissionContext.isDeliveryManager,
+        canEdit: permissionContext.canEdit,
+        canSubmitApproval: permissionContext.canSubmitApproval,
+        canSubmitClose: permissionContext.canSubmitClose,
+        canArchive: permissionContext.canArchive,
+      },
+    };
   }
 
-  @Post('recalculate-progress')
+  @Get("field-permissions/:id")
+  async getFieldPermissions(@Param("id") id: string, @Req() req: any) {
+    const permissionContext = await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "view",
+    );
+    const project = await this.service.getOne({ id });
+    return this.projectFieldPermissionService.getProjectFieldPermissions({
+      project,
+      rawRole: permissionContext.role,
+      canVisit: true,
+    });
+  }
+
+  @Post(":id/sync-alerts")
+  syncAlerts(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.syncProjectAlertsToMessages(id, userId);
+  }
+
+  @Get("cockpit")
+  getCockpit(@Query() query: QueryListDto, @Req() req: any) {
+    return this.service.getCockpit({
+      ...query,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
+  }
+
+  @Post("recalculate-progress")
   recalculateProgress(@Body() body: { projectIds?: string[] }) {
-    return this.service.recalculateProjectProgressBatch(body?.projectIds)
+    return this.service.recalculateProjectProgressBatch(body?.projectIds);
   }
 
-  @Post(':id/recalculate-progress')
-  async recalculateSingleProgress(@Param('id') id: string) {
-    const progress = await this.service.recalculateProjectProgress(id)
-    return { projectId: id, progress }
+  @Post("generate-cockpit-snapshots")
+  generateCockpitSnapshots(@Body() body: { projectIds?: string[] }) {
+    return this.service.generateCockpitSnapshots(body?.projectIds);
   }
 
-  @Post(':id/submit-approval')
-  async submitApproval(
-    @Param('id') id: string,
-    @Req() req: any,
-  ) {
-    const userId = req.user?.id || req.user?.name || '1'
-    const instanceId = await this.workflowService.startProjectApproval(id, userId)
-    return { success: true, instanceId }
+  @Post(":id/recalculate-progress")
+  async recalculateSingleProgress(@Param("id") id: string) {
+    const progress = await this.service.recalculateProjectProgress(id);
+    return { projectId: id, progress };
   }
 
-  @Post(':id/submit-close')
-  async submitClose(
-    @Param('id') id: string,
-    @Req() req: any,
-  ) {
-    const userId = req.user?.id || req.user?.name || '1'
-    const instanceId = await this.workflowService.startProjectCloseApproval(id, userId)
-    return { success: true, instanceId }
+  @Post(":id/submit-approval")
+  async submitApproval(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name || "1";
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "submitApproval",
+    );
+    await this.service.validateBaselinePlan(id);
+    const instanceId = await this.workflowService.startProjectApproval(
+      id,
+      userId,
+    );
+    return { success: true, instanceId };
+  }
+
+  @Post(":id/submit-close")
+  async submitClose(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name || "1";
+    await this.service.assertProjectPermission(id, req.user?.id, "submitClose");
+    await this.service.validateClosePlan(id);
+    const instanceId = await this.workflowService.startProjectCloseApproval(
+      id,
+      userId,
+    );
+    return { success: true, instanceId };
+  }
+
+  @Post(":id/publish-close-review")
+  async publishCloseReview(@Param("id") id: string, @Req() req: any) {
+    await this.service.assertProjectPermission(id, req.user?.id, "edit");
+    return this.service.publishCloseReviewToKnowledge(id, {
+      id: req.user?.id,
+      name: req.user?.name,
+    });
   }
 }

@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common'
-import { SchedulerRegistry } from '@nestjs/schedule'
-import { CronJob } from 'cron'
+import { Injectable } from "@nestjs/common";
+import { SchedulerRegistry } from "@nestjs/schedule";
+import { CronJob } from "cron";
 
 @Injectable()
 export class TasksService {
-  constructor(private schedulerRegistry: SchedulerRegistry) { }
+  constructor(private schedulerRegistry: SchedulerRegistry) {}
 
   // addCronJob(name: string, seconds: string) {
   //   const job = new CronJob(`${seconds} * * * * *`, () => {
@@ -26,21 +26,21 @@ export class TasksService {
   // }
 
   addTimeout(name: string, timeString: number | string, callback) {
-    const timeout = setTimeout(callback, +new Date(timeString) - +new Date())
-    this.schedulerRegistry.addTimeout(name, timeout)
+    const timeout = setTimeout(callback, +new Date(timeString) - +new Date());
+    this.schedulerRegistry.addTimeout(name, timeout);
   }
 
   deleteTimeout(name: string) {
-    let timeout
+    let timeout;
     try {
-      timeout = this.schedulerRegistry.getTimeout(name)
-    } catch (e) { }
-    if (!timeout) return
-    clearTimeout(timeout)
-    this.schedulerRegistry.deleteTimeout(name)
+      timeout = this.schedulerRegistry.getTimeout(name);
+    } catch (e) {}
+    if (!timeout) return;
+    clearTimeout(timeout);
+    this.schedulerRegistry.deleteTimeout(name);
   }
 
   getTimeout(name: string) {
-    return this.schedulerRegistry.getTimeout(name)
+    return this.schedulerRegistry.getTimeout(name);
   }
 }

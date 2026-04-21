@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
 import { getList, getContractStatuses, del } from './api'
 import { getList as getCustomerList } from '../customerManage/api'
 import TableOperation from '@/components/TableOperation.vue'
@@ -30,8 +29,8 @@ const getButtons = (row) => [
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+  <div class="contract-index-page">
+    <RequestChartTable ref="rctRef" class="contract-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="合同名称" prop="name"></BaInput>
         <BaSelect v-model="query.customerId" filterable label="客户" prop="customerId">
@@ -43,13 +42,16 @@ const getButtons = (row) => [
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <el-button v-if="canContractAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/crm/contractManage/form')">新增合同</el-button>
-          <el-button v-if="canContractDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+        <div class="contract-index-operation">
+          <div class="contract-index-operation__left">
+            <el-button v-if="canContractAdd" type="primary" @click="rctRef.goRoute(null, '/crm/contractManage/form')">新增合同</el-button>
+          </div>
+          <el-button v-if="canContractDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="合同名称" prop="name" :show-overflow-tooltip="true" min-width="150" />
         <el-table-column label="合同编号" prop="code" width="150" />
         <el-table-column label="客户名称" prop="customer.name" width="150" :show-overflow-tooltip="true" />
@@ -76,28 +78,43 @@ const getButtons = (row) => [
 </template>
 
 <style lang="scss" scoped>
-.tableOperation {
+.contract-index-page {
+  min-height: 100%;
+}
+
+.contract-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.contract-index-operation {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.contract-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contract-index-panel :deep(.el-table__header-wrapper),
+.contract-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .contract-index-panel {
+    padding-top: 18px;
+  }
+
+  .contract-index-operation,
+  .contract-index-operation__left {
+    align-items: stretch;
   }
 }
 </style>

@@ -2,8 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
-import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval } from './api'
+import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval, submitClose, getFieldPermissions } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { checkPermi } from '@/utils/permission'
 import UserSelect from '@/components/UserSelect.vue'
 import Editor from '@/components/Editor/index.vue'
@@ -53,6 +54,8 @@ const defaultMilestone = (sort = 0) => ({
   completedDate: '',
   status: '1',
   deliverables: [],
+  ownerId: '',
+  delayReason: '',
   description: '',
   sort,
 })
@@ -62,18 +65,44 @@ function createDefaultForm() {
     name: '',
     code: '',
     leaderId: '',
+    creatorId: '',
+    departmentId: '',
+    category: '',
+    tags: [],
+    phase: '',
     startDate: '',
     endDate: '',
+    planStartDate: '',
+    planEndDate: '',
+    actualStartDate: '',
+    actualEndDate: '',
+    phaseStartDate: '',
+    phaseEndDate: '',
     status: '1',
     projectType: '1',
     priority: '2',
     description: '',
+    baselineDeliverables: '',
+    scopeBoundary: '',
+    baselinePlanNote: '',
+    closeSummary: '',
+    closeDeliverables: '',
+    closeOpenIssues: '',
+    closeReview: '',
+    acceptanceDate: '',
     attachments: [],
     customerId: null,
     budget: 0,
     actualCost: 0,
+    currency: 'CNY',
+    riskLevel: '',
+    qualityLevel: '',
+    businessLine: '',
+    industry: '',
+    projectSource: '',
+    spentHours: 0,
     progress: 0,
-    members: [defaultMember(10)],
+    members: [defaultMember(1)],
     milestones: createMilestonesByType('1'),
   }
 }
@@ -93,7 +122,7 @@ const milestoneTemplates = {
 function createMilestonesByType(projectType) {
   const names = milestoneTemplates[projectType] || milestoneTemplates['1']
   return names.map((name, index) => ({
-    ...defaultMilestone((index + 1) * 10),
+    ...defaultMilestone(index + 1),
     name,
   }))
 }
@@ -105,24 +134,89 @@ const form = ref(createDefaultForm())
 const rules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
   leaderId: [{ required: true, message: '请选择项目负责人', trigger: 'change' }],
-  startDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
+  creatorId: [{ required: true, message: '请选择项目发起人', trigger: 'change' }],
+  departmentId: [{ required: true, message: '请选择所属部门', trigger: 'change' }],
+  startDate: [
+    { required: true, message: '请选择开始时间', trigger: 'change' },
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (value && form.value.endDate && value > form.value.endDate) {
+          callback(new Error('开始时间不能晚于结束时间'))
+          return
+        }
+        callback()
+      },
+    },
+  ],
+  endDate: [
+    { required: true, message: '请选择结束时间', trigger: 'change' },
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (value && form.value.startDate && value < form.value.startDate) {
+          callback(new Error('结束时间不能早于开始时间'))
+          return
+        }
+        callback()
+      },
+    },
+  ],
+  planStartDate: [
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (value && form.value.planEndDate && value > form.value.planEndDate) {
+          callback(new Error('计划开始不能晚于计划结束'))
+          return
+        }
+        callback()
+      },
+    },
+  ],
+  planEndDate: [
+    {
+      trigger: 'change',
+      validator: (_rule, value, callback) => {
+        if (value && form.value.planStartDate && value < form.value.planStartDate) {
+          callback(new Error('计划结束不能早于计划开始'))
+          return
+        }
+        callback()
+      },
+    },
+  ],
   projectType: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
+  baselineDeliverables: [{ required: true, message: '请输入主要交付物', trigger: 'blur' }],
+  scopeBoundary: [{ required: true, message: '请输入范围边界说明', trigger: 'blur' }],
 }
 
 const isView = computed(() => route.query.action === 'view')
 const isEdit = computed(() => !!route.query.id && !isView.value)
+const isCreate = computed(() => !route.query.id && !isView.value)
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const canEditCurrentProject = computed(() => String(form.value.status || '') !== '3')
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
+const fieldPermissionResult = ref(null)
 
 const status = ref({})
 const priority = ref({})
 const projectType = ref({})
 const customerList = ref([])
+const deptList = ref([])
+
+const flattenDepts = (depts, result = []) => {
+  depts.forEach((dept) => {
+    result.push(dept)
+    if (dept.children?.length) {
+      flattenDepts(dept.children, result)
+    }
+  })
+  return result
+}
 
 getStatus().then(({ data }) => (status.value = data || {}))
 getPriority().then(({ data }) => (priority.value = data || {}))
@@ -130,9 +224,26 @@ getProjectType().then(({ data }) => (projectType.value = data || {}))
 getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
   customerList.value = res.list || []
 })
+getDeptTrees({}).then((res) => {
+  deptList.value = res.data ? flattenDepts(res.data) : []
+})
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => form.value.customer || customerMap.value.get(String(form.value.customerId || '')) || null)
+const deptMap = computed(() => Object.fromEntries((deptList.value || []).map((item) => [String(item.id), item.name])))
+const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
+
+function canViewGroup(groupCode) {
+  return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
+}
+
+function canEditGroup(groupCode) {
+  return (groupPermissions.value[groupCode] || 'editable') === 'editable'
+}
+
+function isGroupReadonly(groupCode) {
+  return isView.value || !canEditGroup(groupCode)
+}
 
 watch(
   () => form.value.projectType,
@@ -160,10 +271,25 @@ watch(
   },
 )
 
+watch(
+  () => form.value.customerId,
+  (customerId) => {
+    if (!customerId) {
+      form.value.industry = ''
+      return
+    }
+    const customer = customerMap.value.get(String(customerId))
+    if (customer?.industry) {
+      form.value.industry = customer.industry
+    }
+  },
+)
+
 async function loadProject() {
   milestonesManuallyEdited.value = false
   if (!(isEdit.value || isView.value)) {
     form.value = createDefaultForm()
+    fieldPermissionResult.value = null
     return
   }
   const { data } = await getOne(route.query.id)
@@ -174,15 +300,19 @@ async function loadProject() {
   }
   form.value = {
     attachments: [],
+    tags: [],
     members: [],
     milestones: [],
     ...data,
     budget: data.budget || 0,
     actualCost: data.actualCost || 0,
+    spentHours: data.spentHours || 0,
     progress: data.progress || 0,
-    members: (data.members || []).length ? data.members : [defaultMember(10)],
+    members: (data.members || []).length ? data.members : [defaultMember(1)],
     milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
   }
+  const permissionRes = await getFieldPermissions(route.query.id)
+  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
 }
 
 watch(
@@ -196,24 +326,26 @@ watch(
 function resequenceMembers() {
   form.value.members = form.value.members.map((item, index) => ({
     ...item,
-    sort: (index + 1) * 10,
+    sort: index + 1,
   }))
 }
 
 function resequenceMilestones() {
   form.value.milestones = form.value.milestones.map((item, index) => ({
     ...item,
-    sort: (index + 1) * 10,
+    sort: index + 1,
   }))
 }
 
 function addMemberRow() {
-  form.value.members.push(defaultMember((form.value.members.length + 1) * 10))
+  form.value.members.push(defaultMember(form.value.members.length + 1))
 }
 
 function removeMemberRow(index) {
-  if (form.value.members.length === 1) {
-    form.value.members = [defaultMember(10)]
+  const target = form.value.members[index]
+  if (!target) return
+  if (form.value.members.length === 1 && !target.id) {
+    form.value.members = [defaultMember(1)]
   } else {
     form.value.members.splice(index, 1)
   }
@@ -222,13 +354,13 @@ function removeMemberRow(index) {
 
 function addMilestoneRow() {
   milestonesManuallyEdited.value = true
-  form.value.milestones.push(defaultMilestone((form.value.milestones.length + 1) * 10))
+  form.value.milestones.push(defaultMilestone(form.value.milestones.length + 1))
 }
 
 function removeMilestoneRow(index) {
   milestonesManuallyEdited.value = true
   if (form.value.milestones.length === 1) {
-    form.value.milestones = [defaultMilestone(10)]
+    form.value.milestones = [defaultMilestone(1)]
   } else {
     form.value.milestones.splice(index, 1)
   }
@@ -241,24 +373,63 @@ function resetMilestoneTemplate() {
 }
 
 function normalizeSubmitPayload() {
-  return {
+  const payload = {
     ...form.value,
     members: form.value.members
       .filter((item) => item.userId && item.role)
       .map((item, index) => ({
-        ...item,
+        id: item.id,
+        userId: item.userId,
+        role: item.role,
+        remark: item.remark || '',
         sort: Number(item.sort ?? (index + 1) * 10),
         isCore: item.isCore || '0',
       })),
     milestones: form.value.milestones
       .filter((item) => item.name)
       .map((item, index) => ({
-        ...item,
+        id: item.id,
+        name: item.name,
+        dueDate: item.dueDate,
+        ownerId: item.ownerId || '',
+        description: item.description || '',
+        delayReason: item.delayReason || '',
         sort: Number(item.sort ?? (index + 1) * 10),
         status: item.status || '1',
         deliverables: item.deliverables || [],
       })),
   }
+
+  if (isCreate.value) {
+    payload.phase = 'init'
+    payload.status = '1'
+    payload.actualStartDate = ''
+    payload.actualEndDate = ''
+    payload.phaseStartDate = ''
+    payload.phaseEndDate = ''
+    payload.actualCost = 0
+    payload.spentHours = 0
+    payload.riskLevel = ''
+    payload.qualityLevel = ''
+    payload.closeSummary = ''
+    payload.closeDeliverables = ''
+    payload.closeOpenIssues = ''
+    payload.closeReview = ''
+    payload.acceptanceDate = ''
+    payload.members = payload.members.map((item) => ({
+      userId: item.userId,
+      role: item.role,
+      isCore: item.isCore,
+      sort: item.sort,
+    }))
+    payload.milestones = payload.milestones.map((item) => ({
+      name: item.name,
+      dueDate: item.dueDate,
+      sort: item.sort,
+    }))
+  }
+
+  return payload
 }
 
 function persistProject(payload, api) {
@@ -299,6 +470,18 @@ function saveProject(triggerApproval = false) {
     if (!payload.milestones.length) {
       return $sdk.msgWarning('请至少维护一条里程碑')
     }
+    if (triggerApproval) {
+      const invalidMilestone = payload.milestones.find((item) => !item.name || !item.dueDate)
+      if (invalidMilestone) {
+        return $sdk.msgWarning('发起立项审批前，请补齐所有关键里程碑的名称和计划日期')
+      }
+      if (!payload.baselineDeliverables?.trim()) {
+        return $sdk.msgWarning('发起立项审批前，请补齐主要交付物')
+      }
+      if (!payload.scopeBoundary?.trim()) {
+        return $sdk.msgWarning('发起立项审批前，请补齐范围边界说明')
+      }
+    }
     const api = isEdit.value ? update : save
     if (triggerApproval) {
       approvalLoading.value = true
@@ -331,6 +514,32 @@ function saveProject(triggerApproval = false) {
   })
 }
 
+function submitCloseApproval() {
+  if (!isEdit.value) {
+    return $sdk.msgWarning('请先保存项目后再发起结项审批')
+  }
+  if (!form.value.closeSummary?.trim()) {
+    return $sdk.msgWarning('发起结项审批前，请补齐验收说明')
+  }
+  if (!form.value.closeDeliverables?.trim()) {
+    return $sdk.msgWarning('发起结项审批前，请补齐交付清单')
+  }
+  if (!form.value.closeReview?.trim()) {
+    return $sdk.msgWarning('发起结项审批前，请补齐项目复盘')
+  }
+  saveLoading.value = true
+  update(form.value).then(() => {
+    return submitClose(form.value.id || route.query.id)
+  }).then(() => {
+    $sdk.msgSuccess('结项审批提交成功')
+    router.replace({ path: '/projectManage/detail', query: { id: form.value.id || route.query.id } })
+  }).catch((e) => {
+    $sdk.msgError(e.message || '提交结项审批失败')
+  }).finally(() => {
+    saveLoading.value = false
+  })
+}
+
 function submit() {
   saveProject(false)
 }
@@ -345,39 +554,66 @@ function cancel() {
 </script>
 
 <template>
-  <div class="Gcard project-form-page">
-    <div class="mb20">
+  <div class="project-form-page km-page">
+    <div class="Gcard km-panel project-form-shell">
+    <div class="project-form-shell__top">
       <el-page-header @back="$router.back()" :title="isView ? '项目详情' : isEdit ? '编辑项目' : '新增项目'" />
     </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="--FormItemContentMaxWidth: 100%;">
       <div class="project-sections">
-        <section class="section-card section-card--basic">
-          <div class="section-header section-header--stack">
+        <section v-if="canViewGroup('projectBasic') || canViewGroup('projectPlan') || canViewGroup('projectBusiness')" class="section-card section-card--basic">
+          <div class="section-header section-header--stack km-section-header">
             <div>
-              <div class="section-title">基本信息</div>
-              <div class="section-desc">维护项目基础属性、负责人、时间计划和预算进度。</div>
+              <div class="section-title km-section-title">基本信息</div>
+              <div class="section-desc km-section-desc">维护项目基础属性、负责人、时间计划和预算进度，让项目启动信息一目了然。</div>
             </div>
           </div>
-            <el-row :gutter="20" class="basic-info-row">
+            <div class="project-basic-fields">
+            <el-row v-if="canViewGroup('projectBasic')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目名称" prop="name">
-                  <ViewField v-if="isView" :value="form.name" />
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="form.name" />
                   <el-input v-else v-model="form.name" placeholder="请输入项目名称" maxlength="100" show-word-limit />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目编号">
-                  <ViewField v-if="isView" :value="form.code" />
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="form.code" />
                   <el-input v-else v-model="form.code" placeholder="保存后自动生成" disabled />
                 </el-form-item>
               </el-col>
             </el-row>
 
-            <el-row :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectBasic')" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="所属部门" prop="departmentId">
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="deptMap[form.departmentId]" />
+                  <el-select v-else v-model="form.departmentId" placeholder="请选择所属部门" style="width: 100%" clearable>
+                    <el-option v-for="dept in deptList" :key="dept.id" :label="dept.name" :value="dept.id" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="项目分类">
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="form.category" />
+                  <el-input v-else v-model="form.category" placeholder="请输入项目分类" maxlength="100" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="项目阶段">
+                  <ViewField :value="form.phase" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectBasic') || canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="客户">
-                  <ViewEntity v-if="isView" :title="currentCustomer?.name" :subtitle="currentCustomer?.code" />
+                  <ViewEntity v-if="isGroupReadonly('projectBusiness')" :title="currentCustomer?.name" :subtitle="currentCustomer?.code" />
                   <el-select v-else v-model="form.customerId" placeholder="请选择客户" style="width: 100%" clearable>
                     <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id" />
                   </el-select>
@@ -385,7 +621,7 @@ function cancel() {
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目类型" prop="projectType">
-                  <ViewField v-if="isView" :value="projectType[form.projectType]" />
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="projectType[form.projectType]" />
                   <el-select v-else v-model="form.projectType" placeholder="请选择项目类型" style="width: 100%" :disabled="isEdit">
                     <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
                   </el-select>
@@ -393,19 +629,64 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-row :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectBasic')" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="项目标签">
+                  <ViewField v-if="isGroupReadonly('projectBasic')" :value="(form.tags || []).join('、')" />
+                  <el-select v-else v-model="form.tags" multiple filterable allow-create default-first-option collapse-tags collapse-tags-tooltip placeholder="请输入或选择标签" style="width: 100%">
+                    <el-option v-for="tag in form.tags || []" :key="tag" :label="tag" :value="tag" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="项目发起人" prop="creatorId">
+                  <ViewUser v-if="isGroupReadonly('projectBasic')" :user="form.creator" />
+                  <UserSelect v-else v-model="form.creatorId" placeholder="请选择项目发起人" clearable />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectBasic')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目负责人" prop="leaderId">
-                  <ViewUser v-if="isView" :user="form.leader" />
+                  <ViewUser v-if="isGroupReadonly('projectBasic')" :user="form.leader" />
                   <UserSelect v-else v-model="form.leaderId" placeholder="请选择项目负责人" clearable />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">
                 <el-form-item label="优先级" prop="priority">
-                  <ViewTagField v-if="isView" :text="priority[form.priority]" :type="form.priority === '3' ? 'danger' : form.priority === '2' ? 'warning' : 'info'" />
+                  <ViewTagField v-if="isGroupReadonly('projectBasic')" :text="priority[form.priority]" :type="form.priority === '3' ? 'danger' : form.priority === '2' ? 'warning' : 'info'" />
                   <el-select v-else v-model="form.priority" placeholder="请选择优先级" style="width: 100%">
                     <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
                   </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="!isCreate" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="计划开始" prop="planStartDate">
+                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.planStartDate" />
+                  <el-date-picker v-else v-model="form.planStartDate" type="date" placeholder="选择计划开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="计划结束" prop="planEndDate">
+                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.planEndDate" />
+                  <el-date-picker v-else v-model="form.planEndDate" type="date" placeholder="选择计划结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="实际开始">
+                  <ViewField :value="form.actualStartDate" />
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="实际结束">
+                  <ViewField :value="form.actualEndDate" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -425,7 +706,7 @@ function cancel() {
               </el-col>
             </el-row>
 
-            <el-row :gutter="20" class="basic-info-row basic-info-row--last">
+            <el-row v-if="canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="8">
                 <el-form-item label="状态">
                   <ViewTagField v-if="isView" :text="status[form.status]" :type="form.status === '6' ? 'success' : form.status === '3' ? 'primary' : form.status === '4' ? 'warning' : form.status === '7' ? 'danger' : 'info'" />
@@ -436,14 +717,70 @@ function cancel() {
               </el-col>
               <el-col :xs="24" :sm="8">
                 <el-form-item label="项目预算">
-                  <ViewField v-if="isView" :value="form.budget" />
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.budget" />
                   <el-input-number v-else v-model="form.budget" :min="0" :precision="2" :step="1000" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="8">
                 <el-form-item label="实际成本">
-                  <ViewField v-if="isView" :value="form.actualCost" />
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.actualCost" />
                   <el-input-number v-else v-model="form.actualCost" :min="0" :precision="2" :step="1000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="币种">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.currency" />
+                  <el-select v-else v-model="form.currency" placeholder="请选择币种" style="width: 100%" clearable>
+                    <el-option label="CNY" value="CNY" />
+                    <el-option label="USD" value="USD" />
+                    <el-option label="EUR" value="EUR" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="风险等级">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.riskLevel" />
+                  <el-select v-else v-model="form.riskLevel" placeholder="请选择风险等级" style="width: 100%" clearable>
+                    <el-option label="低" value="low" />
+                    <el-option label="中" value="medium" />
+                    <el-option label="高" value="high" />
+                    <el-option label="严重" value="critical" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="质量等级">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.qualityLevel" />
+                  <el-select v-else v-model="form.qualityLevel" placeholder="请选择质量等级" style="width: 100%" clearable>
+                    <el-option label="低" value="low" />
+                    <el-option label="中" value="medium" />
+                    <el-option label="高" value="high" />
+                    <el-option label="优秀" value="excellent" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row v-if="canViewGroup('projectBusiness')" :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="业务线">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.businessLine" />
+                  <el-input v-else v-model="form.businessLine" placeholder="请输入业务线" maxlength="100" />
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="行业">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.industry" />
+                  <el-input v-else v-model="form.industry" placeholder="请输入行业" maxlength="100" />
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="8">
+                <el-form-item label="项目来源">
+                  <ViewField v-if="isGroupReadonly('projectBusiness')" :value="form.projectSource" />
+                  <el-input v-else v-model="form.projectSource" placeholder="请输入项目来源" maxlength="100" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -454,13 +791,20 @@ function cancel() {
                 <div class="progress-readonly-field__tip">项目进度由任务完成率自动计算</div>
               </div>
             </el-form-item>
+            <el-form-item v-if="canViewGroup('projectBusiness') && !isCreate" label="累计工时" class="basic-info-progress-item">
+              <div class="progress-readonly-field">
+                <ViewField :value="form.spentHours" />
+                <div class="progress-readonly-field__tip">项目累计工时由任务工时自动汇总</div>
+              </div>
+            </el-form-item>
+            </div>
         </section>
 
         <section class="section-card section-card--table">
-          <div class="section-header">
+          <div class="section-header km-section-header">
             <div>
-              <div class="section-title">项目成员</div>
-              <div class="section-desc">一个角色允许多人，项目团队直接在草稿阶段维护。</div>
+              <div class="section-title km-section-title">项目成员</div>
+              <div class="section-desc km-section-desc">新建阶段先补齐核心成员。提醒、作用域、权限组等治理字段在项目创建后继续完善。</div>
             </div>
             <el-button v-if="!isView" type="primary" :icon="Plus" @click="addMemberRow">添加成员</el-button>
           </div>
@@ -508,10 +852,10 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isView" label="操作" width="96">
+              <el-table-column v-if="!isView" label="操作" width="120">
                 <template #default="{ $index }">
                   <div class="cell-action">
-                    <el-button type="danger" link :icon="Delete" @click="removeMemberRow($index)">删除</el-button>
+                    <el-button type="danger" link :icon="Delete" @click="removeMemberRow($index)">{{ form.members[$index]?.id ? '退出' : '移除' }}</el-button>
                   </div>
                 </template>
               </el-table-column>
@@ -519,11 +863,37 @@ function cancel() {
           </div>
         </section>
 
-        <section class="section-card section-card--table">
-          <div class="section-header">
+        <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table" style="--FormItemContentMaxWidth: 100%;">
+          <div class="section-header km-section-header section-header--stack">
             <div>
-              <div class="section-title">里程碑计划</div>
-              <div class="section-desc">按项目类型生成默认模板，草稿阶段即可调整名称、日期、交付物。</div>
+              <div class="section-title km-section-title">立项基线计划</div>
+              <div class="section-desc km-section-desc">立项审批前先收口项目的时间承诺、关键里程碑、主要交付物与范围边界。正式立项后，再在项目详情页继续细化执行计划。</div>
+            </div>
+          </div>
+
+          <div class="project-baseline-plan-grid">
+            <el-form-item label="主要交付物" prop="baselineDeliverables" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.baselineDeliverables" />
+              <el-input v-else v-model="form.baselineDeliverables" type="textarea" :rows="3" placeholder="请输入本项目的主要交付物，如实施方案、培训材料、上线清单、验收资料等" />
+            </el-form-item>
+
+            <el-form-item label="范围边界" prop="scopeBoundary" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.scopeBoundary" />
+              <el-input v-else v-model="form.scopeBoundary" type="textarea" :rows="3" placeholder="请输入本项目的范围边界、约束条件或不在本次交付范围内的事项" />
+            </el-form-item>
+
+            <el-form-item label="计划说明" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.baselinePlanNote" />
+              <el-input v-else v-model="form.baselinePlanNote" type="textarea" :rows="3" placeholder="可选，补充说明本次基线计划的假设前提、关键依赖或阶段说明" />
+            </el-form-item>
+          </div>
+        </section>
+
+        <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table">
+          <div class="section-header km-section-header">
+            <div>
+              <div class="section-title km-section-title">里程碑计划</div>
+              <div class="section-desc km-section-desc">新建阶段先录入关键里程碑与计划完成日期，执行中的责任人、状态、延期原因和影响标记在项目详情中继续维护。</div>
             </div>
             <div class="section-actions">
               <el-button v-if="!isView" @click="resetMilestoneTemplate">重置模板</el-button>
@@ -531,10 +901,10 @@ function cancel() {
             </div>
           </div>
 
-          <div class="table-wrapper">
+          <div class="table-wrapper table-wrapper--milestones">
             <el-table :data="form.milestones" border class="edit-table milestones-table" @cell-click="milestonesManuallyEdited = true">
               <el-table-column type="index" label="#" width="50" />
-              <el-table-column label="里程碑名称" width="220">
+              <el-table-column label="里程碑名称" width="180">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.name" />
                   <div v-else class="cell-editor">
@@ -542,7 +912,7 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="计划完成日期" width="160">
+              <el-table-column label="计划完成日期" width="140">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.dueDate" />
                   <div v-else class="cell-editor">
@@ -550,7 +920,15 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="状态" width="130">
+              <el-table-column v-if="!isCreate" label="责任人" width="150">
+                <template #default="{ row }">
+                  <ViewUser v-if="isView" :user="row.owner" />
+                  <div v-else class="cell-editor">
+                    <UserSelect v-model="row.ownerId" placeholder="请选择责任人" clearable />
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isCreate" label="状态" width="130">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="{ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[row.status]" />
                   <div v-else class="cell-editor">
@@ -563,7 +941,7 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="交付物" width="260">
+              <el-table-column v-if="!isCreate" label="交付物" width="220">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
                   <div v-else class="cell-editor">
@@ -573,11 +951,19 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="描述" width="240">
+              <el-table-column v-if="!isCreate" label="描述" width="180">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.description" />
                   <div v-else class="cell-editor">
                     <el-input v-model="row.description" placeholder="请输入说明" :disabled="isView" />
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isCreate" label="延期原因" width="180">
+                <template #default="{ row }">
+                  <ViewField v-if="isView" :value="row.delayReason" />
+                  <div v-else class="cell-editor">
+                    <el-input v-model="row.delayReason" placeholder="请输入延期原因" />
                   </div>
                 </template>
               </el-table-column>
@@ -589,7 +975,7 @@ function cancel() {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isView" label="操作" width="96">
+              <el-table-column v-if="!isView" label="操作" width="120">
                 <template #default="{ $index }">
                   <div class="cell-action">
                     <el-button type="danger" link :icon="Delete" @click="removeMilestoneRow($index)">删除</el-button>
@@ -601,10 +987,10 @@ function cancel() {
         </section>
 
         <section class="section-card section-card--content">
-          <div class="section-header section-header--stack">
+          <div class="section-header section-header--stack km-section-header">
             <div>
-              <div class="section-title">项目描述与附件</div>
-              <div class="section-desc">补充项目背景、范围说明以及相关附件资料。</div>
+              <div class="section-title km-section-title">项目描述与附件</div>
+              <div class="section-desc km-section-desc">补充项目背景、范围说明以及相关附件资料，减少后续沟通信息缺口。</div>
             </div>
           </div>
 
@@ -613,10 +999,49 @@ function cancel() {
             <Editor v-else v-model="form.description" style="min-height: 260px" />
           </el-form-item>
 
-          <el-form-item label="项目附件">
+          <el-form-item label="项目附件" class="project-attachments-item">
             <ViewFileList v-if="isView" :files="form.attachments || []" />
             <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
           </el-form-item>
+        </section>
+
+        <section v-if="!isCreate" class="section-card section-card--table">
+          <div class="section-header km-section-header section-header--stack">
+            <div>
+              <div class="section-title km-section-title">结项资料与复盘</div>
+              <div class="section-desc km-section-desc">在发起结项审批前，先沉淀验收说明、交付清单、遗留问题和项目复盘，让结项从流程动作变成业务闭环。</div>
+            </div>
+            <div v-if="!isView && isEdit" class="section-header__actions">
+              <el-button type="warning" @click="submitCloseApproval">提交结项审批</el-button>
+            </div>
+          </div>
+
+          <div class="project-baseline-plan-grid">
+            <el-form-item label="验收日期" class="project-baseline-plan-grid__item">
+              <ViewField v-if="isView" :value="form.acceptanceDate" />
+              <el-date-picker v-else v-model="form.acceptanceDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择验收日期" style="width: 100%" />
+            </el-form-item>
+
+            <el-form-item label="验收说明" prop="closeSummary" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.closeSummary" />
+              <el-input v-else v-model="form.closeSummary" type="textarea" :rows="3" placeholder="请输入项目验收情况、验收范围、验收结论等内容" />
+            </el-form-item>
+
+            <el-form-item label="交付清单" prop="closeDeliverables" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.closeDeliverables" />
+              <el-input v-else v-model="form.closeDeliverables" type="textarea" :rows="3" placeholder="请输入最终交付物清单，如实施成果、培训材料、上线资料、交接内容等" />
+            </el-form-item>
+
+            <el-form-item label="遗留问题" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.closeOpenIssues" />
+              <el-input v-else v-model="form.closeOpenIssues" type="textarea" :rows="3" placeholder="请输入尚未关闭但已达成处理共识的遗留问题、后续安排或风险说明" />
+            </el-form-item>
+
+            <el-form-item label="项目复盘" prop="closeReview" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
+              <ViewField v-if="isView" :value="form.closeReview" />
+              <el-input v-else v-model="form.closeReview" type="textarea" :rows="4" placeholder="请输入项目复盘，包括关键经验、问题原因、改进建议和可复用实践" />
+            </el-form-item>
+          </div>
         </section>
       </div>
 
@@ -640,6 +1065,7 @@ function cancel() {
         <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
       </el-form-item>
     </el-form>
+    </div>
   </div>
 </template>
 
@@ -648,17 +1074,30 @@ function cancel() {
   min-height: 100%;
 }
 
+.project-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.project-form-shell__top {
+  margin-bottom: 20px;
+}
+
 .project-sections {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
+  min-width: 0;
 }
 
 .section-card {
-  padding: 20px;
+  padding: 22px;
   background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
+  border-radius: 14px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .section-header--stack {
@@ -670,11 +1109,11 @@ function cancel() {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .section-card--basic .section-header {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .section-card--table .section-header {
@@ -685,8 +1124,51 @@ function cancel() {
   margin-top: 4px;
 }
 
+.project-basic-fields :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.project-basic-fields :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.project-baseline-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.project-baseline-plan-grid__item {
+  margin-bottom: 0 !important;
+}
+
+.project-baseline-plan-grid__item--wide {
+  grid-column: 1 / -1;
+}
+
+.project-baseline-plan-grid :deep(.el-textarea__inner) {
+  min-height: 96px;
+}
+
+.section-card :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.section-card :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.project-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .progress-readonly-field {
   width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .progress-readonly-field__tip {
@@ -701,7 +1183,7 @@ function cancel() {
 }
 
 .section-card--content :deep(.el-form-item) {
-  margin-bottom: 22px;
+  margin-bottom: 10px;
 }
 
 .section-card--content :deep(.el-form-item:last-child) {
@@ -709,27 +1191,16 @@ function cancel() {
 }
 
 .basic-info-row {
-  margin-bottom: 8px;
-}
-
-.basic-info-row--last {
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 
 .basic-info-progress-item {
   margin-top: 10px;
+  padding-top: 16px;
 }
 
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.section-desc {
-  margin-top: 4px;
-  color: #909399;
-  font-size: 13px;
+.project-attachments-item {
+  padding-top: 12px;
 }
 
 .section-actions {
@@ -738,13 +1209,64 @@ function cancel() {
 }
 
 .edit-table {
-  width: auto;
+  width: 100%;
+  --el-table-cell-padding: 0;
+}
+
+.edit-table :deep(th.el-table__cell) {
+  background: color-mix(in srgb, var(--Color) 3%, #f8fafc);
+  height: 34px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.edit-table :deep(th.el-table__cell),
+.edit-table :deep(td.el-table__cell) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.edit-table :deep(.el-table__row .el-table__cell) {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+.edit-table :deep(.cell) {
+  line-height: 1.2;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .table-wrapper {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.table-wrapper--milestones {
+  padding-bottom: 6px;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  border-radius: 10px;
+}
+
+.table-wrapper--milestones :deep(.el-table) {
+  min-width: 1280px;
+  width: 1280px;
+  max-width: none;
+}
+
+.table-wrapper--milestones :deep(.el-table__inner-wrapper),
+.table-wrapper--milestones :deep(.el-table__header-wrapper),
+.table-wrapper--milestones :deep(.el-table__body-wrapper),
+.table-wrapper--milestones :deep(table) {
+  min-width: 1280px;
 }
 
 .edit-table :deep(.cell) {
@@ -768,9 +1290,25 @@ function cancel() {
   box-sizing: border-box;
 }
 
+.edit-table :deep(.el-input__wrapper),
+.edit-table :deep(.el-select__wrapper) {
+  padding-inline: 8px;
+}
+
+.edit-table :deep(.el-textarea__inner) {
+  padding: 4px 8px;
+}
+
 .cell-editor {
   width: 100%;
   min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.members-table :deep(tbody tr),
+.milestones-table :deep(tbody tr) {
+  height: 28px;
 }
 
 .cell-editor--compact {
@@ -784,7 +1322,61 @@ function cancel() {
 }
 
 .footer-actions {
-  margin-top: 20px;
+  margin-top: 24px;
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+@media (max-width: 1024px) {
+  .project-baseline-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrapper--milestones :deep(.el-table),
+  .table-wrapper--milestones :deep(.el-table__inner-wrapper),
+  .table-wrapper--milestones :deep(.el-table__header-wrapper),
+  .table-wrapper--milestones :deep(.el-table__body-wrapper),
+  .table-wrapper--milestones :deep(table) {
+    min-width: 1120px;
+    width: 1120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-form-shell__top {
+    margin-bottom: 16px;
+  }
+
+  .section-card {
+    padding: 18px;
+  }
+
+  .table-wrapper--milestones {
+    margin-inline: -6px;
+    padding-inline: 6px;
+  }
+
+  .table-wrapper--milestones :deep(.el-table),
+  .table-wrapper--milestones :deep(.el-table__inner-wrapper),
+  .table-wrapper--milestones :deep(.el-table__header-wrapper),
+  .table-wrapper--milestones :deep(.el-table__body-wrapper),
+  .table-wrapper--milestones :deep(table) {
+    min-width: 980px;
+    width: 980px;
+  }
+
 }
 
 </style>

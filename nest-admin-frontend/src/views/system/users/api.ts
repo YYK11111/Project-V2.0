@@ -28,3 +28,7 @@ export const getTheme = () => get(`${serve}/getTheme`)
 
 // 更新用户主题配置
 export const updateTheme = (data) => put(`${serve}/updateTheme`, data)
+
+export const getProjectReminderPreference = () => get(`${serve}/getProjectReminderPreference`)
+
+export const updateProjectReminderPreference = (data) => put(`${serve}/updateProjectReminderPreference`, data)

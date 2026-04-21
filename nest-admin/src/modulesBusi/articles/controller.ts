@@ -1,52 +1,81 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Query, Req } from '@nestjs/common'
-import { ArticlesService } from './service'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { UpdateResult } from 'typeorm'
-import { Article, status } from './entity'
-import { knowledgeTypeMap, visibilityTypeMap } from './constants'
-import { BaseController } from 'src/common/BaseController'
-import { ForbiddenException } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Put,
+  Query,
+  Req,
+} from "@nestjs/common";
+import { ArticlesService } from "./service";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { UpdateResult } from "typeorm";
+import { Article, status } from "./entity";
+import { knowledgeTypeMap, visibilityTypeMap } from "./constants";
+import { BaseController } from "src/common/BaseController";
+import { ForbiddenException } from "@nestjs/common";
 
-@Controller('business/articles')
-export class ArticlesController extends BaseController<Article, ArticlesService> {
+@Controller("business/articles")
+export class ArticlesController extends BaseController<
+  Article,
+  ArticlesService
+> {
   constructor(readonly service: ArticlesService) {
-    super(service)
+    super(service);
   }
 
-  @Get('getStatus')
+  @Get("getStatus")
   getStatus() {
-    return status
+    return status;
   }
 
-  @Get('getKnowledgeTypes')
+  @Get("getKnowledgeTypes")
   getKnowledgeTypes() {
-    return knowledgeTypeMap
+    return knowledgeTypeMap;
   }
 
-  @Get('getVisibilityTypes')
+  @Get("getVisibilityTypes")
   getVisibilityTypes() {
-    return visibilityTypeMap
+    return visibilityTypeMap;
   }
 
-  @Post('rebuildChunks/:id')
-  rebuildChunks(@Param('id') id: string, @Req() req) {
-    return this.service.rebuildChunks(id, req.user)
+  @Post("rebuildChunks/:id")
+  rebuildChunks(@Param("id") id: string, @Req() req) {
+    return this.service.rebuildChunks(id, req.user);
   }
 
-  @Get('retrieveForAi')
+  @Get("retrieveForAi")
   async retrieveForAi(@Query() query: any, @Req() req) {
-    return this.service.retrieveForAi(query, req.user)
+    return this.service.retrieveForAi(query, req.user);
   }
 
-  @Get('list')
+  @Get("list")
   async list(@Query() query: QueryListDto, @Req() req) {
-    return this.service.list(query, req.user)
+    return this.service.list(query, req.user);
   }
 
-  @Get('getOne/:id')
-  async getProtectedOne(@Param('id') id: string, @Req() req) {
+  @Get("home")
+  async getHome(@Req() req) {
+    return this.service.getHomeData(req.user);
+  }
+
+  @Get("hot-keywords")
+  async getHotKeywords() {
+    return this.service.getHotKeywords();
+  }
+
+  @Post("search-records")
+  async createSearchRecord(@Body() body: { keyword?: string }, @Req() req) {
+    return this.service.recordSearchKeyword(body?.keyword, req.user);
+  }
+
+  @Get("getOne/:id")
+  async getProtectedOne(@Param("id") id: string, @Req() req) {
     try {
-      return await this.service.getOneForAccess(id, req.user)
+      return await this.service.getOneForAccess(id, req.user);
     } catch (error) {
       if (error?.status === 403) {
         throw new ForbiddenException({
@@ -55,9 +84,20 @@ export class ArticlesController extends BaseController<Article, ArticlesService>
           canBorrow: error.canBorrow,
           catalogId: error.catalogId,
           articleId: error.articleId,
-        })
+        });
       }
-      throw error
+      throw error;
     }
+  }
+
+  @Delete("del/:ids")
+  async del(@Param("ids") ids: string, @Req() req) {
+    return this.service.del(
+      ids,
+      req.user.name,
+      req.user.permissions || [],
+      req.user.name,
+      req.user.id,
+    );
   }
 }

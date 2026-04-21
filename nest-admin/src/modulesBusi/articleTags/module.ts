@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common'
-import { TypeOrmModule } from '@nestjs/typeorm'
-import { ArticleTag } from './entity'
-import { ArticleTagsController } from './controller'
-import { ArticleTagsService } from './service'
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ArticleTag } from "./entity";
+import { ArticleTagsController } from "./controller";
+import { ArticleTagsService } from "./service";
 
 @Module({
   imports: [TypeOrmModule.forFeature([ArticleTag])],

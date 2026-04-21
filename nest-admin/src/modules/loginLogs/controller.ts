@@ -1,18 +1,33 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Query, Req, HttpCode } from '@nestjs/common'
-import { LoginLogsService } from './service'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { UpdateResult } from 'typeorm'
-import { LoginLog } from './entity'
-import { BaseController } from 'src/common/BaseController'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Put,
+  Query,
+  Req,
+  HttpCode,
+} from "@nestjs/common";
+import { LoginLogsService } from "./service";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { UpdateResult } from "typeorm";
+import { LoginLog } from "./entity";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('system/loginLogs')
-export class LoginLogsController extends BaseController<LoginLog, LoginLogsService> {
+@Controller("system/loginLogs")
+export class LoginLogsController extends BaseController<
+  LoginLog,
+  LoginLogsService
+> {
   constructor(readonly service: LoginLogsService) {
-    super(service)
+    super(service);
   }
 
   // 重写以避免暴露路由
-  @Post('save')
+  @Post("save")
   @HttpCode(404)
   async save() {}
 
@@ -21,9 +36,9 @@ export class LoginLogsController extends BaseController<LoginLog, LoginLogsServi
    * @param query { beginTime; endTime }
    * @returns
    */
-  @Get('getVisitedNumChart')
+  @Get("getVisitedNumChart")
   async getVisitedNumChart(@Query() query: { beginTime; endTime }) {
-    return await this.service.getVisitedNumChart(query)
+    return await this.service.getVisitedNumChart(query);
   }
 
   /**
@@ -31,8 +46,8 @@ export class LoginLogsController extends BaseController<LoginLog, LoginLogsServi
    * @param query { beginTime; endTime }
    * @returns
    */
-  @Get('getUserAreaList')
+  @Get("getUserAreaList")
   async getUserAreaList(@Query() query: { beginTime; endTime }) {
-    return await this.service.getUserAreaList(query)
+    return await this.service.getUserAreaList(query);
   }
 }

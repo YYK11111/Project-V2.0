@@ -1,19 +1,24 @@
-import { QueryListDto } from 'src/common/dto'
+import { QueryListDto } from "src/common/dto";
 
 export type CreateMilestoneDto = {
-  name: string
-  projectId?: string
-  description?: string
-  dueDate?: string
-  completedDate?: string
-  status?: string
-  taskCount?: number
-  completedTaskCount?: number
-  deliverables?: string[]
-  sort?: number
-} & QueryListDto
+  name: string;
+  projectId?: string;
+  description?: string;
+  dueDate?: string;
+  completedDate?: string;
+  status?: string;
+  taskCount?: number;
+  completedTaskCount?: number;
+  deliverables?: string[];
+  ownerId?: string;
+  delayReason?: string;
+  phase?: string;
+  changeImpactFlag?: string;
+  riskImpactFlag?: string;
+  sort?: number;
+} & QueryListDto;
 
 export type QueryMilestoneDto = {
-  projectId?: string
-  status?: string
-} & QueryListDto
+  projectId?: string;
+  status?: string;
+} & QueryListDto;

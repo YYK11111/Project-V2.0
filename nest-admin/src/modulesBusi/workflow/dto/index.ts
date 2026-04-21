@@ -1,15 +1,19 @@
-import { IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
-import { NodeConfig, FlowConfig, WorkflowDefinitionConfig } from '../interface/node.interface';
+import { IsNotEmpty, IsOptional, MaxLength } from "class-validator";
+import {
+  NodeConfig,
+  FlowConfig,
+  WorkflowDefinitionConfig,
+} from "../interface/node.interface";
 
 /**
  * 创建工作流定义DTO
  */
 export class CreateWorkflowDefinitionDto implements WorkflowDefinitionConfig {
-  @IsNotEmpty({ message: '流程名称不能为空' })
+  @IsNotEmpty({ message: "流程名称不能为空" })
   @MaxLength(100)
   name: string;
 
-  @IsNotEmpty({ message: '流程编码不能为空' })
+  @IsNotEmpty({ message: "流程编码不能为空" })
   @MaxLength(50)
   code: string;
 
@@ -39,10 +43,10 @@ export class CreateWorkflowDefinitionDto implements WorkflowDefinitionConfig {
   @IsOptional()
   statusTriggerValues?: string[];
 
-  @IsNotEmpty({ message: '节点配置不能为空' })
+  @IsNotEmpty({ message: "节点配置不能为空" })
   nodes: NodeConfig[];
 
-  @IsNotEmpty({ message: '连接线配置不能为空' })
+  @IsNotEmpty({ message: "连接线配置不能为空" })
   flows: FlowConfig[];
 
   @IsOptional()
@@ -105,7 +109,7 @@ export class StartWorkflowDto {
   @IsOptional()
   businessScene?: string;
 
-  @IsNotEmpty({ message: '业务数据ID不能为空' })
+  @IsNotEmpty({ message: "业务数据ID不能为空" })
   businessKey: string;
 
   @IsOptional()
@@ -116,8 +120,8 @@ export class StartWorkflowDto {
  * 完成任务DTO
  */
 export class CompleteTaskDto {
-  @IsNotEmpty({ message: '审批动作不能为空' })
-  action: 'approve' | 'reject';
+  @IsNotEmpty({ message: "审批动作不能为空" })
+  action: "approve" | "reject";
 
   @IsOptional()
   comment?: string;
@@ -133,7 +137,7 @@ export class CompleteTaskDto {
  * 加签任务DTO
  */
 export class AddSignTaskDto {
-  @IsNotEmpty({ message: '加签用户ID不能为空' })
+  @IsNotEmpty({ message: "加签用户ID不能为空" })
   signUserId: string;
 
   @IsOptional()
@@ -176,7 +180,7 @@ export class ResubmitReturnedWorkflowDto {
  * 转交任务DTO
  */
 export class TransferTaskDto {
-  @IsNotEmpty({ message: '目标用户ID不能为空' })
+  @IsNotEmpty({ message: "目标用户ID不能为空" })
   targetUserId: string;
 
   @IsOptional()

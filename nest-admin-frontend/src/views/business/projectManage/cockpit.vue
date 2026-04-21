@@ -3,8 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getCockpit, getStatus, getPriority } from './api'
 import ChartPie from '@/components/ChartPie.vue'
+import ChartLine from '@/components/ChartLine.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
+import { phaseMap, qualityLevelMap, riskLevelMap } from './fieldMaps'
+import { downloadCsv } from '@/utils/csv'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,8 +17,26 @@ const cockpit = ref({})
 const statusMap = ref({})
 const priorityMap = ref({})
 const projectId = ref(String(route.query.projectId || ''))
+const filterState = ref({
+  leaderId: String(route.query.leaderId || ''),
+  status: String(route.query.status || ''),
+  priority: String(route.query.priority || ''),
+  category: String(route.query.category || ''),
+  riskLevel: String(route.query.riskLevel || ''),
+  qualityLevel: String(route.query.qualityLevel || ''),
+  healthLevel: String(route.query.healthLevel || ''),
+})
 
 const projectOptions = computed(() => cockpit.value.projectOptions || [])
+const leaderOptions = computed(() => {
+  const map = new Map()
+  projectOptions.value.forEach((item) => {
+    if (item.leader?.id) {
+      map.set(String(item.leader.id), item.leader.nickname || item.leader.name || '未命名负责人')
+    }
+  })
+  return Array.from(map.entries()).map(([id, label]) => ({ id, label }))
+})
 const summary = computed(() => cockpit.value.summary || {})
 const selectedProject = computed(() => cockpit.value.selectedProject || {})
 const projectDashboard = computed(() => selectedProject.value || {})
@@ -25,6 +46,40 @@ const selectedTaskSummary = computed(() => projectDashboard.value.summary?.taskS
 const selectedTicketSummary = computed(() => projectDashboard.value.summary?.ticketSummary || {})
 const selectedRiskSummary = computed(() => projectDashboard.value.summary?.riskSummary || {})
 const selectedMilestoneSummary = computed(() => projectDashboard.value.summary?.milestoneSummary || {})
+const selectedHealthSummary = computed(() => projectDashboard.value.summary?.healthSummary || {})
+const selectedKnowledgeSummary = computed(() => projectDashboard.value.summary?.knowledgeSummary || {})
+const selectedAlerts = computed(() => projectDashboard.value.focus?.alerts || [])
+const selectedTrend = computed(() => cockpit.value.selectedTrend || {})
+const healthDistributionData = computed(() => summary.value.distributions?.health || [])
+const progressDistributionData = computed(() => summary.value.distributions?.progress || [])
+const knowledgeDistributionData = computed(() => summary.value.distributions?.knowledge || [])
+const alertDistributionData = computed(() => summary.value.distributions?.alert || [])
+const riskLevelDistributionData = computed(() => summary.value.distributions?.riskLevel || [])
+const qualityLevelDistributionData = computed(() => summary.value.distributions?.qualityLevel || [])
+const reportSummaryText = computed(() => {
+  const lines = [
+    '项目驾驶舱汇报摘要',
+    `筛选条件：负责人${filterState.value.leaderId ? `=${leaderOptions.value.find((item) => item.id === filterState.value.leaderId)?.label || '-'}` : '=全部'}，状态${filterState.value.status ? `=${statusMap.value[filterState.value.status] || '-'}` : '=全部'}，优先级${filterState.value.priority ? `=${priorityMap.value[filterState.value.priority] || '-'}` : '=全部'}，分类${filterState.value.category || '全部'}，风险${filterState.value.riskLevel || '全部'}，质量${filterState.value.qualityLevel || '全部'}，健康度${filterState.value.healthLevel || '全部'}`,
+    `项目总数：${summary.value.totalProjects || 0}`,
+    `进行中项目：${summary.value.activeProjects || 0}，已完成项目：${summary.value.completedProjects || 0}，逾期项目：${summary.value.overdueProjects || 0}`,
+    `平均进度：${summary.value.averageProgress || 0}% ，平均健康度：${summary.value.averageHealthScore || 0}，累计工时：${summary.value.spentHoursTotal || 0}`,
+    `需关注项目：${summary.value.attentionProjects || 0}，知识活跃项目：${summary.value.knowledgeActiveProjects || 0}`,
+  ]
+
+  if (selectedProjectDetail.value?.name) {
+    lines.push(`当前项目：${selectedProjectDetail.value.name}`)
+    lines.push(`当前项目健康度：${selectedHealthSummary.value.totalScore || 0}（${selectedHealthSummary.value.levelLabel || '基本健康'}）`)
+  }
+
+  if (selectedAlerts.value?.length) {
+    lines.push('当前项目重点提醒：')
+    selectedAlerts.value.slice(0, 5).forEach((item) => {
+      lines.push(`- ${item.title}（${item.value}）：${item.desc}`)
+    })
+  }
+
+  return lines.join('\n')
+})
 
 const taskStatusChartData = computed(() => [
   { value: selectedTaskSummary.value.pending || 0, name: '待处理' },
@@ -46,20 +101,50 @@ const rankingSections = computed(() => [
   { key: 'overdueProjects', title: '逾期项目排行', items: rankings.value.overdueProjects || [], empty: '暂无逾期项目' },
   { key: 'laggingProjects', title: '低进度项目排行', items: rankings.value.laggingProjects || [], empty: '暂无低进度项目' },
   { key: 'costRiskProjects', title: '成本偏差项目', items: rankings.value.costRiskProjects || [], empty: '暂无成本偏差项目' },
+  { key: 'healthRiskProjects', title: '健康度风险项目', items: rankings.value.healthRiskProjects || [], empty: '暂无需关注项目' },
+  { key: 'knowledgeActiveProjects', title: '知识沉淀活跃项目', items: rankings.value.knowledgeActiveProjects || [], empty: '暂无活跃项目' },
 ])
+
+const getHealthTagType = (level) => {
+  if (level === 'healthy') return 'success'
+  if (level === 'stable') return 'primary'
+  if (level === 'attention') return 'warning'
+  return 'danger'
+}
 
 async function loadCockpit() {
   loading.value = true
   try {
     const [statusRes, priorityRes, cockpitRes] = await Promise.all([
-      getStatus(),
-      getPriority(),
-      getCockpit({ pageNum: 1, pageSize: 200, projectId: projectId.value || undefined }),
-    ])
+        getStatus(),
+        getPriority(),
+        getCockpit({
+          pageNum: 1,
+          pageSize: 200,
+          projectId: projectId.value || undefined,
+          leaderId: filterState.value.leaderId || undefined,
+          status: filterState.value.status || undefined,
+          priority: filterState.value.priority || undefined,
+          category: filterState.value.category || undefined,
+          riskLevel: filterState.value.riskLevel || undefined,
+          qualityLevel: filterState.value.qualityLevel || undefined,
+          healthLevel: filterState.value.healthLevel || undefined,
+        }),
+      ])
     statusMap.value = statusRes.data || {}
     priorityMap.value = priorityRes.data || {}
     cockpit.value = cockpitRes.data || {}
-    if (!projectId.value && cockpit.value.selectedProjectId) {
+    const availableProjectIds = new Set((cockpit.value.projectOptions || []).map((item) => String(item.id)))
+    if (projectId.value && !availableProjectIds.has(String(projectId.value))) {
+      projectId.value = String(cockpit.value.selectedProjectId || '')
+      router.replace({
+        path: route.path,
+        query: {
+          ...route.query,
+          projectId: projectId.value || undefined,
+        },
+      })
+    } else if (!projectId.value && cockpit.value.selectedProjectId) {
       projectId.value = String(cockpit.value.selectedProjectId)
     }
   } finally {
@@ -69,7 +154,37 @@ async function loadCockpit() {
 
 function handleProjectChange(value) {
   projectId.value = String(value || '')
-  router.replace({ path: route.path, query: { ...route.query, projectId: projectId.value } })
+  router.replace({ path: route.path, query: { ...route.query, projectId: projectId.value || undefined } })
+}
+
+function handleFilterChange() {
+  router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      projectId: projectId.value || undefined,
+      leaderId: filterState.value.leaderId || undefined,
+      status: filterState.value.status || undefined,
+      priority: filterState.value.priority || undefined,
+      category: filterState.value.category || undefined,
+      riskLevel: filterState.value.riskLevel || undefined,
+      qualityLevel: filterState.value.qualityLevel || undefined,
+      healthLevel: filterState.value.healthLevel || undefined,
+    },
+  })
+}
+
+function resetFilters() {
+  filterState.value = {
+    leaderId: '',
+    status: '',
+    priority: '',
+    category: '',
+    riskLevel: '',
+    qualityLevel: '',
+    healthLevel: '',
+  }
+  handleFilterChange()
 }
 
 function goToProjectDetail() {
@@ -82,15 +197,61 @@ function goToProject(row) {
   router.push({ path: '/projectManage/detail', query: { id: String(row.id) } })
 }
 
+function exportCockpitReport() {
+  const rows = [
+    ['项目名称', '负责人', '状态', '优先级', '项目分类', '风险等级', '质量等级', '币种', '预算', '实际成本', '累计工时', '进度(%)', '健康度', '最近知识更新'],
+    ...projectOptions.value.map((item) => [
+      item.name || '-',
+      item.leader?.nickname || item.leader?.name || '-',
+      statusMap.value[item.status] || '-',
+      priorityMap.value[item.priority] || '-',
+      item.category || '-',
+      riskLevelMap[item.riskLevel] || item.riskLevel || '-',
+      qualityLevelMap[item.qualityLevel] || item.qualityLevel || '-',
+      item.currency || '-',
+      Number(item.budget || 0),
+      Number(item.actualCost || 0),
+      Number(item.spentHours || 0),
+      Number(item.progress || 0),
+      rankings.value.healthRiskProjects?.find((healthItem) => String(healthItem.id) === String(item.id))?.healthScore || '-',
+      rankings.value.knowledgeActiveProjects?.find((knowledgeItem) => String(knowledgeItem.id) === String(item.id))?.recentKnowledgeUpdates || 0,
+    ]),
+  ]
+  downloadCsv('项目驾驶舱导出.csv', rows)
+}
+
+async function copyReportSummary() {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(reportSummaryText.value)
+  } else {
+    const textarea = document.createElement('textarea')
+    textarea.value = reportSummaryText.value
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+  $sdk.msgSuccess('汇报摘要已复制')
+}
+
 onMounted(() => {
   loadCockpit()
 })
 
 watch(
-  () => route.query.projectId,
+  () => [route.query.projectId, route.query.leaderId, route.query.status, route.query.priority, route.query.category, route.query.riskLevel, route.query.qualityLevel, route.query.healthLevel],
   (value, oldValue) => {
-    projectId.value = String(value || '')
-    if (value === oldValue) return
+    projectId.value = String(value[0] || '')
+    filterState.value = {
+      leaderId: String(value[1] || ''),
+      status: String(value[2] || ''),
+      priority: String(value[3] || ''),
+      category: String(value[4] || ''),
+      riskLevel: String(value[5] || ''),
+      qualityLevel: String(value[6] || ''),
+      healthLevel: String(value[7] || ''),
+    }
+    if (JSON.stringify(value) === JSON.stringify(oldValue)) return
     loadCockpit()
   },
 )
@@ -106,9 +267,46 @@ watch(
         <el-select v-model="projectId" placeholder="选择项目" style="width: 260px" @change="handleProjectChange" clearable>
           <el-option v-for="item in projectOptions" :key="item.id" :label="item.name" :value="String(item.id)" />
         </el-select>
+        <el-button @click="copyReportSummary">复制汇报摘要</el-button>
+        <el-button @click="exportCockpitReport">导出筛选结果</el-button>
         <el-button type="primary" :disabled="!projectId" @click="goToProjectDetail">项目详情</el-button>
       </template>
     </el-page-header>
+
+    <el-card shadow="hover" class="report-card">
+      <template #header>汇报摘要</template>
+      <pre class="report-card__content">{{ reportSummaryText }}</pre>
+    </el-card>
+
+    <el-card shadow="hover" class="filter-card">
+      <div class="filter-card__grid">
+        <el-select v-model="filterState.leaderId" placeholder="负责人" clearable @change="handleFilterChange">
+          <el-option v-for="item in leaderOptions" :key="item.id" :label="item.label" :value="item.id" />
+        </el-select>
+        <el-select v-model="filterState.status" placeholder="项目状态" clearable @change="handleFilterChange">
+          <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="String(key)" />
+        </el-select>
+        <el-select v-model="filterState.priority" placeholder="优先级" clearable @change="handleFilterChange">
+          <el-option v-for="(label, key) in priorityMap" :key="key" :label="label" :value="String(key)" />
+        </el-select>
+        <el-input v-model="filterState.category" placeholder="项目分类" clearable @change="handleFilterChange" />
+        <el-select v-model="filterState.riskLevel" placeholder="风险等级" clearable @change="handleFilterChange">
+          <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
+        </el-select>
+        <el-select v-model="filterState.qualityLevel" placeholder="质量等级" clearable @change="handleFilterChange">
+          <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
+        </el-select>
+        <el-select v-model="filterState.healthLevel" placeholder="健康度区间" clearable @change="handleFilterChange">
+          <el-option label="健康" value="healthy" />
+          <el-option label="基本健康" value="stable" />
+          <el-option label="需关注" value="attention" />
+          <el-option label="高风险" value="critical" />
+        </el-select>
+        <div class="filter-card__actions">
+          <el-button @click="resetFilters">重置筛选</el-button>
+        </div>
+      </div>
+    </el-card>
 
     <div class="cockpit-summary-grid mt20">
       <el-card shadow="hover" class="summary-card">
@@ -135,6 +333,116 @@ watch(
         <div class="summary-card__label">总实际成本</div>
         <div class="summary-card__value">{{ summary.actualCostTotal || 0 }}</div>
       </el-card>
+      <el-card shadow="hover" class="summary-card">
+        <div class="summary-card__label">累计工时</div>
+        <div class="summary-card__value">{{ summary.spentHoursTotal || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="summary-card summary-card--health">
+        <div class="summary-card__label">平均健康度</div>
+        <div class="summary-card__value">{{ summary.averageHealthScore || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="summary-card summary-card--warning">
+        <div class="summary-card__label">需关注项目</div>
+        <div class="summary-card__value">{{ summary.attentionProjects || 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="summary-card summary-card--knowledge">
+        <div class="summary-card__label">知识活跃项目</div>
+        <div class="summary-card__value">{{ summary.knowledgeActiveProjects || 0 }}</div>
+      </el-card>
+    </div>
+
+      <div class="cockpit-board-grid mt20">
+        <el-card shadow="hover" class="board-card">
+          <template #header>健康度趋势（最近 7 天）</template>
+          <ChartLine
+            v-if="selectedTrend.dates?.length"
+            :xData="selectedTrend.dates"
+            :legend="['健康度']"
+            :series="selectedTrend.healthScores || []"
+            :bgLinearGradient="false"
+          />
+          <el-empty v-else description="暂无健康度趋势数据" />
+        </el-card>
+
+        <el-card shadow="hover" class="board-card">
+          <template #header>风险数量趋势（最近 7 天）</template>
+          <ChartLine
+            v-if="selectedTrend.dates?.length"
+            :xData="selectedTrend.dates"
+            :legend="['高风险数量']"
+            :series="selectedTrend.riskCounts || []"
+            :bgLinearGradient="false"
+          />
+          <el-empty v-else description="暂无风险趋势数据" />
+        </el-card>
+      </div>
+
+      <div class="cockpit-board-grid mt20">
+        <el-card shadow="hover" class="board-card">
+          <template #header>知识活跃趋势（最近 7 天）</template>
+          <ChartLine
+            v-if="selectedTrend.dates?.length"
+            :xData="selectedTrend.dates"
+            :legend="['知识最近更新']"
+            :series="selectedTrend.knowledgeUpdateCounts || []"
+            :bgLinearGradient="false"
+          />
+          <el-empty v-else description="暂无知识趋势数据" />
+        </el-card>
+
+        <el-card shadow="hover" class="board-card">
+          <template #header>成本偏差趋势（最近 7 天）</template>
+          <ChartLine
+            v-if="selectedTrend.dates?.length"
+            :xData="selectedTrend.dates"
+            :legend="['成本偏差']"
+            :series="selectedTrend.costVariances || []"
+            :bgLinearGradient="false"
+          />
+          <el-empty v-else description="暂无成本偏差趋势数据" />
+        </el-card>
+      </div>
+
+      <div class="cockpit-board-grid mt20">
+        <el-card shadow="hover" class="board-card">
+          <template #header>健康度分布</template>
+          <ChartPie v-if="healthDistributionData.length" :series="healthDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无健康度分布数据" />
+      </el-card>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>进度分布</template>
+        <ChartPie v-if="progressDistributionData.length" :series="progressDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无进度分布数据" />
+      </el-card>
+    </div>
+
+    <div class="cockpit-board-grid mt20">
+      <el-card shadow="hover" class="board-card">
+        <template #header>知识活跃度分布</template>
+        <ChartPie v-if="knowledgeDistributionData.length" :series="knowledgeDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无知识活跃度分布数据" />
+      </el-card>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>异常类型分布</template>
+        <ChartPie v-if="alertDistributionData.length" :series="alertDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无异常类型分布数据" />
+      </el-card>
+    </div>
+
+    <div class="cockpit-board-grid mt20">
+      <el-card shadow="hover" class="board-card">
+        <template #header>项目风险等级分布</template>
+        <ChartPie v-if="riskLevelDistributionData.length" :series="riskLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无项目风险等级数据" />
+      </el-card>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>项目质量等级分布</template>
+        <ChartPie v-if="qualityLevelDistributionData.length" :series="qualityLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无项目质量等级数据" />
+      </el-card>
     </div>
 
     <div v-if="projectId" class="cockpit-main mt20">
@@ -145,6 +453,8 @@ watch(
             <div class="project-hero-card__meta">
               <el-tag :type="selectedProjectDetail.status === '6' ? 'success' : 'primary'">{{ statusMap[selectedProjectDetail.status] || '-' }}</el-tag>
               <el-tag :type="selectedProjectDetail.priority === '3' ? 'danger' : selectedProjectDetail.priority === '2' ? 'warning' : 'info'">{{ priorityMap[selectedProjectDetail.priority] || '-' }}</el-tag>
+              <el-tag v-if="selectedProjectDetail.riskLevel" type="danger">风险 {{ riskLevelMap[selectedProjectDetail.riskLevel] || selectedProjectDetail.riskLevel }}</el-tag>
+              <el-tag v-if="selectedProjectDetail.qualityLevel" type="success">质量 {{ qualityLevelMap[selectedProjectDetail.qualityLevel] || selectedProjectDetail.qualityLevel }}</el-tag>
               <span>进度 {{ selectedProjectDetail.progress || 0 }}%</span>
             </div>
           </div>
@@ -152,6 +462,15 @@ watch(
             <div class="project-hero-card__owner-label">项目负责人</div>
             <ViewUser :user="selectedProjectDetail.leader" />
           </div>
+        </div>
+        <div class="project-hero-card__facts">
+          <span>分类：{{ selectedProjectDetail.category || '-' }}</span>
+          <span>阶段：{{ phaseMap[selectedProjectDetail.phase] || selectedProjectDetail.phase || '-' }}</span>
+          <span>业务线：{{ selectedProjectDetail.businessLine || '-' }}</span>
+          <span>行业：{{ selectedProjectDetail.industry || '-' }}</span>
+          <span>来源：{{ selectedProjectDetail.projectSource || '-' }}</span>
+          <span>币种：{{ selectedProjectDetail.currency || '-' }}</span>
+          <span>累计工时：{{ selectedProjectDetail.spentHours || 0 }}</span>
         </div>
         <ViewRichText v-if="selectedProjectDetail.description" :html="selectedProjectDetail.description" class="project-hero-card__content" />
         <div v-else class="project-hero-card__empty">暂无项目说明</div>
@@ -171,7 +490,43 @@ watch(
             <div class="board-stat-item"><span>未解决工单</span><strong>{{ selectedTicketSummary.open || 0 }}</strong></div>
             <div class="board-stat-item"><span>高风险事项</span><strong>{{ selectedRiskSummary.high || 0 }}</strong></div>
             <div class="board-stat-item"><span>里程碑完成率</span><strong>{{ selectedMilestoneSummary.completionRate || 0 }}%</strong></div>
+            <div class="board-stat-item"><span>健康度</span><strong>{{ selectedHealthSummary.totalScore || 0 }}</strong></div>
+            <div class="board-stat-item"><span>知识最近更新</span><strong>{{ selectedKnowledgeSummary.recentUpdatedCount || 0 }}</strong></div>
           </div>
+        </el-card>
+      </div>
+
+      <div class="cockpit-board-grid mt20">
+        <el-card shadow="hover" class="board-card">
+          <template #header>健康度剖面</template>
+          <div class="health-profile-card">
+            <div class="health-profile-card__hero">
+              <strong>{{ selectedHealthSummary.totalScore || 0 }}</strong>
+              <el-tag :type="getHealthTagType(selectedHealthSummary.level)">{{ selectedHealthSummary.levelLabel || '基本健康' }}</el-tag>
+            </div>
+            <div class="health-profile-card__grid">
+              <div class="health-profile-card__item"><span>进度</span><strong>{{ selectedHealthSummary.dimensions?.progress?.score || 0 }}/25</strong></div>
+              <div class="health-profile-card__item"><span>风险</span><strong>{{ selectedHealthSummary.dimensions?.risk?.score || 0 }}/20</strong></div>
+              <div class="health-profile-card__item"><span>变更</span><strong>{{ selectedHealthSummary.dimensions?.change?.score || 0 }}/15</strong></div>
+              <div class="health-profile-card__item"><span>执行</span><strong>{{ selectedHealthSummary.dimensions?.execution?.score || 0 }}/15</strong></div>
+              <div class="health-profile-card__item"><span>交付</span><strong>{{ selectedHealthSummary.dimensions?.delivery?.score || 0 }}/15</strong></div>
+              <div class="health-profile-card__item"><span>知识</span><strong>{{ selectedHealthSummary.dimensions?.knowledge?.score || 0 }}/10</strong></div>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="board-card">
+          <template #header>统一提醒</template>
+          <div v-if="selectedAlerts.length" class="cockpit-alert-list">
+            <div v-for="item in selectedAlerts" :key="item.title" class="cockpit-alert-item" :class="`cockpit-alert-item--${item.type}`">
+              <div class="cockpit-alert-item__header">
+                <span>{{ item.title }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+              <div class="cockpit-alert-item__desc">{{ item.desc }}</div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无提醒" />
         </el-card>
       </div>
 
@@ -208,6 +563,8 @@ watch(
                 <span>进度 {{ item.progress || 0 }}%</span>
                 <span v-if="item.endDate">/ 截止 {{ item.endDate }}</span>
                 <span v-if="Number(item.actualCost || 0) > Number(item.budget || 0)">/ 偏差 {{ Number(item.actualCost || 0) - Number(item.budget || 0) }}</span>
+                <span v-if="item.healthScore != null">/ 健康度 {{ item.healthScore }}</span>
+                <span v-if="item.recentKnowledgeUpdates != null">/ 最近更新 {{ item.recentKnowledgeUpdates }}</span>
               </div>
             </div>
           </div>
@@ -241,6 +598,13 @@ watch(
               <el-progress :percentage="Number(row.progress || 0)" :stroke-width="8" />
             </template>
           </el-table-column>
+          <el-table-column label="阶段" width="100">
+            <template #default="{ row }">
+              {{ phaseMap[row.phase] || row.phase || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="业务线" prop="businessLine" width="120" />
+          <el-table-column label="来源" prop="projectSource" width="120" />
         </el-table>
       </el-card>
     </div>
@@ -258,6 +622,34 @@ watch(
 .cockpit-header-text {
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+
+.filter-card {
+  border-radius: 16px;
+}
+
+.report-card {
+  border-radius: 16px;
+}
+
+.report-card__content {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.filter-card__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filter-card__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .cockpit-summary-grid {
@@ -292,6 +684,18 @@ watch(
 
 .summary-card--alert {
   background: linear-gradient(135deg, rgba(245, 108, 108, 0.12), rgba(245, 108, 108, 0.03));
+}
+
+.summary-card--health {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.12), rgba(103, 194, 58, 0.03));
+}
+
+.summary-card--warning {
+  background: linear-gradient(135deg, rgba(230, 162, 60, 0.12), rgba(230, 162, 60, 0.03));
+}
+
+.summary-card--knowledge {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(64, 158, 255, 0.03));
 }
 
 .project-hero-card {
@@ -373,6 +777,94 @@ watch(
   color: var(--el-text-color-primary);
 }
 
+.health-profile-card__hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.health-profile-card__hero strong {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--el-color-primary);
+}
+
+.health-profile-card__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.health-profile-card__item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.health-profile-card__item span {
+  display: block;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.health-profile-card__item strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
+  color: var(--el-text-color-primary);
+}
+
+.cockpit-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cockpit-alert-item {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.cockpit-alert-item--danger {
+  background: rgba(245, 108, 108, 0.08);
+  border-color: rgba(245, 108, 108, 0.24);
+}
+
+.cockpit-alert-item--warning {
+  background: rgba(230, 162, 60, 0.08);
+  border-color: rgba(230, 162, 60, 0.24);
+}
+
+.cockpit-alert-item--info {
+  background: rgba(64, 158, 255, 0.08);
+  border-color: rgba(64, 158, 255, 0.22);
+}
+
+.cockpit-alert-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cockpit-alert-item__header span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cockpit-alert-item__header strong {
+  font-size: 20px;
+}
+
+.cockpit-alert-item__desc {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
 .focus-board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -416,20 +908,24 @@ watch(
 }
 
 @media (max-width: 1280px) {
+  .filter-card__grid,
   .cockpit-summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .focus-board {
+  .focus-board,
+  .health-profile-card__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 900px) {
+  .filter-card__grid,
   .cockpit-summary-grid,
   .cockpit-board-grid,
   .focus-board,
-  .board-stat-list {
+  .board-stat-list,
+  .health-profile-card__grid {
     grid-template-columns: 1fr;
   }
 

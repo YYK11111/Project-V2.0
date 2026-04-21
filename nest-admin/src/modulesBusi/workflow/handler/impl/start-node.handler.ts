@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { INodeHandler } from '../../interface/node-handler.interface';
-import { NodeType, NodeExecutionContext, NodeResult } from '../../interface/node.interface';
+import { Injectable } from "@nestjs/common";
+import { INodeHandler } from "../../interface/node-handler.interface";
+import {
+  NodeType,
+  NodeExecutionContext,
+  NodeResult,
+} from "../../interface/node.interface";
 
 /**
  * 开始节点处理器
@@ -11,7 +15,9 @@ export class StartNodeHandler implements INodeHandler {
 
   async onEnter(context: NodeExecutionContext): Promise<void> {
     // 记录流程开始
-    console.log(`[Start] Flow instance ${context.instanceId} started at ${new Date().toISOString()}`);
+    console.log(
+      `[Start] Flow instance ${context.instanceId} started at ${new Date().toISOString()}`,
+    );
   }
 
   async execute(context: NodeExecutionContext): Promise<NodeResult> {
@@ -19,11 +25,13 @@ export class StartNodeHandler implements INodeHandler {
     return {
       success: true,
       nextNodeIds: [],
-      outputData: { status: 'started' },
+      outputData: { status: "started" },
     };
   }
 
   async onExit(context: NodeExecutionContext): Promise<void> {
-    console.log(`[Start] Flow instance ${context.instanceId} exited start node`);
+    console.log(
+      `[Start] Flow instance ${context.instanceId} exited start node`,
+    );
   }
 }

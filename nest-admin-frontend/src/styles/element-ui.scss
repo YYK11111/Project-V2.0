@@ -307,11 +307,11 @@ html.dark {
     }
 
     // 避免提示信息被滚动隐藏
-    .el-form-item__error {
-      position: fixed;
-      left: auto;
-      top: auto;
-    }
+    // .el-form-item__error {
+    //   position: fixed;
+    //   left: auto;
+    //   top: auto;
+    // }
     &:not(.el-form--inline) {
       flex-direction: column;
 

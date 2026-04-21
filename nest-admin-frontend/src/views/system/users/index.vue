@@ -312,7 +312,7 @@ const getButtons = (row: any) => {
     </div>
 
     <div class="GleftRightR">
-      <RequestChartTable ref="rctRef" :isCreateRequest="false" :params="params" :request="getList">
+      <RequestChartTable ref="rctRef" class="user-index-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
           <BaInput v-model="query.name" label="姓名" prop="name"></BaInput>
           <!-- <BaInput v-model="query.nickname" label="昵称" prop="nickname"></BaInput> -->
@@ -323,13 +323,16 @@ const getButtons = (row: any) => {
         </template>
 
         <template #operation="{ selectedIds }">
-          <div class="flexBetween">
-            <el-button v-if="canUserAdd" type="primary" @click="action('add')">新增人员</el-button>
-            <el-button v-if="canUserDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+          <div class="user-index-operation">
+            <div class="user-index-operation__left">
+              <el-button v-if="canUserAdd" type="primary" @click="action('add')">新增人员</el-button>
+            </div>
+            <el-button v-if="canUserDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
           </div>
         </template>
 
         <template #table>
+          <el-table-column type="index" label="序号" width="70" />
           <el-table-column label="头像" prop="avatar">
             <template #default="{ row }">
               <!-- <el-popover v-if="row.avatar" placement="bottom" trigger="hover" show-after="200">
@@ -414,10 +417,46 @@ const getButtons = (row: any) => {
 </template>
 
 <style scoped lang="scss">
+.user-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.user-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.user-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-index-panel :deep(.el-table__header-wrapper),
+.user-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .text-gray {
   color: #999;
 }
 .ml-10 {
   margin-left: 10px;
+}
+
+@media (max-width: 768px) {
+  .user-index-panel {
+    padding-top: 18px;
+  }
+
+  .user-index-operation,
+  .user-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

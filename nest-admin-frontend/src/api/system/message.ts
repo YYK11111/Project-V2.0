@@ -15,3 +15,11 @@ export function getMessageList(params: Record<string, any>) {
 export function markMessageRead(id: string) {
   return request({ url: `/system/messages/read/${id}`, method: 'post' })
 }
+
+export function markProjectAlertsRead() {
+  return request({ url: '/system/messages/project-alerts/read-all', method: 'post' })
+}
+
+export function clearProjectAlerts() {
+  return request({ url: '/system/messages/project-alerts/clear', method: 'post' })
+}

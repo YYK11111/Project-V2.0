@@ -28,6 +28,10 @@ export function getDashboard(id) {
   return request({ url: `${baseUrl}/dashboard/${id}`, method: 'get' })
 }
 
+export function getFieldPermissions(id) {
+  return request({ url: `${baseUrl}/field-permissions/${id}`, method: 'get' })
+}
+
 export function getCockpit(params) {
   return request({ url: `${baseUrl}/cockpit`, method: 'get', params })
 }
@@ -66,6 +70,14 @@ export function submitApproval(id) {
 
 export function submitClose(id) {
   return request({ url: `${baseUrl}/${id}/submit-close`, method: 'post' })
+}
+
+export function publishCloseReview(id) {
+  return request({ url: `${baseUrl}/${id}/publish-close-review`, method: 'post' })
+}
+
+export function syncProjectAlerts(id) {
+  return request({ url: `${baseUrl}/${id}/sync-alerts`, method: 'post' })
 }
 
 export function recalculateProgress(projectIds) {

@@ -1,72 +1,81 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common'
-import { ProjectMembersService } from './service'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { ProjectMember, projectMemberRoleMap } from './entity'
-import { ProjectMemberDto, UpdateProjectMemberDto } from './dto'
-import { BaseController } from 'src/common/BaseController'
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from "@nestjs/common";
+import { ProjectMembersService } from "./service";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { ProjectMember, projectMemberRoleMap } from "./entity";
+import { ProjectMemberDto, UpdateProjectMemberDto } from "./dto";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('business/project-members')
-export class ProjectMembersController extends BaseController<ProjectMember, ProjectMembersService> {
+@Controller("business/project-members")
+export class ProjectMembersController extends BaseController<
+  ProjectMember,
+  ProjectMembersService
+> {
   constructor(readonly service: ProjectMembersService) {
-    super(service)
+    super(service);
   }
 
-  @Get('getRoles')
+  @Get("getRoles")
   getRoles() {
-    return projectMemberRoleMap
+    return projectMemberRoleMap;
   }
 
-  @Get('stats')
+  @Get("stats")
   getStats() {
-    return this.service.getStats()
+    return this.service.getStats();
   }
 
-  @Get('project-overview')
+  @Get("project-overview")
   getProjectOverview(@Query() query: QueryListDto) {
-    return this.service.getProjectOverview(query)
+    return this.service.getProjectOverview(query);
   }
 
   @Post()
   addMember(@Body() data: ProjectMemberDto) {
-    return this.service.addMember(data)
+    return this.service.addMember(data);
   }
 
-  @Put(':id')
-  updateMember(
-    @Param('id') id: string,
-    @Body() data: UpdateProjectMemberDto
-  ) {
-    return this.service.updateMember(id, data)
+  @Put(":id")
+  updateMember(@Param("id") id: string, @Body() data: UpdateProjectMemberDto) {
+    return this.service.updateMember(id, data);
   }
 
-  @Delete(':id')
-  removeMember(@Param('id') id: string) {
-    return this.service.removeMember(id)
+  @Delete(":id")
+  removeMember(@Param("id") id: string) {
+    return this.service.removeMember(id);
   }
 
-  @Get('project/:projectId')
-  getProjectMembers(@Param('projectId') projectId: string) {
-    return this.service.getProjectMembers(projectId)
+  @Get("project/:projectId")
+  getProjectMembers(@Param("projectId") projectId: string) {
+    return this.service.getProjectMembers(projectId);
   }
 
-  @Get('user/:userId/projects')
-  getUserProjects(@Param('userId') userId: string) {
-    return this.service.getUserProjects(userId)
+  @Get("user/:userId/projects")
+  getUserProjects(@Param("userId") userId: string) {
+    return this.service.getUserProjects(userId);
   }
 
-  @Get('check/:projectId/:userId')
+  @Get("check/:projectId/:userId")
   checkMembership(
-    @Param('projectId') projectId: string,
-    @Param('userId') userId: string
+    @Param("projectId") projectId: string,
+    @Param("userId") userId: string,
   ) {
-    return this.service.isProjectMember(projectId, userId)
+    return this.service.isProjectMember(projectId, userId);
   }
 
-  @Get('check-manager/:projectId/:userId')
+  @Get("check-manager/:projectId/:userId")
   checkManagerRole(
-    @Param('projectId') projectId: string,
-    @Param('userId') userId: string
+    @Param("projectId") projectId: string,
+    @Param("userId") userId: string,
   ) {
-    return this.service.isProjectManager(projectId, userId)
+    return this.service.isProjectManager(projectId, userId);
   }
 }

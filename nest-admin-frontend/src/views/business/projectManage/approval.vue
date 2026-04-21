@@ -4,6 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, getStatus, getPriority, getProjectType, submitApproval } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import { closeReturnedWorkflowInstance, getWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { checkPermi } from '@/utils/permission'
@@ -54,6 +55,7 @@ const statusMap = ref({})
 const priorityMap = ref({})
 const projectTypeMap = ref({})
 const customerList = ref([])
+const deptMap = ref({})
 const workflowPanelRef = ref()
 const workflowInstance = ref(null)
 
@@ -74,11 +76,12 @@ function getApprovalType(status) {
 
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, projectRes, workflowRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
+    getDeptTrees({}),
     getOne(projectId.value),
     workflowInstanceId.value ? getWorkflowInstance(workflowInstanceId.value) : Promise.resolve({ data: null }),
   ])
@@ -86,6 +89,15 @@ async function reloadCurrent() {
   priorityMap.value = priorityRes.data || {}
   projectTypeMap.value = projectTypeRes.data || {}
   customerList.value = customerRes.list || []
+  const map = {}
+  const walk = (nodes = []) => {
+    nodes.forEach((item) => {
+      map[item.id] = item.name
+      if (item.children?.length) walk(item.children)
+    })
+  }
+  walk(deptRes.data || [])
+  deptMap.value = map
   project.value = {
     attachments: [],
     members: [],
@@ -299,16 +311,34 @@ watch(
               <ViewField :value="workflowInstance?.businessCode || project.code || '-'" />
             </el-form-item>
           </el-col>
+          <el-col :xs="24" :sm="12" :md="8">
+            <el-form-item label="命中权限角色">
+              <ViewField :value="fieldPermissionResult?.projectRole?.roleLabel || '-'" />
+            </el-form-item>
+          </el-col>
         </el-row>
       </section>
 
-      <section class="section-card section-card--basic">
+      <section v-if="canViewGroup('projectBasic') || canViewGroup('projectPlan') || canViewGroup('projectBusiness')" class="section-card section-card--basic">
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">基本信息</div>
             <div class="section-desc">查看立项审批所需的项目基础属性、负责人、时间计划和预算信息。</div>
           </div>
         </div>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="所属部门">
+              <ViewField :value="deptMap[project.departmentId] || '-'" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="项目分类">
+              <ViewField :value="project.category" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
         <el-row :gutter="20" class="basic-info-row">
           <el-col :xs="24" :sm="12">
@@ -338,6 +368,19 @@ watch(
 
         <el-row :gutter="20" class="basic-info-row">
           <el-col :xs="24" :sm="12">
+            <el-form-item label="项目发起人">
+              <ViewUser :user="project.creator" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="项目标签">
+              <ViewField :value="(project.tags || []).join('、')" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="开始时间">
               <ViewField :value="project.startDate" />
             </el-form-item>
@@ -345,6 +388,32 @@ watch(
           <el-col :xs="24" :sm="12">
             <el-form-item label="结束时间">
               <ViewField :value="project.endDate" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="计划开始">
+              <ViewField :value="project.planStartDate" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="计划结束">
+              <ViewField :value="project.planEndDate" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="实际开始">
+              <ViewField :value="project.actualStartDate" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="实际结束">
+              <ViewField :value="project.actualEndDate" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -361,9 +430,35 @@ watch(
             </el-form-item>
           </el-col>
         </el-row>
+
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="币种">
+              <ViewField :value="project.currency" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="风险等级">
+              <ViewField :value="project.riskLevel" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="质量等级">
+              <ViewField :value="project.qualityLevel" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="累计工时">
+              <ViewField :value="project.spentHours" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </section>
 
-      <section class="section-card section-card--table">
+      <section v-if="canViewGroup('projectMember')" class="section-card section-card--table">
         <div class="section-header">
           <div>
             <div class="section-title">项目成员</div>
@@ -398,7 +493,7 @@ watch(
         </div>
       </section>
 
-      <section class="section-card section-card--table">
+      <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table">
         <div class="section-header">
           <div>
             <div class="section-title">里程碑计划</div>
@@ -418,8 +513,14 @@ watch(
             <el-table-column label="状态" width="130">
               <template #default="{ row }"><ViewField :value="{ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[row.status]" /></template>
             </el-table-column>
+            <el-table-column label="责任人" width="140">
+              <template #default="{ row }"><ViewUser :user="row.owner" /></template>
+            </el-table-column>
             <el-table-column label="交付物" min-width="260">
               <template #default="{ row }"><ViewField :value="(row.deliverables || []).join('、')" /></template>
+            </el-table-column>
+            <el-table-column label="延期原因" min-width="200">
+              <template #default="{ row }"><ViewField :value="row.delayReason" /></template>
             </el-table-column>
             <el-table-column label="描述" min-width="220">
               <template #default="{ row }"><ViewField :value="row.description" /></template>
@@ -428,7 +529,7 @@ watch(
         </div>
       </section>
 
-      <section class="section-card section-card--content">
+      <section v-if="canViewGroup('projectBasic')" class="section-card section-card--content">
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">项目描述与附件</div>

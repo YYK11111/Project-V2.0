@@ -1,11 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Query, Req, HttpCode } from '@nestjs/common'
-import { SystemLogService } from './service'
-import { BaseController } from 'src/common/BaseController'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Put,
+  Query,
+  Req,
+  HttpCode,
+} from "@nestjs/common";
+import { SystemLogService } from "./service";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('system/systemLog')
+@Controller("system/systemLog")
 export class SystemLogController extends BaseController<{}, SystemLogService> {
   constructor(readonly service: SystemLogService) {
-    super(service)
+    super(service);
   }
 
   /**
@@ -15,11 +27,11 @@ export class SystemLogController extends BaseController<{}, SystemLogService> {
    */
   @Get()
   async get(@Query() query) {
-    return await this.service.get()
+    return await this.service.get();
   }
 
   @Delete()
   async del(@Query() query) {
-    return await this.service.del()
+    return await this.service.del();
   }
 }

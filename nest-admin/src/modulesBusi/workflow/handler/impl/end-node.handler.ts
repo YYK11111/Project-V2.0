@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { INodeHandler } from '../../interface/node-handler.interface';
-import { NodeType, NodeExecutionContext, NodeResult } from '../../interface/node.interface';
+import { Injectable } from "@nestjs/common";
+import { INodeHandler } from "../../interface/node-handler.interface";
+import {
+  NodeType,
+  NodeExecutionContext,
+  NodeResult,
+} from "../../interface/node.interface";
 
 /**
  * 结束节点处理器
@@ -18,7 +22,7 @@ export class EndNodeHandler implements INodeHandler {
     return {
       success: true,
       nextNodeIds: [],
-      outputData: { status: 'ended' },
+      outputData: { status: "ended" },
     };
   }
 

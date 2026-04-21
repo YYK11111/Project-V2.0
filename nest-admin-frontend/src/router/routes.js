@@ -28,6 +28,12 @@ const routerView = {
 // 公共路由
 export const constantRoutes = [
   {
+    path: '/',
+    component: Layout,
+    isHidden: true,
+    children: [],
+  },
+  {
     path: '/login',
     component: () => import('@/layout/visitor'),
     isHidden: true,
@@ -92,6 +98,18 @@ export const constantRoutes = [
         component: () => import('@/views/business/projectManage/approval.vue'),
         name: 'ProjectApprovalHidden',
         meta: { title: '项目审批' },
+      },
+      {
+        path: '/projectManage/userStoryManage/form',
+        component: () => import('@/views/business/userStoryManage/form.vue'),
+        name: 'UserStoryFormHidden',
+        meta: { title: '用户故事表单' },
+      },
+      {
+        path: '/projectManage/riskManage/form',
+        component: () => import('@/views/business/riskManage/form.vue'),
+        name: 'ProjectRiskFormHidden',
+        meta: { title: '风险表单' },
       },
       {
         path: '/content/articleManage/aev',
@@ -180,6 +198,18 @@ export const constantRoutes = [
   },
   // 工作流管理路由已移至数据库菜单 sys_menu
 ]
+
+let dynamicRoutesReady = false
+let dynamicRoutesInitPromise = null
+
+export function isDynamicRoutesReady() {
+  return dynamicRoutesReady
+}
+
+export function resetDynamicRoutesState() {
+  dynamicRoutesReady = false
+  dynamicRoutesInitPromise = null
+}
 
 import { getLoginUserMenus } from '@/views/system/roles/api'
 
@@ -309,6 +339,30 @@ export function getUserRoutes(router) {
 
     return userRoutes
   })
+}
+
+export function ensureDynamicRoutes(router) {
+  if (dynamicRoutesReady) {
+    return Promise.resolve(stores().permission.addRoutes || [])
+  }
+  if (dynamicRoutesInitPromise) {
+    return dynamicRoutesInitPromise
+  }
+
+  dynamicRoutesInitPromise = getUserRoutes(router)
+    .then((routes) => {
+      dynamicRoutesReady = true
+      return routes
+    })
+    .catch((error) => {
+      dynamicRoutesReady = false
+      throw error
+    })
+    .finally(() => {
+      dynamicRoutesInitPromise = null
+    })
+
+  return dynamicRoutesInitPromise
 }
 
 // // 遍历后台传来的路由字符串，转换为组件对象

@@ -61,9 +61,12 @@
 <script setup>
 import Cookies from 'js-cookie'
 import { login, getCaptchaImage } from './api'
+import { useUserStore } from '@/stores/user'
+import { ensureDynamicRoutes } from '@/router/routes'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const ispassword = ref(true)
 const loginType = ref('account')
@@ -106,25 +109,40 @@ function getCaptchaImageFun() {
 }
 getCaptchaImageFun()
 
-function submit() {
-  formRef.value.validate().then(async () => {
-    if (form.value.rememberMe) {
-      Cookies.set('account', form.value.account, { expires: 30 })
-      Cookies.set('rememberMe', form.value.rememberMe, {
-        expires: 30,
-      })
-    } else {
-      Cookies.remove('account')
-      Cookies.remove('rememberMe')
+async function submit() {
+  await formRef.value.validate()
+
+  if (form.value.rememberMe) {
+    Cookies.set('account', form.value.account, { expires: 30 })
+    Cookies.set('rememberMe', form.value.rememberMe, {
+      expires: 30,
+    })
+  } else {
+    Cookies.remove('account')
+    Cookies.remove('rememberMe')
+  }
+
+  loading.value = true
+  try {
+    try {
+      await login({ ...form.value })
+    } catch (error) {
+      await getCaptchaImageFun()
+      return
     }
-    loading.value = true
-    login({ ...form.value })
-      .then(() => {
-        redirect.value ? router.push(redirect.value) : router.push('/')
-      })
-      .catch(() => getCaptchaImageFun())
-      .finally(() => (loading.value = false))
-  })
+
+    try {
+      await userStore.getUserInfo()
+      await ensureDynamicRoutes(router)
+      const target = redirect.value || '/'
+      await router.replace(target)
+    } catch (error) {
+      console.error('登录后初始化失败', error)
+      ElMessage.error('登录成功，但页面初始化失败，请重试')
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

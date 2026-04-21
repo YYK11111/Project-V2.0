@@ -1,4 +1,4 @@
-import { NodeType, NodeExecutionContext, NodeResult } from './node.interface';
+import { NodeType, NodeExecutionContext, NodeResult } from "./node.interface";
 
 /**
  * 节点处理器接口

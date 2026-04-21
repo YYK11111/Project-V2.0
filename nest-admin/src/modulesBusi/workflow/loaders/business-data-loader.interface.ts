@@ -1,4 +1,4 @@
-import { FieldDefinition } from '../entity/workflow-business-config.entity';
+import { FieldDefinition } from "../entity/workflow-business-config.entity";
 
 export interface BusinessData {
   id: string;

@@ -1,9 +1,9 @@
-import { config } from 'config'
+import { config } from "config";
 
 // Depends on tencentcloud-sdk-nodejs version 4.0.3 or higher
-const tencentcloud = require('tencentcloud-sdk-nodejs-hunyuan')
+const tencentcloud = require("tencentcloud-sdk-nodejs-hunyuan");
 
-const HunyuanClient = tencentcloud.hunyuan.v20230901.Client
+const HunyuanClient = tencentcloud.hunyuan.v20230901.Client;
 
 // 实例化一个认证对象，入参需要传入腾讯云账户 SecretId 和 SecretKey，此处还需注意密钥对的保密
 // 代码泄露可能会导致 SecretId 和 SecretKey 泄露，并威胁账号下所有资源的安全性。以下代码示例仅供参考，建议采用更安全的方式来使用密钥，请参见：https://cloud.tencent.com/document/product/1278/85305
@@ -13,31 +13,33 @@ const clientConfig = {
     secretId: config.hunyuan.secretId,
     secretKey: config.hunyuan.secretKey,
   },
-  region: '',
+  region: "",
   profile: {
     httpProfile: {
-      endpoint: 'hunyuan.tencentcloudapi.com',
+      endpoint: "hunyuan.tencentcloudapi.com",
     },
   },
-}
+};
 
 // 实例化要请求产品的client对象,clientProfile是可选的
-const client = new HunyuanClient(clientConfig)
+const client = new HunyuanClient(clientConfig);
 const params = {
-  Model: 'hunyuan-pro',
+  Model: "hunyuan-pro",
   Messages: [
     {
-      Role: 'user',
+      Role: "user",
       // Content: 'abc',
     },
   ],
   Stream: true,
-}
+};
 
-export const send = async (data = { content: '' }) => {
-  params.Messages = [Object.assign({ Content: data.content }, { Role: 'user' })]
+export const send = async (data = { content: "" }) => {
+  params.Messages = [
+    Object.assign({ Content: data.content }, { Role: "user" }),
+  ];
 
-  return client.ChatCompletions(params)
+  return client.ChatCompletions(params);
   // .then(
   //   async (res) => {
   //     if (typeof res.on === 'function') {
@@ -59,4 +61,4 @@ export const send = async (data = { content: '' }) => {
   //     console.error('error', err)
   //   },
   // )
-}
+};

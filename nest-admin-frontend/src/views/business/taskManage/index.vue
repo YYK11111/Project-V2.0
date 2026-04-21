@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { getList, getStatus, getPriority, del, updateProgress, submitApproval } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
+import { sourceTypeMap } from '../projectManage/fieldMaps'
 
 const params = ref({})
 
@@ -12,6 +13,7 @@ getStatus().then(({ data }) => (status.value = data))
 
 const priority = ref({})
 getPriority().then(({ data }) => (priority.value = data))
+
 
 const rctRef = ref()
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
@@ -54,15 +56,15 @@ const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
   { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
   { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
-  canTaskUpdate.value ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
+  canTaskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
   canTaskSubmitApproval.value && canSubmitTaskApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canTaskDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  canTaskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList" :key="$route.fullPath">
+  <div class="task-index-page">
+    <RequestChartTable ref="rctRef" class="task-index-panel" :params="params" :request="getList" :key="$route.fullPath" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="任务名称" prop="name"></BaInput>
         <BaSelect v-model="query.status" filterable label="状态" prop="status">
@@ -70,6 +72,9 @@ const getButtons = (row) => [
         </BaSelect>
         <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
           <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
+        </BaSelect>
+        <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+          <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
         </BaSelect>
         <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
           <el-option label="有评论" value="1"></el-option>
@@ -85,13 +90,16 @@ const getButtons = (row) => [
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <el-button v-if="canTaskAdd" type="primary" @click="rctRef.goRoute(null, '/taskManage/form')">新增任务</el-button>
+        <div class="task-index-operation">
+          <div class="task-index-operation__left">
+            <el-button v-if="canTaskAdd" type="primary" @click="rctRef.goRoute(null, '/taskManage/form')">新增任务</el-button>
+          </div>
           <el-button v-if="canTaskDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="任务名称" prop="name" :show-overflow-tooltip="true" min-width="200" />
         <el-table-column label="协作提醒" width="110">
           <template #default="{ row }">
@@ -109,6 +117,18 @@ const getButtons = (row) => [
         <el-table-column label="所属项目" prop="project.name" width="150" :show-overflow-tooltip="true" />
         <el-table-column label="开始时间" prop="startDate" width="120" />
         <el-table-column label="截止时间" prop="endDate" width="120" />
+        <el-table-column label="计划开始" prop="plannedStartDate" width="120" />
+        <el-table-column label="计划结束" prop="plannedEndDate" width="120" />
+        <el-table-column label="实际开始" prop="actualStartDate" width="120" />
+        <el-table-column label="实际结束" prop="actualEndDate" width="120" />
+        <el-table-column label="来源类型" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.sourceType" :type="row.sourceType === 'change' ? 'warning' : row.sourceType === 'baseline' ? 'primary' : 'info'" size="small">
+              {{ sourceTypeMap[row.sourceType] || row.sourceType }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" prop="status" width="100">
           <template #default="{ row }">
             <el-tag 
@@ -166,3 +186,45 @@ const getButtons = (row) => [
     </RequestChartTable>
   </div>
 </template>
+
+<style scoped>
+.task-index-page {
+  min-height: 100%;
+}
+
+.task-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.task-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-index-panel :deep(.el-table__header-wrapper),
+.task-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .task-index-panel {
+    padding-top: 18px;
+  }
+
+  .task-index-operation,
+  .task-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

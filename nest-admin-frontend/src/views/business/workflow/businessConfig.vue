@@ -186,8 +186,8 @@ const getButtons = (row: any) => [
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :params="params" :request="getBusinessConfigs">
+  <div class="workflow-config-index-page">
+    <RequestChartTable ref="rctRef" class="workflow-config-index-panel" :params="params" :request="getBusinessConfigs" :is-selection="true">
       <template #query="{ query }">
         <BaSelect v-model="query.businessType" label="业务对象" prop="businessType" isAll>
           <el-option v-for="item in businessTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -195,8 +195,8 @@ const getButtons = (row: any) => [
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <div>
+        <div class="workflow-config-index-operation">
+          <div class="workflow-config-index-operation__left">
             <el-button v-if="canWorkflowConfigAdd" type="primary" @click="openDialog()">新增自动触发配置</el-button>
           </div>
           <el-button v-if="canWorkflowConfigDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteBusinessConfig)" type="danger">批量删除</el-button>
@@ -204,6 +204,7 @@ const getButtons = (row: any) => [
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="businessType" label="业务对象" width="120">
           <template #default="{ row }">
             <el-tag type="primary" size="small">{{ getBusinessTypeName(row.businessType) }}</el-tag>
@@ -262,6 +263,35 @@ const getButtons = (row: any) => [
 </template>
 
 <style scoped>
+.workflow-config-index-page {
+  min-height: 100%;
+}
+
+.workflow-config-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.workflow-config-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workflow-config-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workflow-config-index-panel :deep(.el-table__header-wrapper),
+.workflow-config-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .trigger-item {
   margin-bottom: 6px;
 }
@@ -280,5 +310,16 @@ const getButtons = (row: any) => [
 
 .ml-8 {
   margin-left: 8px;
+}
+
+@media (max-width: 768px) {
+  .workflow-config-index-panel {
+    padding-top: 18px;
+  }
+
+  .workflow-config-index-operation,
+  .workflow-config-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

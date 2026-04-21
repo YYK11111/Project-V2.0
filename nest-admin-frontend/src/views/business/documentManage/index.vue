@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import { Edit, Refresh, Delete } from '@element-plus/icons-vue'
 import { getList, getType, del, upgradeVersion } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
@@ -34,8 +33,8 @@ const getButtons = (row) => [
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+  <div class="document-index-page">
+    <RequestChartTable ref="rctRef" class="document-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="文档名称" prop="name"></BaInput>
         <BaSelect v-model="query.type" filterable label="类型" prop="type">
@@ -44,13 +43,16 @@ const getButtons = (row) => [
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <el-button v-if="canDocumentAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/documentManage/form')">新增项目文档</el-button>
-          <el-button v-if="canDocumentDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+        <div class="document-index-operation">
+          <div class="document-index-operation__left">
+            <el-button v-if="canDocumentAdd" type="primary" @click="rctRef.goRoute(null, '/documentManage/form')">新增项目文档</el-button>
+          </div>
+          <el-button v-if="canDocumentDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="文档名称" prop="name" :show-overflow-tooltip="true" min-width="200" />
         <el-table-column label="类型" prop="type" width="100">
           <template #default="{ row }">
@@ -82,28 +84,43 @@ const getButtons = (row) => [
 </template>
 
 <style lang="scss" scoped>
-.tableOperation {
+.document-index-page {
+  min-height: 100%;
+}
+
+.document-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.document-index-operation {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.document-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.document-index-panel :deep(.el-table__header-wrapper),
+.document-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .document-index-panel {
+    padding-top: 18px;
+  }
+
+  .document-index-operation,
+  .document-index-operation__left {
+    align-items: stretch;
   }
 }
 </style>

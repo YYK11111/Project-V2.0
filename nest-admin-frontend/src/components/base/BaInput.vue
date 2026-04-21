@@ -55,6 +55,7 @@ export default defineComponent({
       class="BaInput"
       clearable
       show-word-limit
+      style="width: 100%"
       :placeholder="placeholderTransfer"
       v-bind="Object.assign({}, $attrs, { style: '', class: '', id: '' })">
       <template

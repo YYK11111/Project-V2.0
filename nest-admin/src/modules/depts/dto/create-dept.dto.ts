@@ -1,3 +1,3 @@
 export class CreateDeptDto {
-  parentId
+  parentId;
 }

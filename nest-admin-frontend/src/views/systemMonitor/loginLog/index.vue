@@ -5,8 +5,8 @@ const yesOrNOStatus = { [KEY_YES]: '成功', [KEY_NO]: '失败' }
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :request="getList">
+  <div class="login-log-index-page">
+    <RequestChartTable ref="rctRef" class="login-log-index-panel" :request="getList">
       <template #query="{ query }">
         <BaInput v-model="query.account" label="登录账号" prop="account"></BaInput>
         <BaInput v-model="query.address" label="登录地点" prop="ip"></BaInput>
@@ -18,6 +18,7 @@ const yesOrNOStatus = { [KEY_YES]: '成功', [KEY_NO]: '失败' }
       </template>
 
       <template #tableView>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="会话编号" prop="session" :show-overflow-tooltip="true" />
         <el-table-column label="登录账号" prop="account" :show-overflow-tooltip="true" />
         <!-- <el-table-column label="登录密码" prop="password" :show-overflow-tooltip="true" /> -->
@@ -39,16 +40,23 @@ const yesOrNOStatus = { [KEY_YES]: '成功', [KEY_NO]: '失败' }
 </template>
 
 <style lang="scss" scoped>
-.title-name {
-  font-size: 14px;
-
-  font-weight: 600;
-  color: var(--FontBlack);
-  display: flex;
-  align-items: center;
+.login-log-index-page {
+  min-height: 100%;
 }
-.bottom {
-  justify-content: flex-end;
-  padding: 20px;
+
+.login-log-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.login-log-index-panel :deep(.el-table__header-wrapper),
+.login-log-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .login-log-index-panel {
+    padding-top: 18px;
+  }
 }
 </style>

@@ -18,6 +18,7 @@ const canWorkflowInstanceGetOne = computed(() => checkPermi(['business/workflow/
 const canWorkflowInstanceCancel = computed(() => checkPermi(['business/workflow/instances/cancel']))
 const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflow/instances/withdraw']))
 const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/instances/cancel']))
+const canWorkflowInstanceBatchOperate = computed(() => canWorkflowInstanceCancel.value || canWorkflowInstanceWithdraw.value || canWorkflowInstanceCloseReturned.value)
 
 const getButtons = (row: any) => [
   canWorkflowInstanceGetOne.value ? { key: 'detail', label: '详情', onClick: () => viewDetail(row) } : null,
@@ -151,8 +152,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :params="params" :request="api.getWorkflowInstances">
+  <div class="workflow-instance-index-page">
+    <RequestChartTable ref="rctRef" class="workflow-instance-index-panel" :params="params" :request="api.getWorkflowInstances" :is-selection="true">
       <template #query="{ query }">
         <BaSelect v-model="query.mode" label="查看范围" prop="mode">
           <el-option label="我参与的" value="participant" />
@@ -162,7 +163,14 @@ onMounted(async () => {
           <el-option label="进行中" value="1" /><el-option label="已完成" value="2" /><el-option label="已取消" value="3" />
         </BaSelect>
       </template>
+      <template #operation="{ selectedIds }">
+        <div class="workflow-instance-index-operation">
+          <div class="workflow-instance-index-operation__left"></div>
+          <el-button v-if="canWorkflowInstanceBatchOperate" :disabled="!selectedIds.length" type="danger" @click="ElMessage.warning('流程实例暂不支持批量终止或撤回，请逐条处理')">批量处理</el-button>
+        </div>
+      </template>
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="definitionCode" label="流程编码" width="120" />
         <el-table-column prop="id" label="实例ID" width="160" />
         <el-table-column prop="businessType" label="业务对象" width="100">
@@ -302,6 +310,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.workflow-instance-index-page { min-height: 100%; }
+.workflow-instance-index-panel { padding-top: 20px; scroll-behavior: auto; }
+.workflow-instance-index-operation { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.workflow-instance-index-operation__left { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.workflow-instance-index-panel :deep(.el-table__header-wrapper),
+.workflow-instance-index-panel :deep(.el-table__body-wrapper) { scroll-behavior: auto; }
 .code-block { background-color: #f5f7fa; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
 .variables-collapse { margin-top: 16px; }
 .history-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
@@ -312,4 +326,10 @@ onMounted(async () => {
 .instance-title-cell__title { color: var(--el-text-color-primary); }
 .instance-title-cell__code { font-size: 12px; color: var(--el-text-color-secondary); }
 .instance-meta-id { color: var(--el-text-color-secondary); }
+
+@media (max-width: 768px) {
+  .workflow-instance-index-panel { padding-top: 18px; }
+  .workflow-instance-index-operation,
+  .workflow-instance-index-operation__left { align-items: stretch; }
+}
 </style>

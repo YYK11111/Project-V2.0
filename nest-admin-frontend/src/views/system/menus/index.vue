@@ -1,54 +1,21 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { getTrees, getTypes, getDiagnostics, save, del } from './api'
+import { getTrees, getTypes, save, del } from './api'
 import { yesOrNO } from '@/utils/dictionary'
 import { checkPermi } from '@/utils/permission'
 
 const isActive = { '1': '正常', '0': '停用' }
 const formDefault = { isHidden: '0', isActive: '1' }
 const rules = { name: [$sdk.ruleRequiredBlur], key: [$sdk.ruleRequiredBlur] }
-const riskOptions = {
-  redundantHiddenRoute: '重复隐藏路由',
-  missingComponent: '缺少组件',
-  emptyCatalog: '空目录',
-}
 const canMenuAdd = computed(() => checkPermi(['system/menus/add']))
 const canMenuUpdate = computed(() => checkPermi(['system/menus/update']))
 const canMenuDelete = computed(() => checkPermi(['system/menus/delete']))
 const canManageProtectedMenu = computed(() => checkPermi(['system/menus/manageProtected']))
-const diagnosticsData = ref({
-  missingComponentMenus: [],
-  emptyCatalogs: [],
-  duplicateSiblingPaths: [],
-  redundantHiddenRoutes: [],
-})
-const diagnosticsMap = ref({})
-
-const diagnosticsSummary = computed(() => {
-  const riskMap = diagnosticsMap.value || {}
-  const allRiskTexts = Object.values(riskMap).flat()
-  return {
-    total: Object.keys(riskMap).length,
-    redundantHiddenRoute: allRiskTexts.filter((item) => item.includes('重复')).length,
-    missingComponent: allRiskTexts.filter((item) => item.includes('缺少组件')).length,
-    emptyCatalog: allRiskTexts.filter((item) => item.includes('目录无可见子菜单') || item.includes('目录无子菜单')).length,
-    duplicateSiblingPath: allRiskTexts.filter((item) => item.includes('同级菜单')).length,
-  }
-})
-
-const diagnosticIssueList = computed(() => {
-  const data = diagnosticsData.value || {}
-  return [...(data.missingComponentMenus || []), ...(data.emptyCatalogs || []), ...(data.redundantHiddenRoutes || [])]
-})
-
-function getSeverityTagType(severity) {
-  if (severity === 'high') return 'danger'
-  return 'warning'
-}
-
-function getSeverityText(severity) {
-  return severity === 'high' ? '高' : '中'
-}
+const activeView = ref('tree')
+const currentMenuId = ref('')
+const treeKeyword = ref('')
+const treeExpanded = ref(true)
+const treeRef = ref()
 
 function isAdmin(row) {
   return row.permissionKey === 'admin'
@@ -58,188 +25,249 @@ function canOperateProtectedMenu(row) {
   return !isAdmin(row) || canManageProtectedMenu.value
 }
 
-function buildDiagnosticsMap(data = {}) {
-  const nextMap = {}
-  ;(data.missingComponentMenus || []).forEach((item) => {
-    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
+function getMenuTypeLabel(type) {
+  return menuTypes.value?.[type] || type || '-'
+}
+
+function getMenuTypeTagType(type) {
+  if (type === 'catalog') return 'warning'
+  if (type === 'menu') return 'primary'
+  if (type === 'button') return 'success'
+  return 'info'
+}
+
+function findMenuById(rows, targetId) {
+  for (const row of rows || []) {
+    if (String(row.id) === String(targetId)) return row
+    const child = findMenuById(row.children || [], targetId)
+    if (child) return child
+  }
+  return null
+}
+
+function findParentMenu(rows, targetId, parent = null) {
+  for (const row of rows || []) {
+    if (String(row.id) === String(targetId)) return parent
+    const matched = findParentMenu(row.children || [], targetId, row)
+    if (matched) return matched
+  }
+  return null
+}
+
+const menuTreeData = computed(() => trees.value[0]?.children || [])
+const filteredMenuTreeData = computed(() => {
+  const filterByKeyword = (rows) => {
+    const normalizedKeyword = String(treeKeyword.value || '').trim().toLowerCase()
+    if (!normalizedKeyword) return rows || []
+    return (rows || [])
+      .map((row) => ({
+        ...row,
+        children: filterByKeyword(row.children || []),
+      }))
+      .filter((row) => {
+        const searchText = `${row.name || ''} ${row.path || ''} ${row.permissionKey || ''} ${row.component || ''}`.toLowerCase()
+        return searchText.includes(normalizedKeyword) || row.children?.length
+      })
+  }
+
+  return filterByKeyword(menuTreeData.value)
+})
+const currentMenu = computed(() => findMenuById(menuTreeData.value, currentMenuId.value))
+const currentParentMenu = computed(() => findParentMenu(menuTreeData.value, currentMenuId.value))
+
+function selectMenu(menu) {
+  currentMenuId.value = String(menu?.id || '')
+}
+
+function syncCurrentMenu(rows) {
+  if (!rows?.length) {
+    currentMenuId.value = ''
+    return
+  }
+  const matched = currentMenuId.value ? findMenuById(rows, currentMenuId.value) : null
+  currentMenuId.value = String((matched || rows[0])?.id || '')
+}
+
+function setTreeExpanded(nodes, expanded) {
+  ;(nodes || []).forEach((node) => {
+    const currentNode = treeRef.value?.store?.nodesMap?.[node.id]
+    if (currentNode) currentNode.expanded = expanded
+    if (node.children?.length) setTreeExpanded(node.children, expanded)
   })
-  ;(data.emptyCatalogs || []).forEach((item) => {
-    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
-  })
-  ;(data.redundantHiddenRoutes || []).forEach((item) => {
-    nextMap[item.id] = [...(nextMap[item.id] || []), item.reason]
-  })
-  ;(data.duplicateSiblingPaths || []).forEach((item) => {
-    ;(item.menuIds || []).forEach((menuId) => {
-      nextMap[menuId] = [...(nextMap[menuId] || []), '同级菜单下存在重复路由地址']
-    })
-  })
-  diagnosticsMap.value = nextMap
 }
 
-function loadDiagnostics() {
-  return getDiagnostics().then((data) => {
-    diagnosticsData.value = {
-      missingComponentMenus: data?.missingComponentMenus || [],
-      emptyCatalogs: data?.emptyCatalogs || [],
-      duplicateSiblingPaths: data?.duplicateSiblingPaths || [],
-      redundantHiddenRoutes: data?.redundantHiddenRoutes || [],
-    }
-    buildDiagnosticsMap(data || {})
-  })
-}
-
-function hasRisk(row, keyword) {
-  return (diagnosticsMap.value[row.id] || []).some((risk) => risk.includes(keyword))
-}
-
-function getRouteRiskText(row) {
-  const riskList = diagnosticsMap.value[row.id] || []
-  return riskList.length ? riskList.join('；') : '-'
-}
-
-function matchRiskFilter(row, riskType) {
-  if (!riskType) return true
-  if (riskType === 'redundantHiddenRoute') return hasRisk(row, '重复')
-  if (riskType === 'missingComponent') return hasRisk(row, '缺少组件')
-  if (riskType === 'emptyCatalog') return hasRisk(row, '目录无可见子菜单') || hasRisk(row, '目录无子菜单')
-  return true
-}
-
-function filterMenuTreeByRisk(rows, riskType) {
-  return (rows || [])
-    .map((row) => ({
-      ...row,
-      children: filterMenuTreeByRisk(row.children || [], riskType),
-    }))
-    .filter((row) => matchRiskFilter(row, riskType) || row.children?.length)
-}
-
-function dealMenuData(rows, resp) {
-  const riskType = resp?.config?.params?.riskType || ''
-  const filteredRows = filterMenuTreeByRisk(rows, riskType)
-  rows.splice(0, rows.length, ...filteredRows)
+function toggleTreeExpanded() {
+  treeExpanded.value = !treeExpanded.value
+  setTreeExpanded(filteredMenuTreeData.value, treeExpanded.value)
 }
 
 const menuTypes = ref([])
 getTypes().then(({ data }) => (menuTypes.value = data))
-loadDiagnostics()
 
 const trees = ref([{ id: '0', name: '主类目', children: [] }])
 function getTreesFun() {
-  getTrees().then(({ data }) => (trees.value[0].children = data))
+  getTrees().then(({ data }) => {
+    trees.value[0].children = data || []
+    syncCurrentMenu(trees.value[0].children)
+  })
 }
 getTreesFun()
 </script>
 <template>
-  <div>
-    <div class="menu-diagnostics-summary Gcard mb16">
-      <div class="summary-item">风险菜单：{{ diagnosticsSummary.total }}</div>
-      <div class="summary-item">重复隐藏路由：{{ diagnosticsSummary.redundantHiddenRoute }}</div>
-      <div class="summary-item">缺少组件：{{ diagnosticsSummary.missingComponent }}</div>
-      <div class="summary-item">空目录：{{ diagnosticsSummary.emptyCatalog }}</div>
-      <div class="summary-item">同级重复路由：{{ diagnosticsSummary.duplicateSiblingPath }}</div>
-    </div>
+  <div class="menu-index-page">
+    <el-tabs v-model="activeView" class="menu-manage-tabs">
+      <el-tab-pane label="树形维护" name="tree">
+        <div class="menu-workbench">
+          <div class="menu-workbench__tree Gcard">
+            <div class="menu-workbench__header">
+              <div>
+                <div class="panel-title">菜单结构</div>
+                <div class="panel-description">按树形关系维护菜单层级，先选节点，再在右侧查看详情或执行操作。</div>
+              </div>
+              <el-button v-if="canMenuAdd" type="primary" @click="$refs.dialogRef.action(formDefault)">新建</el-button>
+            </div>
 
-    <div class="menu-diagnostics-panel Gcard mb16">
-      <div class="panel-title">菜单体检明细</div>
-      <div class="panel-description">
-        清理顺序建议：先处理重复隐藏路由和缺少组件，再处理同级重复路由，最后处理空目录。
-      </div>
-      <div v-if="diagnosticIssueList.length" class="diagnostic-list">
-        <div v-for="item in diagnosticIssueList" :key="`${item.reason}-${item.id}`" class="diagnostic-item">
-          <div class="diagnostic-main">
-            <el-tag type="warning">{{ item.reason }}</el-tag>
-            <el-tag :type="getSeverityTagType(item.severity)">级别 {{ getSeverityText(item.severity) }}</el-tag>
-            <span class="diagnostic-name">{{ item.name || '-' }}</span>
-            <span class="diagnostic-path">{{ item.path || '-' }}</span>
+            <div class="menu-tree-toolbar">
+              <el-input v-model="treeKeyword" placeholder="搜索菜单名称、路由、权限标识、组件路径" clearable>
+                <template #prefix>
+                  <el-icon-search />
+                </template>
+              </el-input>
+              <el-button @click="toggleTreeExpanded">{{ treeExpanded ? '一键收起' : '一键展开' }}</el-button>
+            </div>
+
+            <el-tree
+              ref="treeRef"
+              class="menu-structure-tree"
+              node-key="id"
+              :current-node-key="currentMenuId"
+              highlight-current
+              :data="filteredMenuTreeData"
+              :props="{ label: 'name' }"
+              :expand-on-click-node="false"
+              :default-expand-all="true"
+              @node-click="selectMenu">
+              <template #default="{ node, data }">
+                <div class="menu-tree-node">
+                  <div class="menu-tree-node__main">
+                    <div class="menu-tree-node__title">{{ node.label }}</div>
+                    <div class="menu-tree-node__meta">
+                      <el-tag size="small" :type="getMenuTypeTagType(data.type)" effect="light">{{ getMenuTypeLabel(data.type) }}</el-tag>
+                      <span>{{ data.path || '-' }}</span>
+                    </div>
+                    <div class="menu-tree-node__badges">
+                      <el-tag v-if="data.permissionKey" size="small" effect="plain">{{ data.permissionKey }}</el-tag>
+                      <el-tag size="small" :type="data.isActive === '1' ? 'success' : 'info'">{{ yesOrNO[data.isActive] || '未知' }}</el-tag>
+                      <el-tag size="small" :type="data.isHidden === '1' ? 'warning' : 'success'">{{ data.isHidden === '1' ? '已隐藏' : '显示中' }}</el-tag>
+                    </div>
+                  </div>
+                  <div class="menu-tree-node__actions">
+                    <el-icon-plus v-if="canMenuAdd" class="hoverColor" title="新增" @click.stop="$refs.dialogRef.action({ parentId: data.id, ...formDefault })"></el-icon-plus>
+                    <el-icon-edit-pen v-if="canMenuUpdate" class="hoverColor" title="编辑" @click.stop="canOperateProtectedMenu(data) ? $refs.dialogRef.action(data) : $sdk.msgWarning('当前操作没有权限')"></el-icon-edit-pen>
+                  </div>
+                </div>
+              </template>
+            </el-tree>
           </div>
-          <div class="diagnostic-sub">ID: {{ item.id }} | 组件: {{ item.component || '-' }} | 类型: {{ item.type }}</div>
-          <div class="diagnostic-action">建议动作：{{ item.suggestion }}</div>
-        </div>
-      </div>
-      <div v-else class="diagnostic-empty">当前没有检测到风险菜单</div>
 
-      <div class="panel-subtitle">同级重复路由</div>
-      <div v-if="diagnosticsData.duplicateSiblingPaths.length" class="diagnostic-list">
-        <div v-for="item in diagnosticsData.duplicateSiblingPaths" :key="`${item.parentId}-${item.path}-${item.type}`" class="diagnostic-item duplicate-item">
-          <div class="diagnostic-main">
-            <el-tag type="danger">重复路由</el-tag>
-            <el-tag :type="getSeverityTagType(item.severity)">级别 {{ getSeverityText(item.severity) }}</el-tag>
-            <span class="diagnostic-path">父级: {{ item.parentId || '0' }}</span>
-            <span class="diagnostic-path">路径: {{ item.path || '-' }}</span>
-            <span class="diagnostic-path">类型: {{ item.type }}</span>
+          <div class="menu-workbench__detail Gcard">
+            <div class="menu-workbench__header">
+              <div>
+                <div class="panel-title">菜单详情</div>
+                <div class="panel-description">查看当前菜单的路由、组件、权限和风险信息，减少在宽表里来回横向滚动。</div>
+              </div>
+              <div class="menu-detail-actions" v-if="currentMenu">
+                <el-button v-if="canMenuAdd" plain @click="$refs.dialogRef.action({ parentId: currentMenu.id, ...formDefault })">新增子菜单</el-button>
+                <el-button v-if="canMenuUpdate" type="primary" @click="canOperateProtectedMenu(currentMenu) ? $refs.dialogRef.action(currentMenu) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
+                <el-button v-if="canMenuDelete" type="danger" plain :disabled="isAdmin(currentMenu) && !canManageProtectedMenu" @click="canOperateProtectedMenu(currentMenu) ? $refs.rctRef.del(del, currentMenu.id) : $sdk.msgWarning('当前操作没有权限')">删除</el-button>
+              </div>
+            </div>
+
+            <template v-if="currentMenu">
+              <el-descriptions :column="2" border class="menu-detail-card">
+                <el-descriptions-item label="菜单名称">{{ currentMenu.name || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="菜单类型">{{ getMenuTypeLabel(currentMenu.type) }}</el-descriptions-item>
+                <el-descriptions-item label="上级菜单">{{ currentParentMenu?.name || '顶级菜单' }}</el-descriptions-item>
+                <el-descriptions-item label="子菜单数量">{{ currentMenu.children?.length || 0 }}</el-descriptions-item>
+                <el-descriptions-item label="路由地址">{{ currentMenu.path || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="组件路径">{{ currentMenu.component || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="权限标识">{{ currentMenu.permissionKey || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="显示排序">{{ currentMenu.order ?? '-' }}</el-descriptions-item>
+                <el-descriptions-item label="是否隐藏">{{ yesOrNO[currentMenu.isHidden] || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="是否启用">{{ yesOrNO[currentMenu.isActive] || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="最近更新">
+                  {{ currentMenu.updateUser || currentMenu.createUser || '-' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="更新时间">
+                  {{ currentMenu.updateTime || currentMenu.createTime || '-' }}
+                </el-descriptions-item>
+              </el-descriptions>
+            </template>
+            <el-empty v-else description="请选择左侧菜单节点" />
           </div>
-          <div class="diagnostic-sub">菜单: {{ (item.menuNames || []).join('、') }} | ID: {{ (item.menuIds || []).join(', ') }}</div>
-          <div class="diagnostic-action">建议动作：{{ item.suggestion }}</div>
         </div>
-      </div>
-      <div v-else class="diagnostic-empty">当前没有检测到同级重复路由</div>
-    </div>
+      </el-tab-pane>
 
-    <RequestChartTable ref="rctRef" :request="getTrees" :dealDataFun="dealMenuData">
-      <template #query="{ query }">
-        <BaInput v-model="query.name" label="菜单名称" prop="name"></BaInput>
-        <BaSelect v-model="query.type" label="菜单类型" prop="type" isAll>
-          <el-option v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.riskType" label="配置风险" prop="riskType" isAll>
-          <el-option v-for="(value, key) in riskOptions" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.isActive" label="是否启用" prop="isActive" isAll>
-          <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-      </template>
+      <el-tab-pane label="列表审计" name="table">
+        <RequestChartTable ref="rctRef" class="menu-index-panel" :request="getTrees">
+          <template #query="{ query }">
+            <BaInput v-model="query.name" label="菜单名称" prop="name"></BaInput>
+            <BaSelect v-model="query.type" label="菜单类型" prop="type" isAll>
+              <el-option v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
+            </BaSelect>
+            <BaSelect v-model="query.isActive" label="是否启用" prop="isActive" isAll>
+              <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
+            </BaSelect>
+          </template>
 
-      <template #operation="{ selectedIds }">
-          <el-button v-if="canMenuAdd" type="primary" @click="$refs.dialogRef.action(formDefault)">新增</el-button>
-      </template>
+          <template #operation>
+            <div class="menu-index-operation">
+              <div class="menu-index-operation__left">
+                <el-button v-if="canMenuAdd" type="primary" @click="$refs.dialogRef.action(formDefault)">新建</el-button>
+              </div>
+            </div>
+          </template>
 
-      <template #="{ data }">
-        <el-table :data="data" row-key="id" :tree-props="{ children: 'children', hasChildren: 'hasChildren' }">
-          <el-table-column prop="name" label="名称" align="left"></el-table-column>
-          <el-table-column prop="icon" label="图标" width="100">
-            <template #default="{ row }">
-              <svg-icon :icon="row.icon" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="order" label="排序" width="100"></el-table-column>
-          <el-table-column prop="permissionKey" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
-          <el-table-column prop="path" label="路由地址" :show-overflow-tooltip="true"></el-table-column>
-          <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
-          <el-table-column label="配置风险" min-width="180">
-            <template #default="{ row }">
-              <el-tag v-if="getRouteRiskText(row) !== '-'" type="warning">{{ getRouteRiskText(row) }}</el-tag>
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="isHidden" label="是否隐藏">
-            <template #default="{ row }">
-              {{ yesOrNO[row.isHidden] }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="isActive" label="是否启用">
-            <template #default="{ row }">
-              {{ yesOrNO[row.isActive] }}
-            </template>
-          </el-table-column>
-          <el-table-column label="最近更新" prop="updateTime">
-            <template #default="{ row }">
-              {{ row.updateUser || row.createUser || '-' }}
-              <br />
-              {{ row.updateTime || row.createTime || '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作">
-            <template #default="{ row }">
-              <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? $refs.dialogRef.action(row) : $sdk.msgWarning('当前操作没有权限')">修改</el-button>
-              <el-button v-if="canMenuAdd" text @click="$refs.dialogRef.action({ parentId: row.id, ...formDefault })">新增</el-button>
-              <el-button v-if="canMenuDelete" text @click="canOperateProtectedMenu(row) ? $refs.rctRef.del(del, row.id) : $sdk.msgWarning('当前操作没有权限')" :disabled="isAdmin(row) && !canManageProtectedMenu">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </template>
-    </RequestChartTable>
+          <template #tableView>
+            <el-table-column type="index" label="序号" width="70" />
+            <el-table-column prop="name" label="名称" align="left"></el-table-column>
+            <el-table-column prop="icon" label="图标" width="100">
+              <template #default="{ row }">
+                <svg-icon :icon="row.icon" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="order" label="排序" width="100"></el-table-column>
+            <el-table-column prop="permissionKey" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
+            <el-table-column prop="path" label="路由地址" :show-overflow-tooltip="true"></el-table-column>
+            <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
+            <el-table-column prop="isHidden" label="是否隐藏">
+              <template #default="{ row }">
+                {{ yesOrNO[row.isHidden] }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="isActive" label="是否启用">
+              <template #default="{ row }">
+                {{ yesOrNO[row.isActive] }}
+              </template>
+            </el-table-column>
+            <el-table-column label="最近更新" prop="updateTime">
+              <template #default="{ row }">
+                {{ row.updateUser || row.createUser || '-' }}
+                <br />
+                {{ row.updateTime || row.createTime || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作">
+              <template #default="{ row }">
+                <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? $refs.dialogRef.action(row) : $sdk.msgWarning('当前操作没有权限')">修改</el-button>
+                <el-button v-if="canMenuAdd" text @click="$refs.dialogRef.action({ parentId: row.id, ...formDefault })">新增</el-button>
+                <el-button v-if="canMenuDelete" text @click="canOperateProtectedMenu(row) ? $refs.rctRef.del(del, row.id) : $sdk.msgWarning('当前操作没有权限')" :disabled="isAdmin(row) && !canManageProtectedMenu">删除</el-button>
+              </template>
+            </el-table-column>
+          </template>
+        </RequestChartTable>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 添加或修改菜单对话框 -->
     <BaDialog
@@ -247,7 +275,7 @@ getTreesFun()
       dynamicTitle="菜单"
       :rules="rules"
       width="800"
-        @confirm="(data) => { const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) return $sdk.msgWarning('当前操作没有权限'); if (isAdmin(form) && !canManageProtectedMenu) return $sdk.msgWarning('当前操作没有权限'); $refs.dialogRef.confirm(save, () => { $refs.rctRef.getList(1); getTreesFun(); loadDiagnostics() }) }">
+        @confirm="(data) => { const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) return $sdk.msgWarning('当前操作没有权限'); if (isAdmin(form) && !canManageProtectedMenu) return $sdk.msgWarning('当前操作没有权限'); $refs.dialogRef.confirm(save, () => { $refs.rctRef.getList(1); getTreesFun() }) }">
       <template #form="{ form }">
         <el-form-item class="width100" label="上级菜单">
           <el-tree-select
@@ -489,22 +517,210 @@ export default {
 </script> -->
 
 <style lang="scss" scoped>
-.menu-diagnostics-summary {
+.menu-index-page {
+  min-height: 100%;
+}
+
+.menu-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.menu-index-operation {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 16px;
 }
 
-.summary-item {
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--ColorLight9);
-  color: var(--FontBlack);
+.menu-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.menu-diagnostics-panel {
-  padding: 16px;
+.menu-index-panel :deep(.el-table__header-wrapper),
+.menu-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+.menu-manage-tabs :deep(.el-tabs__content) {
+  padding-top: 8px;
+}
+
+.menu-workbench {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.menu-workbench__tree,
+.menu-workbench__detail {
+  padding: 18px;
+}
+
+.menu-workbench__tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.menu-workbench__detail {
+  min-height: 0;
+  position: sticky;
+  top: 16px;
+}
+
+.menu-workbench__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.menu-workbench__header :deep(.el-button) {
+  min-width: 88px;
+  white-space: nowrap;
+}
+
+.menu-tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.menu-tree-toolbar :deep(.el-input) {
+  flex: 1;
+}
+
+.menu-structure-tree :deep(.el-tree-node__content) {
+  height: auto;
+  padding: 6px 0;
+}
+
+.menu-structure-tree :deep(.el-tree-node__children) {
+  position: relative;
+  margin-left: 14px;
+  padding-left: 14px;
+}
+
+.menu-structure-tree :deep(.el-tree-node__children::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--el-border-color-lighter);
+}
+
+.menu-structure-tree :deep(.el-tree-node.is-current > .el-tree-node__content .menu-tree-node) {
+  background: linear-gradient(180deg, rgba(64, 158, 255, 0.1) 0%, rgba(64, 158, 255, 0.06) 100%);
+  border-color: rgba(64, 158, 255, 0.28);
+  box-shadow: 0 8px 18px rgba(64, 158, 255, 0.12);
+}
+
+.menu-structure-tree :deep(.el-tree-node.is-current > .el-tree-node__content .menu-tree-node__title) {
+  color: var(--el-color-primary);
+}
+
+.menu-structure-tree {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.menu-tree-node {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.menu-tree-node:hover {
+  background: #f8fafc;
+  border-color: var(--el-border-color-lighter);
+}
+
+.menu-tree-node__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-tree-node__title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.menu-tree-node__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.menu-tree-node__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.menu-tree-node__badges :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.menu-tree-node__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--el-text-color-secondary);
+}
+
+.menu-tree-node__actions :deep(svg) {
+  padding: 4px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.menu-tree-node__actions :deep(svg:hover) {
+  background: rgba(64, 158, 255, 0.12);
+  color: var(--el-color-primary);
+  transform: translateY(-1px);
+}
+
+.menu-detail-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.menu-detail-actions :deep(.el-button) {
+  white-space: nowrap;
+  min-width: max-content;
+}
+
+.menu-detail-actions :deep(.el-button > span) {
+  white-space: nowrap;
+}
+
+.menu-detail-card {
+  margin-top: 4px;
 }
 
 .panel-title,
@@ -513,58 +729,9 @@ export default {
   color: var(--FontBlack);
 }
 
-.panel-subtitle {
-  margin-top: 16px;
-}
-
 .panel-description {
   margin-top: 8px;
   color: var(--FontBlack2);
-}
-
-.diagnostic-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.diagnostic-item {
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--ColorLight9);
-}
-
-.diagnostic-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.diagnostic-name {
-  font-weight: 600;
-  color: var(--FontBlack);
-}
-
-.diagnostic-path,
-.diagnostic-sub,
-.diagnostic-empty {
-  color: var(--FontBlack2);
-}
-
-.diagnostic-sub {
-  margin-top: 8px;
-  font-size: 13px;
-}
-
-.diagnostic-action {
-  margin-top: 8px;
-  color: var(--Color);
-}
-
-.diagnostic-empty {
-  margin-top: 12px;
 }
 
 :deep() .BaDialog .dialogForm {
@@ -575,6 +742,46 @@ export default {
   flex-wrap: wrap;
   .el-form-item {
     flex: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .menu-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-workbench__tree,
+  .menu-workbench__detail,
+  .menu-index-panel {
+    padding-top: 18px;
+  }
+
+  .menu-workbench__tree,
+  .menu-workbench__detail {
+    padding: 16px;
+  }
+
+  .menu-workbench__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .menu-tree-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .menu-structure-tree {
+    max-height: none;
+  }
+
+  .menu-workbench__detail {
+    position: static;
+  }
+
+  .menu-index-operation,
+  .menu-index-operation__left {
+    align-items: stretch;
   }
 }
 </style>

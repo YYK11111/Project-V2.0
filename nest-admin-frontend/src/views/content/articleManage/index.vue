@@ -4,6 +4,8 @@ import { articleTagApi, getKnowledgeTypes, getList, getStatus, getVisibilityType
 import { listRole } from '@/api/system/role'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
+import { sourceTypeMap, templateTypeMap } from '@/views/business/projectManage/fieldMaps'
+import { downloadCsv } from '@/utils/csv'
 const params = ref({})
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const canArticleDelete = computed(() => checkPermi(['business/articles/delete']))
@@ -60,6 +62,26 @@ function rebuildChunks(row: any) {
     $sdk.msgSuccess('切片重建成功')
     rctRef.value?.getList?.()
   })
+}
+
+function exportArticleList() {
+  const rows = [
+    ['标题', '分类', '知识类型', '来源类型', '来源项目ID', '来源对象ID', '模板类型', '作者', '维护人', '状态', '更新时间'],
+    ...((rctRef.value?.data || []).map((row: any) => [
+      row.title || '-',
+      row.catalog?.name || '-',
+      knowledgeTypes.value[row.knowledgeType] || '-',
+      sourceTypeMap[row.sourceType] || row.sourceType || '-',
+      row.sourceProjectId || '-',
+      row.sourceId || '-',
+      templateTypeMap[row.templateType] || row.templateType || '-',
+      row.author?.nickname || row.author?.name || '-',
+      row.maintainer?.nickname || row.maintainer?.name || '-',
+      status.value[row.status] || '-',
+      row.updateTime || '-',
+    ])),
+  ]
+  downloadCsv('知识列表导出.csv', rows)
 }
 
 /** -- 分类目录 模块 -- */
@@ -144,7 +166,7 @@ catalog.getTrees()
 
     <el-tabs v-model="activeTab" class="knowledge-manage-tabs">
       <el-tab-pane label="知识列表" name="articles">
-        <RequestChartTable ref="rctRef" :isCreateRequest="false" :params="params" :request="getList">
+        <RequestChartTable ref="rctRef" class="knowledge-article-table-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
           <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
           <BaSelect v-model="query.status" filterable label="状态" prop="status">
@@ -155,6 +177,13 @@ catalog.getTrees()
           </BaSelect>
           <BaSelect v-model="query.visibilityType" filterable label="可见范围" prop="visibilityType">
             <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+            <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
+          </BaSelect>
+          <BaInput v-model="query.sourceProjectId" label="来源项目ID" prop="sourceProjectId"></BaInput>
+          <BaSelect v-model="query.templateType" filterable label="模板类型" prop="templateType">
+            <el-option v-for="(label, key) in templateTypeMap" :key="key" :label="label" :value="key"></el-option>
           </BaSelect>
           <BaFormItem label="标签" prop="tagIds">
             <el-select v-model="query.tagIds" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="选择标签" style="width: 240px">
@@ -167,14 +196,16 @@ catalog.getTrees()
           <div class="knowledge-manage-actions">
             <el-button @click="$router.push('/content/articleManage/home')">知识首页</el-button>
             <el-button v-if="canAiDebug" @click="$router.push('/content/articleManage/aiRetrieveDebug')">AI检索调试</el-button>
-            <el-button v-if="canArticleAdd" type="primary" @click="$refs.rctRef.goRoute(null, '/content/aev')">新增</el-button>
+            <el-button @click="exportArticleList">导出</el-button>
+            <el-button v-if="canArticleAdd" type="primary" @click="rctRef.goRoute(null, '/content/aev')">新增</el-button>
             <el-button v-if="canArticleBorrowMy" @click="$router.push('/content/articleManage/myBorrows')">我的借阅</el-button>
             <el-button v-if="canArticleBorrowPending" @click="$router.push('/content/articleManage/borrowApproval')">借阅审批</el-button>
-            <el-button v-if="canArticleDelete" :disabled="!selectedIds.length" @click="$refs.rctRef.del(del)" type="danger">批量删除</el-button>
+            <el-button v-if="canArticleDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
           </div>
         </template>
 
         <template #table>
+          <el-table-column type="index" label="序号" width="70" />
           <el-table-column label="封面" prop="thumb">
             <template #default="{ row }">
               <el-popover v-if="row.thumb" placement="bottom" trigger="hover" show-after="200">
@@ -215,6 +246,13 @@ catalog.getTrees()
           <el-table-column label="可见范围" prop="visibilityType" width="120">
             <template #default="{ row }">{{ visibilityTypes[row.visibilityType] || '-' }}</template>
           </el-table-column>
+          <el-table-column label="来源类型" width="120">
+            <template #default="{ row }">{{ sourceTypeMap[row.sourceType] || row.sourceType || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="来源项目" prop="sourceProjectId" width="120" />
+          <el-table-column label="模板类型" width="120">
+            <template #default="{ row }">{{ templateTypeMap[row.templateType] || row.templateType || '-' }}</template>
+          </el-table-column>
           <el-table-column label="切片数" width="90">
             <template #default="{ row }">{{ row.contentChunks?.length || 0 }}</template>
           </el-table-column>
@@ -235,6 +273,14 @@ catalog.getTrees()
               <el-tag :type="row.authorityLevel === '1' ? 'warning' : 'info'" size="small">{{ row.authorityLevel === '1' ? '是' : '否' }}</el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="首页推荐" width="180">
+            <template #default="{ row }">
+              <div class="article-top-meta">
+                <el-tag :type="row.isTop === '1' ? 'danger' : 'info'" size="small">{{ row.isTop === '1' ? '置顶' : '普通' }}</el-tag>
+                <span class="article-top-meta__text">排序 {{ row.topSort || 0 }}</span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column v-if="canAiOperate" label="检索权重" width="100" prop="retrievalWeight" />
           <el-table-column label="访问状态" width="140">
             <template #default="{ row }">
@@ -253,9 +299,9 @@ catalog.getTrees()
         </template>
         <template #tableOperation="{ row }">
           <TbOpBtn icon="view" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.id } })">详情</TbOpBtn>
-          <TbOpBtn v-if="checkPermi(['business/articles/update'])" icon="edit" @click="$refs.rctRef.goRoute(row.id, '/content/aev')">修改</TbOpBtn>
+          <TbOpBtn v-if="checkPermi(['business/articles/update']) && row.canEdit !== false" icon="edit" @click="rctRef.goRoute(row.id, '/content/aev')">修改</TbOpBtn>
           <TbOpBtn v-if="canAiOperate" icon="refresh" @click="rebuildChunks(row)">重建切片</TbOpBtn>
-          <TbOpBtn v-if="checkPermi(['business/articles/delete'])" icon="delete" @click="$refs.rctRef.del(del, row.id)">删除</TbOpBtn>
+          <TbOpBtn v-if="checkPermi(['business/articles/delete']) && row.canDelete !== false" icon="delete" @click="rctRef.del(del, row.id)">删除</TbOpBtn>
         </template>
         </RequestChartTable>
       </el-tab-pane>
@@ -388,6 +434,16 @@ catalog.getTrees()
   gap: 10px;
 }
 
+.knowledge-article-table-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.knowledge-article-table-panel :deep(.el-table__header-wrapper),
+.knowledge-article-table-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .title-name {
   font-size: 14px;
 
@@ -440,6 +496,17 @@ catalog.getTrees()
   color: var(--el-text-color-secondary);
 }
 
+.article-top-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.article-top-meta__text {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
 .knowledge-catalog-tree :deep(.el-tree-node__content) {
   height: auto;
   padding: 6px 0;
@@ -483,6 +550,10 @@ catalog.getTrees()
 }
 
 @media (max-width: 768px) {
+  .knowledge-article-table-panel {
+    padding-top: 18px;
+  }
+
   .knowledge-panel__header,
   .tag-panel__item {
     flex-direction: column;

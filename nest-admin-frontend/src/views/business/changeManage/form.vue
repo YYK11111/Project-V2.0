@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { getOne, save, update, getStatus, getType, getImpact, approve, reject, submitApproval } from './api'
+import { getOne, save, update, getStatus, getType, getImpact, approve, reject, publishKnowledge, submitApproval, confirmPlanImpact, confirmPlanImpactScope } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
@@ -12,6 +12,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,10 +58,14 @@ const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
+const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
+const canEditCurrentChange = computed(() => !hasChangeId.value || form.value?.canEdit !== false)
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
 const hasChangeId = computed(() => !!route.query.id)
+const confirmImpactLoading = ref(false)
+const confirmScopeLoading = ref(false)
 
 const defaultForm = () => ({
   title: '',
@@ -82,7 +87,10 @@ const defaultForm = () => ({
 
 async function loadChange() {
   if (!hasChangeId.value) {
-    form.value = defaultForm()
+    form.value = {
+      ...defaultForm(),
+      projectId: String(route.query.projectId || ''),
+    }
     return
   }
   const { data } = await getOne(route.query.id)
@@ -143,6 +151,53 @@ async function handleCloseReturnedInstance() {
   reloadCurrent()
 }
 
+async function handlePublishKnowledge() {
+  if (!route.query.id) return
+  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  await confirmRepublishIfNeeded({ articleId: form.value?.knowledgeArticleId, entityLabel: '变更' })
+  await publishKnowledge(route.query.id)
+  $sdk.msgSuccess('变更结论已沉淀到知识中心')
+  reloadCurrent()
+}
+
+async function handleConfirmPlanImpact() {
+  if (!route.query.id) return
+  ElMessageBox.prompt('请输入本次计划影响处理说明（选填）', '确认计划影响已处理', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：已调整项目计划并同步任务负责人',
+  }).then(async ({ value }) => {
+    confirmImpactLoading.value = true
+    try {
+      await confirmPlanImpact(route.query.id, { remark: value || '' })
+      $sdk.msgSuccess('已确认计划影响处理')
+      reloadCurrent()
+    } finally {
+      confirmImpactLoading.value = false
+    }
+  }).catch(() => {})
+}
+
+async function handleConfirmPlanImpactScope(scope) {
+  if (!route.query.id || !scope) return
+  ElMessageBox.prompt('请输入本次分项处理说明（选填）', '确认分项已处理', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：已调整相关计划并同步责任人',
+  }).then(async ({ value }) => {
+    confirmScopeLoading.value = true
+    try {
+      await confirmPlanImpactScope(route.query.id, { scope, remark: value || '' })
+      $sdk.msgSuccess('已确认分项处理')
+      reloadCurrent()
+    } finally {
+      confirmScopeLoading.value = false
+    }
+  }).catch(() => {})
+}
+
 function goToEdit() {
   if (!route.query.id) return
   router.push({ path: '/changeManage/form', query: { id: route.query.id } })
@@ -151,6 +206,9 @@ function goToEdit() {
 function submit() {
   if (isReadonly.value || (isEdit.value && !canChangeUpdate.value) || (!isEdit.value && !canChangeAdd.value)) {
     return $sdk.msgWarning('当前操作没有权限')
+  }
+  if (hasChangeId.value && !canEditCurrentChange.value) {
+    return $sdk.msgWarning('当前无编辑该变更的权限')
   }
   formRef.value.validate((valid) => {
     if (valid) {
@@ -178,6 +236,12 @@ function scrollToWorkflowPanel() {
       <el-page-header @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
+          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
+          <el-button v-if="route.query.id && canArticleAdd" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+          <el-button v-if="route.query.id && !form.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('milestone')">确认里程碑已处理</el-button>
+          <el-button v-if="route.query.id && !form.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('sprint')">确认 Sprint 已处理</el-button>
+          <el-button v-if="route.query.id && !form.planImpactScopes?.task?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('task')">确认任务已处理</el-button>
+          <el-button v-if="route.query.id && String(form.planImpactConfirmed || '0') !== '1'" :loading="confirmImpactLoading" type="warning" plain @click="handleConfirmPlanImpact">确认计划影响已处理</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </template>
       </el-page-header>
@@ -200,7 +264,7 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
       <el-form-item label="变更标题" prop="title">
         <ViewField v-if="isReadonly" :value="form.title" />
         <el-input v-else v-model="form.title" placeholder="请输入变更标题" maxlength="200" show-word-limit />
@@ -247,6 +311,45 @@ function scrollToWorkflowPanel() {
         <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
       </el-form-item>
 
+      <el-form-item label="计划影响处理" v-if="hasChangeId">
+        <ViewTagField :text="String(form.planImpactConfirmed || '0') === '1' ? '已确认处理' : '待确认处理'" :type="String(form.planImpactConfirmed || '0') === '1' ? 'success' : 'warning'" />
+      </el-form-item>
+
+      <el-form-item label="分项处理状态" v-if="hasChangeId">
+        <div class="change-impact-scope-list">
+          <ViewTagField :text="form.planImpactScopes?.milestone?.confirmed ? '里程碑已处理' : '里程碑待处理'" :type="form.planImpactScopes?.milestone?.confirmed ? 'success' : 'warning'" />
+          <ViewTagField :text="form.planImpactScopes?.sprint?.confirmed ? 'Sprint已处理' : 'Sprint待处理'" :type="form.planImpactScopes?.sprint?.confirmed ? 'success' : 'warning'" />
+          <ViewTagField :text="form.planImpactScopes?.task?.confirmed ? '任务已处理' : '任务待处理'" :type="form.planImpactScopes?.task?.confirmed ? 'success' : 'warning'" />
+        </div>
+      </el-form-item>
+
+      <el-form-item label="分项处理记录" v-if="hasChangeId">
+        <div class="change-impact-record">
+          <div v-if="form.planImpactScopes?.milestone?.remark">里程碑处理：{{ form.planImpactScopes.milestone.remark }}</div>
+          <div v-if="form.planImpactScopes?.sprint?.remark">Sprint 处理：{{ form.planImpactScopes.sprint.remark }}</div>
+          <div v-if="form.planImpactScopes?.task?.remark">任务处理：{{ form.planImpactScopes.task.remark }}</div>
+          <div v-if="!form.planImpactScopes?.milestone?.remark && !form.planImpactScopes?.sprint?.remark && !form.planImpactScopes?.task?.remark">暂无分项处理记录</div>
+        </div>
+      </el-form-item>
+
+      <el-form-item label="处理记录" v-if="hasChangeId && form.planImpactConfirmInfo">
+        <div class="change-impact-record">
+          <div>确认时间：{{ form.planImpactConfirmInfo.confirmedAt || '-' }}</div>
+          <div>确认人：{{ form.planImpactConfirmInfo.confirmedBy || '-' }}</div>
+          <div v-if="form.planImpactConfirmInfo.remark">处理说明：{{ form.planImpactConfirmInfo.remark }}</div>
+        </div>
+      </el-form-item>
+
+      <el-form-item label="确认历史" v-if="hasChangeId && form.confirmHistory?.length">
+        <div class="change-impact-history">
+          <div v-for="item in form.confirmHistory" :key="item.id" class="change-impact-history__item">
+            <div class="change-impact-history__title">{{ { overall: '整体确认', milestone: '里程碑处理', sprint: 'Sprint 处理', task: '任务处理' }[item.scope] || item.scope }}</div>
+            <div class="change-impact-history__meta">{{ item.confirmedAt || item.createTime || '-' }} / {{ item.operatorName || item.operatorId || '-' }}</div>
+            <div v-if="item.remark" class="change-impact-history__remark">{{ item.remark }}</div>
+          </div>
+        </div>
+      </el-form-item>
+
       <el-alert
         v-if="hasChangeId && form.approvalStatus === '2'"
         title="该变更已审批通过，可继续推进实施。"
@@ -284,6 +387,22 @@ function scrollToWorkflowPanel() {
           </el-form-item>
         </el-col>
       </el-row>
+
+      <el-alert
+        v-if="Number(form.scheduleImpact || 0) > 0 || Number(form.costImpact || 0) > 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb-16"
+      >
+        <template #title>
+          <div class="change-impact-alert__title">计划影响提示</div>
+        </template>
+        <div class="change-impact-alert__list">
+          <div v-if="Number(form.scheduleImpact || 0) > 0">当前变更会带来 {{ Number(form.scheduleImpact || 0) }} 天的进度影响，建议同步核对项目计划视图中的里程碑、Sprint 与任务安排。</div>
+          <div v-if="Number(form.costImpact || 0) > 0">当前变更会带来 {{ Number(form.costImpact || 0) }} 的成本影响，建议同步关注预算偏差和相关交付范围。</div>
+        </div>
+      </el-alert>
 
       <el-form-item label="申请人">
         <ViewUser v-if="isReadonly" :user="form.requester" />
@@ -345,5 +464,64 @@ function scrollToWorkflowPanel() {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+}
+
+.change-impact-alert__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.change-impact-alert__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.change-impact-record {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.change-impact-scope-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.change-impact-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.change-impact-history__item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.change-impact-history__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.change-impact-history__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.change-impact-history__remark {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
 }
 </style>

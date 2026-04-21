@@ -7,6 +7,7 @@ import { ChatDotRound, DocumentAdd } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
+import { getList as getMilestoneList } from '@/views/business/milestoneManage/api'
 import { useUserStore } from '@/stores/user'
 import UserSelect from '@/components/UserSelect.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -30,10 +31,15 @@ const formRef = ref()
 const form = ref({
   name: '',
   projectId: '',
+  milestoneId: '',
   leaderId: '',
   executorIds: [],
   startDate: '',
   endDate: '',
+  plannedStartDate: '',
+  plannedEndDate: '',
+  actualStartDate: '',
+  actualEndDate: '',
   status: '1',
   priority: '2',
   progress: 0,
@@ -43,6 +49,8 @@ const form = ref({
   actualHours: 0,
   remainingHours: 0,
   acceptanceCriteria: '',
+  sourceType: '',
+  sourceId: '',
   storyPoints: 0,
 })
 
@@ -70,6 +78,7 @@ const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
+const canEditCurrentTask = computed(() => !hasTaskId.value || form.value?.canEdit !== false)
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
@@ -80,6 +89,7 @@ const dependencies = ref([])
 const dependents = ref([])
 const availableTasks = ref([])
 const sprintList = ref([])
+const milestoneList = ref([])
 const showDependencyDialog = ref(false)
 const newDependencyId = ref('')
 const taskComments = ref([])
@@ -320,9 +330,15 @@ async function loadSprintOptions() {
   sprintList.value = res.list || []
 }
 
+async function loadMilestoneOptions() {
+  const res = await getMilestoneList({ pageNum: 1, pageSize: 1000, projectId: form.value.projectId || undefined })
+  milestoneList.value = res.list || []
+}
+
 watch(() => form.value.projectId, () => {
   loadAvailableTasks()
   loadSprintOptions()
+  loadMilestoneOptions()
 })
 
 async function handleAddDependency() {
@@ -353,10 +369,15 @@ async function handleRemoveDependency(depId) {
 const defaultForm = () => ({
   name: '',
   projectId: '',
+  milestoneId: '',
   leaderId: '',
   executorIds: [],
   startDate: '',
   endDate: '',
+  plannedStartDate: '',
+  plannedEndDate: '',
+  actualStartDate: '',
+  actualEndDate: '',
   status: '1',
   priority: '2',
   progress: 0,
@@ -366,12 +387,17 @@ const defaultForm = () => ({
   actualHours: 0,
   remainingHours: 0,
   acceptanceCriteria: '',
+  sourceType: '',
+  sourceId: '',
   storyPoints: 0,
 })
 
 async function loadTask() {
   if (!hasTaskId.value) {
-    form.value = defaultForm()
+    form.value = {
+      ...defaultForm(),
+      projectId: String(route.query.projectId || ''),
+    }
     dependencies.value = []
     dependents.value = []
     taskComments.value = []
@@ -407,6 +433,9 @@ function reloadCurrent() {
 function submit() {
   if (isReadonly.value || (isEdit.value && !canTaskUpdate.value) || (!isEdit.value && !canTaskAdd.value)) {
     return $sdk.msgWarning('当前操作没有权限')
+  }
+  if (hasTaskId.value && !canEditCurrentTask.value) {
+    return $sdk.msgWarning('当前无编辑该任务的权限')
   }
   formRef.value.validate((valid) => {
     if (valid) {
@@ -473,6 +502,45 @@ function scrollToTaskSection() {
 }
 
 const normalizedAttachments = computed(() => Array.isArray(form.value.attachments) ? form.value.attachments : [])
+const selectedSprint = computed(() => sprintList.value.find((item) => String(item.id) === String(form.value.sprintId || '')) || null)
+const selectedMilestone = computed(() => milestoneList.value.find((item) => String(item.id) === String(form.value.milestoneId || '')) || null)
+const taskPlanAlerts = computed(() => {
+  const alerts = []
+  if (selectedSprint.value?.startDate && form.value.startDate && form.value.startDate < selectedSprint.value.startDate) {
+    alerts.push(`任务开始时间早于 Sprint 开始时间（${selectedSprint.value.startDate}）`)
+  }
+  if (selectedSprint.value?.endDate && form.value.endDate && form.value.endDate > selectedSprint.value.endDate) {
+    alerts.push(`任务截止时间晚于 Sprint 结束时间（${selectedSprint.value.endDate}）`)
+  }
+  if (selectedMilestone.value?.dueDate && form.value.endDate && form.value.endDate > selectedMilestone.value.dueDate) {
+    alerts.push(`任务截止时间晚于里程碑计划完成日期（${selectedMilestone.value.dueDate}）`)
+  }
+  return alerts
+})
+
+function suggestTaskDates(source: { startDate?: string; endDate?: string; dueDate?: string }, type: 'sprint' | 'milestone') {
+  if (isReadonly.value) return
+  if (type === 'sprint') {
+    if (!form.value.startDate && source.startDate) form.value.startDate = source.startDate
+    if (!form.value.endDate && source.endDate) form.value.endDate = source.endDate
+    return
+  }
+  if (!form.value.endDate && source.dueDate) {
+    form.value.endDate = source.dueDate
+  }
+}
+
+watch(selectedSprint, (value) => {
+  if (value) {
+    suggestTaskDates(value, 'sprint')
+  }
+})
+
+watch(selectedMilestone, (value) => {
+  if (value) {
+    suggestTaskDates(value, 'milestone')
+  }
+})
 
 watch(() => route.query.tab, () => {
   setTimeout(scrollToTaskSection, 50)
@@ -486,42 +554,83 @@ watch(hasTaskId, (value) => {
 </script>
 
 <template>
-  <div class="Gcard task-form-page">
-    <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
-        <template #extra>
-          <el-button v-if="hasTaskId" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
-          <el-button v-if="hasTaskId" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
-          <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-          <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-        </template>
-      </el-page-header>
+  <div class="task-form-page km-page">
+    <div class="task-form-hero Gcard km-hero">
+      <div class="task-form-hero__eyebrow km-hero__eyebrow">任务管理</div>
+      <div class="task-form-hero__title km-hero__title">{{ isReadonly ? '查看任务全量执行信息与协作记录' : isEdit ? '统一维护任务计划、执行信息与审批状态' : '创建新任务并补齐执行基础信息' }}</div>
+      <div class="task-form-hero__desc km-hero__desc">先完成任务归属、负责人和时间计划，再补齐执行说明、验收标准、附件、汇报与评论，让任务推进信息更清楚、更容易协作。</div>
+      <div class="task-form-hero__stats">
+        <div class="task-form-hero__stat">
+          <div class="task-form-hero__stat-label">当前模式</div>
+          <div class="task-form-hero__stat-value">{{ isReadonly ? '查看任务' : isEdit ? '编辑任务' : '新增任务' }}</div>
+        </div>
+        <div class="task-form-hero__stat">
+          <div class="task-form-hero__stat-label">任务状态</div>
+          <div class="task-form-hero__stat-value">{{ status[form.status] || '草稿' }}</div>
+        </div>
+        <div class="task-form-hero__stat">
+          <div class="task-form-hero__stat-label">当前进度</div>
+          <div class="task-form-hero__stat-value">{{ Number(form.progress || 0) }}%</div>
+        </div>
+        <div class="task-form-hero__stat">
+          <div class="task-form-hero__stat-label">协作记录</div>
+          <div class="task-form-hero__stat-value">{{ (timeLogs?.length || 0) + (taskComments?.length || 0) }}</div>
+        </div>
+      </div>
     </div>
 
-    <el-alert
-      v-if="isEdit && form.approvalStatus === '3'"
-      :title="String(form.currentNodeName || '').includes('退回发起人') ? '该任务审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该任务审批已驳回，请根据意见调整后重新提交。'"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="mb-16"
-    >
-      <template #default>
-        <div class="top-alert-actions">
-          <el-button v-if="route.query.action === 'view'" type="primary" size="small" @click="goToEdit">去编辑</el-button>
-          <el-button v-if="isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
-          <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-        </div>
-      </template>
-    </el-alert>
+    <div class="Gcard km-panel task-form-shell">
+      <div class="task-form-shell__top">
+        <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
+          <template #extra>
+            <el-button v-if="hasTaskId && canEditCurrentTask" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
+            <el-button v-if="hasTaskId && canEditCurrentTask" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
+            <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
+            <el-button v-if="canCloseReturnedInstance && canEditCurrentTask" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
+          </template>
+        </el-page-header>
+      </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-      <div class="task-sections">
-      <section class="task-section section-card section-card--basic task-section--hero">
+      <el-alert
+        v-if="isEdit && form.approvalStatus === '3'"
+        :title="String(form.currentNodeName || '').includes('退回发起人') ? '该任务审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该任务审批已驳回，请根据意见调整后重新提交。'"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb-16"
+      >
+        <template #default>
+          <div class="top-alert-actions">
+            <el-button v-if="route.query.action === 'view' && canEditCurrentTask" type="primary" size="small" @click="goToEdit">去编辑</el-button>
+            <el-button v-if="isEdit && canTaskUpdate && canEditCurrentTask && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
+            <el-button v-if="canCloseReturnedInstance && canEditCurrentTask" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
+          </div>
+        </template>
+      </el-alert>
+
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+        <div class="task-sections">
+      <section class="task-section section-card section-card--basic">
         <div class="task-section__header">
           <div class="task-section__title">基本信息</div>
-          <div class="task-section__desc">维护任务归属、负责人和基础计划信息。</div>
+          <div class="task-section__desc">维护任务归属、负责人、时间计划与优先级，让任务基础上下文一目了然。</div>
         </div>
+
+        <div class="task-basic-fields">
+        <el-alert
+          v-if="taskPlanAlerts.length && !isReadonly"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="mb-16"
+        >
+          <template #title>
+            <div class="task-plan-alert__title">任务计划边界提示</div>
+          </template>
+          <div class="task-plan-alert__list">
+            <div v-for="item in taskPlanAlerts" :key="item">{{ item }}</div>
+          </div>
+        </el-alert>
 
         <el-row :gutter="20" class="task-info-row">
           <el-col :xs="24" :sm="hasTaskId ? 12 : 24">
@@ -566,7 +675,14 @@ watch(hasTaskId, (value) => {
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="12"></el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="所属里程碑">
+              <ViewEntity v-if="isReadonly" :title="form.milestone?.name" :subtitle="form.milestone?.dueDate" />
+              <el-select v-else v-model="form.milestoneId" placeholder="请选择里程碑" style="width: 100%" clearable>
+                <el-option v-for="milestone in milestoneList" :key="milestone.id" :label="milestone.name" :value="milestone.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
 
         <el-row :gutter="20" class="task-info-row">
@@ -614,6 +730,36 @@ watch(hasTaskId, (value) => {
           </el-col>
         </el-row>
 
+        <el-row :gutter="20" class="task-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="计划开始">
+              <ViewField v-if="isReadonly" :value="form.plannedStartDate" />
+              <el-date-picker v-else v-model="form.plannedStartDate" type="date" placeholder="选择计划开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="计划结束">
+              <ViewField v-if="isReadonly" :value="form.plannedEndDate" />
+              <el-date-picker v-else v-model="form.plannedEndDate" type="date" placeholder="选择计划结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="task-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="实际开始">
+              <ViewField v-if="isReadonly" :value="form.actualStartDate" />
+              <el-date-picker v-else v-model="form.actualStartDate" type="date" placeholder="选择实际开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="实际结束">
+              <ViewField v-if="isReadonly" :value="form.actualEndDate" />
+              <el-date-picker v-else v-model="form.actualEndDate" type="date" placeholder="选择实际结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
         <el-row :gutter="20" class="task-info-row task-info-row--last">
           <el-col v-if="hasTaskId" :xs="24" :sm="12">
             <el-form-item label="状态" prop="status">
@@ -633,10 +779,30 @@ watch(hasTaskId, (value) => {
           </el-col>
         </el-row>
 
+        <el-row :gutter="20" class="task-info-row task-info-row--last">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="来源类型">
+              <ViewField v-if="isReadonly" :value="form.sourceType" />
+              <el-select v-else v-model="form.sourceType" placeholder="请选择来源类型" style="width: 100%" clearable>
+                <el-option label="基线" value="baseline" />
+                <el-option label="变更" value="change" />
+                <el-option label="临时" value="adhoc" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="来源对象ID">
+              <ViewField v-if="isReadonly" :value="form.sourceId" />
+              <el-input v-else v-model="form.sourceId" placeholder="请输入来源对象ID" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
         <el-form-item label="任务描述" prop="description">
           <ViewRichText v-if="isReadonly" :html="form.description" />
           <Editor v-else v-model="form.description" style="min-height: 220px" />
         </el-form-item>
+        </div>
       </section>
 
       <section class="task-section section-card section-card--execution">
@@ -645,6 +811,7 @@ watch(hasTaskId, (value) => {
           <div class="task-section__desc">维护工时、验收标准和附件，支撑任务执行与交付。</div>
         </div>
 
+        <div class="task-execution-fields">
         <div class="metric-grid">
           <div class="metric-card">
             <div class="metric-card__title">进度</div>
@@ -727,6 +894,7 @@ watch(hasTaskId, (value) => {
           </div>
           <el-empty v-else description="暂无任务汇报" />
         </div>
+        </div>
       </section>
 
       <section v-if="hasTaskId" ref="commentSectionRef" class="task-section section-card section-card--comment" v-loading="commentLoading">
@@ -769,6 +937,7 @@ watch(hasTaskId, (value) => {
           <div class="task-section__desc">查看当前审批状态、节点信息以及任务依赖关系。</div>
         </div>
 
+        <div class="task-approval-fields">
         <el-form-item label="审批状态">
           <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
         </el-form-item>
@@ -822,25 +991,27 @@ watch(hasTaskId, (value) => {
             <el-button v-if="canTaskUpdate && !isReadonly" type="primary" @click="handleAddDependency">确定</el-button>
           </template>
         </el-dialog>
+        </div>
       </section>
 
+        </div>
+
+        <el-form-item class="footer-actions">
+          <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">提交</el-button>
+          <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+          <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+        </el-form-item>
+      </el-form>
+
+      <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
+        <div class="workflow-panel-section__header">审批操作区</div>
+        <WorkflowApprovalPanel
+          :task-id="workflowTaskId"
+          :instance-id="workflowInstanceId"
+          :node-name="form.currentNodeName"
+          @approved="reloadCurrent"
+        />
       </div>
-
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-        <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      </el-form-item>
-    </el-form>
-
-    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-      <div class="workflow-panel-section__header">审批操作区</div>
-      <WorkflowApprovalPanel
-        :task-id="workflowTaskId"
-        :instance-id="workflowInstanceId"
-        :node-name="form.currentNodeName"
-        @approved="reloadCurrent"
-      />
     </div>
 
     <BaDialog v-model="reportDialogVisible" :title="timeLogForm.id ? '编辑任务汇报' : '新增任务汇报'" width="760" @confirm="submitTaskTimeLog">
@@ -889,7 +1060,49 @@ watch(hasTaskId, (value) => {
 }
 
 .task-form-page {
-  padding: 4px 6px 8px;
+  padding: 0;
+}
+
+.task-form-hero__title {
+  max-width: none;
+}
+
+.task-form-hero__desc {
+  max-width: none;
+}
+
+.task-form-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.task-form-hero__stat {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(64, 158, 255, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.task-form-hero__stat-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.task-form-hero__stat-value {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.task-form-shell {
+  margin-top: 18px;
+}
+
+.task-form-shell__top {
+  margin-bottom: 20px;
 }
 
 .task-sections {
@@ -899,20 +1112,19 @@ watch(hasTaskId, (value) => {
 }
 
 .task-section {
-  padding: 24px;
-  border: 1px solid var(--el-border-color-light);
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
   border-radius: 14px;
   background: var(--el-bg-color);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
-.task-section--hero {
-  border-color: rgba(64, 158, 255, 0.16);
-  background: linear-gradient(180deg, rgba(64, 158, 255, 0.05) 0%, rgba(255, 255, 255, 0.98) 100%);
+.section-card--basic .task-section__header {
+  margin-bottom: 22px;
 }
 
 .task-section__header {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .task-section__title {
@@ -927,11 +1139,25 @@ watch(hasTaskId, (value) => {
 .task-section__desc {
   margin-top: 4px;
   font-size: 13px;
+  line-height: 1.6;
   color: var(--el-text-color-secondary);
 }
 
+.task-basic-fields,
+.task-approval-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.task-execution-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .task-info-row {
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 .task-info-row--last {
@@ -941,13 +1167,13 @@ watch(hasTaskId, (value) => {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 14px;
+  margin-bottom: 0;
 }
 
 .metric-card {
-  padding: 14px;
-  border-radius: 10px;
+  padding: 16px;
+  border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-extra-light);
 }
@@ -979,8 +1205,8 @@ watch(hasTaskId, (value) => {
 }
 
 .execution-subsection {
-  margin-top: 24px;
-  padding-top: 20px;
+  margin-top: 0;
+  padding-top: 22px;
   border-top: 1px dashed var(--el-border-color);
 }
 
@@ -1116,7 +1342,6 @@ watch(hasTaskId, (value) => {
 
 .workflow-panel-section {
   margin-top: 28px;
-  max-width: 920px;
   padding-top: 20px;
   border-top: 1px solid var(--el-border-color-light);
 }
@@ -1132,6 +1357,19 @@ watch(hasTaskId, (value) => {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+}
+
+.task-plan-alert__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.task-plan-alert__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .field-with-tip {
@@ -1153,19 +1391,40 @@ watch(hasTaskId, (value) => {
 }
 
 .footer-actions {
-  margin-top: 8px;
+  margin-top: 4px;
   padding-top: 12px;
 }
 
-:deep(.el-form-item) {
-  margin-bottom: 22px;
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-:deep(.el-form-item:last-child) {
-  margin-bottom: 0;
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.task-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.task-basic-fields :deep(.el-form-item),
+.task-execution-fields :deep(.el-form-item),
+.task-approval-fields :deep(.el-form-item) {
+  margin: 0 !important;
 }
 
 @media (max-width: 768px) {
+  .task-form-hero__stats {
+    grid-template-columns: 1fr;
+  }
+
   .task-section {
     padding: 18px;
     border-radius: 12px;
@@ -1181,6 +1440,10 @@ watch(hasTaskId, (value) => {
 }
 
 @media (max-width: 1080px) {
+  .task-form-hero__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

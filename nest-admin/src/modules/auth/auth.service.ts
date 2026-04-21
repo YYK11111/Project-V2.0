@@ -1,22 +1,27 @@
-import { ForbiddenException, Injectable, SetMetadata, UnauthorizedException } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
-import { Response } from 'express'
+import {
+  ForbiddenException,
+  Injectable,
+  SetMetadata,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { Response } from "express";
 
-import { UsersService } from '../users/users.service'
-import { RolesService } from '../roles/service'
-import { LoginLogsService } from '../loginLogs/service'
-import { BoolNum } from 'src/common/type/base'
-import { RedisService } from '../global/redis.service'
-import { SystenConfigsService } from '../configs/service'
-import dayjs from 'dayjs'
-import { CaptchaService } from '../common/captcha.service'
-import { getIpAddress } from '../../common/utils/common'
-import { verifyPassword } from 'src/common/utils/password'
+import { UsersService } from "../users/users.service";
+import { RolesService } from "../roles/service";
+import { LoginLogsService } from "../loginLogs/service";
+import { BoolNum } from "src/common/type/base";
+import { RedisService } from "../global/redis.service";
+import { SystenConfigsService } from "../configs/service";
+import dayjs from "dayjs";
+import { CaptchaService } from "../common/captcha.service";
+import { getIpAddress } from "../../common/utils/common";
+import { verifyPassword } from "src/common/utils/password";
 
-import { config } from 'config'
-export const Public = () => SetMetadata(config.isPublicKey, true)
+import { config } from "config";
+export const Public = () => SetMetadata(config.isPublicKey, true);
 
-const sessionCookieName = 'admin_session'
+const sessionCookieName = "admin_session";
 
 @Injectable()
 export class AuthService {
@@ -30,126 +35,143 @@ export class AuthService {
     private captchaService: CaptchaService,
   ) {}
   async login(req, res: Response): Promise<{ success: boolean }> {
-    let user: any = {}
-    let body: any = req.body || {}
+    let user: any = {};
+    let body: any = req.body || {};
 
     try {
       if (!body.account) {
-        throw new Error('账号不能为空')
+        throw new Error("账号不能为空");
       }
       if (!body.password) {
-        throw new Error('密码不能为空')
+        throw new Error("密码不能为空");
       }
 
-      let result = this.captchaService.validateCaptcha(body.uuid, body.code)
-      if (result !== 'true') {
-        throw new Error(result)
+      let result = this.captchaService.validateCaptcha(body.uuid, body.code);
+      if (result !== "true") {
+        throw new Error(result);
       }
 
-      user = await this.usersService.getOne({ name: body.account })
-      if (user.roles?.some?.(role => role.permissionKey === config.adminKey)) {
-        user.permissions = ['*']
+      user = await this.usersService.getOne({ name: body.account });
+      if (
+        user.roles?.some?.((role) => role.permissionKey === config.adminKey)
+      ) {
+        user.permissions = ["*"];
       } else {
-        const menus = await this.rolesService.getUserMenus(user)
-        user.permissions = [...new Set(menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean))]
+        const menus = await this.rolesService.getUserMenus(user);
+        user.permissions = [
+          ...new Set(
+            menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean),
+          ),
+        ];
       }
 
       if (!(await verifyPassword(body.password, user?.password))) {
-        throw new Error('密码错误')
+        throw new Error("密码错误");
       }
     } catch (error) {
       let log = {
         isSuccess: BoolNum.No,
         msg: error.message,
         ...body,
-      }
-      await this.loginLogsService.createLog(req, log)
-      throw error
+      };
+      await this.loginLogsService.createLog(req, log);
+      throw error;
     }
-    let { password: _, ...result } = user
+    let { password: _, ...result } = user;
 
-    let address = await getIpAddress(req.headers['x-forwarded-for'] || req.connection.remoteAddress)
+    let address = await getIpAddress(
+      req.headers["x-forwarded-for"] || req.connection.remoteAddress,
+    );
 
     const payload = {
       sub: user.id,
       account: user.name,
       address,
-      loginTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      loginTime: dayjs().format("YYYY-MM-DD HH:mm:ss"),
       ...result,
-    }
-    const sessionExpireMinutes = await this.systemConfigsService.getSessionExpireMinutes()
+    };
+    const sessionExpireMinutes =
+      await this.systemConfigsService.getSessionExpireMinutes();
     let accessToken = await this.jwtService.signAsync(payload, {
       secret: config.jwtSecret,
       expiresIn: `${sessionExpireMinutes}m`,
-    })
+    });
 
     let log = await this.loginLogsService.createLog(req, {
-      session: accessToken.split('.').at(-1),
+      session: accessToken.split(".").at(-1),
       loginTime: payload.loginTime,
       address,
       ...body,
-    })
+    });
 
-    await this.redisService.setRedisOnlineUser(log, undefined, sessionExpireMinutes * 60)
-    this.setSessionCookie(res, accessToken, sessionExpireMinutes)
+    await this.redisService.setRedisOnlineUser(
+      log,
+      undefined,
+      sessionExpireMinutes * 60,
+    );
+    this.setSessionCookie(res, accessToken, sessionExpireMinutes);
 
     return {
       success: true,
-    }
+    };
   }
 
   async logout(req: Record<string, any>, isQuit = false, res?: Response) {
-    let params = {}
-    let session = ''
+    let params = {};
+    let session = "";
     if (isQuit) {
-      this.ensureAdmin(req.user)
-      session = req.body.session
-      params = { ...req.body, msg: '被强退' }
+      this.ensureAdmin(req.user);
+      session = req.body.session;
+      params = { ...req.body, msg: "被强退" };
     } else {
-      session = req.user.session
-      params = { ...req.user, msg: '退出登录' }
+      session = req.user.session;
+      params = { ...req.user, msg: "退出登录" };
     }
-    await this.loginLogsService.createLog(req, params)
+    await this.loginLogsService.createLog(req, params);
 
-    await this.redisService.delRedisOnlineUser(session)
+    await this.redisService.delRedisOnlineUser(session);
     if (!isQuit && res) {
-      this.clearSessionCookie(res)
+      this.clearSessionCookie(res);
     }
-    return { success: true }
+    return { success: true };
   }
 
   async getOnlineUsers(query): Promise<any> {
-    let [data, total] = await this.redisService.getRedisOnlineUser(query)
-    return { total, data, _flag: true }
+    let [data, total] = await this.redisService.getRedisOnlineUser(query);
+    return { total, data, _flag: true };
   }
 
   ensureAdmin(user: Record<string, any>) {
-    const permissions = user?.permissions || []
-    if (!permissions.includes('*')) {
-      throw new ForbiddenException('接口无权限')
+    const permissions = user?.permissions || [];
+    if (!permissions.includes("*")) {
+      throw new ForbiddenException("接口无权限");
     }
   }
 
   getSessionCookieName() {
-    return sessionCookieName
+    return sessionCookieName;
   }
 
-  private setSessionCookie(res: Response, token: string, sessionExpireMinutes: number) {
+  private setSessionCookie(
+    res: Response,
+    token: string,
+    sessionExpireMinutes: number,
+  ) {
     res.cookie(sessionCookieName, token, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: "lax",
       secure: false,
-      path: '/',
+      path: "/",
       maxAge: sessionExpireMinutes * 60 * 1000,
-    })
+    });
   }
 
   private clearSessionCookie(res: Response) {
     res.clearCookie(sessionCookieName, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: "lax",
       secure: false,
-      path: '/',
-    })
+      path: "/",
+    });
   }
 }

@@ -1,48 +1,94 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator'
-import { ProjectMemberRole } from './entity'
+import { IsNotEmpty, IsOptional, IsString, IsEnum } from "class-validator";
+import { ProjectMemberRole } from "./entity";
 
 export class ProjectMemberDto {
-  @IsNotEmpty({ message: '项目ID不能为空' })
+  @IsNotEmpty({ message: "项目ID不能为空" })
   @IsString()
-  projectId: string
+  projectId: string;
 
-  @IsNotEmpty({ message: '用户ID不能为空' })
+  @IsNotEmpty({ message: "用户ID不能为空" })
   @IsString()
-  userId: string
-
-  @IsOptional()
-  @IsEnum(ProjectMemberRole, { message: '角色值无效' })
-  role?: ProjectMemberRole
+  userId: string;
 
   @IsOptional()
-  @IsString()
-  isCore?: string
+  @IsEnum(ProjectMemberRole, { message: "角色值无效" })
+  role?: ProjectMemberRole;
 
   @IsOptional()
   @IsString()
-  remark?: string
+  isCore?: string;
 
   @IsOptional()
-  sort?: number
+  @IsString()
+  remark?: string;
+
+  @IsOptional()
+  sort?: number;
+
+  @IsOptional()
+  @IsString()
+  joinDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notificationEnabled?: string;
+
+  @IsOptional()
+  responsibilityScope?: string[];
+
+  @IsOptional()
+  @IsString()
+  positionTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  leaveDate?: string;
+
+  @IsOptional()
+  @IsString()
+  fieldPermissionGroup?: string;
 }
 
 export class UpdateProjectMemberDto {
   @IsOptional()
-  @IsEnum(ProjectMemberRole, { message: '角色值无效' })
-  role?: ProjectMemberRole
+  @IsEnum(ProjectMemberRole, { message: "角色值无效" })
+  role?: ProjectMemberRole;
 
   @IsOptional()
   @IsString()
-  isActive?: string
+  isActive?: string;
 
   @IsOptional()
   @IsString()
-  isCore?: string
+  isCore?: string;
 
   @IsOptional()
   @IsString()
-  remark?: string
+  remark?: string;
 
   @IsOptional()
-  sort?: number
+  sort?: number;
+
+  @IsOptional()
+  @IsString()
+  joinDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notificationEnabled?: string;
+
+  @IsOptional()
+  responsibilityScope?: string[];
+
+  @IsOptional()
+  @IsString()
+  positionTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  leaveDate?: string;
+
+  @IsOptional()
+  @IsString()
+  fieldPermissionGroup?: string;
 }

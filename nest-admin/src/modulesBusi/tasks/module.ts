@@ -1,18 +1,31 @@
-import { Module } from '@nestjs/common'
-import { TasksService } from './service'
-import { TasksController } from './controller'
-import { Task } from './entity'
-import { TaskDependency } from './entities/task-dependency.entity'
-import { TaskTimeLog } from './entities/task-time-log.entity'
-import { TypeOrmModule } from '@nestjs/typeorm'
-import { UsersModule } from 'src/modules/users/users.module'
-import { ProjectsModule } from '../projects/module'
-import { SysFileModule } from 'src/modules/sys/file/module'
-import { User } from 'src/modules/users/entities/user.entity'
-import { TaskComment } from '../task-comments/entity'
+import { Module } from "@nestjs/common";
+import { TasksService } from "./service";
+import { TasksController } from "./controller";
+import { Task } from "./entity";
+import { TaskDependency } from "./entities/task-dependency.entity";
+import { TaskTimeLog } from "./entities/task-time-log.entity";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { UsersModule } from "src/modules/users/users.module";
+import { ProjectsModule } from "../projects/module";
+import { SysFileModule } from "src/modules/sys/file/module";
+import { User } from "src/modules/users/entities/user.entity";
+import { TaskComment } from "../task-comments/entity";
+import { Milestone } from "../milestones/entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task, TaskDependency, TaskTimeLog, TaskComment, User]), UsersModule, ProjectsModule, SysFileModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      Task,
+      TaskDependency,
+      TaskTimeLog,
+      TaskComment,
+      User,
+      Milestone,
+    ]),
+    UsersModule,
+    ProjectsModule,
+    SysFileModule,
+  ],
   controllers: [TasksController],
   providers: [TasksService],
   exports: [TasksService],

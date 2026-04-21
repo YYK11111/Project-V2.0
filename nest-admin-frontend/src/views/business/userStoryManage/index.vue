@@ -7,12 +7,8 @@ import { checkPermi } from '@/utils/permission'
 const router = useRouter()
 const route = useRoute()
 
-const loading = ref(false)
-const list = ref([])
-const total = ref(0)
-const queryParams = ref({
-  pageNum: 1,
-  pageSize: 20,
+const rctRef = ref()
+const params = ref({
   projectId: '',
   sprintId: '',
   type: '',
@@ -22,13 +18,22 @@ const queryParams = ref({
 const statusMap = ref({})
 const typeMap = ref({})
 const expandedRows = ref([])
+const selectedIds = ref([])
 const canStoryAdd = computed(() => checkPermi(['business/stories/add']))
 const canStoryUpdate = computed(() => checkPermi(['business/stories/update']))
 const canStoryDelete = computed(() => checkPermi(['business/stories/delete']))
+const tableAttrs = computed(() => ({
+  rowKey: 'id',
+  treeProps: { children: '_children', hasChildren: 'hasChildren' },
+  defaultExpandAll: true,
+  expandRowKeys: expandedRows.value,
+}))
+const tableEvents = {
+  'expand-change': handleExpand,
+}
 
 onMounted(async () => {
   await loadStatus()
-  loadData()
 })
 
 async function loadStatus() {
@@ -37,33 +42,8 @@ async function loadStatus() {
   typeMap.value = typeRes.data || {}
 }
 
-function loadData() {
-  loading.value = true
-  getList(queryParams.value)
-    .then((res) => {
-      list.value = res.list || []
-      total.value = res.total || 0
-    })
-    .finally(() => {
-      loading.value = false
-    })
-}
-
-function handleQuery() {
-  queryParams.value.pageNum = 1
-  loadData()
-}
-
-function handleReset() {
-  queryParams.value = {
-    pageNum: 1,
-    pageSize: 20,
-    projectId: '',
-    sprintId: '',
-    type: '',
-    status: '',
-  }
-  loadData()
+function handleSelectionChange(rows) {
+  selectedIds.value = rows.map((row) => row.id)
 }
 
 function getFormPath() {
@@ -93,8 +73,19 @@ function handleDelete(row) {
   $sdk.msgConfirm('确认删除？').then(() => {
     del(row.id).then(() => {
       $sdk.msgSuccess('删除成功')
-      loadData()
+      rctRef.value?.getList?.()
     })
+  })
+}
+
+function handleBatchDelete() {
+  if (!canStoryDelete.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!selectedIds.value.length) return $sdk.msgWarning('请选择需要删除的故事')
+  $sdk.msgConfirm('确认批量删除？').then(async () => {
+    await Promise.all(selectedIds.value.map((id) => del(id)))
+    $sdk.msgSuccess('删除成功')
+    selectedIds.value = []
+    rctRef.value?.getList?.()
   })
 }
 
@@ -103,7 +94,7 @@ async function handleExpand(row, expanded) {
     try {
       const res = await getChildren(row.id)
       const children = res.list || []
-      const updateItem = list.value.find(item => item.id === row.id)
+      const updateItem = rctRef.value?.data?.find?.((item) => item.id === row.id)
       if (updateItem) {
         updateItem._children = children
       }
@@ -136,94 +127,117 @@ function getTypeTag(type) {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="filter-container">
-      <el-form :inline="true" :model="queryParams">
-        <el-form-item label="类型">
-          <el-select v-model="queryParams.type" placeholder="请选择" clearable style="width: 120px">
-            <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="queryParams.status" placeholder="请选择" clearable style="width: 120px">
-            <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleQuery">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <div class="table-operate">
-      <el-button v-if="canStoryAdd" type="primary" @click="handleAdd">新增</el-button>
-    </div>
-
-    <el-table
-      v-loading="loading"
-      :data="list"
-      :tree-props="{ children: '_children', hasChildren: 'hasChildren' }"
-      row-key="id"
-      :expand-row-keys="expandedRows"
-      @expand-change="handleExpand"
-      default-expand-all
+  <div class="user-story-index-page">
+    <RequestChartTable
+      ref="rctRef"
+      class="user-story-index-panel"
+      :params="params"
+      :request="getList"
+      :is-selection="true"
+      :table-attrs="tableAttrs"
+      :table-events="tableEvents"
+      @selection-change="handleSelectionChange"
     >
-      <el-table-column prop="title" label="标题" min-width="200" />
-      <el-table-column prop="type" label="类型" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getTypeTag(row.type)" size="small">
-            {{ typeMap[row.type] || '-' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getStatusType(row.status)" size="small">
-            {{ statusMap[row.status] || '-' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="storyPoints" label="故事点" width="80" align="center" />
-      <el-table-column prop="priority" label="优先级" width="80" align="center" />
-      <el-table-column prop="sprintId" label="所属Sprint" width="120">
-        <template #default="{ row }">
-          {{ row.sprint?.name || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="assignee" label="负责人" width="100">
-        <template #default="{ row }">
-          {{ row.assignee?.nickname || row.assignee?.name || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="handleView(row)">详情</el-button>
-          <el-button v-if="canStoryUpdate" link type="primary" @click="handleEdit(row)">修改</el-button>
-          <el-button v-if="canStoryDelete" link type="danger" @click="handleDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      <template #query="{ query }">
+        <BaSelect v-model="query.type" filterable label="类型" prop="type">
+          <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
+        </BaSelect>
+        <BaSelect v-model="query.status" filterable label="状态" prop="status">
+          <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
+        </BaSelect>
+      </template>
 
-    <el-pagination
-      class="mt20"
-      v-model:current-page="queryParams.pageNum"
-      v-model:page-size="queryParams.pageSize"
-      :total="total"
-      :page-sizes="[10, 20, 50, 100]"
-      layout="total, sizes, prev, pager, next"
-      @size-change="loadData"
-      @current-change="loadData"
-    />
+      <template #operation>
+        <div class="user-story-index-operation">
+          <div class="user-story-index-operation__left">
+            <el-button v-if="canStoryAdd" type="primary" @click="handleAdd">新增</el-button>
+          </div>
+          <el-button v-if="canStoryDelete" :disabled="!selectedIds.length" type="danger" @click="handleBatchDelete">批量删除</el-button>
+        </div>
+      </template>
+
+      <template #table>
+        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column prop="title" label="标题" min-width="200" />
+        <el-table-column prop="type" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getTypeTag(row.type)" size="small">
+              {{ typeMap[row.type] || '-' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)" size="small">
+              {{ statusMap[row.status] || '-' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="storyPoints" label="故事点" width="80" align="center" />
+        <el-table-column prop="priority" label="优先级" width="80" align="center" />
+        <el-table-column prop="sprintId" label="所属Sprint" width="120">
+          <template #default="{ row }">
+            {{ row.sprint?.name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="assignee" label="负责人" width="100">
+          <template #default="{ row }">
+            {{ row.assignee?.nickname || row.assignee?.name || '-' }}
+          </template>
+        </el-table-column>
+      </template>
+
+      <template #tableOperation="{ row }">
+        <el-button link type="primary" @click="handleView(row)">详情</el-button>
+        <el-button v-if="canStoryUpdate" link type="primary" @click="handleEdit(row)">修改</el-button>
+        <el-button v-if="canStoryDelete" link type="danger" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </RequestChartTable>
   </div>
 </template>
 
 <style lang="scss" scoped>
+.user-story-index-page {
+  min-height: 100%;
+}
+
+.user-story-index-panel {
+  padding-top: 20px;
+}
+
 .filter-container {
   margin-bottom: 16px;
 }
 
-.table-operate {
+.user-story-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.user-story-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-story-index-table :deep(.el-table__header-wrapper),
+.user-story-index-table :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .user-story-index-panel {
+    padding-top: 18px;
+  }
+
+  .user-story-index-operation,
+  .user-story-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

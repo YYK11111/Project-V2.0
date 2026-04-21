@@ -4,7 +4,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, del } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
+import { downloadCsv } from '@/utils/csv'
 
 const router = useRouter()
 const route = useRoute()
@@ -82,6 +84,30 @@ const getStatusType = (status) => {
   return map[status] || 'info'
 }
 
+function handleQueryChange() {
+  rctRef.value?.getList?.(1)
+}
+
+function exportMilestoneList() {
+  const rows = [
+    ['里程碑名称', '所属项目', '计划完成日期', '责任人', '阶段', '状态', '延期原因', '变更影响', '风险影响', '关联任务', '已完成'],
+    ...((rctRef.value?.data || []).map((row) => [
+      row.name || '-',
+      projectMap.value[row.projectId] || '-',
+      row.dueDate || '-',
+      row.owner?.nickname || row.owner?.name || '-',
+      row.phase || '-',
+      statusMap.value[row.status] || '-',
+      row.delayReason || '-',
+      row.changeImpactFlag === '1' ? '是' : '否',
+      row.riskImpactFlag === '1' ? '是' : '否',
+      row.taskCount || 0,
+      row.completedTaskCount || 0,
+    ])),
+  ]
+  downloadCsv('里程碑列表导出.csv', rows)
+}
+
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
   canMilestoneUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
@@ -90,32 +116,117 @@ const getButtons = (row) => [
 </script>
 
 <template>
-  <RequestChartTable ref="rctRef" :params="params" :request="getList">
-    <template #query="{ query }">
-      <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 200px; margin-right: 10px">
-        <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
-      </el-select>
-      <el-select v-model="query.status" placeholder="状态" clearable style="width: 150px">
-        <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
-      </el-select>
-    </template>
+  <div class="milestone-index-page">
+    <RequestChartTable ref="rctRef" class="milestone-index-panel" :params="params" :request="getList" :is-selection="true">
+      <template #query="{ query }">
+        <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 200px; margin-right: 10px">
+          <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
+        </el-select>
+        <div class="query-user-item">
+          <div class="query-user-label">责任人</div>
+          <UserSelect v-model="query.ownerId" placeholder="请选择责任人" clearable @change="handleQueryChange" />
+        </div>
+        <el-input v-model="query.phase" placeholder="里程碑阶段" clearable style="width: 160px; margin-right: 10px" @change="handleQueryChange" />
+        <el-select v-model="query.changeImpactFlag" placeholder="变更影响" clearable style="width: 120px; margin-right: 10px" @change="handleQueryChange">
+          <el-option label="是" value="1" />
+          <el-option label="否" value="0" />
+        </el-select>
+        <el-select v-model="query.riskImpactFlag" placeholder="风险影响" clearable style="width: 120px; margin-right: 10px" @change="handleQueryChange">
+          <el-option label="是" value="1" />
+          <el-option label="否" value="0" />
+        </el-select>
+        <el-select v-model="query.status" placeholder="状态" clearable style="width: 150px" @change="handleQueryChange">
+          <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
+        </el-select>
+      </template>
 
-    <template #operation>
-      <el-button v-if="canMilestoneAdd" type="primary" @click="handleAdd">新增</el-button>
-    </template>
+      <template #operation="{ selectedIds }">
+        <div class="milestone-index-operation">
+          <div class="milestone-index-operation__left">
+            <el-button v-if="canMilestoneAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button @click="exportMilestoneList">导出</el-button>
+          </div>
+          <el-button v-if="canMilestoneDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+        </div>
+      </template>
 
-    <template #table>
-      <el-table-column prop="name" label="里程碑名称" min-width="150" />
-      <el-table-column prop="projectId" label="所属项目" width="150"><template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template></el-table-column>
-      <el-table-column prop="dueDate" label="计划完成日期" width="120" />
-      <el-table-column prop="status" label="状态" width="100"><template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template></el-table-column>
-      <el-table-column prop="taskCount" label="关联任务" width="100" />
-      <el-table-column prop="completedTaskCount" label="已完成" width="100" />
-      <el-table-column label="进度" width="150"><template #default="{ row }"><el-progress :percentage="row.taskCount > 0 ? Math.round((row.completedTaskCount / row.taskCount) * 100) : 0" :stroke-width="8" /></template></el-table-column>
-    </template>
+      <template #table>
+        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column prop="name" label="里程碑名称" min-width="150" />
+        <el-table-column prop="projectId" label="所属项目" width="150"><template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template></el-table-column>
+        <el-table-column prop="dueDate" label="计划完成日期" width="120" />
+        <el-table-column label="责任人" width="120">
+          <template #default="{ row }">{{ row.owner?.nickname || row.owner?.name || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="phase" label="阶段" width="120" />
+        <el-table-column prop="status" label="状态" width="100"><template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template></el-table-column>
+        <el-table-column prop="delayReason" label="延期原因" min-width="180" :show-overflow-tooltip="true" />
+        <el-table-column label="变更影响" width="100"><template #default="{ row }">{{ row.changeImpactFlag === '1' ? '是' : '否' }}</template></el-table-column>
+        <el-table-column label="风险影响" width="100"><template #default="{ row }">{{ row.riskImpactFlag === '1' ? '是' : '否' }}</template></el-table-column>
+        <el-table-column prop="taskCount" label="关联任务" width="100" />
+        <el-table-column prop="completedTaskCount" label="已完成" width="100" />
+        <el-table-column label="进度" width="150"><template #default="{ row }"><el-progress :percentage="row.taskCount > 0 ? Math.round((row.completedTaskCount / row.taskCount) * 100) : 0" :stroke-width="8" /></template></el-table-column>
+      </template>
 
-    <template #tableOperation="{ row }">
-      <TableOperation :buttons="getButtons(row)" :row="row" />
-    </template>
-  </RequestChartTable>
+      <template #tableOperation="{ row }">
+        <TableOperation :buttons="getButtons(row)" :row="row" />
+      </template>
+    </RequestChartTable>
+  </div>
 </template>
+
+<style scoped>
+.milestone-index-page {
+  min-height: 100%;
+}
+
+.milestone-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.milestone-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.milestone-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.query-user-item {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+  margin-right: 10px;
+}
+
+.query-user-label {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.milestone-index-panel :deep(.el-table__header-wrapper),
+.milestone-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .milestone-index-panel {
+    padding-top: 18px;
+  }
+
+  .milestone-index-operation,
+  .milestone-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

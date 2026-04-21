@@ -15,12 +15,33 @@
         <el-button @click="cancel">取消</el-button>
         <el-button @click="reset">重置</el-button>
       </div>
+
+      <div class="drawer-title mt20">项目提醒偏好</div>
+      <div class="drawer-item drawer-item--column">
+        <div class="drawer-switch-row">
+          <span>接收项目提醒</span>
+          <el-switch v-model="projectReminderPreference.enabled" />
+        </div>
+        <div class="drawer-tip">在系统级策略允许的前提下，控制你个人是否接收项目异常提醒。</div>
+      </div>
+
+      <div class="drawer-item drawer-item--column">
+        <div class="drawer-item__label">提醒项</div>
+        <el-checkbox v-model="projectReminderPreference.rules.taskOverdue">任务已逾期</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.taskDueSoon">临近到期任务</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.milestoneDelayed">里程碑延期/超期</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.sprintDelayed">Sprint 节奏偏慢</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.highRisk">高风险事项未关闭</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.changePending">变更待审批</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.unplannedTask">任务未纳入执行计划</el-checkbox>
+        <el-checkbox v-model="projectReminderPreference.rules.closureIncomplete">结项资料待完善</el-checkbox>
+      </div>
     </div>
   </el-drawer>
 </template>
 
 <script>
-import { getTheme, updateTheme } from '@/views/system/users/api'
+import { getProjectReminderPreference, getTheme, updateProjectReminderPreference, updateTheme } from '@/views/system/users/api'
 
 export default {
   components: {},
@@ -29,6 +50,7 @@ export default {
       theme: getComputedStyle(document.documentElement).getPropertyValue('--Color').trim(),
       themeOld: '',
       visible: false,
+      projectReminderPreference: this.getDefaultProjectReminderPreference(),
     }
   },
   computed: {},
@@ -40,8 +62,16 @@ export default {
     // 从数据库恢复主题
     async restoreThemeFromDB() {
       try {
-        const res = await getTheme()
+        const [res, reminderRes] = await Promise.all([getTheme(), getProjectReminderPreference()])
         const themeHsl = res.data?.themeHsl
+        this.projectReminderPreference = {
+          ...this.getDefaultProjectReminderPreference(),
+          ...(reminderRes.data?.projectReminderPreference || {}),
+          rules: {
+            ...this.getDefaultProjectReminderPreference().rules,
+            ...(reminderRes.data?.projectReminderPreference?.rules || {}),
+          },
+        }
         
         if (themeHsl) {
           const [h, s, l] = themeHsl.split(',').map((e) => e.trim())
@@ -62,6 +92,21 @@ export default {
         console.error('获取主题配置失败:', error)
         // 失败时尝试从 localStorage 恢复
         this.restoreThemeFromLocal()
+      }
+    },
+    getDefaultProjectReminderPreference() {
+      return {
+        enabled: true,
+        rules: {
+          taskOverdue: true,
+          taskDueSoon: true,
+          milestoneDelayed: true,
+          sprintDelayed: true,
+          highRisk: true,
+          changePending: true,
+          unplannedTask: true,
+          closureIncomplete: true,
+        },
       }
     },
     
@@ -105,15 +150,18 @@ export default {
     async confirm() {
       try {
         const hsl = localStorage.hsl
-        if (hsl) {
-          await updateTheme({ themeHsl: hsl })
-          ElMessage.success('主题保存成功')
-        }
+        await Promise.all([
+          updateTheme({ themeHsl: hsl || null }),
+          updateProjectReminderPreference({
+            projectReminderPreference: this.projectReminderPreference,
+          }),
+        ])
+        ElMessage.success('设置保存成功')
         this.visible = false
         this.themeOld = this.theme
       } catch (error) {
-        console.error('保存主题失败:', error)
-        ElMessage.error('主题保存失败')
+        console.error('保存设置失败:', error)
+        ElMessage.error('设置保存失败')
       }
     },
     // 恢复默认主题
@@ -165,6 +213,31 @@ export default {
   color: var(--FontBlack5);
   font-size: 14px;
   padding: 0 0 12px;
+}
+
+.drawer-item--column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drawer-item__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--FontBlack2);
+}
+
+.drawer-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.drawer-tip {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--FontBlack5);
 }
 
 .drawer-switch {

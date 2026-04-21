@@ -56,3 +56,19 @@ export function reject(id, data) {
 export function submitApproval(id) {
   return request.post(`/business/changes/${id}/submit-approval`)
 }
+
+export function publishKnowledge(id) {
+  return request.post(`/business/changes/${id}/publish-knowledge`)
+}
+
+export function confirmPlanImpact(id, data = {}) {
+  return request.post(`/business/changes/${id}/confirm-plan-impact`, data)
+}
+
+export function confirmPlanImpactScope(id, data = {}) {
+  return request.post(`/business/changes/${id}/confirm-plan-impact-scope`, data)
+}
+
+export function confirmPlanImpactTarget(id, data = {}) {
+  return request.post(`/business/changes/${id}/confirm-plan-impact-target`, data)
+}

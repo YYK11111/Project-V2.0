@@ -1,46 +1,169 @@
-import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { FindManyOptions, In, Repository } from 'typeorm'
-import { ProjectChange, ChangeStatus } from './entity'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { BaseService } from 'src/common/BaseService'
-import { CreateChangeDto } from './dto'
-import { SysFileService } from 'src/modules/sys/file/service'
-import { SaveDto } from 'src/common/dto'
-import { User } from 'src/modules/users/entities/user.entity'
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindManyOptions, In, Repository } from "typeorm";
+import {
+  ProjectChange,
+  ChangeStatus,
+  changeImpactMap,
+  changeTypeMap,
+} from "./entity";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { BaseService } from "src/common/BaseService";
+import { CreateChangeDto } from "./dto";
+import { SysFileService } from "src/modules/sys/file/service";
+import { SaveDto } from "src/common/dto";
+import { User } from "src/modules/users/entities/user.entity";
+import { Article, Status as ArticleStatus } from "../articles/entity";
+import { ArticleCatalog } from "../articleCatalogs/entity";
+import { KnowledgeType, VisibilityType } from "../articles/constants";
+import { ProjectsService } from "../projects/service";
+import { ChangeImpactConfirmHistory } from "./entities/change-impact-confirm-history.entity";
 
 @Injectable()
-export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> {
+export class ChangesService extends BaseService<
+  ProjectChange,
+  CreateChangeDto
+> {
   constructor(
     @InjectRepository(ProjectChange) repository: Repository<ProjectChange>,
+    @InjectRepository(Article) private articleRepository: Repository<Article>,
+    @InjectRepository(ChangeImpactConfirmHistory)
+    private historyRepository: Repository<ChangeImpactConfirmHistory>,
     private readonly sysFileService: SysFileService,
+    private readonly projectsService: ProjectsService,
   ) {
-    super(ProjectChange, repository)
+    super(ProjectChange, repository);
   }
 
-  private normalizeChangePayload(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    if (typeof dto.attachments === 'string' && !dto.attachments) {
-      dto.attachments = [] as any
+  private async getChangePermissions(
+    change: ProjectChange,
+    operatorId: string,
+  ) {
+    if (!operatorId) return { canEdit: false, canDelete: false };
+    const context = await this.projectsService.getProjectPermissionContext(
+      change.projectId,
+      operatorId,
+    );
+    const canEdit =
+      Boolean(context?.isManager) ||
+      Boolean(context?.isDeliveryManager) ||
+      Boolean(context?.isFunctionalLead) ||
+      String(change.requesterId || "") === String(operatorId) ||
+      String(change.createUser || "") === String(operatorId);
+    return {
+      canEdit,
+      canDelete:
+        Boolean(context?.isManager) ||
+        Boolean(context?.isDeliveryManager) ||
+        String(change.requesterId || "") === String(operatorId) ||
+        String(change.createUser || "") === String(operatorId),
+    };
+  }
+
+  private async assertChangeEditPermission(
+    changeId: string,
+    operatorId: string,
+  ) {
+    if (!changeId || !operatorId) return;
+    const change = await this.repository.findOne({
+      where: { id: changeId, isDelete: null as any } as any,
+      select: ["id", "projectId", "requesterId", "createUser"] as any,
+    });
+    if (!change) throw new NotFoundException("变更不存在");
+    const context = await this.projectsService.assertProjectPermission(
+      change.projectId,
+      operatorId,
+      "view",
+    );
+    const canEdit =
+      context.isManager ||
+      context.isDeliveryManager ||
+      context.isFunctionalLead ||
+      String(change.requesterId || "") === String(operatorId) ||
+      String(change.createUser || "") === String(operatorId);
+    if (!canEdit) {
+      throw new ForbiddenException("当前无编辑该变更的权限");
+    }
+  }
+
+  private normalizeChangePayload(
+    dto: SaveDto<CreateChangeDto> & { attachments?: string[] },
+  ) {
+    if (typeof dto.attachments === "string" && !dto.attachments) {
+      dto.attachments = [] as any;
     }
     if (dto.attachments != null && !Array.isArray(dto.attachments)) {
-      dto.attachments = [dto.attachments].filter(Boolean) as any
+      dto.attachments = [dto.attachments].filter(Boolean) as any;
     }
-    return dto
+    return dto;
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<ProjectChange>> {
-    let { projectId, status, type, name } = query
+    let {
+      projectId,
+      status,
+      type,
+      name,
+      knowledgeLinked,
+      _operatorId,
+      _operatorPermissions,
+    } = query as any;
+    const visibleProjectIds =
+      await this.projectsService.getVisibleProjectIdsForUser(
+        String(_operatorId || ""),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
+    if (visibleProjectIds && !visibleProjectIds.length) {
+      return { list: [], total: 0 } as any;
+    }
+    let executionVisibleProjectIds = visibleProjectIds;
+    if (_operatorId && visibleProjectIds) {
+      executionVisibleProjectIds = [];
+      for (const id of visibleProjectIds) {
+        try {
+          await this.projectsService.assertExecutionObjectPermission(
+            id,
+            String(_operatorId),
+          );
+          executionVisibleProjectIds.push(id);
+        } catch {}
+      }
+      if (!executionVisibleProjectIds.length) {
+        return { list: [], total: 0 } as any;
+      }
+    }
     let queryOrm: FindManyOptions = {
       where: {
         title: this.sqlLike(name),
-        projectId: projectId || undefined,
+        projectId:
+          projectId ||
+          (executionVisibleProjectIds
+            ? In(executionVisibleProjectIds)
+            : undefined),
         status: status || undefined,
         type: type || undefined,
+        knowledgeLinked:
+          knowledgeLinked !== undefined && knowledgeLinked !== ""
+            ? knowledgeLinked
+            : undefined,
       },
-      relations: ['project', 'requester', 'approver'],
-      order: { sort: 'ASC', createTime: 'DESC' },
+      relations: ["project", "requester", "approver"],
+      order: { sort: "ASC", createTime: "DESC" },
+    };
+    const res = await this.listBy(queryOrm, query);
+    for (const row of res.list || []) {
+      if (_operatorId) {
+        Object.assign(
+          row,
+          await this.getChangePermissions(row, String(_operatorId)),
+        );
+      }
     }
-    return this.listBy(queryOrm, query)
+    return res;
   }
 
   async approve(id: string, approverId: string, comment: string): Promise<any> {
@@ -48,8 +171,8 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
       status: ChangeStatus.approved,
       approverId,
       approvalComment: comment,
-      approvalDate: new Date().toISOString().split('T')[0],
-    })
+      approvalDate: new Date().toISOString().split("T")[0],
+    });
   }
 
   async reject(id: string, approverId: string, comment: string): Promise<any> {
@@ -57,106 +180,220 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
       status: ChangeStatus.rejected,
       approverId,
       approvalComment: comment,
-      approvalDate: new Date().toISOString().split('T')[0],
-    })
+      approvalDate: new Date().toISOString().split("T")[0],
+    });
+  }
+
+  async confirmPlanImpact(
+    id: string,
+    userId: string,
+    remark?: string,
+    operatorName?: string,
+  ): Promise<any> {
+    await this.repository.update(id, {
+      planImpactConfirmed: "1",
+      planImpactConfirmedAt: new Date().toISOString().split("T")[0],
+      planImpactConfirmedBy: userId,
+      planImpactConfirmRemark: remark || null,
+    });
+    await this.historyRepository.save(
+      new ChangeImpactConfirmHistory({
+        changeId: id,
+        scope: "overall",
+        action: "confirm",
+        operatorId: userId,
+        operatorName,
+        remark: remark || null,
+        confirmedAt: new Date().toISOString().split("T")[0],
+      }),
+    );
+    return true;
+  }
+
+  async confirmPlanImpactScope(
+    id: string,
+    scope: "milestone" | "sprint" | "task",
+    userId: string,
+    remark?: string,
+    operatorName?: string,
+  ): Promise<any> {
+    const fieldMap = {
+      milestone: {
+        flag: "milestoneImpactConfirmed",
+        at: "milestoneImpactConfirmedAt",
+        by: "milestoneImpactConfirmedBy",
+        remark: "milestoneImpactConfirmRemark",
+      },
+      sprint: {
+        flag: "sprintImpactConfirmed",
+        at: "sprintImpactConfirmedAt",
+        by: "sprintImpactConfirmedBy",
+        remark: "sprintImpactConfirmRemark",
+      },
+      task: {
+        flag: "taskImpactConfirmed",
+        at: "taskImpactConfirmedAt",
+        by: "taskImpactConfirmedBy",
+        remark: "taskImpactConfirmRemark",
+      },
+    };
+    const field = fieldMap[scope];
+    if (!field) throw new Error("不支持的确认范围");
+    await this.repository.update(id, {
+      [field.flag]: "1",
+      [field.at]: new Date().toISOString().split("T")[0],
+      [field.by]: userId,
+      [field.remark]: remark || null,
+    } as any);
+    await this.historyRepository.save(
+      new ChangeImpactConfirmHistory({
+        changeId: id,
+        scope,
+        action: "confirm",
+        operatorId: userId,
+        operatorName,
+        targetId: null,
+        targetName: null,
+        remark: remark || null,
+        confirmedAt: new Date().toISOString().split("T")[0],
+      }),
+    );
+    return true;
+  }
+
+  async confirmPlanImpactTarget(
+    id: string,
+    scope: "milestone" | "sprint" | "task",
+    targetId: string,
+    targetName: string,
+    userId: string,
+    remark?: string,
+    operatorName?: string,
+  ) {
+    await this.historyRepository.save(
+      new ChangeImpactConfirmHistory({
+        changeId: id,
+        scope,
+        action: "confirm",
+        operatorId: userId,
+        operatorName,
+        targetId,
+        targetName,
+        remark: remark || null,
+        confirmedAt: new Date().toISOString().split("T")[0],
+      }),
+    );
+    return true;
   }
 
   async save(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    this.normalizeChangePayload(dto)
-    const attachments = dto.attachments
-    delete dto.attachments
+    if (dto.id && dto._operatorId) {
+      await this.assertChangeEditPermission(
+        String(dto.id),
+        String(dto._operatorId),
+      );
+    }
+    this.normalizeChangePayload(dto);
+    const attachments = dto.attachments;
+    delete dto.attachments;
 
-    const result = await super.save(dto as any)
+    const result = await super.save(dto as any);
 
     if (attachments !== undefined) {
-      const saved = Array.isArray(result) ? result[0] : result
-      const fileIds = await this.getFileIdsByPaths(attachments)
+      const saved = Array.isArray(result) ? result[0] : result;
+      const fileIds = await this.getFileIdsByPaths(attachments);
       if (fileIds.length > 0) {
         await this.sysFileService.associateFiles({
-          businessType: 'change',
+          businessType: "change",
           businessId: saved.id,
           fileIds,
-        })
+        });
       } else if (attachments.length === 0 && saved.id) {
         await this.sysFileService.associateFiles({
-          businessType: 'change',
+          businessType: "change",
           businessId: saved.id,
           fileIds: [],
-        })
+        });
       }
     }
 
-    return result
+    return result;
   }
 
   async add(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    this.normalizeChangePayload(dto)
-    const attachments = dto.attachments
-    delete dto.attachments
+    this.normalizeChangePayload(dto);
+    const attachments = dto.attachments;
+    delete dto.attachments;
 
-    const result = await super.add(dto as any)
+    const result = await super.add(dto as any);
 
     if (attachments !== undefined && attachments.length > 0) {
-      const saved = Array.isArray(result) ? result[0] : result
-      const fileIds = await this.getFileIdsByPaths(attachments)
+      const saved = Array.isArray(result) ? result[0] : result;
+      const fileIds = await this.getFileIdsByPaths(attachments);
       if (fileIds.length > 0) {
         await this.sysFileService.associateFiles({
-          businessType: 'change',
+          businessType: "change",
           businessId: saved.id,
           fileIds,
-        })
+        });
       }
     }
 
-    return result
+    return result;
   }
 
   async update(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    this.normalizeChangePayload(dto)
-    const attachments = dto.attachments
-    delete dto.attachments
+    if (dto.id && dto._operatorId) {
+      await this.assertChangeEditPermission(
+        String(dto.id),
+        String(dto._operatorId),
+      );
+    }
+    this.normalizeChangePayload(dto);
+    const attachments = dto.attachments;
+    delete dto.attachments;
 
-    const result = await super.update(dto as any)
+    const result = await super.update(dto as any);
 
     if (attachments !== undefined) {
-      const saved = Array.isArray(result) ? result[0] : result
-      const fileIds = await this.getFileIdsByPaths(attachments)
+      const saved = Array.isArray(result) ? result[0] : result;
+      const fileIds = await this.getFileIdsByPaths(attachments);
       await this.sysFileService.associateFiles({
-        businessType: 'change',
+        businessType: "change",
         businessId: saved.id,
         fileIds,
-      })
+      });
     }
 
-    return result
+    return result;
   }
 
   private async getFileIdsByPaths(paths: string[]): Promise<string[]> {
-    if (!paths || paths.length === 0) return []
-    const files = await this.sysFileService['repository'].find({
+    if (!paths || paths.length === 0) return [];
+    const files = await this.sysFileService["repository"].find({
       where: { storedPath: In(paths) },
-      select: ['id'],
-    })
-    return files.map((f) => f.id)
+      select: ["id"],
+    });
+    return files.map((f) => f.id);
   }
 
   private mapUserSummary(user?: User | null) {
-    if (!user) return null
+    if (!user) return null;
     return {
       id: user.id,
       name: user.name,
       nickname: user.nickname,
       avatar: user.avatar,
-    }
+    };
   }
 
   private mapProjectSummary(project?: any) {
-    if (!project) return null
+    if (!project) return null;
     return {
       id: project.id,
       code: project.code,
       name: project.name,
-    }
+    };
   }
 
   private buildChangeDetail(change: ProjectChange) {
@@ -165,18 +402,223 @@ export class ChangesService extends BaseService<ProjectChange, CreateChangeDto> 
       project: this.mapProjectSummary(change.project),
       requester: this.mapUserSummary(change.requester),
       approver: this.mapUserSummary(change.approver),
-    }
+      planImpactConfirmInfo:
+        String(change.planImpactConfirmed || "0") === "1"
+          ? {
+              confirmed: true,
+              confirmedAt: change.planImpactConfirmedAt,
+              confirmedBy: change.planImpactConfirmedBy,
+              remark: change.planImpactConfirmRemark,
+            }
+          : null,
+      planImpactScopes: {
+        milestone: {
+          confirmed: String(change.milestoneImpactConfirmed || "0") === "1",
+          confirmedAt: change.milestoneImpactConfirmedAt,
+          confirmedBy: change.milestoneImpactConfirmedBy,
+          remark: change.milestoneImpactConfirmRemark,
+        },
+        sprint: {
+          confirmed: String(change.sprintImpactConfirmed || "0") === "1",
+          confirmedAt: change.sprintImpactConfirmedAt,
+          confirmedBy: change.sprintImpactConfirmedBy,
+          remark: change.sprintImpactConfirmRemark,
+        },
+        task: {
+          confirmed: String(change.taskImpactConfirmed || "0") === "1",
+          confirmedAt: change.taskImpactConfirmedAt,
+          confirmedBy: change.taskImpactConfirmedBy,
+          remark: change.taskImpactConfirmRemark,
+        },
+      },
+    };
   }
 
   async getOne(query, isError = true): Promise<any | null> {
     const change = await super.getOne(
       {
         where: query,
-        relations: ['project', 'requester', 'approver'],
+        relations: ["project", "requester", "approver"],
       },
       isError,
-    )
-    if (!change) return change
-    return this.buildChangeDetail(change)
+    );
+    if (!change) return change;
+    if ((query as any)._operatorId) {
+      await this.projectsService.assertExecutionObjectPermission(
+        change.projectId,
+        String((query as any)._operatorId),
+      );
+    }
+    const history = await this.historyRepository.find({
+      where: { changeId: change.id, isDelete: null as any } as any,
+      order: { createTime: "DESC" },
+      take: 20,
+    });
+    const detail = {
+      ...this.buildChangeDetail(change),
+      confirmHistory: history,
+    };
+    if ((query as any)._operatorId) {
+      Object.assign(
+        detail,
+        await this.getChangePermissions(
+          change,
+          String((query as any)._operatorId),
+        ),
+      );
+    }
+    return detail;
+  }
+
+  async publishToKnowledge(
+    id: string,
+    currentUser: { id?: string; name?: string } = {},
+  ) {
+    const change = await this.getOne({ id });
+    if (!change) throw new Error("变更不存在");
+    if (!change.projectId) {
+      throw new Error("仅支持将已关联项目的变更沉淀到知识中心");
+    }
+
+    const reviewCatalog = await this.projectsService.getKnowledgeChildCatalog(
+      change.projectId,
+      "项目复盘",
+    );
+    if (!reviewCatalog) {
+      throw new Error("当前项目尚未生成“项目复盘”知识分类");
+    }
+
+    const title = `${change.title}-变更结论`;
+    const existing = await this.articleRepository.findOne({
+      where: {
+        catalogId: reviewCatalog.id,
+        title,
+        isDelete: null as any,
+      } as any,
+      order: { createTime: "DESC" },
+    });
+
+    const content = [
+      "## 变更背景",
+      change.description || "暂无",
+      "",
+      "## 变更原因",
+      change.reason || "暂无",
+      "",
+      "## 变更类型与影响",
+      `${changeTypeMap[change.type] || "-"} / ${changeImpactMap[change.impact] || "-"}`,
+      `\n成本影响：${change.costImpact || 0}`,
+      `\n进度影响：${change.scheduleImpact || 0} 天`,
+      "",
+      "## 影响分析",
+      change.impactAnalysis || "暂无",
+      "",
+      "## 审批结论",
+      `审批状态：${change.status || "-"}\n审批意见：${change.approvalComment || "暂无"}\n审批日期：${change.approvalDate || "-"}`,
+    ].join("\n");
+
+    const operatorId = String(currentUser.id || change.requesterId || "");
+    const operatorName = String(currentUser.name || "系统");
+    const article = await this.articleRepository.save(
+      new Article({
+        id: existing?.id,
+        title,
+        desc:
+          change.description ||
+          change.impactAnalysis ||
+          change.approvalComment ||
+          "",
+        summary: String(
+          change.description ||
+            change.impactAnalysis ||
+            change.approvalComment ||
+            "",
+        ).slice(0, 200),
+        catalogId: reviewCatalog.id,
+        catalog: Object.assign(new ArticleCatalog(), { id: reviewCatalog.id }),
+        thumb: existing?.thumb || "",
+        content,
+        contentText: content,
+        knowledgeType: KnowledgeType.experience,
+        sourceType: "change",
+        sourceId: String(change.id || ""),
+        sourceProjectId: String(change.projectId || ""),
+        templateType: "review",
+        authorId: operatorId || null,
+        maintainerId: operatorId || null,
+        visibilityType: VisibilityType.specified,
+        visibleRoleIds: [],
+        visibleUserIds: reviewCatalog.defaultVisibleUserIds || [],
+        order: existing?.order || "1",
+        status: ArticleStatus.published,
+        createUser: operatorName,
+        updateUser: operatorName,
+      }),
+    );
+
+    await this.repository.update(change.id, {
+      knowledgeLinked: "1",
+      knowledgeArticleId: String(article.id),
+    } as any);
+
+    return {
+      articleId: article.id,
+      catalogId: reviewCatalog.id,
+      title: article.title,
+    };
+  }
+
+  async del(
+    ids: string[] | string,
+    updateUser?: string,
+    permissions: string[] = [],
+    operatorName?: string,
+    operatorId?: string,
+  ) {
+    const idList = Array.isArray(ids)
+      ? ids.map((item) => String(item))
+      : String(ids || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    const successIds: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+    if (operatorId) {
+      for (const id of idList) {
+        try {
+          await this.assertChangeEditPermission(id, operatorId);
+          successIds.push(id);
+        } catch (error) {
+          failed.push({
+            id,
+            reason: error?.message || "当前无删除该变更的权限",
+          });
+        }
+      }
+    } else {
+      successIds.push(...idList);
+    }
+    if (!successIds.length) {
+      return {
+        successCount: 0,
+        failedCount: failed.length,
+        successIds: [],
+        failed,
+      } as any;
+    }
+    const result = await super.del(
+      successIds,
+      updateUser,
+      permissions,
+      operatorName,
+      operatorId,
+    );
+    return {
+      ...result,
+      successCount: successIds.length,
+      failedCount: failed.length,
+      successIds,
+      failed,
+    } as any;
   }
 }

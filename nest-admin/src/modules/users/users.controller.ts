@@ -1,20 +1,30 @@
-import { Request } from 'express'
-import { Body, Controller, Get, Post, Query, Put, Req, UploadedFile, HttpCode } from '@nestjs/common'
-import { UsersService } from './users.service'
-import { User } from './entities/user.entity'
-import { HttpExceptionFilter } from '../../common/filters/httpException.filter'
-import { UseFilters } from '@nestjs/common'
-import { UpdateResult } from 'typeorm'
+import { Request } from "express";
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Put,
+  Req,
+  UploadedFile,
+  HttpCode,
+} from "@nestjs/common";
+import { UsersService } from "./users.service";
+import { User } from "./entities/user.entity";
+import { HttpExceptionFilter } from "../../common/filters/httpException.filter";
+import { UseFilters } from "@nestjs/common";
+import { UpdateResult } from "typeorm";
 
-import { QueryListDto, ResponseListDto } from '../../common/dto/index'
-import { BaseController } from 'src/common/BaseController'
-import { MulterFileInterceptor } from 'src/common/interceptor/file.interceptor'
-import { CaptchaService } from '../common/captcha.service'
-import { Public } from '../auth/auth.service'
-import { SysFileService } from '../sys/file/service'
-import { BusinessType, FileStatus } from '../sys/file/entity'
+import { QueryListDto, ResponseListDto } from "../../common/dto/index";
+import { BaseController } from "src/common/BaseController";
+import { MulterFileInterceptor } from "src/common/interceptor/file.interceptor";
+import { CaptchaService } from "../common/captcha.service";
+import { Public } from "../auth/auth.service";
+import { SysFileService } from "../sys/file/service";
+import { BusinessType, FileStatus } from "../sys/file/entity";
 
-@Controller('system/users')
+@Controller("system/users")
 // @UseFilters(new HttpExceptionFilter())
 export class UsersController extends BaseController<User, UsersService> {
   constructor(
@@ -22,22 +32,22 @@ export class UsersController extends BaseController<User, UsersService> {
     private captchaService: CaptchaService,
     private sysFileService: SysFileService,
   ) {
-    super(usersService)
+    super(usersService);
   }
 
   // 重置密码
   @Public()
-  @Put('resetPassword')
+  @Put("resetPassword")
   async resetPassword(@Body() body) {
-    let result = this.captchaService.validateCaptcha(body.uuid, body.code)
-    if (result !== 'true') {
-      throw new Error(result)
+    let result = this.captchaService.validateCaptcha(body.uuid, body.code);
+    if (result !== "true") {
+      throw new Error(result);
     }
-    return this.usersService.resetPassword(body)
+    return this.usersService.resetPassword(body);
   }
 
-  @Post('uploadAvatar')
-  @MulterFileInterceptor('avatar')
+  @Post("uploadAvatar")
+  @MulterFileInterceptor("avatar")
   async uploadFile(@Req() req, @UploadedFile() file: Express.Multer.File) {
     // 1. 创建 sys_file 记录
     await this.sysFileService.create({
@@ -50,35 +60,58 @@ export class UsersController extends BaseController<User, UsersService> {
       businessId: req.user.id,
       uploaderId: req.user.id,
       status: FileStatus.Associated,
-    })
+    });
 
     // 2. 查询旧头像并软删除
-    const oldUser = await this.usersService.getOne({ id: req.user.id })
+    const oldUser = await this.usersService.getOne({ id: req.user.id });
     if (oldUser?.avatar) {
-      await this.sysFileService.softDeleteByPath(oldUser.avatar)
+      await this.sysFileService.softDeleteByPath(oldUser.avatar);
     }
 
     // 3. 更新用户头像
-    await this.usersService.save({ id: req.user.id, avatar: file.filename })
+    await this.usersService.save({ id: req.user.id, avatar: file.filename });
 
-    return { url: file.filename }
+    return { url: file.filename };
   }
 
   // 获取当前用户主题配置
-  @Get('getTheme')
+  @Get("getTheme")
   async getTheme(@Req() req) {
     try {
-      const user = await this.usersService.getOne({ id: req.user.id })
-      return { themeHsl: user?.themeHsl || null }
+      const user = await this.usersService.getOne({ id: req.user.id });
+      return { themeHsl: user?.themeHsl || null };
     } catch (error) {
-      return { themeHsl: null }
+      return { themeHsl: null };
     }
   }
 
   // 更新当前用户主题配置
-  @Put('updateTheme')
+  @Put("updateTheme")
   async updateTheme(@Req() req, @Body() body: { themeHsl: string }) {
-    await this.usersService.update({ id: req.user.id, themeHsl: body.themeHsl })
-    return { success: true }
+    await this.usersService.update({
+      id: req.user.id,
+      themeHsl: body.themeHsl,
+    });
+    return { success: true };
+  }
+
+  @Get("getProjectReminderPreference")
+  async getProjectReminderPreference(@Req() req) {
+    const user = await this.usersService.getOne({ id: req.user.id });
+    return {
+      projectReminderPreference: user?.projectReminderPreference || null,
+    };
+  }
+
+  @Put("updateProjectReminderPreference")
+  async updateProjectReminderPreference(
+    @Req() req,
+    @Body() body: { projectReminderPreference: Record<string, any> },
+  ) {
+    await this.usersService.update({
+      id: req.user.id,
+      projectReminderPreference: body.projectReminderPreference,
+    });
+    return { success: true };
   }
 }

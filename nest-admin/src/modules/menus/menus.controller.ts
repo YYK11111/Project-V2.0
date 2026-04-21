@@ -1,38 +1,47 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common'
-import { MenusService } from './menus.service'
-import { CreateMenuDto } from './dto/create-menu.dto'
-import { UpdateMenuDto } from './dto/update-menu.dto'
-import { Menu, MenuType, menuTypes } from './menu.entity'
-import { BaseController } from 'src/common/BaseController'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from "@nestjs/common";
+import { MenusService } from "./menus.service";
+import { CreateMenuDto } from "./dto/create-menu.dto";
+import { UpdateMenuDto } from "./dto/update-menu.dto";
+import { Menu, MenuType, menuTypes } from "./menu.entity";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('system/menus')
+@Controller("system/menus")
 export class MenusController extends BaseController<Menu, MenusService> {
   constructor(service: MenusService) {
-    super(service)
+    super(service);
   }
 
-  @Get('getTrees')
+  @Get("getTrees")
   getTrees(@Query() query): Promise<Menu[]> {
-    return this.service.list(query)
+    return this.service.list(query);
   }
 
-  @Get('getTypes')
+  @Get("getTypes")
   getTypes() {
-    return menuTypes
+    return menuTypes;
   }
 
-  @Get('diagnostics')
+  @Get("diagnostics")
   diagnostics() {
-    return this.service.getDiagnostics()
+    return this.service.getDiagnostics();
   }
 
-  @Get('treeselect')
+  @Get("treeselect")
   treeselect() {
-    return this.service.treeselect()
+    return this.service.treeselect();
   }
 
-  @Get('roleMenuTreeselect/:roleId')
-  roleMenuTreeselect(@Param('roleId') roleId: string) {
-    return this.service.roleMenuTreeselect(+roleId)
+  @Get("roleMenuTreeselect/:roleId")
+  roleMenuTreeselect(@Param("roleId") roleId: string) {
+    return this.service.roleMenuTreeselect(+roleId);
   }
 }

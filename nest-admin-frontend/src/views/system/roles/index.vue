@@ -160,8 +160,8 @@ function submit({ form, visible, loading }: any) {
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :request="getList">
+  <div class="role-index-page">
+    <RequestChartTable ref="rctRef" class="role-index-panel" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="角色名称" prop="name"></BaInput>
         <BaInput v-model="query.permissionKey" label="权限字符" prop="permissionKey"></BaInput>
@@ -172,8 +172,8 @@ function submit({ form, visible, loading }: any) {
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <div>
+        <div class="role-index-operation">
+          <div class="role-index-operation__left">
             <el-button v-if="canRoleAdd" type="primary" @click="handleAdd">新增</el-button>
             <el-button v-if="canRoleUpdate" class="ml-10" :disabled="selectedIds.length !== 1" @click="handleEdit({ id: selectedIds[0] })">修改</el-button>
             <el-button v-if="canRoleDelete" class="ml-10" type="danger" :disabled="!selectedIds.length" @click="rctRef?.del(delRole)">批量删除</el-button>
@@ -182,7 +182,7 @@ function submit({ form, visible, loading }: any) {
       </template>
 
       <template #table>
-        <el-table-column type="selection" width="50" />
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="角色编号" prop="id" width="100" />
         <el-table-column label="角色名称" prop="name" min-width="140" />
         <el-table-column label="权限字符" prop="permissionKey" min-width="140" />
@@ -238,3 +238,45 @@ function submit({ form, visible, loading }: any) {
     </BaDialog>
   </div>
 </template>
+
+<style scoped>
+.role-index-page {
+  min-height: 100%;
+}
+
+.role-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.role-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.role-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.role-index-panel :deep(.el-table__header-wrapper),
+.role-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .role-index-panel {
+    padding-top: 18px;
+  }
+
+  .role-index-operation,
+  .role-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

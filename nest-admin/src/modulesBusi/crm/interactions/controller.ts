@@ -1,21 +1,24 @@
-import { Controller, Get, Param, Query } from '@nestjs/common'
-import { CustomerInteractionService } from './service'
-import { CustomerInteraction, interactionTypeMap } from './entity'
-import { BaseController } from 'src/common/BaseController'
+import { Controller, Get, Param, Query } from "@nestjs/common";
+import { CustomerInteractionService } from "./service";
+import { CustomerInteraction, interactionTypeMap } from "./entity";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('business/crm/interactions')
-export class CustomerInteractionsController extends BaseController<CustomerInteraction, CustomerInteractionService> {
+@Controller("business/crm/interactions")
+export class CustomerInteractionsController extends BaseController<
+  CustomerInteraction,
+  CustomerInteractionService
+> {
   constructor(readonly service: CustomerInteractionService) {
-    super(service)
+    super(service);
   }
 
-  @Get('customer/:customerId')
-  getByCustomerId(@Param('customerId') customerId: string) {
-    return this.service.findByCustomerId(customerId)
+  @Get("customer/:customerId")
+  getByCustomerId(@Param("customerId") customerId: string) {
+    return this.service.findByCustomerId(customerId);
   }
 
-  @Get('getTypes')
+  @Get("getTypes")
   getTypes() {
-    return interactionTypeMap
+    return interactionTypeMap;
   }
 }

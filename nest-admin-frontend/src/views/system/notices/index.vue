@@ -20,8 +20,8 @@ const getButtons = (row: any) => [
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :request="getList">
+  <div class="notice-index-page">
+    <RequestChartTable ref="rctRef" class="notice-index-panel" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.title" label="公告标题" prop="title"></BaInput>
         <BaSelect v-model="query.isActive" filterable label="是否激活" prop="isActive">
@@ -30,13 +30,16 @@ const getButtons = (row: any) => [
       </template>
 
         <template #operation="{ selectedIds }">
-          <div class="flexBetween">
-          <el-button v-if="canNoticeAdd" type="primary" @click="dialogRef?.action({ isActive: KEY_YES })">新增公告</el-button>
-          <el-button v-if="canNoticeDelete" :disabled="!selectedIds.length" @click="rctRef?.del(del)" type="danger">批量删除</el-button>
+          <div class="notice-index-operation">
+            <div class="notice-index-operation__left">
+           <el-button v-if="canNoticeAdd" type="primary" @click="dialogRef?.action({ isActive: KEY_YES })">新增公告</el-button>
+            </div>
+           <el-button v-if="canNoticeDelete" :disabled="!selectedIds.length" @click="rctRef?.del(del)" type="danger">批量删除</el-button>
           </div>
         </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="公告标题" prop="title" :show-overflow-tooltip="true" />
         <el-table-column label="公告内容" prop="content" :show-overflow-tooltip="true" />
         <el-table-column label="是否激活" prop="isActive">
@@ -74,16 +77,43 @@ const getButtons = (row: any) => [
 </template>
 
 <style lang="scss" scoped>
-.title-name {
-  font-size: 14px;
-
-  font-weight: 600;
-  color: var(--FontBlack);
-  display: flex;
-  align-items: center;
+.notice-index-page {
+  min-height: 100%;
 }
-.bottom {
-  justify-content: flex-end;
-  padding: 20px;
+
+.notice-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.notice-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.notice-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notice-index-panel :deep(.el-table__header-wrapper),
+.notice-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .notice-index-panel {
+    padding-top: 18px;
+  }
+
+  .notice-index-operation,
+  .notice-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

@@ -38,6 +38,16 @@ export default defineComponent({
     isTimeQuery: {
       type: Boolean,
     },
+    // 表单 label 位置: 'top' | 'left' | 'right'
+    labelPosition: {
+      type: String,
+      default: 'top',
+    },
+    // 表单 label 宽度
+    labelWidth: {
+      type: String,
+      default: 'auto',
+    },
 
     // 自定义的查询参数处理方法，可用于添加和修改查询参数
     dealQueryFun: {
@@ -86,6 +96,18 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    tableAttrs: {
+      type: Object,
+      default: null,
+    },
+    tableEvents: {
+      type: Object,
+      default: null,
+    },
+    refreshOnActivate: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     return {
@@ -100,6 +122,7 @@ export default defineComponent({
       total: 0,
 
       selectedIds: [], // 多选数据
+      hasDeactivated: false,
     }
   },
   computed: {},
@@ -107,6 +130,15 @@ export default defineComponent({
   created() {
     this.isPageQuery && Object.assign(this.query, { pageNum: 1, pageSize: 10 })
     this.isCreateRequest && !this.isTimeQuery && this.getList()
+  },
+  activated() {
+    if (!this.refreshOnActivate || !this.hasDeactivated) {
+      return
+    }
+    this.getList()
+  },
+  deactivated() {
+    this.hasDeactivated = true
   },
   mounted() {},
   methods: {
@@ -190,7 +222,20 @@ export default defineComponent({
         .then(() => {
           this.loading = true
           return delApi(ids).then((res) => {
-            $sdk.msgSuccess('删除成功')
+            const successCount = Number(res?.successCount ?? 0)
+            const failedCount = Number(res?.failedCount ?? 0)
+            const failed = Array.isArray(res?.failed) ? res.failed : []
+            if (failedCount > 0 && successCount > 0) {
+              $sdk.msgWarning(`部分删除成功：成功 ${successCount} 条，失败 ${failedCount} 条`) 
+              console.warn('[批量删除失败明细]', failed)
+            } else if (failedCount > 0 && successCount === 0) {
+              const firstReason = failed?.[0]?.reason || '当前操作没有权限'
+              $sdk.msgError(`删除失败：${firstReason}`)
+              console.warn('[批量删除失败明细]', failed)
+              return
+            } else {
+              $sdk.msgSuccess('删除成功')
+            }
             this.getList()
           })
         })
@@ -275,16 +320,20 @@ export default defineComponent({
 <template>
   <div class="RequestChartTable" :class="$slots.query || 'Gcard'" v-loading="loading">
     <!-- 顶部查询框 -->
-    <el-form
-      v-if="$slots.query"
-      :model="query"
-      ref="queryForm"
-      inline
-      class="GtopSearch"
-      @keyup.enter.prevent="getList(1)">
+    <div v-if="$slots.query" class="query-outer">
       <slot name="query" v-bind="{ query }"></slot>
-      <SearchResetButton @search="getList(1)" @reset="reset('queryForm')"></SearchResetButton>
-    </el-form>
+      <el-form
+        :model="query"
+        ref="queryForm"
+        inline
+        :label-position="labelPosition || 'top'"
+        :label-width="labelWidth || 'auto'"
+        class="GtopSearch"
+        @keyup.enter.prevent="getList(1)">
+        <slot name="extraButtons" v-bind="{ query }"></slot>
+        <SearchResetButton @search="getList(1)" @reset="reset('queryForm')"></SearchResetButton>
+      </el-form>
+    </div>
 
     <div :class="$slots.query && 'Gcard'">
       <!-- 卡片标题 -->
@@ -331,7 +380,7 @@ export default defineComponent({
       <template v-else-if="type == 'table'">
         <slot v-bind="{ data, query, getList, apiConfirm, goRoute }"></slot>
 
-        <el-table v-if="$slots.tableView" :data="data" show-overflow-tooltip>
+        <el-table v-if="$slots.tableView" :data="data" show-overflow-tooltip v-bind="tableAttrs || {}" v-on="tableEvents || {}">
           <slot name="tableView"></slot>
         </el-table>
 
@@ -340,6 +389,8 @@ export default defineComponent({
           ref="table"
           :data="data"
           show-overflow-tooltip
+          v-bind="tableAttrs || {}"
+          v-on="tableEvents || {}"
           @selection-change="(val) => ((selectedIds = val.map((e) => e[dataKey])), $emit('selectionChange', val))">
           <template v-if="isSelection">
             <el-table-column v-if="isSigleSelect" width="30" fixed="left">

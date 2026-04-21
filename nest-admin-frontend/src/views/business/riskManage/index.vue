@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getList, getStatus, getLevel, getCategory, resolve, del } from './api'
+import { getList, getStatus, getLevel, getCategory, resolve, del, publishKnowledge } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
 import RiskMatrix from '@/components/RiskMatrix.vue'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
+import { downloadCsv } from '@/utils/csv'
+import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 
 const router = useRouter()
 const route = useRoute()
@@ -29,6 +31,7 @@ const rctRef = ref()
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
 const canRiskDelete = computed(() => checkPermi(['business/risks/delete']))
+const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
 const columns = [
   { prop: 'name', label: '风险名称', minWidth: 150 },
@@ -46,7 +49,7 @@ const fetchAllRisks = async () => {
 }
 
 function getFormPath() {
-  return `${route.path.replace(/\/$/, '')}/form`
+  return '/projectManage/riskManage/form'
 }
 
 const handleAdd = () => {
@@ -76,6 +79,37 @@ const handleResolve = async (row) => {
   await resolve(row.id)
   $sdk.msgSuccess('操作成功')
   rctRef.value?.getList()
+}
+
+const handlePublishKnowledge = async (row) => {
+  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  await confirmRepublishIfNeeded({ articleId: row.knowledgeArticleId, entityLabel: '风险' })
+  await publishKnowledge(row.id)
+  $sdk.msgSuccess('风险案例已沉淀到知识中心')
+  rctRef.value?.getList?.()
+}
+
+const openKnowledgeDetail = (articleId) => {
+  if (!articleId) return
+  router.push({ path: '/content/articleManage/detail', query: { id: articleId } })
+}
+
+function exportRiskList() {
+  const rows = [
+    ['风险名称', '所属项目', '分类', '等级', '状态', '计划解决日期', '影响程度', '知识回流', '知识文章ID'],
+    ...((rctRef.value?.data || []).map((row) => [
+      row.name || '-',
+      projectMap.value[row.projectId] || '-',
+      categoryMap.value[row.category] || '-',
+      levelMap.value[row.level] || '-',
+      statusMap.value[row.status] || '-',
+      row.dueDate || '-',
+      row.impactEstimate || '-',
+      row.knowledgeLinked === '1' ? '已关联' : '未关联',
+      row.knowledgeArticleId || '-',
+    ])),
+  ]
+  downloadCsv('风险列表导出.csv', rows)
 }
 
 const getStatusType = (status) => {
@@ -118,47 +152,112 @@ watch(
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canRiskUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canRiskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  row.knowledgeArticleId
+    ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
+    : canArticleAdd.value
+      ? { key: 'publishKnowledge', label: '转知识', type: 'primary', onClick: () => handlePublishKnowledge(row) }
+      : null,
+  row.knowledgeArticleId && canArticleAdd.value
+    ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
+    : null,
   canRiskUpdate.value && row.status !== '4' && row.status !== '5' ? { key: 'resolve', label: '解决', type: 'primary', onClick: () => handleResolve(row) } : null,
-  canRiskDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  canRiskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>
 
 <template>
-  <RequestChartTable ref="rctRef" :params="params" :request="getList">
-    <template #query="{ query }">
-      <el-button type="warning" @click="handleShowMatrix">风险矩阵</el-button>
-      <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 180px; margin-left: 10px">
-        <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-      </el-select>
-      <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px; margin-left: 10px">
-        <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
-      </el-select>
-      <el-select v-model="query.level" placeholder="风险等级" clearable style="width: 100px; margin-left: 10px">
-        <el-option v-for="(v, k) in levelMap" :key="k" :label="v" :value="k" />
-      </el-select>
-    </template>
+  <div class="risk-index-page">
+    <RequestChartTable ref="rctRef" class="risk-index-panel" :params="params" :request="getList" :is-selection="true">
+      <template #query="{ query }">
+        <el-button type="warning" @click="handleShowMatrix">风险矩阵</el-button>
+        <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 180px; margin-left: 10px">
+          <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px; margin-left: 10px">
+          <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.level" placeholder="风险等级" clearable style="width: 100px; margin-left: 10px">
+          <el-option v-for="(v, k) in levelMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.knowledgeLinked" placeholder="知识回流" clearable style="width: 120px; margin-left: 10px">
+          <el-option label="已关联" value="1" />
+          <el-option label="未关联" value="0" />
+        </el-select>
+      </template>
 
-    <template #operation>
-      <el-button v-if="canRiskAdd" type="primary" @click="handleAdd">新增</el-button>
-    </template>
+      <template #operation="{ selectedIds }">
+        <div class="risk-index-operation">
+          <div class="risk-index-operation__left">
+            <el-button v-if="canRiskAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button @click="exportRiskList">导出</el-button>
+          </div>
+          <el-button v-if="canRiskDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+        </div>
+      </template>
 
-    <template #table>
-      <el-table-column prop="name" label="风险名称" min-width="150" />
-      <el-table-column prop="projectId" label="所属项目" width="120"><template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template></el-table-column>
-      <el-table-column prop="category" label="分类" width="100"><template #default="{ row }">{{ categoryMap[row.category] || '-' }}</template></el-table-column>
-      <el-table-column prop="level" label="等级" width="80"><template #default="{ row }"><el-tag :type="getLevelType(row.level)">{{ levelMap[row.level] || '-' }}</el-tag></template></el-table-column>
-      <el-table-column prop="status" label="状态" width="100"><template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template></el-table-column>
-      <el-table-column prop="dueDate" label="计划解决日期" width="120" />
-      <el-table-column prop="impactEstimate" label="影响程度" width="100" />
-    </template>
+      <template #table>
+        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column prop="name" label="风险名称" min-width="150" />
+        <el-table-column prop="projectId" label="所属项目" width="120"><template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template></el-table-column>
+        <el-table-column prop="category" label="分类" width="100"><template #default="{ row }">{{ categoryMap[row.category] || '-' }}</template></el-table-column>
+        <el-table-column prop="level" label="等级" width="80"><template #default="{ row }"><el-tag :type="getLevelType(row.level)">{{ levelMap[row.level] || '-' }}</el-tag></template></el-table-column>
+        <el-table-column prop="status" label="状态" width="100"><template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template></el-table-column>
+        <el-table-column prop="dueDate" label="计划解决日期" width="120" />
+        <el-table-column prop="impactEstimate" label="影响程度" width="100" />
+        <el-table-column label="知识回流" width="100"><template #default="{ row }"><el-tag :type="row.knowledgeLinked === '1' ? 'success' : 'info'" size="small">{{ row.knowledgeLinked === '1' ? '已关联' : '未关联' }}</el-tag></template></el-table-column>
+        <el-table-column label="知识文章" width="120"><template #default="{ row }"><el-button v-if="row.knowledgeArticleId" link type="primary" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.knowledgeArticleId } })">查看知识</el-button><span v-else>-</span></template></el-table-column>
+      </template>
 
-    <template #tableOperation="{ row }">
-      <TableOperation :buttons="getButtons(row)" :row="row" />
-    </template>
-  </RequestChartTable>
+      <template #tableOperation="{ row }">
+        <TableOperation :buttons="getButtons(row)" :row="row" />
+      </template>
+    </RequestChartTable>
+  </div>
 
   <el-dialog v-model="matrixDialogVisible" title="风险矩阵" width="800px">
     <RiskMatrix v-if="matrixDialogVisible" :risks="showMatrix" @risk-click="handleRiskClick" />
   </el-dialog>
 </template>
+
+<style scoped>
+.risk-index-page {
+  min-height: 100%;
+}
+
+.risk-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.risk-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.risk-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.risk-index-panel :deep(.el-table__header-wrapper),
+.risk-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .risk-index-panel {
+    padding-top: 18px;
+  }
+
+  .risk-index-operation,
+  .risk-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

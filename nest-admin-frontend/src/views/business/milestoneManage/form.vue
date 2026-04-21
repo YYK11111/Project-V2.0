@@ -2,10 +2,13 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
+import { getList as getTaskList } from '@/views/business/taskManage/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
+import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -24,6 +27,11 @@ const form = ref({
   completedDate: '',
   status: '1',
   deliverables: [],
+  ownerId: '',
+  delayReason: '',
+  phase: '',
+  changeImpactFlag: '0',
+  riskImpactFlag: '0',
   sort: 0,
 })
 
@@ -41,6 +49,22 @@ const hasMilestoneId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
 const canMilestoneUpdate = computed(() => checkPermi(['business/milestones/update']))
+const taskSummary = computed(() => form.value.taskSummary || { total: 0, completed: 0, inProgress: 0, pending: 0, completionRate: 0 })
+const linkedTasks = computed(() => form.value.tasks || [])
+const affectedTasks = ref([])
+const milestoneImpactTips = computed(() => {
+  return affectedTasks.value.filter((task) => {
+    if (!form.value.dueDate || !task.endDate) return false
+    return task.endDate > form.value.dueDate
+  })
+})
+const milestoneTimeStatus = computed(() => {
+  if (!form.value.dueDate || String(form.value.status || '') === '2') return '-'
+  const today = new Date().toISOString().split('T')[0]
+  if (form.value.dueDate < today) return '已超期'
+  if (form.value.dueDate === today) return '今日到期'
+  return '按计划推进'
+})
 
 const defaultForm = () => ({
   name: '',
@@ -50,6 +74,11 @@ const defaultForm = () => ({
   completedDate: '',
   status: '1',
   deliverables: [],
+  ownerId: '',
+  delayReason: '',
+  phase: '',
+  changeImpactFlag: '0',
+  riskImpactFlag: '0',
   sort: 0,
 })
 
@@ -60,6 +89,16 @@ async function loadMilestone() {
   }
   const { data } = await getOne(route.query.id)
   form.value = data || {}
+  loadAffectedTasks()
+}
+
+async function loadAffectedTasks() {
+  if (!form.value.projectId || !hasMilestoneId.value) {
+    affectedTasks.value = []
+    return
+  }
+  const res = await getTaskList({ pageNum: 1, pageSize: 1000, projectId: form.value.projectId, milestoneId: route.query.id })
+  affectedTasks.value = res.list || []
 }
 
 watch(
@@ -69,6 +108,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(() => form.value.dueDate, () => {
+  if (hasMilestoneId.value) loadAffectedTasks()
+})
 
 function handleInputConfirm() {
   if (inputValue.value) {
@@ -132,6 +175,28 @@ function cancel() {
         <el-date-picker v-else v-model="form.dueDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
       </el-form-item>
 
+      <el-form-item label="里程碑责任人">
+        <ViewUser v-if="isView" :user="form.owner" />
+        <UserSelect v-else v-model="form.ownerId" placeholder="请选择里程碑责任人" clearable />
+      </el-form-item>
+
+      <el-alert
+        v-if="milestoneImpactTips.length && !isView"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb16"
+      >
+        <template #title>
+          <div class="milestone-impact-alert__title">里程碑变更影响提示</div>
+        </template>
+        <div class="milestone-impact-alert__list">
+          <div v-for="task in milestoneImpactTips.slice(0, 5)" :key="task.id">
+            任务《{{ task.name }}》截止时间 {{ task.endDate }} 晚于当前里程碑日期 {{ form.dueDate }}
+          </div>
+        </div>
+      </el-alert>
+
       <el-form-item label="状态" v-if="hasMilestoneId">
         <ViewTagField v-if="isView" :text="status[form.status]" :type="form.status === '2' ? 'success' : form.status === '3' ? 'warning' : form.status === '4' ? 'info' : 'primary'" />
         <el-select v-else v-model="form.status" placeholder="请选择状态" style="width: 100%">
@@ -146,6 +211,26 @@ function cancel() {
       <el-form-item label="里程碑描述">
         <ViewField v-if="isView" :value="form.description" />
         <el-input v-else v-model="form.description" type="textarea" :rows="4" placeholder="请输入描述" />
+      </el-form-item>
+
+      <el-form-item label="延期原因">
+        <ViewField v-if="isView" :value="form.delayReason" />
+        <el-input v-else v-model="form.delayReason" type="textarea" :rows="3" placeholder="请输入延期或偏差原因" />
+      </el-form-item>
+
+      <el-form-item label="里程碑阶段">
+        <ViewField v-if="isView" :value="form.phase" />
+        <el-input v-else v-model="form.phase" placeholder="请输入里程碑阶段" maxlength="30" />
+      </el-form-item>
+
+      <el-form-item label="受变更影响">
+        <ViewField v-if="isView" :value="form.changeImpactFlag === '1' ? '是' : '否'" />
+        <el-switch v-else v-model="form.changeImpactFlag" active-value="1" inactive-value="0" />
+      </el-form-item>
+
+      <el-form-item label="受风险影响">
+        <ViewField v-if="isView" :value="form.riskImpactFlag === '1' ? '是' : '否'" />
+        <el-switch v-else v-model="form.riskImpactFlag" active-value="1" inactive-value="0" />
       </el-form-item>
 
       <el-form-item label="交付物清单">
@@ -169,6 +254,52 @@ function cancel() {
         <el-input-number v-else v-model="form.sort" :min="0" />
       </el-form-item>
 
+      <template v-if="hasMilestoneId">
+        <el-divider content-position="left">任务概况</el-divider>
+
+        <div class="milestone-summary-grid">
+          <div class="milestone-summary-card"><span>关联任务</span><strong>{{ taskSummary.total }}</strong></div>
+          <div class="milestone-summary-card"><span>已完成</span><strong>{{ taskSummary.completed }}</strong></div>
+          <div class="milestone-summary-card"><span>进行中</span><strong>{{ taskSummary.inProgress }}</strong></div>
+          <div class="milestone-summary-card"><span>待处理</span><strong>{{ taskSummary.pending }}</strong></div>
+          <div class="milestone-summary-card"><span>完成率</span><strong>{{ taskSummary.completionRate }}%</strong></div>
+          <div class="milestone-summary-card"><span>时间状态</span><strong>{{ milestoneTimeStatus }}</strong></div>
+        </div>
+
+        <el-divider content-position="left">关联任务列表</el-divider>
+
+        <el-table :data="linkedTasks" stripe>
+          <el-table-column prop="name" label="任务名称" min-width="220">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="$router.push({ path: '/taskManage/form', query: { id: row.id, action: 'view' } })">{{ row.name || '-' }}</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column prop="code" label="任务编号" width="140" />
+          <el-table-column label="负责人" min-width="140">
+            <template #default="{ row }">
+              <ViewUser v-if="row.leader" :user="row.leader" />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <ViewTagField :text="{ '1': '待处理', '2': '处理中', '3': '已完成', '4': '已驳回', '5': '暂缓' }[row.status] || '-'" :type="row.status === '3' ? 'success' : row.status === '2' ? 'warning' : 'info'" />
+            </template>
+          </el-table-column>
+          <el-table-column label="优先级" width="100">
+            <template #default="{ row }">
+              <ViewTagField :text="{ '1': '低', '2': '中', '3': '高' }[row.priority] || '-'" :type="row.priority === '3' ? 'danger' : row.priority === '2' ? 'warning' : 'info'" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="progress" label="进度" width="160">
+            <template #default="{ row }">
+              <el-progress :percentage="row.progress || 0" :stroke-width="8" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="endDate" label="截止时间" width="120" />
+        </el-table>
+      </template>
+
       <el-form-item v-if="!isView">
         <el-button v-if="!isView && (isEdit ? canMilestoneUpdate : canMilestoneAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">取消</el-button>
@@ -180,5 +311,50 @@ function cancel() {
 <style scoped>
 .input-new-tag {
   vertical-align: middle;
+}
+
+.milestone-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.milestone-summary-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.milestone-summary-card span {
+  display: block;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.milestone-summary-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  color: var(--el-text-color-primary);
+}
+
+.milestone-impact-alert__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.milestone-impact-alert__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .milestone-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

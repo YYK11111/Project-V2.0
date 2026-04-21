@@ -23,7 +23,7 @@ describe('request 401 处理', () => {
     })
   })
 
-  it('401 时只执行本地过期处理，不调用后端登出', async () => {
+  it('登录态探测接口返回 401 时不弹登录过期弹窗', async () => {
     const { default: request } = await import('./request')
     const responseInterceptor = request.interceptors.response.handlers[0].fulfilled
 
@@ -36,8 +36,8 @@ describe('request 401 处理', () => {
 
     await Promise.resolve()
 
-    expect((window as any).ElMessageBox.confirm).toHaveBeenCalledTimes(1)
-    expect(mockHandleSessionExpired).toHaveBeenCalledWith('/dashboard?tab=1')
+    expect((window as any).ElMessageBox.confirm).not.toHaveBeenCalled()
+    expect(mockHandleSessionExpired).not.toHaveBeenCalled()
   })
 
   it('登录页公开请求返回 401 时不弹登录过期弹窗', async () => {

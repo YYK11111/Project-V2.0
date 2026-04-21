@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecentMessages, getUnreadCount, markMessageRead } from '@/api/system/message'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const unread = ref({ total: 0, todo: 0, cc: 0 })
 const messageData = ref<{ todo: any[]; cc: any[] }>({ todo: [], cc: [] })
 const activeTab = ref('todo')
 let timer: ReturnType<typeof setInterval> | null = null
+const projectAlertMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType === 'project_alert'))
+const otherCcMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType !== 'project_alert'))
 
 const getMetaText = (row: any) => {
   const starterText = `发起人：${row.starterName || '-'}`
@@ -32,6 +36,11 @@ const getMessageRoute = (row: any) => {
 }
 
 const loadMessages = async () => {
+  if (!userStore.name) {
+    unread.value = { total: 0, todo: 0, cc: 0 }
+    messageData.value = { todo: [], cc: [] }
+    return
+  }
   const [countRes, recentRes] = await Promise.all([getUnreadCount(), getRecentMessages(10)])
   unread.value = countRes.data || countRes
   messageData.value = recentRes.data || recentRes
@@ -49,6 +58,9 @@ const goMessage = async (row: any) => {
 }
 
 onMounted(() => {
+  if (!userStore.name) {
+    return
+  }
   loadMessages()
   timer = setInterval(() => {
     loadMessages()
@@ -83,11 +95,26 @@ onUnmounted(() => {
         </el-tab-pane>
         <el-tab-pane :label="`待阅 (${unread.cc})`" name="cc">
           <div class="message-section">
-            <div v-if="messageData.cc.length" class="message-list">
-              <button v-for="row in messageData.cc" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
-                <div class="message-item__title">{{ row.title }}</div>
-                <div class="message-item__meta">{{ getMetaText(row) }}</div>
-              </button>
+            <div v-if="messageData.cc.length" class="message-group-list">
+              <div v-if="projectAlertMessages.length" class="message-group">
+                <div class="message-group__title">项目提醒</div>
+                <div class="message-list">
+                  <button v-for="row in projectAlertMessages" :key="row.id" type="button" class="message-item message-item--project" @click="goMessage(row)">
+                    <div class="message-item__title">{{ row.title }}</div>
+                    <div class="message-item__meta">{{ getMetaText(row) }}</div>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="otherCcMessages.length" class="message-group">
+                <div class="message-group__title">其他待阅</div>
+                <div class="message-list">
+                  <button v-for="row in otherCcMessages" :key="row.id" type="button" class="message-item" @click="goMessage(row)">
+                    <div class="message-item__title">{{ row.title }}</div>
+                    <div class="message-item__meta">{{ getMetaText(row) }}</div>
+                  </button>
+                </div>
+              </div>
             </div>
             <el-empty v-else description="暂无待阅" :image-size="60" />
           </div>
@@ -162,6 +189,19 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
+.message-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-group__title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+}
+
 .message-item {
   width: 100%;
   text-align: left;
@@ -175,6 +215,11 @@ onUnmounted(() => {
 .message-item:hover {
   border-color: var(--el-color-primary-light-5);
   background: var(--el-fill-color-light);
+}
+
+.message-item--project {
+  border-color: rgba(230, 162, 60, 0.24);
+  background: rgba(230, 162, 60, 0.08);
 }
 
 .message-item__title {

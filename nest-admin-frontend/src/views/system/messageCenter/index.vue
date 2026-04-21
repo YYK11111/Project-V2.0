@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMessageList, getUnreadCount, markMessageRead } from '@/api/system/message'
+import { clearProjectAlerts, getMessageList, getUnreadCount, markMessageRead, markProjectAlertsRead } from '@/api/system/message'
 import { getMyHandledWorkflowHistory } from '@/views/business/workflow/api'
 
 type MessageTab = 'todoCurrent' | 'todoHistory' | 'ccCurrent' | 'ccHistory'
@@ -16,6 +16,8 @@ const query = reactive({
   pageNum: 1,
   pageSize: 10,
 })
+const ccSourceFilter = ref<'all' | 'project_alert' | 'workflow_instance'>('all')
+const batchActionLoading = ref(false)
 
 const tabConfig = computed(() => ({
   todoCurrent: { label: `当前待办 (${unread.value.todo})` },
@@ -60,6 +62,7 @@ const getSourceTypeLabel = (sourceType: string) => {
     ticket: '工单',
     change: '变更',
     customer: '客户',
+    project_alert: '项目提醒',
     workflow_task: '待办',
     workflow_instance: '流程',
   }
@@ -103,8 +106,8 @@ const loadList = async () => {
     const paramsMap: Record<MessageTab, Record<string, any>> = {
       todoCurrent: { messageType: 'todo', scope: 'current' },
       todoHistory: {},
-      ccCurrent: { messageType: 'cc', scope: 'current' },
-      ccHistory: { messageType: 'cc', scope: 'history' },
+      ccCurrent: { messageType: 'cc', scope: 'current', sourceType: ccSourceFilter.value === 'all' ? '' : ccSourceFilter.value },
+      ccHistory: { messageType: 'cc', scope: 'history', sourceType: ccSourceFilter.value === 'all' ? '' : ccSourceFilter.value },
     }
     const res = await getMessageList({ ...query, ...paramsMap[activeTab.value] })
     total.value = res.total || res.data?.total || 0
@@ -136,6 +139,31 @@ const handleTabChange = async () => {
   await loadList()
 }
 
+const handleCcSourceChange = async () => {
+  query.pageNum = 1
+  await loadList()
+}
+
+const handleMarkProjectAlertsRead = async () => {
+  batchActionLoading.value = true
+  try {
+    await markProjectAlertsRead()
+    await reload()
+  } finally {
+    batchActionLoading.value = false
+  }
+}
+
+const handleClearProjectAlerts = async () => {
+  batchActionLoading.value = true
+  try {
+    await clearProjectAlerts()
+    await reload()
+  } finally {
+    batchActionLoading.value = false
+  }
+}
+
 const handlePageChange = async (pageNum: number) => {
   query.pageNum = pageNum
   await loadList()
@@ -160,7 +188,21 @@ onMounted(() => {
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane v-for="(item, key) in tabConfig" :key="key" :label="item.label" :name="key">
-            <el-table :data="listData" border v-loading="loading">
+          <div v-if="activeTab === 'ccCurrent' || activeTab === 'ccHistory'" class="message-filter-bar">
+            <div class="message-filter-bar__main">
+              <el-radio-group v-model="ccSourceFilter" size="small" @change="handleCcSourceChange">
+                <el-radio-button label="all">全部待阅</el-radio-button>
+                <el-radio-button label="project_alert">项目提醒</el-radio-button>
+                <el-radio-button label="workflow_instance">流程待阅</el-radio-button>
+              </el-radio-group>
+              <div v-if="ccSourceFilter === 'project_alert'" class="message-filter-bar__actions">
+                <el-button size="small" :loading="batchActionLoading" @click="handleMarkProjectAlertsRead">批量已读</el-button>
+                <el-button size="small" type="danger" plain :loading="batchActionLoading" @click="handleClearProjectAlerts">批量清理</el-button>
+              </div>
+            </div>
+          </div>
+
+          <el-table :data="listData" border v-loading="loading">
             <el-table-column prop="title" label="标题" min-width="200">
               <template #default="{ row }">
                 <el-button link type="primary" @click="goMessage(row)">{{ row.title || row.businessTitle || '-' }}</el-button>
@@ -168,6 +210,11 @@ onMounted(() => {
             </el-table-column>
             <el-table-column prop="starterName" label="发起人" width="110">
               <template #default="{ row }">{{ row.starterName || '-' }}</template>
+            </el-table-column>
+            <el-table-column v-if="activeTab === 'ccCurrent' || activeTab === 'ccHistory'" label="分类" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.sourceType === 'project_alert' ? 'warning' : 'info'" size="small">{{ getSourceTypeLabel(row.sourceType) }}</el-tag>
+              </template>
             </el-table-column>
             <el-table-column v-if="activeTab === 'todoHistory'" prop="actionText" label="处理结果" width="120">
               <template #default="{ row }">
@@ -202,6 +249,10 @@ onMounted(() => {
   padding: 16px;
 }
 
+.message-center-page :deep(.el-card__body) {
+  padding-top: 20px;
+}
+
 .page-title {
   font-size: 18px;
   font-weight: 600;
@@ -214,7 +265,25 @@ onMounted(() => {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 16px;
+}
+
+.message-filter-bar {
+  margin-bottom: 12px;
+}
+
+.message-filter-bar__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.message-filter-bar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .message-center-page :deep(.el-table .cell) {
@@ -222,8 +291,19 @@ onMounted(() => {
   font-size: 13px;
 }
 
+.message-center-page :deep(.el-table__header-wrapper),
+.message-center-page :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .message-center-page :deep(.el-table td),
 .message-center-page :deep(.el-table th) {
   padding: 8px 0;
+}
+
+@media (max-width: 768px) {
+  .message-center-page :deep(.el-card__body) {
+    padding-top: 18px;
+  }
 }
 </style>

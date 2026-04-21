@@ -102,7 +102,7 @@ function getStatusType(status) {
 }
 
 function handleStoryClick(story) {
-  router.push(`/business/userStoryManage/form?id=${story.id}`)
+  router.push({ path: '/projectManage/userStoryManage/form', query: { id: story.id } })
 }
 </script>
 

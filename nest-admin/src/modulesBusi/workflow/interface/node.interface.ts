@@ -1,7 +1,23 @@
-import { NodeType, ConditionOperator, AssigneeType, MultiInstanceType, CompleteType, AssigneeMode, AssigneeEmptyAction } from './node-type.enum';
+import {
+  NodeType,
+  ConditionOperator,
+  AssigneeType,
+  MultiInstanceType,
+  CompleteType,
+  AssigneeMode,
+  AssigneeEmptyAction,
+} from "./node-type.enum";
 
 // 重新导出枚举类型，方便其他模块使用
-export { NodeType, ConditionOperator, AssigneeType, MultiInstanceType, CompleteType, AssigneeMode, AssigneeEmptyAction };
+export {
+  NodeType,
+  ConditionOperator,
+  AssigneeType,
+  MultiInstanceType,
+  CompleteType,
+  AssigneeMode,
+  AssigneeEmptyAction,
+};
 
 /**
  * 条件配置
@@ -32,7 +48,7 @@ export interface FlowConfig {
   /** 目标节点ID */
   targetNodeId: string;
   /** 连线类型 */
-  flowType?: 'normal' | 'condition' | 'default';
+  flowType?: "normal" | "condition" | "default";
   /** 绑定条件ID */
   conditionId?: string;
   /** 连接线标签 */
@@ -46,7 +62,7 @@ export interface BaseNodeProperties {
   /** 超时时间(毫秒) */
   timeout?: number;
   /** 超时动作 */
-  timeoutAction?: 'autoApprove' | 'autoReject' | 'notify';
+  timeoutAction?: "autoApprove" | "autoReject" | "notify";
 }
 
 /**
@@ -60,7 +76,7 @@ export interface ApprovalNodeProperties extends BaseNodeProperties {
   /** 审批部门ID(当type为department时) */
   departmentId?: string;
   /** 固定部门取人模式 */
-  departmentMode?: 'leader' | 'members';
+  departmentMode?: "leader" | "members";
   /** 业务字段映射的字段名(当type为business_field时) */
   fieldPath?: string;
   /** 业务对象类型(当type为business_field时)，如 project */
@@ -98,7 +114,7 @@ export interface ConditionNodeProperties extends BaseNodeProperties {
  */
 export interface NotificationNodeProperties extends ApprovalNodeProperties {
   /** 通知类型 */
-  notificationType?: 'email' | 'sms' | 'system' | 'wechat';
+  notificationType?: "email" | "sms" | "system" | "wechat";
   /** 通知模板（标题） */
   notificationTemplate?: string;
   /** 通知内容 */
@@ -119,7 +135,7 @@ export interface CcNodeProperties extends ApprovalNodeProperties {}
  */
 export interface DelayNodeProperties extends BaseNodeProperties {
   /** 延时类型 */
-  delayType?: 'fixed' | 'variable';
+  delayType?: "fixed" | "variable";
   /** 延时值(毫秒) */
   delayValue?: number;
   /** 延时变量名 */
@@ -147,7 +163,7 @@ export interface FormField {
   /** 字段名称 */
   name: string;
   /** 字段类型 */
-  type: 'text' | 'number' | 'date' | 'select' | 'textarea';
+  type: "text" | "number" | "date" | "select" | "textarea";
   /** 是否必填 */
   required?: boolean;
   /** 默认值 */
@@ -171,7 +187,14 @@ export interface NodeConfig {
   /** 设计器中的Y坐标 */
   y?: number;
   /** 节点属性 */
-  properties: ApprovalNodeProperties | ConditionNodeProperties | NotificationNodeProperties | CcNodeProperties | DelayNodeProperties | FormNodeProperties | BaseNodeProperties;
+  properties:
+    | ApprovalNodeProperties
+    | ConditionNodeProperties
+    | NotificationNodeProperties
+    | CcNodeProperties
+    | DelayNodeProperties
+    | FormNodeProperties
+    | BaseNodeProperties;
 }
 
 /**

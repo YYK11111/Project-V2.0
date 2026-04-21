@@ -1,10 +1,12 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getList, getStatus, getType, approve, reject, del, submitApproval } from './api'
+import { getList, getStatus, getType, approve, reject, del, publishKnowledge, submitApproval } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
 import { checkPermi } from '@/utils/permission'
+import { downloadCsv } from '@/utils/csv'
+import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 
 const router = useRouter()
 const route = useRoute()
@@ -24,6 +26,7 @@ const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
 const canChangeDelete = computed(() => checkPermi(['business/changes/delete']))
 const canChangeSubmitApproval = computed(() => checkPermi(['business/changes/approve']))
+const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
 const columns = [
   { prop: 'title', label: '变更标题', minWidth: 150 },
@@ -69,13 +72,53 @@ const handleSubmitApproval = async (row) => {
   rctRef.value?.getList()
 }
 
+const handlePublishKnowledge = async (row) => {
+  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  await confirmRepublishIfNeeded({ articleId: row.knowledgeArticleId, entityLabel: '变更' })
+  await publishKnowledge(row.id)
+  $sdk.msgSuccess('变更结论已沉淀到知识中心')
+  rctRef.value?.getList?.()
+}
+
+const openKnowledgeDetail = (articleId) => {
+  if (!articleId) return
+  router.push({ path: '/content/articleManage/detail', query: { id: articleId } })
+}
+
+function exportChangeList() {
+  const rows = [
+    ['变更标题', '所属项目', '变更类型', '影响程度', '状态', '审批状态', '成本影响', '进度影响(天)', '知识回流', '知识文章ID'],
+    ...((rctRef.value?.data || []).map((row) => [
+      row.title || '-',
+      projectMap.value[row.projectId] || '-',
+      typeMap.value[row.type] || row.type || '-',
+      { '1': '低', '2': '中', '3': '高' }[row.impact] || '-',
+      statusMap.value[row.status] || '-',
+      ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批'),
+      row.costImpact || 0,
+      row.scheduleImpact || 0,
+      row.knowledgeLinked === '1' ? '已关联' : '未关联',
+      row.knowledgeArticleId || '-',
+    ])),
+  ]
+  downloadCsv('变更列表导出.csv', rows)
+}
+
 const canSubmitChangeApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
+  row.knowledgeArticleId
+    ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
+    : canArticleAdd.value
+      ? { key: 'publishKnowledge', label: '转知识', type: 'primary', onClick: () => handlePublishKnowledge(row) }
+      : null,
+  row.knowledgeArticleId && canArticleAdd.value
+    ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
+    : null,
   canChangeSubmitApproval.value && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canChangeUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
-  canChangeDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  canChangeUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canChangeDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 
 const getStatusType = (status) => {
@@ -105,51 +148,108 @@ watch(
 </script>
 
 <template>
-  <RequestChartTable ref="rctRef" :params="params" :request="getList">
-    <template #query="{ query }">
-      <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 180px; margin-right: 10px">
-        <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-      </el-select>
-      <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px; margin-right: 10px">
-        <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
-      </el-select>
-      <el-select v-model="query.type" placeholder="变更类型" clearable style="width: 120px">
-        <el-option v-for="(v, k) in typeMap" :key="k" :label="v" :value="k" />
-      </el-select>
-    </template>
+  <div class="change-index-page">
+    <RequestChartTable ref="rctRef" class="change-index-panel" :params="params" :request="getList" :is-selection="true">
+      <template #query="{ query }">
+        <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 180px; margin-right: 10px">
+          <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px; margin-right: 10px">
+          <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.type" placeholder="变更类型" clearable style="width: 120px">
+          <el-option v-for="(v, k) in typeMap" :key="k" :label="v" :value="k" />
+        </el-select>
+        <el-select v-model="query.knowledgeLinked" placeholder="知识回流" clearable style="width: 120px; margin-left: 10px">
+          <el-option label="已关联" value="1" />
+          <el-option label="未关联" value="0" />
+        </el-select>
+      </template>
 
-    <template #operation>
-      <el-button v-if="canChangeAdd" type="primary" @click="handleAdd">新增</el-button>
-    </template>
+      <template #operation="{ selectedIds }">
+        <div class="change-index-operation">
+          <div class="change-index-operation__left">
+            <el-button v-if="canChangeAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button @click="exportChangeList">导出</el-button>
+          </div>
+          <el-button v-if="canChangeDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+        </div>
+      </template>
 
-    <template #table>
-      <el-table-column prop="title" label="变更标题" min-width="150" />
-      <el-table-column prop="projectId" label="所属项目" width="150">
-        <template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template>
-      </el-table-column>
-      <el-table-column prop="type" label="变更类型" width="100" />
-      <el-table-column prop="impact" label="影响程度" width="100">
-        <template #default="{ row }"><el-tag :type="getImpactType(row.impact)">{{ { '1': '低', '2': '中', '3': '高' }[row.impact] || '-' }}</el-tag></template>
-      </el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template>
-      </el-table-column>
-      <el-table-column prop="approvalStatus" label="审批状态" width="110">
-        <template #default="{ row }">
-          <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
-            {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="currentNodeName" label="当前节点" min-width="140" :show-overflow-tooltip="true" />
-      <el-table-column prop="costImpact" label="成本影响" width="100">
-        <template #default="{ row }">¥{{ (row.costImpact || 0).toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column prop="scheduleImpact" label="进度影响(天)" width="100" />
-    </template>
+      <template #table>
+        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column prop="title" label="变更标题" min-width="150" />
+        <el-table-column prop="projectId" label="所属项目" width="150">
+          <template #default="{ row }">{{ projectMap[row.projectId] || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="type" label="变更类型" width="100" />
+        <el-table-column prop="impact" label="影响程度" width="100">
+          <template #default="{ row }"><el-tag :type="getImpactType(row.impact)">{{ { '1': '低', '2': '中', '3': '高' }[row.impact] || '-' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }"><el-tag :type="getStatusType(row.status)">{{ statusMap[row.status] || '-' }}</el-tag></template>
+        </el-table-column>
+        <el-table-column prop="approvalStatus" label="审批状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="currentNodeName" label="当前节点" min-width="140" :show-overflow-tooltip="true" />
+        <el-table-column prop="costImpact" label="成本影响" width="100">
+          <template #default="{ row }">¥{{ (row.costImpact || 0).toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column prop="scheduleImpact" label="进度影响(天)" width="100" />
+        <el-table-column label="知识回流" width="100"><template #default="{ row }"><el-tag :type="row.knowledgeLinked === '1' ? 'success' : 'info'" size="small">{{ row.knowledgeLinked === '1' ? '已关联' : '未关联' }}</el-tag></template></el-table-column>
+        <el-table-column label="知识文章" width="120"><template #default="{ row }"><el-button v-if="row.knowledgeArticleId" link type="primary" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.knowledgeArticleId } })">查看知识</el-button><span v-else>-</span></template></el-table-column>
+      </template>
 
-    <template #tableOperation="{ row }">
-      <TableOperation :buttons="getButtons(row)" :row="row" />
-    </template>
-  </RequestChartTable>
+      <template #tableOperation="{ row }">
+        <TableOperation :buttons="getButtons(row)" :row="row" />
+      </template>
+    </RequestChartTable>
+  </div>
 </template>
+
+<style scoped>
+.change-index-page {
+  min-height: 100%;
+}
+
+.change-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.change-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.change-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.change-index-panel :deep(.el-table__header-wrapper),
+.change-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .change-index-panel {
+    padding-top: 18px;
+  }
+
+  .change-index-operation,
+  .change-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

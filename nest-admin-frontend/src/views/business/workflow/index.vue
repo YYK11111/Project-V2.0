@@ -134,8 +134,8 @@ const getButtons = (row: any) => [
 </script>
 
 <template>
-  <div>
-    <RequestChartTable ref="rctRef" :params="params" :request="getWorkflowDefinitions">
+  <div class="workflow-index-page">
+    <RequestChartTable ref="rctRef" class="workflow-index-panel" :params="params" :request="getWorkflowDefinitions" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.name" label="流程名称" prop="name" />
         <BaInput v-model="query.code" label="流程编码" prop="code" />
@@ -144,12 +144,15 @@ const getButtons = (row: any) => [
         </BaSelect>
       </template>
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <el-button v-if="canWorkflowAdd" type="primary" @click="dialogRef.action()">新增流程</el-button>
+        <div class="workflow-index-operation">
+          <div class="workflow-index-operation__left">
+            <el-button v-if="canWorkflowAdd" type="primary" @click="dialogRef.action()">新增流程</el-button>
+          </div>
           <el-button v-if="canWorkflowDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteWorkflowDefinition)" type="danger">批量删除</el-button>
         </div>
       </template>
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="name" label="流程名称" width="150" />
         <el-table-column prop="code" label="流程编码" width="150" />
         <el-table-column prop="version" label="版本" width="80" />
@@ -219,3 +222,45 @@ const getButtons = (row: any) => [
     </BaDialog>
   </div>
 </template>
+
+<style scoped>
+.workflow-index-page {
+  min-height: 100%;
+}
+
+.workflow-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.workflow-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workflow-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workflow-index-panel :deep(.el-table__header-wrapper),
+.workflow-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .workflow-index-panel {
+    padding-top: 18px;
+  }
+
+  .workflow-index-operation,
+  .workflow-index-operation__left {
+    align-items: stretch;
+  }
+}
+</style>

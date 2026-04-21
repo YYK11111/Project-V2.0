@@ -1,16 +1,20 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { WorkflowBusinessConfig, FieldDefinition, TriggerConfig } from './entity/workflow-business-config.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import {
+  WorkflowBusinessConfig,
+  FieldDefinition,
+  TriggerConfig,
+} from "./entity/workflow-business-config.entity";
 import {
   BusinessDataLoader,
   BusinessData,
-} from './loaders/business-data-loader.interface';
-import { ProjectLoader } from './loaders/project.loader';
-import { CustomerLoader } from './loaders/customer.loader';
-import { TicketLoader } from './loaders/ticket.loader';
-import { ChangeLoader } from './loaders/change.loader';
-import { TaskLoader } from './loaders/task.loader';
+} from "./loaders/business-data-loader.interface";
+import { ProjectLoader } from "./loaders/project.loader";
+import { CustomerLoader } from "./loaders/customer.loader";
+import { TicketLoader } from "./loaders/ticket.loader";
+import { ChangeLoader } from "./loaders/change.loader";
+import { TaskLoader } from "./loaders/task.loader";
 
 @Injectable()
 export class WorkflowDataLoaderService {
@@ -29,14 +33,17 @@ export class WorkflowDataLoaderService {
   }
 
   private registerDefaultLoaders(): void {
-    this.loaders.set('project', this.projectLoader);
-    this.loaders.set('customer', this.customerLoader);
-    this.loaders.set('ticket', this.ticketLoader);
-    this.loaders.set('task', this.taskLoader);
-    this.loaders.set('change', this.changeLoader);
+    this.loaders.set("project", this.projectLoader);
+    this.loaders.set("customer", this.customerLoader);
+    this.loaders.set("ticket", this.ticketLoader);
+    this.loaders.set("task", this.taskLoader);
+    this.loaders.set("change", this.changeLoader);
   }
 
-  async loadData(businessType: string, businessKey: string): Promise<BusinessData> {
+  async loadData(
+    businessType: string,
+    businessKey: string,
+  ): Promise<BusinessData> {
     const loader = this.loaders.get(businessType);
     if (!loader) {
       throw new Error(`未注册的业务类型: ${businessType}`);
@@ -51,7 +58,7 @@ export class WorkflowDataLoaderService {
 
   resolveFieldValue(data: any, fieldPath: string): any {
     if (!fieldPath) return null;
-    const parts = fieldPath.split('.');
+    const parts = fieldPath.split(".");
     let value = data;
     for (const part of parts) {
       if (value == null) return null;
@@ -60,9 +67,12 @@ export class WorkflowDataLoaderService {
     return value;
   }
 
-  async getTriggerConfig(businessType: string, triggerEvent: string): Promise<TriggerConfig | null> {
+  async getTriggerConfig(
+    businessType: string,
+    triggerEvent: string,
+  ): Promise<TriggerConfig | null> {
     const config = await this.configRepo.findOne({
-      where: { businessType, isActive: '1' },
+      where: { businessType, isActive: "1" },
     });
     if (!config) return null;
 
@@ -74,9 +84,11 @@ export class WorkflowDataLoaderService {
     return trigger;
   }
 
-  async getBusinessConfig(businessType: string): Promise<WorkflowBusinessConfig | null> {
+  async getBusinessConfig(
+    businessType: string,
+  ): Promise<WorkflowBusinessConfig | null> {
     return this.configRepo.findOne({
-      where: { businessType, isActive: '1' },
+      where: { businessType, isActive: "1" },
     });
   }
 

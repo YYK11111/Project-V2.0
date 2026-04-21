@@ -98,20 +98,24 @@ const getButtons = (row: any) => [
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+  <div class="task-comment-index-page">
+    <RequestChartTable ref="rctRef" class="task-comment-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.taskId" label="任务ID" prop="taskId"></BaInput>
         <BaInput v-model="query.userId" label="用户ID" prop="userId"></BaInput>
       </template>
 
-      <template #operation>
-        <div class="flexBetween">
-          <el-button v-if="canTaskCommentAdd" type="primary" @click="handleAddComment">新增评论</el-button>
+      <template #operation="{ selectedIds }">
+        <div class="task-comment-index-operation">
+          <div class="task-comment-index-operation__left">
+            <el-button v-if="canTaskCommentAdd" type="primary" @click="handleAddComment">新增评论</el-button>
+          </div>
+          <el-button v-if="canTaskCommentDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteComment)" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="评论内容" prop="content" :show-overflow-tooltip="true" min-width="300" />
         <el-table-column label="评论人" width="120">
           <template #default="{ row }">{{ row.user?.nickname || row.user?.name || row.userId || '-' }}</template>
@@ -158,28 +162,43 @@ const getButtons = (row: any) => [
 </template>
 
 <style lang="scss" scoped>
-.tableOperation {
+.task-comment-index-page {
+  min-height: 100%;
+}
+
+.task-comment-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.task-comment-index-operation {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-comment-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-comment-index-panel :deep(.el-table__header-wrapper),
+.task-comment-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 768px) {
+  .task-comment-index-panel {
+    padding-top: 18px;
+  }
+
+  .task-comment-index-operation,
+  .task-comment-index-operation__left {
+    align-items: stretch;
   }
 }
 </style>

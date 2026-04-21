@@ -1,70 +1,80 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from '@nestjs/common'
-import { RolesService } from './service'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+} from "@nestjs/common";
+import { RolesService } from "./service";
 import {
   AuthUserCancelAllDto,
   AuthUserCancelDto,
   AuthUserSelectAllDto,
   ListRoleDto,
   SaveRoleDto,
-} from './dto'
-import { MenuType } from '../menus/menu.entity'
-import { arrayToTree } from 'src/common/utils/common'
-import { dataPermissionType, Role } from './entity'
-import { BaseController } from 'src/common/BaseController'
+} from "./dto";
+import { MenuType } from "../menus/menu.entity";
+import { arrayToTree } from "src/common/utils/common";
+import { dataPermissionType, Role } from "./entity";
+import { BaseController } from "src/common/BaseController";
 
-@Controller('system/roles')
+@Controller("system/roles")
 export class RolesController extends BaseController<Role, RolesService> {
   constructor(readonly service: RolesService) {
-    super(service)
+    super(service);
   }
 
-  @Get('getLoginUserMenus')
+  @Get("getLoginUserMenus")
   async getLoginUserMenus(@Req() req: Record<string, any>) {
-    const menus = await this.service.getUserMenus(req.user)
-    const visibleMenus = menus.filter((item) => item.type !== MenuType.button)
-    return arrayToTree(visibleMenus)
+    const menus = await this.service.getUserMenus(req.user);
+    const visibleMenus = menus.filter((item) => item.type !== MenuType.button);
+    return arrayToTree(visibleMenus);
   }
 
-  @Get('getDataPermissionType')
+  @Get("getDataPermissionType")
   getDataPermissionType() {
-    return dataPermissionType
+    return dataPermissionType;
   }
 
-  @Get('menuTreeselect')
+  @Get("menuTreeselect")
   menuTreeselect() {
-    return this.service.menuTreeselect()
+    return this.service.menuTreeselect();
   }
 
-  @Get('roleMenuTreeselect/:roleId')
-  roleMenuTreeselect(@Param('roleId') roleId: string) {
-    return this.service.roleMenuTreeselect(roleId)
+  @Get("roleMenuTreeselect/:roleId")
+  roleMenuTreeselect(@Param("roleId") roleId: string) {
+    return this.service.roleMenuTreeselect(roleId);
   }
 
-  @Get('authUser/allocatedList')
+  @Get("authUser/allocatedList")
   authUserAllocatedList(@Query() query: any) {
-    return this.service.allocatedUserList(query)
+    return this.service.allocatedUserList(query);
   }
 
-  @Get('authUser/unallocatedList')
+  @Get("authUser/unallocatedList")
   authUserUnallocatedList(@Query() query: any) {
-    return this.service.unallocatedUserList(query)
+    return this.service.unallocatedUserList(query);
   }
 
-  @Put('authUser/cancel')
+  @Put("authUser/cancel")
   authUserCancel(@Body() body: AuthUserCancelDto, @Req() req) {
-    ;(body as any).permissions = req.user.permissions || []
-    return this.service.authUserCancel(body)
+    (body as any).permissions = req.user.permissions || [];
+    return this.service.authUserCancel(body);
   }
 
-  @Put('authUser/cancelAll')
+  @Put("authUser/cancelAll")
   authUserCancelAll(@Body() body: AuthUserCancelAllDto, @Req() req) {
-    ;(body as any).permissions = req.user.permissions || []
-    return this.service.authUserCancelAll(body)
+    (body as any).permissions = req.user.permissions || [];
+    return this.service.authUserCancelAll(body);
   }
 
-  @Put('authUser/selectAll')
+  @Put("authUser/selectAll")
   authUserSelectAll(@Body() body: AuthUserSelectAllDto, @Req() req) {
-    ;(body as any).permissions = req.user.permissions || []
-    return this.service.authUserSelectAll(body)
+    (body as any).permissions = req.user.permissions || [];
+    return this.service.authUserSelectAll(body);
   }
 }

@@ -2,10 +2,13 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
+import { getList as getTaskList } from '@/views/business/taskManage/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
+import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 
 const route = useRoute()
@@ -17,8 +20,12 @@ const form = ref({
   projectId: '',
   status: '1',
   goal: '',
+  ownerId: '',
   startDate: '',
   endDate: '',
+  delayReason: '',
+  changeImpactFlag: '0',
+  healthScoreSnapshot: 0,
   totalStoryPoints: 0,
   completedStoryPoints: 0,
   totalTaskCount: 0,
@@ -43,14 +50,26 @@ const hasSprintId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canSprintUpdate = computed(() => checkPermi(['business/sprints/update']))
+const sprintTasks = ref([])
+const sprintImpactTips = computed(() => {
+  return sprintTasks.value.filter((task) => {
+    const beforeStart = form.value.startDate && task.startDate && task.startDate < form.value.startDate
+    const afterEnd = form.value.endDate && task.endDate && task.endDate > form.value.endDate
+    return beforeStart || afterEnd
+  })
+})
 
 const defaultForm = () => ({
   name: '',
   projectId: '',
   status: '1',
   goal: '',
+  ownerId: '',
   startDate: '',
   endDate: '',
+  delayReason: '',
+  changeImpactFlag: '0',
+  healthScoreSnapshot: 0,
   totalStoryPoints: 0,
   completedStoryPoints: 0,
   totalTaskCount: 0,
@@ -60,11 +79,24 @@ const defaultForm = () => ({
 
 async function loadSprint() {
   if (!hasSprintId.value) {
-    form.value = defaultForm()
+    form.value = {
+      ...defaultForm(),
+      projectId: String(route.query.projectId || ''),
+    }
     return
   }
   const { data } = await getOne(route.query.id)
   form.value = data || {}
+  loadSprintTasks()
+}
+
+async function loadSprintTasks() {
+  if (!form.value.projectId || !hasSprintId.value) {
+    sprintTasks.value = []
+    return
+  }
+  const res = await getTaskList({ pageNum: 1, pageSize: 1000, projectId: form.value.projectId, sprintId: route.query.id })
+  sprintTasks.value = res.list || []
 }
 
 watch(
@@ -74,6 +106,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(() => [form.value.startDate, form.value.endDate], () => {
+  if (hasSprintId.value) loadSprintTasks()
+})
 
 function submit() {
   if ((isEdit.value && !canSprintUpdate.value) || (!isEdit.value && !canSprintAdd.value)) {
@@ -124,6 +160,11 @@ function cancel() {
         <el-input v-else v-model="form.goal" type="textarea" :rows="3" placeholder="请输入Sprint目标" />
       </el-form-item>
 
+      <el-form-item label="Sprint负责人">
+        <ViewUser v-if="isView" :user="form.owner" />
+        <UserSelect v-else v-model="form.ownerId" placeholder="请选择Sprint负责人" clearable />
+      </el-form-item>
+
       <el-form-item label="开始日期">
         <ViewField v-if="isView" :value="form.startDate" />
         <el-date-picker v-else v-model="form.startDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -133,6 +174,38 @@ function cancel() {
         <ViewField v-if="isView" :value="form.endDate" />
         <el-date-picker v-else v-model="form.endDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
       </el-form-item>
+
+      <el-form-item label="偏差说明">
+        <ViewField v-if="isView" :value="form.delayReason" />
+        <el-input v-else v-model="form.delayReason" type="textarea" :rows="3" placeholder="请输入延期或偏差说明" />
+      </el-form-item>
+
+      <el-form-item label="受变更影响">
+        <ViewField v-if="isView" :value="form.changeImpactFlag === '1' ? '是' : '否'" />
+        <el-switch v-else v-model="form.changeImpactFlag" active-value="1" inactive-value="0" />
+      </el-form-item>
+
+      <el-form-item label="健康度快照">
+        <ViewField v-if="isView" :value="form.healthScoreSnapshot" />
+        <el-input-number v-else v-model="form.healthScoreSnapshot" :min="0" :max="100" :precision="2" style="width: 100%" />
+      </el-form-item>
+
+      <el-alert
+        v-if="sprintImpactTips.length && !isView"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb16"
+      >
+        <template #title>
+          <div class="sprint-impact-alert__title">Sprint 变更影响提示</div>
+        </template>
+        <div class="sprint-impact-alert__list">
+          <div v-for="task in sprintImpactTips.slice(0, 5)" :key="task.id">
+            任务《{{ task.name }}》当前时间范围为 {{ task.startDate || '-' }} 至 {{ task.endDate || '-' }}，已超出当前 Sprint 边界
+          </div>
+        </div>
+      </el-alert>
 
       <el-row :gutter="20">
         <el-col :span="12">
@@ -176,3 +249,18 @@ function cancel() {
     </el-form>
   </div>
 </template>
+
+<style scoped>
+.sprint-impact-alert__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sprint-impact-alert__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+</style>

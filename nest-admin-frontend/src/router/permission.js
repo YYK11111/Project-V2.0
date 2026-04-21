@@ -4,7 +4,7 @@ import stores from '@/stores'
 import { ElMessage as Message } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import { getUserRoutes } from './routes'
+import { ensureDynamicRoutes } from './routes'
 
 NProgress.configure({ showSpinner: true })
 
@@ -62,19 +62,20 @@ export default function permission(router) {
       const userStore = useUserStore()
       if (userStore.name) {
         const appStore = stores()
+        const firstVisibleRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
         const hasSidebarRoutes = Array.isArray(appStore.permission.sidebarRouters) && appStore.permission.sidebarRouters.length > 0
         const hasMatchedRoute = router.resolve(to.fullPath).matched.length > 0
         if (!hasSidebarRoutes || !hasMatchedRoute) {
-          await getUserRoutes(router)
+          await ensureDynamicRoutes(router)
           if (shouldAttemptRestore) {
             const restored = await tryRestoreInitialPath(router, 'existing-user')
             if (restored) return restored
           }
           if (to.path === '/') {
-            const firstVisibleRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
-            if (firstVisibleRoute?.path) {
+            const firstRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
+            if (firstRoute?.path) {
               clearInitialBrowserPath()
-              return { path: firstVisibleRoute.path, replace: true }
+              return { path: firstRoute.path, replace: true }
             }
           }
           clearInitialBrowserPath()
@@ -86,23 +87,35 @@ export default function permission(router) {
           }
         }
         if (noLoginList.includes(to.path) && !shouldAttemptRestore) {
-          return { path: window.sysConfig.BASE_URL }
+          clearInitialBrowserPath()
+          if (firstVisibleRoute?.path) {
+            return { path: firstVisibleRoute.path, replace: true }
+          }
+          return { path: '/', replace: true }
+        }
+        if (to.path === '/' && firstVisibleRoute?.path) {
+          clearInitialBrowserPath()
+          return { path: firstVisibleRoute.path, replace: true }
         }
         return
       } else {
         try {
           await userStore.getUserInfo()
-          await getUserRoutes(router)
+          await ensureDynamicRoutes(router)
+          const appStore = stores()
+          const firstVisibleRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
           if (noLoginList.includes(to.path) && !shouldAttemptRestore) {
-            return { path: window.sysConfig.BASE_URL }
+            clearInitialBrowserPath()
+            if (firstVisibleRoute?.path) {
+              return { path: firstVisibleRoute.path, replace: true }
+            }
+            return { path: '/', replace: true }
           }
           if (shouldAttemptRestore) {
             const restored = await tryRestoreInitialPath(router, 'recovered-user')
             if (restored) return restored
           }
           if (to.path === '/') {
-            const appStore = stores()
-            const firstVisibleRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
             if (firstVisibleRoute?.path) {
               clearInitialBrowserPath()
               return { path: firstVisibleRoute.path, replace: true }

@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { INodeHandler } from '../../interface/node-handler.interface';
-import { NodeType, NodeExecutionContext, NodeResult, DelayNodeProperties } from '../../interface/node.interface';
-import { WorkflowInstance } from '../../entity/workflow-instance.entity';
-import { Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Injectable } from "@nestjs/common";
+import { INodeHandler } from "../../interface/node-handler.interface";
+import {
+  NodeType,
+  NodeExecutionContext,
+  NodeResult,
+  DelayNodeProperties,
+} from "../../interface/node.interface";
+import { WorkflowInstance } from "../../entity/workflow-instance.entity";
+import { Repository } from "typeorm";
+import { InjectRepository } from "@nestjs/typeorm";
 
 /**
  * 延时节点处理器
@@ -24,14 +29,16 @@ export class DelayNodeHandler implements INodeHandler {
     const props = context.variables._nodeProperties as DelayNodeProperties;
     const delayMs = this.calculateDelayTime(props, context.variables);
 
-    console.log(`[Delay] Node ${context.nodeId} delays ${delayMs}ms for instance ${context.instanceId}`);
+    console.log(
+      `[Delay] Node ${context.nodeId} delays ${delayMs}ms for instance ${context.instanceId}`,
+    );
 
     if (delayMs <= 0) {
       // 无延时，立即继续
       return {
         success: true,
         nextNodeIds: [],
-        outputData: { status: 'no_delay' },
+        outputData: { status: "no_delay" },
       };
     }
 
@@ -39,7 +46,9 @@ export class DelayNodeHandler implements INodeHandler {
     // 注意：此实现不保证服务器重启后仍能继续，建议生产环境使用任务队列
     setTimeout(async () => {
       try {
-        console.log(`[Delay] Resuming after ${delayMs}ms for instance ${context.instanceId}`);
+        console.log(
+          `[Delay] Resuming after ${delayMs}ms for instance ${context.instanceId}`,
+        );
         // 通知工作流引擎继续执行（通过更新实例状态或发送事件）
         // 当前为占位实现，实际需要工作流引擎支持异步resume
         await this.instanceRepo.update(
@@ -55,16 +64,19 @@ export class DelayNodeHandler implements INodeHandler {
     return {
       success: true,
       nextNodeIds: [],
-      outputData: { status: 'delay_scheduled', delayMs },
+      outputData: { status: "delay_scheduled", delayMs },
     };
   }
 
   /**
    * 计算延时时间（毫秒）
    */
-  calculateDelayTime(properties: DelayNodeProperties, variables: Record<string, any>): number {
-    if (properties.delayType === 'variable') {
-      const value = variables[properties.delayVariable || ''];
+  calculateDelayTime(
+    properties: DelayNodeProperties,
+    variables: Record<string, any>,
+  ): number {
+    if (properties.delayType === "variable") {
+      const value = variables[properties.delayVariable || ""];
       return Number(value) || 0;
     }
     return properties.delayValue || 0;

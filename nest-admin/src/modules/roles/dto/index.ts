@@ -1,84 +1,90 @@
-import { IsArray, IsEnum, IsNumberString, IsOptional, IsString } from 'class-validator'
-import { BoolNum } from 'src/common/type/base'
+import {
+  IsArray,
+  IsEnum,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from "class-validator";
+import { BoolNum } from "src/common/type/base";
 
 export class SaveRoleDto {
   @IsOptional()
   @IsString()
-  id?: string
+  id?: string;
 
   @IsString()
-  name: string
+  name: string;
 
   @IsString()
-  permissionKey: string
+  permissionKey: string;
 
   @IsOptional()
   @IsArray()
-  menuIds?: Array<string>
+  menuIds?: Array<string>;
 
   @IsOptional()
   @IsEnum(BoolNum)
-  isActive?: BoolNum
+  isActive?: BoolNum;
 
   @IsOptional()
   @IsString()
-  order?: string
+  order?: string;
 
   @IsOptional()
   @IsString()
-  remark?: string
+  remark?: string;
 }
 
 export class ListRoleDto {
   @IsOptional()
   @IsString()
-  name?: string
+  name?: string;
 
   @IsOptional()
   @IsString()
-  permissionKey?: string
+  permissionKey?: string;
 
   @IsOptional()
   @IsEnum(BoolNum)
-  isActive?: BoolNum
+  isActive?: BoolNum;
 
   @IsOptional()
   @IsString()
-  id?: string
+  id?: string;
 
-  pageNum?: number
-  pageSize?: number
+  pageNum?: number;
+  pageSize?: number;
 }
 
 export class AuthUserCancelDto {
   @IsString()
-  roleId: string
+  roleId: string;
 
   @IsString()
-  userId: string
+  userId: string;
 
   @IsOptional()
-  permissions?: string[]
+  permissions?: string[];
 }
 
 export class AuthUserCancelAllDto {
   @IsString()
-  roleId: string
+  roleId: string;
 
   @IsString()
-  userIds: string
+  userIds: string;
 
   @IsOptional()
-  permissions?: string[]
+  permissions?: string[];
 }
 
 export class AuthUserSelectAllDto {
   @IsString()
-  roleId: string
+  roleId: string;
 
   @IsString()
-  userIds: string
+  userIds: string;
 
   @IsOptional()
-  permissions?: string[]
+  permissions?: string[];
 }

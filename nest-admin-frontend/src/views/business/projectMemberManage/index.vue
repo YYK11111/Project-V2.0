@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getList, getRoles, getStats, getProjectOverview, addMember, updateMember, removeMember } from './api'
@@ -8,6 +8,7 @@ import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
+import { downloadCsv } from '@/utils/csv'
 
 const params = ref<Record<string, any>>({})
 const router = useRouter()
@@ -34,6 +35,12 @@ const addForm = reactive({
   projectId: '',
   userId: '',
   role: '2',
+  joinDate: '',
+  notificationEnabled: '1',
+  responsibilityScope: ['project'],
+  positionTitle: '',
+  leaveDate: '',
+  fieldPermissionGroup: '',
 })
 const addRules = {
   projectId: [{ required: true, message: '请选择项目', trigger: 'change' }],
@@ -55,6 +62,12 @@ const editForm = reactive({
   role: '2',
   isCore: '0',
   isActive: '1',
+  joinDate: '',
+  notificationEnabled: '1',
+  responsibilityScope: ['project'],
+  positionTitle: '',
+  leaveDate: '',
+  fieldPermissionGroup: '',
   remark: '',
   sort: 0,
 })
@@ -68,6 +81,12 @@ function handleAddMember(row?: any) {
   addForm.projectId = row?.id || params.value.projectId || ''
   addForm.userId = ''
   addForm.role = '2'
+  addForm.joinDate = ''
+  addForm.notificationEnabled = '1'
+  addForm.responsibilityScope = ['project']
+  addForm.positionTitle = ''
+  addForm.leaveDate = ''
+  addForm.fieldPermissionGroup = ''
   addDialogVisible.value = true
 }
 
@@ -98,6 +117,12 @@ function handleEditMember(row: any) {
   editForm.role = row.role || '2'
   editForm.isCore = row.isCore || '0'
   editForm.isActive = row.isActive || '1'
+  editForm.joinDate = row.joinDate || ''
+  editForm.notificationEnabled = row.notificationEnabled || '1'
+  editForm.responsibilityScope = row.responsibilityScope?.length ? row.responsibilityScope : ['project']
+  editForm.positionTitle = row.positionTitle || ''
+  editForm.leaveDate = row.leaveDate || ''
+  editForm.fieldPermissionGroup = row.fieldPermissionGroup || ''
   editForm.remark = row.remark || ''
   editForm.sort = Number(row.sort || 0)
   editDialogVisible.value = true
@@ -113,6 +138,12 @@ function submitEditMember() {
         role: editForm.role,
         isCore: editForm.isCore,
         isActive: editForm.isActive,
+        joinDate: editForm.joinDate,
+        notificationEnabled: editForm.notificationEnabled,
+        responsibilityScope: editForm.responsibilityScope,
+        positionTitle: editForm.positionTitle,
+        leaveDate: editForm.leaveDate,
+        fieldPermissionGroup: editForm.fieldPermissionGroup,
         remark: editForm.remark,
         sort: editForm.sort,
       })
@@ -171,13 +202,34 @@ function goToProject(row: any) {
   router.push({ path: '/projectManage/detail', query: { id: row.projectId } })
 }
 
+function exportProjectMemberList() {
+  const rows = [
+    ['所属项目', '成员姓名', '账号/昵称', '角色', '核心成员', '状态', '项目提醒', '作用域', '岗位名称', '退出时间', '权限组', '加入时间'],
+    ...((rctRef.value?.data || []).map((row: any) => [
+      row.project?.name || row.projectName || '-',
+      row.user?.name || '-',
+      row.user?.nickname || row.user?.userName || '-',
+      getRoleLabel(row.role),
+      row.isCore === '1' ? '是' : '否',
+      row.isActive === '1' ? '激活' : '禁用',
+      row.notificationEnabled === '1' ? '接收' : '关闭',
+      (row.responsibilityScope || []).join('、') || '-',
+      row.positionTitle || '-',
+      row.leaveDate || '-',
+      row.fieldPermissionGroup || '-',
+      row.joinDate || row.createTime || '-',
+    ])),
+  ]
+  downloadCsv('项目成员列表导出.csv', rows)
+}
+
 onMounted(() => {
   loadStats()
 })
 </script>
 
 <template>
-  <div class="Gcard">
+  <div class="project-member-index-page Gcard">
     <div class="stats-grid">
       <div class="stats-card">
         <div class="stats-card__label">成员总数</div>
@@ -208,7 +260,7 @@ onMounted(() => {
       </el-radio-group>
     </div>
 
-    <RequestChartTable ref="rctRef" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview">
+    <RequestChartTable ref="rctRef" class="project-member-index-panel" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview" :is-selection="viewMode === 'member'">
       <template #query="{ query }">
         <BaInput v-model="query.keyword" label="关键词" prop="keyword" placeholder="项目名/姓名/昵称" />
         <div class="query-select-item">
@@ -240,14 +292,18 @@ onMounted(() => {
       </template>
 
       <template #operation="{ selectedIds }">
-        <div v-if="viewMode === 'member'" class="flexBetween">
-          <el-button v-if="canProjectMemberAdd" type="primary" @click="handleAddMember">新增成员</el-button>
+        <div v-if="viewMode === 'member'" class="project-member-index-operation">
+          <div class="project-member-index-operation__left">
+            <el-button v-if="canProjectMemberAdd" type="primary" @click="handleAddMember">新增成员</el-button>
+            <el-button @click="exportProjectMemberList">导出</el-button>
+          </div>
           <el-button v-if="canProjectMemberDelete" :disabled="!selectedIds.length" @click="handleBatchRemove(selectedIds)" type="danger">批量移除</el-button>
         </div>
       </template>
 
       <template #table>
         <template v-if="viewMode === 'member'">
+          <el-table-column type="index" label="序号" width="70" />
           <el-table-column label="所属项目" min-width="180" :show-overflow-tooltip="true">
             <template #default="{ row }">
               <div class="project-member-project-cell">
@@ -281,9 +337,24 @@ onMounted(() => {
               </el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="项目提醒" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.notificationEnabled === '0' ? 'info' : 'success'" size="small">
+                {{ row.notificationEnabled === '0' ? '关闭' : '接收' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="作用域" min-width="180" :show-overflow-tooltip="true">
+            <template #default="{ row }">{{ (row.responsibilityScope || []).join('、') || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="岗位名称" prop="positionTitle" min-width="140" :show-overflow-tooltip="true" />
+          <el-table-column label="退出时间" prop="leaveDate" width="120" />
+          <el-table-column label="权限组" prop="fieldPermissionGroup" min-width="140" :show-overflow-tooltip="true" />
           <el-table-column label="备注" prop="remark" min-width="180" :show-overflow-tooltip="true" />
           <el-table-column label="排序" prop="sort" width="90" />
-          <el-table-column label="加入时间" prop="createTime" width="180" />
+          <el-table-column label="加入时间" width="180">
+            <template #default="{ row }">{{ row.joinDate || row.createTime || '-' }}</template>
+          </el-table-column>
         </template>
         <template v-else>
           <el-table-column label="项目名称" min-width="220" :show-overflow-tooltip="true">
@@ -340,6 +411,37 @@ onMounted(() => {
               <el-option v-for="(value, key) of roles" :key="key" :label="value" :value="key"></el-option>
             </el-select>
           </el-form-item>
+          <el-form-item label="加入时间">
+            <el-date-picker v-model="addForm.joinDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择加入时间" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="项目提醒">
+            <el-switch v-model="addForm.notificationEnabled" active-value="1" inactive-value="0" />
+          </el-form-item>
+          <el-form-item label="作用域">
+            <el-select v-model="addForm.responsibilityScope" multiple collapse-tags collapse-tags-tooltip placeholder="请选择作用域" style="width: 100%">
+              <el-option label="项目" value="project"></el-option>
+              <el-option label="任务" value="task"></el-option>
+              <el-option label="风险" value="risk"></el-option>
+              <el-option label="工单" value="ticket"></el-option>
+              <el-option label="变更" value="change"></el-option>
+              <el-option label="知识" value="knowledge"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="岗位名称">
+            <el-input v-model="addForm.positionTitle" placeholder="请输入岗位/职责名称" />
+          </el-form-item>
+          <el-form-item label="退出时间">
+            <el-date-picker v-model="addForm.leaveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择退出时间" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="权限组">
+            <el-select v-model="addForm.fieldPermissionGroup" placeholder="请选择权限组" style="width: 100%" clearable>
+              <el-option label="项目基础组" value="projectBasic"></el-option>
+              <el-option label="项目计划组" value="projectPlan"></el-option>
+              <el-option label="项目经营组" value="projectBusiness"></el-option>
+              <el-option label="项目结项组" value="projectClosure"></el-option>
+              <el-option label="项目知识组" value="projectKnowledge"></el-option>
+            </el-select>
+          </el-form-item>
         </el-form>
       </template>
     </BaDialog>
@@ -367,6 +469,37 @@ onMounted(() => {
               <el-radio value="0">禁用</el-radio>
             </el-radio-group>
           </el-form-item>
+          <el-form-item label="加入时间">
+            <el-date-picker v-model="editForm.joinDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择加入时间" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="项目提醒">
+            <el-switch v-model="editForm.notificationEnabled" active-value="1" inactive-value="0" />
+          </el-form-item>
+          <el-form-item label="作用域">
+            <el-select v-model="editForm.responsibilityScope" multiple collapse-tags collapse-tags-tooltip placeholder="请选择作用域" style="width: 100%">
+              <el-option label="项目" value="project"></el-option>
+              <el-option label="任务" value="task"></el-option>
+              <el-option label="风险" value="risk"></el-option>
+              <el-option label="工单" value="ticket"></el-option>
+              <el-option label="变更" value="change"></el-option>
+              <el-option label="知识" value="knowledge"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="岗位名称">
+            <el-input v-model="editForm.positionTitle" placeholder="请输入岗位/职责名称" />
+          </el-form-item>
+          <el-form-item label="退出时间">
+            <el-date-picker v-model="editForm.leaveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择退出时间" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="权限组">
+            <el-select v-model="editForm.fieldPermissionGroup" placeholder="请选择权限组" style="width: 100%" clearable>
+              <el-option label="项目基础组" value="projectBasic"></el-option>
+              <el-option label="项目计划组" value="projectPlan"></el-option>
+              <el-option label="项目经营组" value="projectBusiness"></el-option>
+              <el-option label="项目结项组" value="projectClosure"></el-option>
+              <el-option label="项目知识组" value="projectKnowledge"></el-option>
+            </el-select>
+          </el-form-item>
           <el-form-item label="备注">
             <el-input v-model="editForm.remark" type="textarea" :rows="3" placeholder="请输入备注" />
           </el-form-item>
@@ -380,6 +513,35 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
+.project-member-index-page {
+  min-height: 100%;
+}
+
+.project-member-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.project-member-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.project-member-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.project-member-index-panel :deep(.el-table__header-wrapper),
+.project-member-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .query-select-item {
   display: flex;
   flex-direction: column;
@@ -391,31 +553,6 @@ onMounted(() => {
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1;
-}
-
-.tableOperation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  
-  :deep(.el-button) {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
-  }
 }
 
 .project-member-project-cell {
@@ -477,5 +614,16 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .project-member-index-panel {
+    padding-top: 18px;
+  }
+
+  .project-member-index-operation,
+  .project-member-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

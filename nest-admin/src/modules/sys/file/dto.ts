@@ -1,62 +1,68 @@
-import { IsNotEmpty, IsOptional, MaxLength, IsNumberString, IsArray } from 'class-validator'
-import { QueryListDto } from 'src/common/dto'
+import {
+  IsNotEmpty,
+  IsOptional,
+  MaxLength,
+  IsNumberString,
+  IsArray,
+} from "class-validator";
+import { QueryListDto } from "src/common/dto";
 
 export class CreateFileDto {
-  @IsNotEmpty({ message: '原始文件名不能为空' })
+  @IsNotEmpty({ message: "原始文件名不能为空" })
   @MaxLength(255)
-  originalName: string
+  originalName: string;
 
-  @IsNotEmpty({ message: '存储文件名不能为空' })
+  @IsNotEmpty({ message: "存储文件名不能为空" })
   @MaxLength(255)
-  storedName: string
+  storedName: string;
 
-  @IsNotEmpty({ message: '存储路径不能为空' })
+  @IsNotEmpty({ message: "存储路径不能为空" })
   @MaxLength(500)
-  storedPath: string
+  storedPath: string;
 
   @IsOptional()
-  fileSize?: number
+  fileSize?: number;
 
   @IsOptional()
   @MaxLength(100)
-  mimeType?: string
+  mimeType?: string;
 
   @IsOptional()
   @MaxLength(50)
-  businessType?: string
+  businessType?: string;
 
   @IsOptional()
   @MaxLength(36)
-  businessId?: string
+  businessId?: string;
 
   @IsOptional()
   @MaxLength(36)
-  uploaderId?: string
+  uploaderId?: string;
 
   @IsOptional()
-  status?: string
+  status?: string;
 }
 
 export type QueryFileDto = {
-  businessType?: string
-  businessId?: string
-  status?: string
-} & QueryListDto
+  businessType?: string;
+  businessId?: string;
+  status?: string;
+} & QueryListDto;
 
 export class AssociateFileDto {
-  @IsNotEmpty({ message: '业务类型不能为空' })
-  businessType: string
+  @IsNotEmpty({ message: "业务类型不能为空" })
+  businessType: string;
 
-  @IsNotEmpty({ message: '业务ID不能为空' })
-  businessId: string
+  @IsNotEmpty({ message: "业务ID不能为空" })
+  businessId: string;
 
   @IsArray()
-  @IsNotEmpty({ message: '文件ID列表不能为空' })
-  fileIds: string[]
+  @IsNotEmpty({ message: "文件ID列表不能为空" })
+  fileIds: string[];
 }
 
 export type CleanupResultDto = {
-  deletedCount: number
-  totalSize: number
-  details: string[]
-}
+  deletedCount: number;
+  totalSize: number;
+  details: string[];
+};

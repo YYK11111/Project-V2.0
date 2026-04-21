@@ -24,14 +24,17 @@ import { getTrees } from './api.catalog'
 import { watch } from 'vue'
 import UserSelect from '@/components/UserSelect.vue'
 import { useUserStore } from '@/stores/user'
+import { getArticleTemplate, getArticleTemplateOptions } from './templates'
 const trees = ref([])
 getTrees().then(({ data }) => (trees.value = data))
 const userStore = useUserStore()
+const templateOptions = ref(getArticleTemplateOptions())
 const inheritedVisibility = ref(false)
 const accessDeniedInfo = ref<{ message?: string; canBorrow?: boolean } | null>(null)
 const isHydratingForm = ref(false)
 const borrowDialogVisible = ref(false)
 const borrowLoading = ref(false)
+const canEditCurrentArticle = computed(() => !route.query.id || form.value?.canEdit !== false)
 const borrowForm = ref({
   articleId: '',
   requestedDays: 1,
@@ -50,8 +53,16 @@ function createDefaultForm() {
     retrievalWeight: 1,
     aiPreferred: '0',
     authorityLevel: '0',
+    isTop: '0',
+    topSort: 0,
+    topStartTime: '',
+    topEndTime: '',
     authorId: userStore.id,
     maintainerId: userStore.id,
+    sourceType: '',
+    sourceId: '',
+    sourceProjectId: String(route.query.projectId || ''),
+    templateType: String(route.query.template || ''),
   }
 }
 
@@ -63,6 +74,7 @@ async function loadArticle() {
   inheritedVisibility.value = false
   if (!route.query.id) {
     form.value = createDefaultForm()
+    applyTemplateFromRoute()
     isEdited.value = false
     isHydratingForm.value = false
     return
@@ -86,6 +98,34 @@ async function loadArticle() {
   } finally {
     isHydratingForm.value = false
   }
+}
+
+function applyTemplateFromRoute() {
+  const templateKey = String(route.query.template || '')
+  const template = getArticleTemplate(templateKey)
+  if (!template) return
+  form.value = {
+    ...form.value,
+    title: form.value.title || template.title,
+    summary: form.value.summary || template.summary,
+    knowledgeType: template.knowledgeType || form.value.knowledgeType,
+    content: form.value.content || template.content,
+    templateType: form.value.templateType || templateKey,
+  }
+}
+
+function handleApplyTemplate(templateKey: string) {
+  const template = getArticleTemplate(templateKey)
+  if (!template) return
+  form.value = {
+    ...form.value,
+    title: template.title,
+    summary: template.summary,
+    knowledgeType: template.knowledgeType || form.value.knowledgeType,
+    content: template.content,
+    templateType: templateKey,
+  }
+  isEdited.value = true
 }
 
 watch(
@@ -125,6 +165,10 @@ watch(
 )
 
 function submit(type) {
+  if (!canEditCurrentArticle.value) {
+    $sdk.msgError('当前无编辑该知识的权限')
+    return
+  }
   formRef.value.$refs.formRef.validate().then(() => {
     let _form = JSON.parse(JSON.stringify(form.value))
     type == 'draft' && (_form.status = '0')
@@ -186,12 +230,16 @@ function submitBorrow() {
           <span class="knowledge-editor-hero__status-label">当前模式</span>
           <span class="knowledge-editor-hero__status-value">{{ route.query.id ? '编辑已有知识' : '新增知识' }}</span>
         </div>
-        <div class="knowledge-editor-hero__status-item">
-          <span class="knowledge-editor-hero__status-label">编辑状态</span>
-          <span class="knowledge-editor-hero__status-value">{{ isEdited ? '有未保存变更' : '内容已同步' }}</span>
+          <div class="knowledge-editor-hero__status-item">
+            <span class="knowledge-editor-hero__status-label">编辑状态</span>
+            <span class="knowledge-editor-hero__status-value">{{ isEdited ? '有未保存变更' : '内容已同步' }}</span>
+          </div>
+          <div class="knowledge-editor-hero__status-item" v-if="route.query.id">
+            <span class="knowledge-editor-hero__status-label">当前权限</span>
+            <span class="knowledge-editor-hero__status-value">{{ canEditCurrentArticle ? '可编辑' : '只读' }}</span>
+          </div>
         </div>
       </div>
-    </div>
 
     <BaForm ref="formRef" class="Gcard knowledge-editor-form km-panel" :model="form">
       <template v-if="!accessDeniedInfo">
@@ -204,8 +252,13 @@ function submitBorrow() {
             </div>
           </div>
           <div class="knowledge-form-fields">
-            <BaInput v-model="form.title" maxlength="100" prop="title" label="标题" required></BaInput>
-            <BaInput v-model="form.summary" maxlength="200" prop="summary" label="摘要"></BaInput>
+            <BaFormItem label="知识模板">
+              <el-select placeholder="选择模板快速创建" clearable style="width: 100%" :disabled="!canEditCurrentArticle" @change="handleApplyTemplate">
+                <el-option v-for="item in templateOptions" :key="item.key" :label="item.label" :value="item.key" />
+              </el-select>
+            </BaFormItem>
+            <BaInput v-model="form.title" maxlength="100" prop="title" label="标题" required :disabled="!canEditCurrentArticle"></BaInput>
+            <BaInput v-model="form.summary" maxlength="200" prop="summary" label="摘要" :disabled="!canEditCurrentArticle"></BaInput>
             <BaFormItem prop="catalogId" label="分类" required>
               <el-tree-select
                 v-model="form.catalogId"
@@ -213,21 +266,22 @@ function submitBorrow() {
                 show-checkbox
                 ref="menuRef"
                 node-key="id"
+                :disabled="!canEditCurrentArticle"
                 :check-strictly="true"
                 empty-text="加载中，请稍后"
                 :props="{ label: 'name' }"
                 placeholder="选择分类"></el-tree-select>
             </BaFormItem>
-            <BaSelect v-model="form.knowledgeType" prop="knowledgeType" label="知识类型">
+            <BaSelect v-model="form.knowledgeType" prop="knowledgeType" label="知识类型" :disabled="!canEditCurrentArticle">
               <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key"></el-option>
             </BaSelect>
             <BaFormItem prop="tagIds" label="标签">
-              <el-select v-model="form.tagIds" multiple filterable clearable collapse-tags collapse-tags-tooltip placeholder="选择标签" style="width: 100%">
+              <el-select v-model="form.tagIds" multiple filterable clearable collapse-tags collapse-tags-tooltip placeholder="选择标签" style="width: 100%" :disabled="!canEditCurrentArticle">
                 <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id"></el-option>
               </el-select>
             </BaFormItem>
             <BaFormItem prop="thumb" label="封面">
-              <Upload v-model:fileUrl="form.thumb" :params="{ module: 'article' }"></Upload>
+              <Upload v-model:fileUrl="form.thumb" :params="{ module: 'article' }" :disabled="!canEditCurrentArticle"></Upload>
             </BaFormItem>
           </div>
         </section>
@@ -240,31 +294,44 @@ function submitBorrow() {
             </div>
           </div>
           <div class="knowledge-form-fields">
-            <BaSelect v-model="form.visibilityType" prop="visibilityType" label="可见范围">
+            <BaSelect v-model="form.visibilityType" prop="visibilityType" label="可见范围" :disabled="!canEditCurrentArticle">
               <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
             </BaSelect>
             <BaFormItem label="作者">
-              <UserSelect v-model="form.authorId" placeholder="请选择作者" clearable />
+              <UserSelect v-model="form.authorId" placeholder="请选择作者" clearable :disabled="!canEditCurrentArticle" />
             </BaFormItem>
             <BaFormItem label="维护人">
-              <UserSelect v-model="form.maintainerId" placeholder="请选择维护人" clearable />
+              <UserSelect v-model="form.maintainerId" placeholder="请选择维护人" clearable :disabled="!canEditCurrentArticle" />
             </BaFormItem>
-            <BaInput v-model="form.keywords" maxlength="200" prop="keywords" label="关键词"></BaInput>
+            <BaInput v-model="form.keywords" maxlength="200" prop="keywords" label="关键词" :disabled="!canEditCurrentArticle"></BaInput>
             <BaDatePicker
               v-model="form.publishTime"
               value-format="YYYY-MM-DD HH:mm:ss"
               type="datetime"
+              :disabled="!canEditCurrentArticle"
               :disabledDate="(time) => time <= new Date(new Date().setDate(new Date().getDate() - 1))"
               prop="publishTime"
               label="定时发布" />
-            <BaInputNumber v-model="form.order" :precision="2" :step="1" :min="0" prop="order" label="排序" required />
+            <BaInputNumber v-model="form.order" :precision="2" :step="1" :min="0" prop="order" label="排序" required :disabled="!canEditCurrentArticle" />
             <BaFormItem v-if="form.visibilityType === 'role'" label="可见角色">
-              <el-select v-model="form.visibleRoleIds" multiple filterable clearable collapse-tags collapse-tags-tooltip placeholder="选择角色" style="width: 100%">
+              <el-select v-model="form.visibleRoleIds" multiple filterable clearable collapse-tags collapse-tags-tooltip placeholder="选择角色" style="width: 100%" :disabled="!canEditCurrentArticle">
                 <el-option v-for="item in roles" :key="item.id" :label="item.name" :value="String(item.id)" />
               </el-select>
             </BaFormItem>
             <BaFormItem v-if="form.visibilityType === 'specified'" label="指定可见人员">
-              <UserSelect v-model="form.visibleUserIds" placeholder="请选择用户" clearable multiple />
+              <UserSelect v-model="form.visibleUserIds" placeholder="请选择用户" clearable multiple :disabled="!canEditCurrentArticle" />
+            </BaFormItem>
+            <BaFormItem label="来源类型">
+              <el-input :model-value="form.sourceType || '-'" disabled />
+            </BaFormItem>
+            <BaFormItem label="来源项目ID">
+              <el-input :model-value="form.sourceProjectId || '-'" disabled />
+            </BaFormItem>
+            <BaFormItem label="来源对象ID">
+              <el-input :model-value="form.sourceId || '-'" disabled />
+            </BaFormItem>
+            <BaFormItem label="模板类型">
+              <el-input :model-value="form.templateType || '-'" disabled />
             </BaFormItem>
           </div>
         </section>
@@ -278,8 +345,25 @@ function submitBorrow() {
             </div>
           </div>
           <el-form-item prop="content" label="正文" style="max-width: none !important">
-            <Editor v-model="form.content" style="min-height: 500px; height: auto"></Editor>
+            <Editor v-model="form.content" style="min-height: 500px; height: auto" :disabled="!canEditCurrentArticle"></Editor>
           </el-form-item>
+        </section>
+
+        <section class="knowledge-form-section knowledge-form-section--full">
+          <div class="section-header">
+            <div>
+              <div class="section-title">首页推荐配置</div>
+              <div class="section-desc">控制知识是否进入首页置顶区，以及置顶排序和有效时间，避免把首页推荐配置混在 AI 参数里。</div>
+            </div>
+          </div>
+          <div class="knowledge-top-grid">
+            <el-form-item label="置顶知识">
+              <el-switch v-model="form.isTop" active-value="1" inactive-value="0" :disabled="!canEditCurrentArticle" />
+            </el-form-item>
+            <BaInputNumber v-model="form.topSort" :precision="0" :step="1" :min="0" prop="topSort" label="置顶排序" :disabled="!canEditCurrentArticle" />
+            <BaDatePicker v-model="form.topStartTime" value-format="YYYY-MM-DD HH:mm:ss" type="datetime" prop="topStartTime" label="置顶开始" :disabled="!canEditCurrentArticle" />
+            <BaDatePicker v-model="form.topEndTime" value-format="YYYY-MM-DD HH:mm:ss" type="datetime" prop="topEndTime" label="置顶结束" :disabled="!canEditCurrentArticle" />
+          </div>
         </section>
 
         <section class="knowledge-form-section knowledge-form-section--full">
@@ -290,12 +374,12 @@ function submitBorrow() {
             </div>
           </div>
           <div class="knowledge-ai-grid">
-            <BaInputNumber v-model="form.retrievalWeight" :precision="0" :step="1" :min="1" prop="retrievalWeight" label="检索权重" />
+            <BaInputNumber v-model="form.retrievalWeight" :precision="0" :step="1" :min="1" prop="retrievalWeight" label="检索权重" :disabled="!canEditCurrentArticle" />
             <el-form-item label="AI优先">
-              <el-switch v-model="form.aiPreferred" active-value="1" inactive-value="0" />
+              <el-switch v-model="form.aiPreferred" active-value="1" inactive-value="0" :disabled="!canEditCurrentArticle" />
             </el-form-item>
             <el-form-item label="权威知识">
-              <el-switch v-model="form.authorityLevel" active-value="1" inactive-value="0" />
+              <el-switch v-model="form.authorityLevel" active-value="1" inactive-value="0" :disabled="!canEditCurrentArticle" />
             </el-form-item>
             <BaFormItem label="版本号">
               <el-input v-model="form.versionNo" disabled />
@@ -307,11 +391,11 @@ function submitBorrow() {
         </section>
       </template>
     </BaForm>
-    <OperateBar v-if="!accessDeniedInfo" class="knowledge-editor-operate-bar">
-      <ElButton type="primary" @click="cancel">取消</ElButton>
-      <ElButton type="primary" @click="submit('draft')">保存草稿</ElButton>
-      <ElButton type="primary" @click="submit()">发布</ElButton>
-    </OperateBar>
+      <OperateBar v-if="!accessDeniedInfo && canEditCurrentArticle" class="knowledge-editor-operate-bar">
+        <ElButton type="primary" @click="cancel">取消</ElButton>
+        <ElButton type="primary" @click="submit('draft')">保存草稿</ElButton>
+        <ElButton type="primary" @click="submit()">发布</ElButton>
+      </OperateBar>
 
     <BaDialog v-model="borrowDialogVisible" title="申请借阅" width="520" @confirm="submitBorrow">
       <template #form>
@@ -432,6 +516,12 @@ function submitBorrow() {
   gap: 16px 20px;
 }
 
+.knowledge-top-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+
 .knowledge-form-section :deep(.tox-tinymce),
 .knowledge-form-section :deep(.w-e-text-container),
 .knowledge-form-section :deep(.w-e-bar) {
@@ -465,6 +555,7 @@ function submitBorrow() {
 
 @media (max-width: 1024px) {
   .knowledge-form-grid,
+  .knowledge-top-grid,
   .knowledge-ai-grid,
   .knowledge-editor-hero__status {
     grid-template-columns: 1fr;

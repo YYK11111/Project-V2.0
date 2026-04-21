@@ -27,6 +27,9 @@ export const save = base.save
 export const getStatus = () => get(`${serve}/getStatus`)
 export const getKnowledgeTypes = () => get(`${serve}/getKnowledgeTypes`)
 export const getVisibilityTypes = () => get(`${serve}/getVisibilityTypes`)
+export const getHomeData = () => get(`${serve}/home`)
+export const getHotKeywords = () => get(`${serve}/hot-keywords`)
+export const createSearchRecord = (data) => request.post(`${serve}/search-records`, data)
 export const retrieveForAi = (params) => get(`${serve}/retrieveForAi`, params)
 export const rebuildArticleChunks = (id) => request.post(`${serve}/rebuildChunks/${id}`)
 

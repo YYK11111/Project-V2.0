@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, save, update, getStatus, getLevel, getCategory } from './api'
+import { getOne, save, update, getStatus, getLevel, getCategory, publishKnowledge } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
@@ -9,6 +9,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,6 +49,8 @@ const hasRiskId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
+const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
+const canEditCurrentRisk = computed(() => !hasRiskId.value || form.value?.canEdit !== false)
 
 const defaultForm = () => ({
   name: '',
@@ -67,7 +70,10 @@ const defaultForm = () => ({
 
 async function loadRisk() {
   if (!hasRiskId.value) {
-    form.value = defaultForm()
+    form.value = {
+      ...defaultForm(),
+      projectId: String(route.query.projectId || ''),
+    }
     return
   }
   const { data } = await getOne(route.query.id)
@@ -86,6 +92,9 @@ function submit() {
   if ((isEdit.value && !canRiskUpdate.value) || (!isEdit.value && !canRiskAdd.value)) {
     return $sdk.msgWarning('当前操作没有权限')
   }
+  if (hasRiskId.value && !canEditCurrentRisk.value) {
+    return $sdk.msgWarning('当前无编辑该风险的权限')
+  }
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -100,15 +109,29 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+async function handlePublishKnowledge() {
+  if (!route.query.id) return
+  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  await confirmRepublishIfNeeded({ articleId: form.value?.knowledgeArticleId, entityLabel: '风险' })
+  await publishKnowledge(route.query.id)
+  $sdk.msgSuccess('风险案例已沉淀到知识中心')
+  await loadRisk()
+}
 </script>
 
 <template>
   <div class="Gcard">
     <div class="mb20">
-      <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'" />
+      <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
+        <template #extra>
+          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
+          <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+        </template>
+      </el-page-header>
     </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
       <el-form-item label="风险名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入风险名称" maxlength="200" show-word-limit />

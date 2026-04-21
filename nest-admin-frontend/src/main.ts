@@ -60,8 +60,21 @@ initRequest().catch(err => {
 })
 
 import router from './router'
+import { ensureDynamicRoutes } from './router/routes'
 import stores, { store } from '@/stores'
+import { useUserStore } from '@/stores/user'
 app.use(store)
+
+const userStore = useUserStore()
+if (!userStore.name) {
+  try {
+    await userStore.getUserInfo()
+    await ensureDynamicRoutes(router)
+  } catch {
+    userStore.clearUserState()
+  }
+}
+
 app.use(router)
 app.config.globalProperties.$store = stores()
 

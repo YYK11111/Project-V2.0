@@ -4,7 +4,15 @@ import { useUserStore } from '../stores/user'
 import { errorCode } from '@/utils/dictionary'
 
 let isHandlingUnauthorized = false
-const publicUnauthorizedIgnoreList = ['/system/common/getCaptchaImage', '/system/configs/list', '/system/messages/unread-count', '/system/messages/recent', '/system/messages/list']
+const publicUnauthorizedIgnoreList = [
+  '/auth/getLoginUser',
+  '/auth/logout',
+  '/system/common/getCaptchaImage',
+  '/system/configs/list',
+  '/system/messages/unread-count',
+  '/system/messages/recent',
+  '/system/messages/list',
+]
 
 function shouldIgnoreUnauthorized(config = {}) {
   const requestUrl = config.url || ''

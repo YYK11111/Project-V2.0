@@ -1,6 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { INodeHandler } from '../../interface/node-handler.interface';
-import { NodeType, NodeExecutionContext, NodeResult, ConditionNodeProperties, Condition, ConditionOperator } from '../../interface/node.interface';
+import { Injectable } from "@nestjs/common";
+import { INodeHandler } from "../../interface/node-handler.interface";
+import {
+  NodeType,
+  NodeExecutionContext,
+  NodeResult,
+  ConditionNodeProperties,
+  Condition,
+  ConditionOperator,
+} from "../../interface/node.interface";
 
 /**
  * 条件节点处理器
@@ -15,14 +22,17 @@ export class ConditionNodeHandler implements INodeHandler {
     return {
       success: true,
       nextNodeIds: [],
-      outputData: { status: 'condition_evaluated' },
+      outputData: { status: "condition_evaluated" },
     };
   }
 
   /**
    * 评估条件
    */
-  evaluateCondition(condition: Condition, variables: Record<string, any>): boolean {
+  evaluateCondition(
+    condition: Condition,
+    variables: Record<string, any>,
+  ): boolean {
     const fieldValue = this.getFieldValue(condition.field, variables);
     const { operator, value } = condition;
 
@@ -52,13 +62,13 @@ export class ConditionNodeHandler implements INodeHandler {
    * 获取字段值
    */
   private getFieldValue(field: string, variables: Record<string, any>): any {
-    if (field.startsWith('${') && field.endsWith('}')) {
+    if (field.startsWith("${") && field.endsWith("}")) {
       const varName = field.slice(2, -1);
-      if (varName.startsWith('variables.')) {
+      if (varName.startsWith("variables.")) {
         return variables[varName.slice(10)];
       }
-      if (varName === 'initiator') {
-        return variables['starterId'];
+      if (varName === "initiator") {
+        return variables["starterId"];
       }
       return variables[varName];
     }
@@ -68,13 +78,18 @@ export class ConditionNodeHandler implements INodeHandler {
   /**
    * 查找满足条件的目标节点
    */
-  findNextNode(conditions: Condition[], variables: Record<string, any>): string | null {
-    const sortedConditions = [...conditions].sort((a, b) => (a.priority || 0) - (b.priority || 0))
+  findNextNode(
+    conditions: Condition[],
+    variables: Record<string, any>,
+  ): string | null {
+    const sortedConditions = [...conditions].sort(
+      (a, b) => (a.priority || 0) - (b.priority || 0),
+    );
     for (const condition of sortedConditions) {
       if (this.evaluateCondition(condition, variables)) {
-        return condition.id
+        return condition.id;
       }
     }
-    return null
+    return null;
   }
 }

@@ -48,3 +48,7 @@ export function getCategory() {
 export function resolve(id) {
   return request.post(`/business/risks/resolve/${id}`)
 }
+
+export function publishKnowledge(id) {
+  return request.post(`/business/risks/${id}/publish-knowledge`)
+}

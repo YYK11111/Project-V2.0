@@ -1,3 +1,3 @@
-import { Message } from './entity'
+import { Message } from "./entity";
 
 export class MessageDto extends Message {}

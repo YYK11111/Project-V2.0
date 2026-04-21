@@ -1,9 +1,13 @@
-import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
-import { Task, priorityMap, taskStatusMap } from '../../tasks/entity'
-import { User } from '../../../modules/users/entities/user.entity'
-import { BusinessData, BusinessDataLoader, FieldDefinition } from './business-data-loader.interface'
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Task, priorityMap, taskStatusMap } from "../../tasks/entity";
+import { User } from "../../../modules/users/entities/user.entity";
+import {
+  BusinessData,
+  BusinessDataLoader,
+  FieldDefinition,
+} from "./business-data-loader.interface";
 
 @Injectable()
 export class TaskLoader implements BusinessDataLoader {
@@ -15,23 +19,25 @@ export class TaskLoader implements BusinessDataLoader {
   ) {}
 
   async load(businessKey: string): Promise<BusinessData> {
-    const id = businessKey.replace('task_', '')
+    const id = businessKey.replace("task_", "");
     const task = await this.taskRepo.findOne({
       where: { id },
-      relations: ['project', 'sprint', 'leader'],
-    })
+      relations: ["project", "sprint", "leader"],
+    });
 
     if (!task) {
-      throw new Error(`Task not found: ${id}`)
+      throw new Error(`Task not found: ${id}`);
     }
 
     const executors = task.executorIds?.length
-      ? await this.userRepo.find({ where: task.executorIds.map((executorId) => ({ id: executorId })) })
-      : []
+      ? await this.userRepo.find({
+          where: task.executorIds.map((executorId) => ({ id: executorId })),
+        })
+      : [];
 
     return {
       id: task.id,
-      type: 'task',
+      type: "task",
       data: {
         id: task.id,
         name: task.name,
@@ -76,22 +82,38 @@ export class TaskLoader implements BusinessDataLoader {
           deptId: user.deptId,
         })),
       },
-    }
+    };
   }
 
   getFields(): FieldDefinition[] {
     return [
-      { name: 'id', label: '任务ID', type: 'string' },
-      { name: 'name', label: '任务名称', type: 'string' },
-      { name: 'code', label: '任务编号', type: 'string' },
-      { name: 'status', label: '任务状态', type: 'enum', enumValues: Object.entries(taskStatusMap).map(([value, label]) => ({ value, label })) },
-      { name: 'priority', label: '任务优先级', type: 'enum', enumValues: Object.entries(priorityMap).map(([value, label]) => ({ value, label })) },
-      { name: 'progress', label: '任务进度', type: 'number' },
-      { name: 'startDate', label: '开始日期', type: 'date' },
-      { name: 'endDate', label: '截止日期', type: 'date' },
-      { name: 'leader.id', label: '任务负责人', type: 'string' },
-      { name: 'leader.deptId', label: '任务负责人部门', type: 'string' },
-      { name: 'executorIds', label: '任务经办人', type: 'array' },
-    ]
+      { name: "id", label: "任务ID", type: "string" },
+      { name: "name", label: "任务名称", type: "string" },
+      { name: "code", label: "任务编号", type: "string" },
+      {
+        name: "status",
+        label: "任务状态",
+        type: "enum",
+        enumValues: Object.entries(taskStatusMap).map(([value, label]) => ({
+          value,
+          label,
+        })),
+      },
+      {
+        name: "priority",
+        label: "任务优先级",
+        type: "enum",
+        enumValues: Object.entries(priorityMap).map(([value, label]) => ({
+          value,
+          label,
+        })),
+      },
+      { name: "progress", label: "任务进度", type: "number" },
+      { name: "startDate", label: "开始日期", type: "date" },
+      { name: "endDate", label: "截止日期", type: "date" },
+      { name: "leader.id", label: "任务负责人", type: "string" },
+      { name: "leader.deptId", label: "任务负责人部门", type: "string" },
+      { name: "executorIds", label: "任务经办人", type: "array" },
+    ];
   }
 }

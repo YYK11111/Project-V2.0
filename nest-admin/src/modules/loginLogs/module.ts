@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common'
-import { LoginLogsService } from './service'
-import { LoginLogsController } from './controller'
-import { LoginLog } from './entity'
-import { TypeOrmModule } from '@nestjs/typeorm'
-import { HttpModule } from '@nestjs/axios'
+import { Module } from "@nestjs/common";
+import { LoginLogsService } from "./service";
+import { LoginLogsController } from "./controller";
+import { LoginLog } from "./entity";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { HttpModule } from "@nestjs/axios";
 
 @Module({
   imports: [

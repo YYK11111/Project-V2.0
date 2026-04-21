@@ -132,8 +132,8 @@ const getButtons = (row: any) => [
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+  <div class="task-report-index-page">
+    <RequestChartTable ref="rctRef" class="task-report-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
         <BaInput v-model="query.userId" label="用户ID" prop="userId" />
@@ -141,13 +141,17 @@ const getButtons = (row: any) => [
         <BaDatePicker v-model="query.endDate" label="结束日期" prop="endDate" value-format="YYYY-MM-DD" />
       </template>
 
-      <template #operation>
-        <div class="flexBetween">
-          <el-button v-if="canTaskReportAdd" type="primary" @click="handleAddReport">新增汇报</el-button>
+      <template #operation="{ selectedIds }">
+        <div class="task-report-index-operation">
+          <div class="task-report-index-operation__left">
+            <el-button v-if="canTaskReportAdd" type="primary" @click="handleAddReport">新增汇报</el-button>
+          </div>
+          <el-button v-if="canTaskReportDelete" :disabled="!selectedIds.length" @click="rctRef.del(deleteReport)" type="danger">批量删除</el-button>
         </div>
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="所属任务" min-width="180" :show-overflow-tooltip="true">
           <template #default="{ row }">{{ row.task?.name || row.taskId || '-' }}</template>
         </el-table-column>
@@ -210,10 +214,50 @@ const getButtons = (row: any) => [
 </template>
 
 <style scoped>
+.task-report-index-page {
+  min-height: 100%;
+}
+
+.task-report-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.task-report-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-report-index-operation__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-report-index-panel :deep(.el-table__header-wrapper),
+.task-report-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
 .report-form-tip {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.4;
   color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .task-report-index-panel {
+    padding-top: 18px;
+  }
+
+  .task-report-index-operation,
+  .task-report-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

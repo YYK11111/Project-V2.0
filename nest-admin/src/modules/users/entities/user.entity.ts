@@ -1,91 +1,129 @@
-import { Entity, Column, ManyToOne, OneToMany, RelationId, JoinColumn, ManyToMany, JoinTable, Index } from 'typeorm'
-import { BaseEntity, BaseColumn, MyEntity, boolNumColumn, DbUnique } from 'src/common/entity/BaseEntity'
-import { BoolNum } from 'src/common/type/base'
-import { Dept } from 'src/modules/depts/entities/dept.entity'
-import { IsEmail, IsNotEmpty, IsNumberString, MaxLength, ValidateIf } from 'class-validator'
-import { Role } from 'src/modules/roles/entity'
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  RelationId,
+  JoinColumn,
+  ManyToMany,
+  JoinTable,
+  Index,
+} from "typeorm";
+import {
+  BaseEntity,
+  BaseColumn,
+  MyEntity,
+  boolNumColumn,
+  DbUnique,
+} from "src/common/entity/BaseEntity";
+import { BoolNum } from "src/common/type/base";
+import { Dept } from "src/modules/depts/entities/dept.entity";
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsNumberString,
+  MaxLength,
+  ValidateIf,
+} from "class-validator";
+import { Role } from "src/modules/roles/entity";
 
 // 菜单类型
 export enum GenderTypes {
-  man = 'man',
-  woamn = 'woamn',
+  man = "man",
+  woamn = "woamn",
 }
 export const genderTypes = {
-  [GenderTypes.man]: '男',
-  [GenderTypes.woamn]: '女',
-}
+  [GenderTypes.man]: "男",
+  [GenderTypes.woamn]: "女",
+};
 
-@MyEntity('sys_user')
+@MyEntity("sys_user")
 // @Index(['email', 'isDelete', 'createTime'], { })
 export class User extends BaseEntity {
   constructor(obj = {}) {
-    super()
-    this.assignOwn(obj)
+    super();
+    this.assignOwn(obj);
   }
 
   @DbUnique
   @IsNotEmpty()
   @MaxLength(30)
   @BaseColumn()
-  name: string
+  name: string;
 
-  @BaseColumn({ comment: '昵称' })
-  nickname: string
+  @BaseColumn({ comment: "昵称" })
+  nickname: string;
 
-  @BaseColumn({ length: 50, nullable: true, comment: '主题颜色HSL值，格式：h,s,l' })
-  themeHsl: string
+  @BaseColumn({
+    length: 50,
+    nullable: true,
+    comment: "主题颜色HSL值，格式：h,s,l",
+  })
+  themeHsl: string;
 
-  @BaseColumn({ length: 255, comment: '密码哈希' })
-  password: string
+  @BaseColumn({
+    type: "json",
+    nullable: true,
+    comment: "项目提醒个人偏好配置",
+  })
+  projectReminderPreference: Record<string, any>;
 
-  @BaseColumn({ default: 2, comment: '密码版本，2 表示哈希密码' })
-  passwordVersion: number
+  @BaseColumn({ length: 255, comment: "密码哈希" })
+  password: string;
 
-  @BaseColumn({ comment: '头像地址' })
-  avatar: string
+  @BaseColumn({ default: 2, comment: "密码版本，2 表示哈希密码" })
+  passwordVersion: number;
+
+  @BaseColumn({ comment: "头像地址" })
+  avatar: string;
 
   @DbUnique
   @IsEmail()
   @BaseColumn()
-  email: string
+  email: string;
   // @ValidateIf((o) => o.email !== '')
 
   @DbUnique
   @MaxLength(11)
   @IsNumberString()
   @BaseColumn({ length: 11 })
-  phone: string
+  phone: string;
 
-  @BaseColumn({ type: 'enum', enum: GenderTypes, default: null, comment: '性别，默认 null' })
-  gender: GenderTypes
+  @BaseColumn({
+    type: "enum",
+    enum: GenderTypes,
+    default: null,
+    comment: "性别，默认 null",
+  })
+  gender: GenderTypes;
 
   // @BaseColumn({ nullable: true, name: 'roles', })
   @ManyToMany(() => Role, (role) => role.users, {
     cascade: true,
   })
   @JoinTable({
-    name: 'sys_user_role',
+    name: "sys_user_role",
     joinColumn: {
-      name: 'userId',
-      referencedColumnName: 'id',
-      foreignKeyConstraintName: 'fk_sys_user_role_user',
+      name: "userId",
+      referencedColumnName: "id",
+      foreignKeyConstraintName: "fk_sys_user_role_user",
     },
     inverseJoinColumn: {
-      name: 'roleId',
-      referencedColumnName: 'id',
-      foreignKeyConstraintName: 'fk_sys_user_role_role',
+      name: "roleId",
+      referencedColumnName: "id",
+      foreignKeyConstraintName: "fk_sys_user_role_role",
     },
   })
-  roles: Role[]
+  roles: Role[];
 
   @ManyToOne((type) => Dept, (dept) => dept.user)
-  @JoinColumn({ name: 'dept_id' })
-  dept: Dept
+  @JoinColumn({ name: "dept_id" })
+  dept: Dept;
 
-  @BaseColumn({ nullable: true, name: 'dept_id', comment: '部门id' })
+  @BaseColumn({ nullable: true, name: "dept_id", comment: "部门id" })
   // @RelationId((dept: Dept) => dept.id)
-  deptId: string
+  deptId: string;
 
-  @BaseColumn(boolNumColumn('激活', 'is_active', BoolNum.Yes))
-  isActive: BoolNum
+  @BaseColumn(boolNumColumn("激活", "is_active", BoolNum.Yes))
+  isActive: BoolNum;
 }

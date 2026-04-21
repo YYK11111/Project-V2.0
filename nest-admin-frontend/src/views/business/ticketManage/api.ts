@@ -70,3 +70,7 @@ export function getTaskList(projectId) {
 export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
 }
+
+export function publishKnowledge(id) {
+  return request({ url: `${baseUrl}/${id}/publish-knowledge`, method: 'post' })
+}

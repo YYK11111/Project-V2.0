@@ -1,21 +1,37 @@
 <script setup>
 import { ref } from 'vue'
-import { QuestionFilled } from '@element-plus/icons-vue'
+import { QuestionFilled, CaretBottom } from '@element-plus/icons-vue'
 import { getList, getStatus, getPriority, getProjectType, del, archive, recalculateProgress } from './api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import TableOperation from '@/components/TableOperation.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
+import { phaseMap, qualityLevelMap, riskLevelMap } from './fieldMaps'
 
 const params = ref({})
 const status = ref({})
 const priority = ref({})
 const projectType = ref({})
+const deptMap = ref({})
 
 getStatus().then(({ data }) => (status.value = data))
 getPriority().then(({ data }) => (priority.value = data))
 getProjectType().then(({ data }) => (projectType.value = data))
+getDeptTrees({}).then((res) => {
+  const map = {}
+  const walk = (nodes = []) => {
+    nodes.forEach((item) => {
+      map[item.id] = item.name
+      if (item.children?.length) walk(item.children)
+    })
+  }
+  walk(res.data || [])
+  deptMap.value = map
+})
 
 const rctRef = ref()
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
+const showAdvanced = ref(false)
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectDelete = computed(() => checkPermi(['business/projects/delete']))
 const canProjectArchive = computed(() => checkPermi(['business/projects/archive']))
@@ -23,11 +39,11 @@ const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/s
 const recalculatingProgress = ref(false)
 
 function canEditProject(row) {
-  return canProjectUpdate.value && String(row.status || '') !== '3'
+  return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') !== '3'
 }
 
 function canEnterApprovalPage(row) {
-  return canProjectSubmitApproval.value && (
+  return canProjectSubmitApproval.value && row.permissionContext?.canSubmitApproval !== false && (
     String(row.status || '') === '1'
     || ['1', '3'].includes(String(row.approvalStatus || '0'))
   )
@@ -61,34 +77,68 @@ const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') },
   canEditProject(row) ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
   canEnterApprovalPage(row) ? { key: 'approval', label: '立项审批', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
-  canProjectArchive.value ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
-  canProjectDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  canProjectArchive.value && row.permissionContext?.canArchive !== false ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
+  canProjectDelete.value && row.permissionContext?.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
 <template>
-  <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList">
+  <div class="project-index-page">
+    <RequestChartTable ref="rctRef" class="project-index-panel" :params="params" :request="getList" :is-selection="true" label-position="left" label-width="80px">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="项目名称" prop="name" />
-        <BaSelect v-model="query.status" filterable label="状态" prop="status">
-          <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
-          <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.projectType" filterable label="项目类型" prop="projectType">
-          <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.isArchived" filterable label="是否归档" prop="isArchived">
-          <el-option label="未归档" value="0" />
-          <el-option label="已归档" value="1" />
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.name" label="项目名称" prop="name" />
+          <BaSelect v-model="query.status" filterable label="状态" prop="status">
+            <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
+          </BaSelect>
+          <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
+            <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
+          </BaSelect>
+          <BaSelect v-model="query.projectType" filterable label="项目类型" prop="projectType">
+            <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
+          </BaSelect>
+          <BaSelect v-model="query.phase" filterable label="项目阶段" prop="phase">
+            <el-option v-for="(label, key) in phaseMap" :key="key" :label="label" :value="key" />
+          </BaSelect>
+          <template v-if="showAdvanced">
+            <div class="query-select-item">
+              <div class="query-select-label">所属部门</div>
+              <el-select v-model="query.departmentId" placeholder="请选择所属部门" clearable filterable>
+                <el-option v-for="(label, key) in deptMap" :key="key" :label="label" :value="key" />
+              </el-select>
+            </div>
+            <div class="query-select-item">
+              <div class="query-select-label">项目发起人</div>
+              <UserSelect v-model="query.creatorId" placeholder="请选择项目发起人" clearable />
+            </div>
+            <BaSelect v-model="query.riskLevel" filterable label="风险等级" prop="riskLevel">
+              <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
+            </BaSelect>
+            <BaSelect v-model="query.qualityLevel" filterable label="质量等级" prop="qualityLevel">
+              <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
+            </BaSelect>
+            <BaSelect v-model="query.isArchived" filterable label="是否归档" prop="isArchived">
+              <el-option label="未归档" value="0" />
+              <el-option label="已归档" value="1" />
+            </BaSelect>
+            <BaInput v-model="query.category" label="项目分类" prop="category" />
+            <BaInput v-model="query.businessLine" label="业务线" prop="businessLine" />
+            <BaInput v-model="query.industry" label="行业" prop="industry" />
+            <BaInput v-model="query.projectSource" label="项目来源" prop="projectSource" />
+          </template>
+        </div>
+      </template>
+
+      <template #extraButtons>
+        <el-button link type="primary" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '收起更多' : '更多筛选' }}
+          <el-icon :class="{ 'rotate-180': showAdvanced }"><CaretBottom /></el-icon>
+        </el-button>
       </template>
 
       <template #operation="{ selectedIds }">
-        <div class="flexBetween">
-          <div class="operation-left">
+        <div class="project-index-operation">
+          <div class="project-index-operation__left">
             <el-button v-if="canProjectAdd" type="primary" @click="rctRef.goRoute(null, '/projectManage/form')">新增项目</el-button>
             <el-button v-if="canProjectUpdate" :loading="recalculatingProgress" @click="handleRecalculateAllProgress">重算全部进度</el-button>
           </div>
@@ -97,9 +147,26 @@ const getButtons = (row) => [
       </template>
 
       <template #table>
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="项目名称" prop="name" :show-overflow-tooltip="true" min-width="150" />
         <el-table-column label="项目编号" prop="code" width="150" />
         <el-table-column label="负责人" prop="leader.nickname" width="100" />
+        <el-table-column label="发起人" width="100">
+          <template #default="{ row }">
+            {{ row.creator?.nickname || row.creator?.name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="所属部门" width="140">
+          <template #default="{ row }">
+            {{ deptMap[row.departmentId] || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="项目分类" prop="category" width="120" />
+        <el-table-column label="项目阶段" width="100">
+          <template #default="{ row }">
+            {{ phaseMap[row.phase] || row.phase || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="项目类型" prop="projectType" width="140">
           <template #default="{ row }">
             {{ projectType[row.projectType] || '-' }}
@@ -107,6 +174,8 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="开始时间" prop="startDate" width="120" />
         <el-table-column label="结束时间" prop="endDate" width="120" />
+        <el-table-column label="计划开始" prop="planStartDate" width="120" />
+        <el-table-column label="计划结束" prop="planEndDate" width="120" />
         <el-table-column label="状态" prop="status" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === '6' ? 'success' : row.status === '3' ? 'primary' : row.status === '2' || row.status === '5' ? 'warning' : row.status === '7' ? 'danger' : 'info'">
@@ -142,6 +211,27 @@ const getButtons = (row) => [
             <el-progress :percentage="row.progress || 0" :stroke-width="8" />
           </template>
         </el-table-column>
+        <el-table-column label="币种" prop="currency" width="90" />
+        <el-table-column label="业务线" prop="businessLine" width="120" />
+        <el-table-column label="行业" prop="industry" width="120" />
+        <el-table-column label="项目来源" prop="projectSource" width="120" />
+        <el-table-column label="风险等级" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.riskLevel" :type="row.riskLevel === 'critical' ? 'danger' : row.riskLevel === 'high' ? 'warning' : 'info'" size="small">
+              {{ riskLevelMap[row.riskLevel] || row.riskLevel }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="质量等级" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.qualityLevel" :type="row.qualityLevel === 'excellent' ? 'success' : row.qualityLevel === 'high' ? 'primary' : 'info'" size="small">
+              {{ qualityLevelMap[row.qualityLevel] || row.qualityLevel }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计工时" prop="spentHours" width="110" />
         <el-table-column label="是否归档" prop="isArchived" width="100">
           <template #default="{ row }">
             <el-tag :type="row.isArchived === '1' ? 'success' : 'info'" size="small">
@@ -159,10 +249,40 @@ const getButtons = (row) => [
 </template>
 
 <style scoped>
-.operation-left {
+.project-index-page {
+  min-height: 100%;
+}
+
+.project-index-panel {
+  padding-top: 20px;
+  scroll-behavior: auto;
+}
+
+.project-index-operation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.project-index-operation__left {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.query-select-label {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+  transition: transform 0.3s;
 }
 
 .progress-column-label {
@@ -175,5 +295,60 @@ const getButtons = (row) => [
   color: var(--el-text-color-secondary);
   font-size: 14px;
   cursor: help;
+}
+
+.project-index-panel :deep(.el-table__header-wrapper),
+.project-index-panel :deep(.el-table__body-wrapper) {
+  scroll-behavior: auto;
+}
+
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+.query-select-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.query-select-item .el-select,
+.query-select-item .el-input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .project-index-panel {
+    padding-top: 18px;
+  }
+
+  .project-index-operation,
+  .project-index-operation__left {
+    align-items: stretch;
+  }
 }
 </style>

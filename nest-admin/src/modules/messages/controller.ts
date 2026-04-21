@@ -1,40 +1,54 @@
-import { Controller, Get, Param, Post, Query, Req } from '@nestjs/common'
-import { MessagesService } from './service'
-import { QueryListDto } from 'src/common/dto'
+import { Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
+import { MessagesService } from "./service";
+import { QueryListDto } from "src/common/dto";
 
-@Controller('system/messages')
+@Controller("system/messages")
 export class MessagesController {
   constructor(private readonly service: MessagesService) {}
 
-  @Get('unread-count')
+  @Get("unread-count")
   async unreadCount(@Req() req: any) {
-    const userId = req.user?.id || req.user?.name
-    return this.service.getUnreadCount(userId)
+    const userId = req.user?.id || req.user?.name;
+    return this.service.getUnreadCount(userId);
   }
 
-  @Get('recent')
-  async recent(@Req() req: any, @Query('limit') limit?: string) {
-    const userId = req.user?.id || req.user?.name
-    await this.service.ensureWorkflowTodoMessages()
-    return this.service.getRecentMessages(userId, Number(limit || 10))
+  @Get("recent")
+  async recent(@Req() req: any, @Query("limit") limit?: string) {
+    const userId = req.user?.id || req.user?.name;
+    await this.service.ensureWorkflowTodoMessages();
+    return this.service.getRecentMessages(userId, Number(limit || 10));
   }
 
-  @Get('list')
+  @Get("list")
   async list(@Req() req: any, @Query() query: QueryListDto) {
-    const userId = req.user?.id || req.user?.name
-    return this.service.getMessageList(userId, query)
+    const userId = req.user?.id || req.user?.name;
+    return this.service.getMessageList(userId, query);
   }
 
-  @Post('read/:id')
-  async markRead(@Req() req: any, @Param('id') id: string) {
-    const userId = req.user?.id || req.user?.name
-    await this.service.markRead(id, userId)
-    return true
+  @Post("read/:id")
+  async markRead(@Req() req: any, @Param("id") id: string) {
+    const userId = req.user?.id || req.user?.name;
+    await this.service.markRead(id, userId);
+    return true;
   }
 
-  @Post('rebuild-todo')
+  @Post("project-alerts/read-all")
+  async markProjectAlertsRead(@Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    await this.service.markProjectAlertsRead(userId);
+    return true;
+  }
+
+  @Post("project-alerts/clear")
+  async clearProjectAlerts(@Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    await this.service.clearProjectAlerts(userId);
+    return true;
+  }
+
+  @Post("rebuild-todo")
   async rebuildTodo() {
-    await this.service.ensureWorkflowTodoMessages()
-    return true
+    await this.service.ensureWorkflowTodoMessages();
+    return true;
   }
 }

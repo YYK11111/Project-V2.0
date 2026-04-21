@@ -1,9 +1,14 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getDashboard, getStatus, getPriority, getProjectType, submitClose } from './api'
+import { getDashboard, getStatus, getPriority, getProjectType, publishCloseReview, submitClose, syncProjectAlerts, getFieldPermissions } from './api'
+import { confirmPlanImpact, confirmPlanImpactScope, confirmPlanImpactTarget } from '@/views/business/changeManage/api'
+import { getKnowledgeTypes } from '@/views/content/articleManage/api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
+import { phaseMap } from './fieldMaps'
 import { checkPermi } from '@/utils/permission'
 import ChartPie from '@/components/ChartPie.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
@@ -19,7 +24,9 @@ const project = ref({})
 const statusMap = ref({})
 const priorityMap = ref({})
 const projectTypeMap = ref({})
+const knowledgeTypeMap = ref({})
 const customerList = ref([])
+const deptMap = ref({})
 const dashboard = ref({})
 const tasks = ref([])
 const tickets = ref([])
@@ -27,6 +34,10 @@ const milestones = ref([])
 const risks = ref([])
 const changes = ref([])
 const sprints = ref([])
+const knowledgeSummary = ref({})
+const knowledgeArticles = ref([])
+const projectPermissionContext = ref({})
+const fieldPermissionResult = ref(null)
 const activeTab = ref('overview')
 const taskFilter = ref('all')
 const ticketFilter = ref('all')
@@ -35,6 +46,25 @@ const riskFilter = ref('all')
 const changeFilter = ref('all')
 const sprintFilter = ref('all')
 const canProjectSubmitClose = computed(() => checkPermi(['business/projects/submitClose']))
+const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
+const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
+const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
+const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
+const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
+const canKnowledgeAdd = computed(() => checkPermi(['business/articles/add']))
+const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false)
+const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false)
+const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
+const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
+
+function canViewGroup(groupCode) {
+  return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
+}
+
+const publishReviewLoading = ref(false)
+const confirmPlanImpactLoading = ref(false)
+const confirmScopeLoading = ref(false)
+const confirmTargetLoading = ref(false)
 
 const today = computed(() => new Date())
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
@@ -43,7 +73,7 @@ const completedTaskStatuses = ['3']
 const resolvedTicketStatuses = ['3', '4']
 const closedRiskStatuses = ['4', '5']
 const dueSoonDays = 7
-const validTabs = new Set(['overview', 'focus', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints'])
+const validTabs = new Set(['overview', 'focus', 'plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'knowledge', 'closure'])
 const validFilters = {
   taskFilter: new Set(['all', 'overdue', 'dueSoon', 'inProgress']),
   ticketFilter: new Set(['all', 'open', 'critical', 'unassigned']),
@@ -128,12 +158,22 @@ function getChangeImpactType(impact) {
   return 'info'
 }
 
+function getHealthTagType(level) {
+  if (level === 'healthy') return 'success'
+  if (level === 'stable') return 'primary'
+  if (level === 'attention') return 'warning'
+  return 'danger'
+}
+
 const taskSummary = computed(() => dashboard.value.summary?.taskSummary || { total: 0, completed: 0, inProgress: 0, pending: 0, overdue: 0, dueSoon: 0, completionRate: 0 })
 const ticketSummary = computed(() => dashboard.value.summary?.ticketSummary || { total: 0, open: 0, critical: 0 })
 const riskSummary = computed(() => dashboard.value.summary?.riskSummary || { total: 0, active: 0, high: 0, overdue: 0 })
 const changeSummary = computed(() => dashboard.value.summary?.changeSummary || { total: 0, pendingApproval: 0, highImpact: 0, implemented: 0 })
 const milestoneSummary = computed(() => dashboard.value.summary?.milestoneSummary || { total: 0, completed: 0, delayed: 0, dueSoon: 0, overdue: 0, completionRate: 0 })
 const sprintSummary = computed(() => dashboard.value.summary?.sprintSummary || { total: 0, active: 0, planning: 0, current: null })
+const projectKnowledgeSummary = computed(() => knowledgeSummary.value || { total: 0, faq: 0, experience: 0, delivery: 0, recentUpdatedCount: 0 })
+const projectHealthSummary = computed(() => dashboard.value.summary?.healthSummary || { totalScore: 0, level: 'stable', levelLabel: '基本健康', dimensions: {}, alerts: [] })
+const changeImpactSummary = computed(() => dashboard.value.summary?.changeImpactSummary || { total: 0, scheduleChanged: 0, costChanged: 0, impactedMilestones: [], impactedSprints: [], impactedTasks: [] })
 const costVariance = computed(() => Number(dashboard.value.summary?.costVariance || 0))
 
 const dueSoonTasks = computed(() => dashboard.value.focus?.dueSoonTasks || [])
@@ -142,6 +182,8 @@ const criticalTickets = computed(() => dashboard.value.focus?.criticalTickets ||
 const highRisks = computed(() => dashboard.value.focus?.highRisks || [])
 const pendingChanges = computed(() => dashboard.value.focus?.pendingChanges || [])
 const dueSoonMilestones = computed(() => dashboard.value.focus?.dueSoonMilestones || [])
+const latestKnowledgeArticles = computed(() => knowledgeArticles.value || [])
+const projectAlerts = computed(() => dashboard.value.focus?.alerts || [])
 const delayedMilestones = computed(() => milestones.value.filter(item => String(item.status || '') === '3').slice(0, 5))
 const coreMembers = computed(() => (project.value.members || []).filter(item => String(item.isCore || '0') === '1'))
 const overdueMilestoneCount = computed(() => milestoneSummary.value.overdue || 0)
@@ -156,6 +198,132 @@ const milestoneTimelineData = computed(() => {
       return aDate - bDate
     })
     .slice(0, 8)
+})
+
+const executionPlanMilestones = computed(() => {
+  return [...milestones.value]
+    .map((milestone) => {
+      const linkedTasks = tasks.value.filter((task) => String(task.milestoneId || '') === String(milestone.id || ''))
+      return {
+        ...milestone,
+        linkedTasks,
+        taskCount: linkedTasks.length,
+        completedTaskCount: linkedTasks.filter((task) => isTaskCompleted(task)).length,
+      }
+    })
+    .sort((a, b) => {
+      const aDate = getDateValue(a.dueDate)?.getTime() || Number.MAX_SAFE_INTEGER
+      const bDate = getDateValue(b.dueDate)?.getTime() || Number.MAX_SAFE_INTEGER
+      if (aDate !== bDate) return aDate - bDate
+      return Number(a.sort || 0) - Number(b.sort || 0)
+    })
+})
+
+const sprintExecutionPlan = computed(() => {
+  return [...sprints.value]
+    .map((sprint) => {
+      const sprintTasks = tasks.value.filter((task) => String(task.sprintId || '') === String(sprint.id || ''))
+      const completedTaskCount = sprintTasks.filter((task) => isTaskCompleted(task)).length
+      const storyPoints = sprintTasks.reduce((sum, task) => sum + Number(task.storyPoints || 0), 0)
+      return {
+        ...sprint,
+        sprintTasks,
+        linkedMilestones: executionPlanMilestones.value.filter((milestone) => milestone.linkedTasks.some((task) => String(task.sprintId || '') === String(sprint.id || ''))),
+        completedTaskCount,
+        storyPoints,
+      }
+    })
+    .sort((a, b) => {
+      const aDate = getDateValue(a.startDate)?.getTime() || Number.MAX_SAFE_INTEGER
+      const bDate = getDateValue(b.startDate)?.getTime() || Number.MAX_SAFE_INTEGER
+      return aDate - bDate
+    })
+})
+
+const unplannedTasks = computed(() => {
+  return tasks.value
+    .filter((task) => !String(task.sprintId || '').trim())
+    .sort((a, b) => {
+      const priorityDiff = Number(b.priority || 0) - Number(a.priority || 0)
+      if (priorityDiff !== 0) return priorityDiff
+      return (getDaysDiff(a.endDate) ?? 999) - (getDaysDiff(b.endDate) ?? 999)
+    })
+})
+
+const executionPlanSummary = computed(() => ({
+  milestones: executionPlanMilestones.value.length,
+  sprints: sprintExecutionPlan.value.length,
+  plannedTasks: tasks.value.length - unplannedTasks.value.length,
+  unplannedTasks: unplannedTasks.value.length,
+}))
+
+const executionPlanProgress = computed(() => {
+  if (!tasks.value.length) return 0
+  return Math.round((executionPlanSummary.value.plannedTasks / tasks.value.length) * 100)
+})
+
+const delayedMilestonesForPlan = computed(() => {
+  return executionPlanMilestones.value.filter((item) => String(item.status || '') === '3' || (String(item.status || '') !== '2' && (getDaysDiff(item.dueDate) ?? 1) < 0))
+})
+
+const delayedSprintsForPlan = computed(() => {
+  return sprintExecutionPlan.value.filter((item) => String(item.status || '') === '2' && (getDaysDiff(item.endDate) ?? 1) < 0)
+})
+
+const dueSoonPlannedTasks = computed(() => {
+  return tasks.value.filter((task) => String(task.sprintId || '').trim() && !isTaskCompleted(task) && (getDaysDiff(task.endDate) ?? 99) >= 0 && (getDaysDiff(task.endDate) ?? 99) <= dueSoonDays)
+})
+
+const overduePlannedTasks = computed(() => {
+  return tasks.value.filter((task) => String(task.sprintId || '').trim() && !isTaskCompleted(task) && (getDaysDiff(task.endDate) ?? 1) < 0)
+})
+
+const planDeviationSummary = computed(() => ({
+  delayedMilestones: delayedMilestonesForPlan.value.length,
+  delayedSprints: delayedSprintsForPlan.value.length,
+  overduePlannedTasks: overduePlannedTasks.value.length,
+  dueSoonPlannedTasks: dueSoonPlannedTasks.value.length,
+  unplannedTasks: unplannedTasks.value.length,
+}))
+
+const planDeviationAlerts = computed(() => {
+  const alerts = []
+  if (planDeviationSummary.value.delayedMilestones > 0) {
+    alerts.push({
+      type: 'danger',
+      title: '里程碑已出现延期',
+      desc: `当前共有 ${planDeviationSummary.value.delayedMilestones} 个里程碑已延期或超期，建议优先核对交付节点和任务完成情况。`,
+    })
+  }
+  if (planDeviationSummary.value.delayedSprints > 0) {
+    alerts.push({
+      type: 'warning',
+      title: 'Sprint 进度偏慢',
+      desc: `当前共有 ${planDeviationSummary.value.delayedSprints} 个进行中的 Sprint 已超出计划结束日期，建议尽快调整任务范围或结束节奏。`,
+    })
+  }
+  if (planDeviationSummary.value.overduePlannedTasks > 0) {
+    alerts.push({
+      type: 'danger',
+      title: '计划内任务已逾期',
+      desc: `当前共有 ${planDeviationSummary.value.overduePlannedTasks} 个已纳入执行计划的任务逾期，说明执行计划和实际推进已经产生明显偏差。`,
+    })
+  }
+  if (planDeviationSummary.value.unplannedTasks > 0) {
+    alerts.push({
+      type: 'info',
+      title: '仍有任务未纳入执行计划',
+      desc: `当前仍有 ${planDeviationSummary.value.unplannedTasks} 个任务未归入 Sprint，建议尽快纳入执行编排，避免工作项游离于计划之外。`,
+    })
+  }
+  if (!alerts.length) {
+    alerts.push({
+      type: 'success',
+      title: '当前计划偏差可控',
+      desc: '目前未发现明显的延期节点和计划异常，建议持续关注临近到期任务与 Sprint 结束节奏。',
+    })
+  }
+  return alerts
 })
 
 const taskStatusChartData = computed(() => {
@@ -285,27 +453,35 @@ watch(
   },
 )
 
-watch(
-  () => route.query.id,
-  async () => {
-    await reloadCurrent()
-  },
-)
-
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, dashboardRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, knowledgeTypeRes, customerRes, deptRes, dashboardRes, fieldPermissionsRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
+    getKnowledgeTypes(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
+    getDeptTrees({}),
     getDashboard(projectId.value),
+    getFieldPermissions(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
   projectTypeMap.value = projectTypeRes.data || {}
+  knowledgeTypeMap.value = knowledgeTypeRes.data || {}
   customerList.value = customerRes.list || []
+  const map = {}
+  const walk = (nodes = []) => {
+    nodes.forEach((item) => {
+      map[item.id] = item.name
+      if (item.children?.length) walk(item.children)
+    })
+  }
+  walk(deptRes.data || [])
+  deptMap.value = map
   dashboard.value = dashboardRes.data || {}
+  fieldPermissionResult.value = fieldPermissionsRes?.data || fieldPermissionsRes || null
+  projectPermissionContext.value = dashboard.value.permissionContext || {}
   project.value = dashboard.value.project || {}
   tasks.value = dashboard.value.tasks || []
   tickets.value = dashboard.value.tickets || []
@@ -313,15 +489,64 @@ async function reloadCurrent() {
   risks.value = dashboard.value.risks || []
   changes.value = dashboard.value.changes || []
   sprints.value = dashboard.value.sprints || []
+  knowledgeSummary.value = dashboard.value.summary?.knowledgeSummary || {}
+  knowledgeArticles.value = dashboard.value.focus?.latestKnowledgeArticles || []
+  syncProjectAlerts(projectId.value).catch(() => {})
+}
+
+function goToProjectKnowledgeList() {
+  if (!project.value?.knowledgeCatalogId) return
+  router.push({ path: '/content/articleManage/manage', query: { catalogId: project.value.knowledgeCatalogId } })
+}
+
+function goToProjectKnowledgeCreate() {
+  if (!project.value?.knowledgeCatalogId) return
+  router.push({ path: '/content/aev', query: { catalogId: project.value.knowledgeCatalogId } })
+}
+
+function goToProjectKnowledgeTemplate(template) {
+  if (!project.value?.knowledgeCatalogId) return
+  router.push({ path: '/content/aev', query: { catalogId: project.value.knowledgeCatalogId, template } })
+}
+
+function goToKnowledgeDetail(id) {
+  if (!id) return
+  router.push({ path: '/content/articleManage/detail', query: { id } })
+}
+
+function createProjectScopedRecord(path) {
+  if (!projectId.value) return
+  router.push({ path, query: { projectId: projectId.value } })
 }
 
 function handleSubmitClose() {
-  if (!canProjectSubmitClose.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSubmitCloseCurrentProject.value) return $sdk.msgWarning('当前操作没有权限')
   submitClose(projectId.value).then(() => {
     $sdk.msgSuccess('结项申请已提交')
     reloadCurrent()
   }).catch(e => {
     $sdk.msgError(e.message || '提交失败')
+  })
+}
+
+function handlePublishCloseReview() {
+  if (!projectId.value) return
+  if (!project.value?.closeReview?.trim()) {
+    return $sdk.msgWarning('请先完善项目复盘后再沉淀到知识中心')
+  }
+  publishReviewLoading.value = true
+  publishCloseReview(projectId.value).then((res) => {
+    $sdk.msgSuccess('项目复盘已沉淀到知识中心')
+    const articleId = res?.data?.articleId || res?.articleId
+    if (articleId) {
+      goToKnowledgeDetail(articleId)
+    } else {
+      goToProjectKnowledgeList()
+    }
+  }).catch((e) => {
+    $sdk.msgError(e.message || '沉淀项目复盘失败')
+  }).finally(() => {
+    publishReviewLoading.value = false
   })
 }
 
@@ -350,6 +575,9 @@ function resetTabFilters() {
 
 function getValidTab(value) {
   const tab = String(value || 'overview')
+  if (isProjectVisitor.value && ['plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'closure'].includes(tab)) {
+    return 'overview'
+  }
   return validTabs.has(tab) ? tab : 'overview'
 }
 
@@ -424,6 +652,99 @@ function handleMetricCardClick(tabName, filter = 'all') {
   goToTabWithFilter(tabName, filter)
 }
 
+function handleProjectAlertClick(item) {
+  if (!item?.tab) return
+  if (item.tab === 'plan' || item.tab === 'closure' || item.filter === 'unplanned' || item.filter === 'incomplete') {
+    goToTab(item.tab)
+    return
+  }
+  goToTabWithFilter(item.tab, item.filter || 'all')
+}
+
+function handleOpenImpactedItem(type, item) {
+  if (!item?.id) return
+  const pathMap = {
+    milestone: '/milestoneManage/form',
+    sprint: '/sprintManage/form',
+    task: '/taskManage/form',
+  }
+  goToDetail(pathMap[type], item.id)
+}
+
+function handleOpenImpactedGroup(type) {
+  const firstItemMap = {
+    milestone: changeImpactSummary.value?.impactedMilestones?.[0],
+    sprint: changeImpactSummary.value?.impactedSprints?.[0],
+    task: changeImpactSummary.value?.impactedTasks?.[0],
+  }
+  handleOpenImpactedItem(type, firstItemMap[type])
+}
+
+function handleConfirmPlanImpact(changeId) {
+  if (!changeId) return
+  ElMessageBox.prompt('请输入本次计划影响处理说明（选填）', '确认已处理', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：已调整里程碑日期并同步相关任务负责人',
+  }).then(({ value }) => {
+    confirmPlanImpactLoading.value = true
+    confirmPlanImpact(changeId, { remark: value || '' }).then(() => {
+      $sdk.msgSuccess('已确认计划影响处理')
+      reloadCurrent()
+    }).catch((e) => {
+      $sdk.msgError(e.message || '确认失败')
+    }).finally(() => {
+      confirmPlanImpactLoading.value = false
+    })
+  }).catch(() => {})
+}
+
+function handleConfirmPlanImpactScope(changeId, scope) {
+  if (!changeId || !scope) return
+  ElMessageBox.prompt('请输入本次分项处理说明（选填）', '确认分项已处理', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：已调整相关里程碑日期并同步责任人',
+  }).then(({ value }) => {
+    confirmScopeLoading.value = true
+    confirmPlanImpactScope(changeId, { scope, remark: value || '' }).then(() => {
+      $sdk.msgSuccess('已确认分项处理')
+      reloadCurrent()
+    }).catch((e) => {
+      $sdk.msgError(e.message || '确认失败')
+    }).finally(() => {
+      confirmScopeLoading.value = false
+    })
+  }).catch(() => {})
+}
+
+function handleConfirmPlanImpactTarget(changeId, scope, target) {
+  if (!changeId || !scope || !target?.id) return
+  ElMessageBox.prompt('请输入本次对象处理说明（选填）', '确认对象已处理', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：已更新该对象的时间安排并同步相关责任人',
+  }).then(({ value }) => {
+    confirmTargetLoading.value = true
+    confirmPlanImpactTarget(changeId, {
+      scope,
+      targetId: target.id,
+      targetName: target.name,
+      remark: value || '',
+    }).then(() => {
+      $sdk.msgSuccess('已确认对象处理')
+      reloadCurrent()
+    }).catch((e) => {
+      $sdk.msgError(e.message || '确认失败')
+    }).finally(() => {
+      confirmTargetLoading.value = false
+    })
+  }).catch(() => {})
+}
+
 function goToDetail(path, id, query = {}) {
   if (!id) return
   router.push({ path, query: { id, action: 'view', ...query } })
@@ -435,7 +756,8 @@ function goToDetail(path, id, query = {}) {
     <el-page-header @back="$router.back()" title="项目详情">
       <template #extra>
         <el-button @click="goToCockpit">进入驾驶舱</el-button>
-        <el-button type="warning" @click="handleSubmitClose" v-if="canProjectSubmitClose && project.status === '3'">提交结项申请</el-button>
+        <el-button type="primary" :disabled="!canEditCurrentProject" @click="canEditCurrentProject ? goToEdit() : $sdk.msgWarning('当前无编辑该项目的权限')">编辑项目</el-button>
+        <el-button type="warning" :disabled="!canSubmitCloseCurrentProject" @click="handleSubmitClose" v-if="project.status === '3'">提交结项申请</el-button>
       </template>
     </el-page-header>
 
@@ -467,8 +789,28 @@ function goToDetail(path, id, query = {}) {
             <div class="project-meta-item__value">{{ projectTypeMap[project.projectType] || '-' }}</div>
           </div>
           <div class="project-meta-item">
+            <span class="project-meta-item__label">所属部门</span>
+            <div class="project-meta-item__value">{{ deptMap[project.departmentId] || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">项目分类</span>
+            <div class="project-meta-item__value">{{ project.category || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">项目阶段</span>
+            <div class="project-meta-item__value">{{ phaseMap[project.phase] || project.phase || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
             <span class="project-meta-item__label">当前审批节点</span>
             <div class="project-meta-item__value">{{ project.currentNodeName || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">项目发起人</span>
+            <div class="project-meta-item__value">{{ project.creator?.nickname || project.creator?.name || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">命中权限角色</span>
+            <div class="project-meta-item__value">{{ fieldPermissionResult?.projectRole?.roleLabel || '-' }}</div>
           </div>
           <div class="project-meta-item">
             <span class="project-meta-item__label">开始时间</span>
@@ -478,17 +820,62 @@ function goToDetail(path, id, query = {}) {
             <span class="project-meta-item__label">结束时间</span>
             <div class="project-meta-item__value">{{ project.endDate || '-' }}</div>
           </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">计划开始</span>
+            <div class="project-meta-item__value">{{ project.planStartDate || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">计划结束</span>
+            <div class="project-meta-item__value">{{ project.planEndDate || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">实际开始</span>
+            <div class="project-meta-item__value">{{ project.actualStartDate || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">实际结束</span>
+            <div class="project-meta-item__value">{{ project.actualEndDate || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">业务线</span>
+            <div class="project-meta-item__value">{{ project.businessLine || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">行业</span>
+            <div class="project-meta-item__value">{{ project.industry || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">项目来源</span>
+            <div class="project-meta-item__value">{{ project.projectSource || '-' }}</div>
+          </div>
         </div>
       </div>
 
       <div class="project-hero__side">
+        <div v-if="!isProjectVisitor" class="hero-action-card">
+          <div class="hero-action-card__title">快捷发起</div>
+          <div class="hero-action-card__desc">从项目上下文直接发起核心业务动作，把任务、风险、变更、工单、Sprint 和知识收口到同一个工作台。</div>
+          <div class="hero-action-card__grid">
+            <el-button v-if="canTaskAdd" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
+            <el-button v-if="canRiskAdd" @click="createProjectScopedRecord('/projectManage/riskManage/form')">新增风险</el-button>
+            <el-button v-if="canChangeAdd" @click="createProjectScopedRecord('/changeManage/form')">新增变更</el-button>
+            <el-button v-if="canTicketAdd" @click="createProjectScopedRecord('/ticketManage/form')">新增工单</el-button>
+            <el-button v-if="canSprintAdd" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
+            <el-button v-if="canKnowledgeAdd" type="primary" @click="goToProjectKnowledgeCreate">新增知识</el-button>
+          </div>
+        </div>
+
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">预算</div>
-          <div class="hero-stat-card__value">¥ {{ Number(project.budget || 0).toLocaleString() }}</div>
+          <div class="hero-stat-card__value">{{ project.currency || 'CNY' }} {{ Number(project.budget || 0).toLocaleString() }}</div>
         </div>
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">实际成本</div>
-          <div class="hero-stat-card__value">¥ {{ Number(project.actualCost || 0).toLocaleString() }}</div>
+          <div class="hero-stat-card__value">{{ project.currency || 'CNY' }} {{ Number(project.actualCost || 0).toLocaleString() }}</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-card__label">累计工时</div>
+          <div class="hero-stat-card__value">{{ Number(project.spentHours || 0).toLocaleString() }}</div>
         </div>
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">总体进度</div>
@@ -530,9 +917,45 @@ function goToDetail(path, id, query = {}) {
             <div class="metric-card__label">里程碑达成率</div>
             <div class="metric-card__desc">延期 {{ milestoneSummary.delayed }}，临近 {{ milestoneSummary.dueSoon }}</div>
           </el-card>
+          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('knowledge')">
+            <div class="metric-card__value">{{ projectKnowledgeSummary.total || 0 }}</div>
+            <div class="metric-card__label">项目知识</div>
+            <div class="metric-card__desc">最近更新 {{ projectKnowledgeSummary.recentUpdatedCount || 0 }}</div>
+          </el-card>
+          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('plan')">
+            <div class="metric-card__value">{{ executionPlanProgress }}%</div>
+            <div class="metric-card__label">执行计划覆盖率</div>
+            <div class="metric-card__desc">已纳入 {{ executionPlanSummary.plannedTasks }} / 总任务 {{ taskSummary.total }}</div>
+          </el-card>
+          <el-card shadow="hover" class="metric-card">
+            <div class="metric-card__value">{{ projectHealthSummary.totalScore || 0 }}</div>
+            <div class="metric-card__label">项目健康度</div>
+            <div class="metric-card__desc">
+              <ViewTagField :text="projectHealthSummary.levelLabel || '基本健康'" :type="getHealthTagType(projectHealthSummary.level)" />
+            </div>
+          </el-card>
+          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('closure')">
+            <div class="metric-card__value">{{ project.closeReview ? '已补齐' : '待完善' }}</div>
+            <div class="metric-card__label">结项资料</div>
+            <div class="metric-card__desc">验收说明、交付清单、遗留问题与项目复盘</div>
+          </el-card>
         </div>
 
-        <div class="focus-grid mt20">
+        <el-card shadow="hover" class="mt20 panel-card">
+          <template #header>统一提醒</template>
+          <div v-if="!isProjectVisitor && projectAlerts.length" class="project-alert-grid">
+            <div v-for="item in projectAlerts" :key="`${item.tab}-${item.title}`" class="project-alert-card" :class="`project-alert-card--${item.type}`" @click="handleProjectAlertClick(item)">
+              <div class="project-alert-card__header">
+                <span>{{ item.title }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+              <div class="project-alert-card__desc">{{ item.desc }}</div>
+            </div>
+          </div>
+          <div v-else class="focus-list__empty">{{ isProjectVisitor ? '访客角色不展示项目执行提醒' : '当前项目暂无需要重点跟进的提醒' }}</div>
+        </el-card>
+
+        <div v-if="!isProjectVisitor" class="focus-grid mt20">
           <el-card shadow="hover" class="focus-card">
             <template #header>
               <div class="focus-card__header">
@@ -679,13 +1102,13 @@ function goToDetail(path, id, query = {}) {
               <template #header>团队与里程碑</template>
               <div class="side-panel-block">
                 <div class="side-panel-block__title">核心成员</div>
-                <div v-if="coreMembers.length" class="core-member-list">
+                <div v-if="canViewGroup('projectMember') && coreMembers.length" class="core-member-list">
                   <div v-for="item in coreMembers" :key="item.id || item.userId" class="core-member-item">
                     <ViewUser :user="item.user" />
                     <div class="core-member-item__role">{{ item.role ? item.role : '-' }}</div>
                   </div>
                 </div>
-                <div v-else class="focus-list__empty">暂无核心成员</div>
+                <div v-else class="focus-list__empty">{{ canViewGroup('projectMember') ? '暂无核心成员' : '当前角色无权查看项目成员' }}</div>
               </div>
               <div class="side-panel-block">
                 <div class="side-panel-block__title">近期里程碑</div>
@@ -701,14 +1124,67 @@ function goToDetail(path, id, query = {}) {
           </el-col>
         </el-row>
 
+        <el-row :gutter="20" class="mt20">
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover" class="panel-card">
+              <template #header>项目健康度</template>
+              <div class="health-score-card">
+                <div class="health-score-card__main">
+                  <div class="health-score-card__score">{{ projectHealthSummary.totalScore || 0 }}</div>
+                  <ViewTagField :text="projectHealthSummary.levelLabel || '基本健康'" :type="getHealthTagType(projectHealthSummary.level)" />
+                </div>
+                <div class="health-score-card__desc">基于进度、风险、变更、执行透明度、交付达成和知识沉淀六个维度综合评估当前项目运行状态。</div>
+              </div>
+              <div class="health-dimension-grid">
+                <div class="health-dimension-card">
+                  <span>进度</span>
+                  <strong>{{ projectHealthSummary.dimensions?.progress?.score || 0 }}/25</strong>
+                </div>
+                <div class="health-dimension-card">
+                  <span>风险</span>
+                  <strong>{{ projectHealthSummary.dimensions?.risk?.score || 0 }}/20</strong>
+                </div>
+                <div class="health-dimension-card">
+                  <span>变更</span>
+                  <strong>{{ projectHealthSummary.dimensions?.change?.score || 0 }}/15</strong>
+                </div>
+                <div class="health-dimension-card">
+                  <span>执行</span>
+                  <strong>{{ projectHealthSummary.dimensions?.execution?.score || 0 }}/15</strong>
+                </div>
+                <div class="health-dimension-card">
+                  <span>交付</span>
+                  <strong>{{ projectHealthSummary.dimensions?.delivery?.score || 0 }}/15</strong>
+                </div>
+                <div class="health-dimension-card">
+                  <span>知识</span>
+                  <strong>{{ projectHealthSummary.dimensions?.knowledge?.score || 0 }}/10</strong>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover" class="panel-card">
+              <template #header>健康度异常提示</template>
+              <div v-if="projectHealthSummary.alerts?.length" class="health-alert-list">
+                <div v-for="item in projectHealthSummary.alerts" :key="item" class="health-alert-item">
+                  {{ item }}
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">当前暂无健康度异常提示</div>
+            </el-card>
+          </el-col>
+        </el-row>
+
         <el-card shadow="hover" class="mt20 panel-card">
           <template #header>项目描述</template>
           <ViewRichText :html="project.description" />
         </el-card>
 
-        <el-card shadow="hover" class="mt20 panel-card">
+        <el-card v-if="canViewGroup('projectMember')" shadow="hover" class="mt20 panel-card">
           <template #header>项目成员</template>
-          <el-table :data="project.members || []" size="small" border>
+            <el-table :data="project.members || []" size="small" border>
             <el-table-column label="成员" min-width="180">
               <template #default="{ row }">
                 <ViewUser :user="row.user" />
@@ -811,7 +1287,289 @@ function goToDetail(path, id, query = {}) {
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="任务" name="tasks">
+      <el-tab-pane v-if="!isProjectVisitor" label="计划" name="plan">
+        <div class="tab-summary-grid">
+          <div class="tab-summary-card"><span>关键里程碑</span><strong>{{ executionPlanSummary.milestones }}</strong></div>
+          <div class="tab-summary-card"><span>Sprint 数量</span><strong>{{ executionPlanSummary.sprints }}</strong></div>
+          <div class="tab-summary-card"><span>已纳入执行计划任务</span><strong>{{ executionPlanSummary.plannedTasks }}</strong></div>
+          <div class="tab-summary-card"><span>待纳入执行计划任务</span><strong>{{ executionPlanSummary.unplannedTasks }}</strong></div>
+          <div class="tab-summary-card"><span>执行计划覆盖率</span><strong>{{ executionPlanProgress }}%</strong></div>
+        </div>
+
+        <div class="tab-summary-grid mt16">
+          <div class="tab-summary-card tab-summary-card--warning"><span>延期里程碑</span><strong>{{ planDeviationSummary.delayedMilestones }}</strong></div>
+          <div class="tab-summary-card tab-summary-card--warning"><span>延期 Sprint</span><strong>{{ planDeviationSummary.delayedSprints }}</strong></div>
+          <div class="tab-summary-card tab-summary-card--danger"><span>逾期计划内任务</span><strong>{{ planDeviationSummary.overduePlannedTasks }}</strong></div>
+          <div class="tab-summary-card"><span>临近到期计划内任务</span><strong>{{ planDeviationSummary.dueSoonPlannedTasks }}</strong></div>
+          <div class="tab-summary-card"><span>计划外任务</span><strong>{{ planDeviationSummary.unplannedTasks }}</strong></div>
+        </div>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>变更影响回写计划</template>
+          <div class="plan-impact-actions">
+            <el-button :disabled="!changeImpactSummary.impactedMilestones?.length" @click="handleOpenImpactedGroup('milestone')">处理受影响里程碑</el-button>
+            <el-button :disabled="!changeImpactSummary.impactedSprints?.length" @click="handleOpenImpactedGroup('sprint')">处理受影响 Sprint</el-button>
+            <el-button :disabled="!changeImpactSummary.impactedTasks?.length" type="primary" @click="handleOpenImpactedGroup('task')">处理受影响任务</el-button>
+          </div>
+          <div class="tab-summary-grid">
+            <div class="tab-summary-card"><span>已生效变更</span><strong>{{ changeImpactSummary.total || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>待确认处理</span><strong>{{ changeImpactSummary.pendingConfirm || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>进度受影响变更</span><strong>{{ changeImpactSummary.scheduleChanged || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>成本受影响变更</span><strong>{{ changeImpactSummary.costChanged || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>受影响里程碑</span><strong>{{ changeImpactSummary.impactedMilestones?.length || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>受影响 Sprint</span><strong>{{ changeImpactSummary.impactedSprints?.length || 0 }}</strong></div>
+            <div class="tab-summary-card"><span>受影响任务</span><strong>{{ changeImpactSummary.impactedTasks?.length || 0 }}</strong></div>
+          </div>
+          <div v-if="changeImpactSummary.actionableChanges?.length" class="plan-impact-confirm-list mt16">
+            <div v-for="item in changeImpactSummary.actionableChanges" :key="item.id" class="plan-impact-confirm-item">
+              <div>
+                <div class="plan-impact-confirm-item__title">{{ item.title }}</div>
+                <div class="plan-impact-confirm-item__meta">进度影响 {{ item.scheduleImpact || 0 }} 天 / 成本影响 {{ item.costImpact || 0 }}</div>
+                <div v-if="String(item.planImpactConfirmed || '0') === '1' && item.planImpactConfirmRemark" class="plan-impact-confirm-item__remark">处理记录：{{ item.planImpactConfirmRemark }}</div>
+                <div class="plan-impact-confirm-item__scopes">
+                  <ViewTagField :text="item.planImpactScopes?.milestone?.confirmed ? '里程碑已处理' : '里程碑待处理'" :type="item.planImpactScopes?.milestone?.confirmed ? 'success' : 'warning'" />
+                  <ViewTagField :text="item.planImpactScopes?.sprint?.confirmed ? 'Sprint已处理' : 'Sprint待处理'" :type="item.planImpactScopes?.sprint?.confirmed ? 'success' : 'warning'" />
+                  <ViewTagField :text="item.planImpactScopes?.task?.confirmed ? '任务已处理' : '任务待处理'" :type="item.planImpactScopes?.task?.confirmed ? 'success' : 'warning'" />
+                </div>
+                <div class="plan-impact-confirm-item__scope-records">
+                  <div v-if="item.planImpactScopes?.milestone?.remark">里程碑处理：{{ item.planImpactScopes.milestone.remark }}</div>
+                  <div v-if="item.planImpactScopes?.sprint?.remark">Sprint 处理：{{ item.planImpactScopes.sprint.remark }}</div>
+                  <div v-if="item.planImpactScopes?.task?.remark">任务处理：{{ item.planImpactScopes.task.remark }}</div>
+                </div>
+              </div>
+              <div class="plan-impact-confirm-item__actions">
+                <ViewTagField :text="String(item.planImpactConfirmed || '0') === '1' ? '已确认处理' : '待确认处理'" :type="String(item.planImpactConfirmed || '0') === '1' ? 'success' : 'warning'" />
+                <el-button link type="primary" @click="goToDetail('/changeManage/form', item.id)">详情</el-button>
+                <el-button v-if="!item.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'milestone')">确认里程碑已处理</el-button>
+                <el-button v-if="!item.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'sprint')">确认 Sprint 已处理</el-button>
+                <el-button v-if="!item.planImpactScopes?.task?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'task')">确认任务已处理</el-button>
+                <el-button v-if="String(item.planImpactConfirmed || '0') !== '1'" :loading="confirmPlanImpactLoading" type="primary" @click="handleConfirmPlanImpact(item.id)">确认已处理</el-button>
+              </div>
+            </div>
+          </div>
+          <div class="plan-deviation-grid mt16">
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">受影响里程碑</div>
+              <div v-if="changeImpactSummary.impactedMilestones?.length" class="focus-list">
+                <div v-for="item in changeImpactSummary.impactedMilestones.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">
+                    <el-button link type="primary" @click="handleOpenImpactedItem('milestone', item)">{{ item.name }}</el-button>
+                  </div>
+                  <div class="focus-list__meta">计划完成 {{ item.dueDate || '-' }}</div>
+                  <div class="focus-list__actions">
+                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'milestone', item)">确认 {{ change.title }} 已处理</el-button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无受影响里程碑</div>
+            </div>
+
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">受影响 Sprint</div>
+              <div v-if="changeImpactSummary.impactedSprints?.length" class="focus-list">
+                <div v-for="item in changeImpactSummary.impactedSprints.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">
+                    <el-button link type="primary" @click="handleOpenImpactedItem('sprint', item)">{{ item.name }}</el-button>
+                  </div>
+                  <div class="focus-list__meta">{{ item.startDate || '-' }} 至 {{ item.endDate || '-' }}</div>
+                  <div class="focus-list__actions">
+                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'sprint', item)">确认 {{ change.title }} 已处理</el-button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无受影响 Sprint</div>
+            </div>
+
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">受影响任务</div>
+              <div v-if="changeImpactSummary.impactedTasks?.length" class="focus-list">
+                <div v-for="item in changeImpactSummary.impactedTasks.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">
+                    <el-button link type="primary" @click="handleOpenImpactedItem('task', item)">{{ item.name }}</el-button>
+                  </div>
+                  <div class="focus-list__meta">截止 {{ item.endDate || '-' }}</div>
+                  <div class="focus-list__actions">
+                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'task', item)">确认 {{ change.title }} 已处理</el-button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无受影响任务</div>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>计划异常提示</template>
+          <div class="plan-alert-list">
+            <div v-for="item in planDeviationAlerts" :key="item.title" class="plan-alert-item" :class="`plan-alert-item--${item.type}`">
+              <div class="plan-alert-item__title">{{ item.title }}</div>
+              <div class="plan-alert-item__desc">{{ item.desc }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card plan-action-card">
+          <div class="plan-action-card__header">
+            <div>
+              <div class="plan-action-card__title">执行计划编排动作</div>
+              <div class="plan-action-card__desc">先维护里程碑和基线计划，再把任务纳入 Sprint，逐步把执行过程从零散推进转成结构化计划。</div>
+            </div>
+            <div class="plan-action-card__actions">
+              <el-button v-if="canSprintAdd" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
+              <el-button v-if="canTaskAdd" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
+              <el-button type="primary" @click="goToEdit">调整基线计划</el-button>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>
+            <div class="focus-card__header">
+              <span>执行计划说明</span>
+              <el-button link type="primary" @click="goToEdit">调整基线计划</el-button>
+            </div>
+          </template>
+          <div class="plan-intro-card">
+            <div class="plan-intro-card__block">
+              <div class="plan-intro-card__label">计划边界</div>
+              <div class="plan-intro-card__value">{{ project.scopeBoundary || '暂未填写范围边界说明' }}</div>
+            </div>
+            <div class="plan-intro-card__block">
+              <div class="plan-intro-card__label">主要交付物</div>
+              <div class="plan-intro-card__value">{{ project.baselineDeliverables || '暂未填写主要交付物' }}</div>
+            </div>
+            <div class="plan-intro-card__block">
+              <div class="plan-intro-card__label">计划说明</div>
+              <div class="plan-intro-card__value">{{ project.baselinePlanNote || '暂未补充执行计划说明' }}</div>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>关键里程碑时间轴</template>
+          <div v-if="executionPlanMilestones.length" class="plan-milestone-list">
+            <div v-for="item in executionPlanMilestones" :key="item.id" class="plan-milestone-item">
+              <div class="plan-milestone-item__date">{{ item.dueDate || '-' }}</div>
+              <div class="plan-milestone-item__body">
+                <div class="plan-milestone-item__header">
+                  <div class="plan-milestone-item__title">{{ item.name }}</div>
+                  <ViewTagField :text="{ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[item.status] || '-'" :type="item.status === '2' ? 'success' : item.status === '3' ? 'danger' : 'info'" />
+                </div>
+                <div class="plan-milestone-item__meta">关联任务 {{ item.taskCount || 0 }} / 已完成 {{ item.completedTaskCount || 0 }} / {{ formatDiffLabel(item.dueDate, '已超期', '即将到期') }}</div>
+                <div class="plan-milestone-item__desc">{{ item.description || '暂未补充里程碑说明' }}</div>
+                <div v-if="item.linkedTasks?.length" class="plan-milestone-item__tasks">
+                  <div v-for="task in item.linkedTasks.slice(0, 5)" :key="task.id" class="plan-milestone-item__task-chip">
+                    <el-button link type="primary" @click="goToDetail('/taskManage/form', task.id)">{{ task.name || '-' }}</el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="focus-list__empty">当前项目暂无可展示的执行里程碑</div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>延期识别与偏差清单</template>
+          <div class="plan-deviation-grid">
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">延期里程碑</div>
+              <div v-if="delayedMilestonesForPlan.length" class="focus-list">
+                <div v-for="item in delayedMilestonesForPlan.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">{{ item.name }}</div>
+                  <div class="focus-list__meta">计划 {{ item.dueDate || '-' }} / {{ formatDiffLabel(item.dueDate, '已超期', '即将到期') }}</div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无延期里程碑</div>
+            </div>
+
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">延期 Sprint</div>
+              <div v-if="delayedSprintsForPlan.length" class="focus-list">
+                <div v-for="item in delayedSprintsForPlan.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">{{ item.name }}</div>
+                  <div class="focus-list__meta">结束 {{ item.endDate || '-' }} / {{ formatDiffLabel(item.endDate, '已超期', '临近结束') }}</div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无延期 Sprint</div>
+            </div>
+
+            <div class="plan-deviation-block">
+              <div class="plan-deviation-block__title">逾期计划内任务</div>
+              <div v-if="overduePlannedTasks.length" class="focus-list">
+                <div v-for="item in overduePlannedTasks.slice(0, 5)" :key="item.id" class="focus-list__item">
+                  <div class="focus-list__title">{{ item.name }}</div>
+                  <div class="focus-list__meta">负责人 {{ item.leader?.nickname || item.leader?.name || '-' }} / 截止 {{ item.endDate || '-' }}</div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty">暂无逾期计划内任务</div>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>Sprint 执行编排</template>
+          <div v-if="sprintExecutionPlan.length" class="plan-sprint-list">
+            <div v-for="item in sprintExecutionPlan" :key="item.id" class="plan-sprint-card">
+              <div class="plan-sprint-card__header">
+                <div>
+                  <div class="plan-sprint-card__title">{{ item.name }}</div>
+                  <div class="plan-sprint-card__meta">{{ item.startDate || '-' }} 至 {{ item.endDate || '-' }}</div>
+                </div>
+                <ViewTagField :text="{ '1': '计划中', '2': '进行中', '3': '已完成', '4': '已取消' }[item.status] || '-'" :type="item.status === '2' ? 'primary' : item.status === '3' ? 'success' : 'info'" />
+              </div>
+              <div class="plan-sprint-card__stats">
+                <div><span>任务</span><strong>{{ item.sprintTasks.length }}</strong></div>
+                <div><span>已完成</span><strong>{{ item.completedTaskCount }}</strong></div>
+                <div><span>故事点</span><strong>{{ item.storyPoints }}</strong></div>
+                <div><span>关联里程碑</span><strong>{{ item.linkedMilestones.length }}</strong></div>
+              </div>
+              <div class="plan-sprint-card__links" v-if="item.linkedMilestones.length">
+                <span v-for="milestone in item.linkedMilestones" :key="milestone.id" class="plan-sprint-card__link-item">{{ milestone.name }}</span>
+              </div>
+              <div v-if="item.sprintTasks.length" class="plan-sprint-card__task-list">
+                <div v-for="task in item.sprintTasks.slice(0, 5)" :key="task.id" class="plan-sprint-card__task-item">
+                  <el-button link type="primary" class="plan-sprint-card__task-name" @click="goToDetail('/taskManage/form', task.id)">{{ task.name || '-' }}</el-button>
+                  <div class="plan-sprint-card__task-meta">
+                    <span>{{ task.leader?.nickname || task.leader?.name || '未分配负责人' }}</span>
+                    <span>{{ task.endDate || '未设置截止时间' }}</span>
+                    <ViewTagField :text="priorityMap[task.priority] || '-'" :type="getPriorityType(task.priority)" />
+                  </div>
+                </div>
+              </div>
+              <div v-else class="focus-list__empty plan-sprint-card__empty">当前 Sprint 暂未分配任务</div>
+            </div>
+          </div>
+          <div v-else class="focus-list__empty">当前项目暂无 Sprint 编排，建议先创建 Sprint 承接执行计划。</div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>待纳入执行计划任务</template>
+          <el-table :data="unplannedTasks" stripe>
+            <el-table-column prop="name" label="任务名称" min-width="220">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="goToDetail('/taskManage/form', row.id)">{{ row.name || '-' }}</el-button>
+              </template>
+            </el-table-column>
+            <el-table-column prop="leader" label="负责人" min-width="140">
+              <template #default="{ row }">{{ row.leader?.nickname || row.leader?.name || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="priority" label="优先级" width="100">
+              <template #default="{ row }">
+                <ViewTagField :text="priorityMap[row.priority] || '-'" :type="getPriorityType(row.priority)" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="endDate" label="截止时间" width="120" />
+            <el-table-column label="时间状态" width="120">
+              <template #default="{ row }">{{ row.endDate ? formatDiffLabel(row.endDate, '已超期', '即将到期') : '-' }}</template>
+            </el-table-column>
+            <el-table-column label="处置建议" min-width="220">
+              <template #default="{ row }">{{ row.endDate ? '建议尽快纳入对应 Sprint 或阶段计划，避免执行与基线计划脱节。' : '建议补齐时间安排并纳入 Sprint 或里程碑关联。' }}</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="!isProjectVisitor" label="任务" name="tasks">
         <div v-if="taskFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { overdue: '已逾期任务', dueSoon: '即将到期任务', inProgress: '处理中任务' }[taskFilter] || '任务' }}</span>
           <el-button link type="primary" @click="clearTabFilter('tasks')">查看全部</el-button>
@@ -842,6 +1600,11 @@ function goToDetail(path, id, query = {}) {
           <el-table-column label="优先级" width="100">
             <template #default="{ row }">
               <ViewTagField :text="priorityMap[row.priority] || '-'" :type="getPriorityType(row.priority)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="里程碑" min-width="150">
+            <template #default="{ row }">
+              {{ row.milestone?.name || '-' }}
             </template>
           </el-table-column>
           <el-table-column prop="progress" label="进度" width="160">
@@ -928,7 +1691,7 @@ function goToDetail(path, id, query = {}) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="里程碑" name="milestones">
+      <el-tab-pane v-if="!isProjectVisitor" label="里程碑" name="milestones">
         <div v-if="milestoneFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { dueSoon: '即将到期里程碑', overdue: '已超期里程碑', delayed: '已延期里程碑' }[milestoneFilter] || '里程碑' }}</span>
           <el-button link type="primary" @click="clearTabFilter('milestones')">查看全部</el-button>
@@ -977,6 +1740,12 @@ function goToDetail(path, id, query = {}) {
             </template>
           </el-table-column>
           <el-table-column prop="dueDate" label="计划完成日期" width="130" />
+          <el-table-column label="责任人" min-width="140">
+            <template #default="{ row }">
+              {{ row.owner?.nickname || row.owner?.name || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="phase" label="阶段" width="120" />
           <el-table-column label="时间状态" width="120">
             <template #default="{ row }">
               {{ String(row.status || '') !== '2' && row.dueDate ? formatDiffLabel(row.dueDate, '已超期', '即将到期') : '-' }}
@@ -994,6 +1763,13 @@ function goToDetail(path, id, query = {}) {
               <el-progress :percentage="row.taskCount > 0 ? Math.round((row.completedTaskCount / row.taskCount) * 100) : 0" :stroke-width="8" />
             </template>
           </el-table-column>
+          <el-table-column prop="delayReason" label="延期原因" min-width="200" show-overflow-tooltip />
+          <el-table-column label="变更影响" width="100">
+            <template #default="{ row }">{{ row.changeImpactFlag === '1' ? '是' : '否' }}</template>
+          </el-table-column>
+          <el-table-column label="风险影响" width="100">
+            <template #default="{ row }">{{ row.riskImpactFlag === '1' ? '是' : '否' }}</template>
+          </el-table-column>
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="goToDetail('/milestoneManage/form', row.id)">详情</el-button>
@@ -1002,7 +1778,7 @@ function goToDetail(path, id, query = {}) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="风险" name="risks">
+      <el-tab-pane v-if="!isProjectVisitor" label="风险" name="risks">
         <div v-if="riskFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { active: '活跃风险', high: '高风险事项', overdue: '已超期风险', unassigned: '待分配风险' }[riskFilter] || '风险' }}</span>
           <el-button link type="primary" @click="clearTabFilter('risks')">查看全部</el-button>
@@ -1016,7 +1792,7 @@ function goToDetail(path, id, query = {}) {
         <el-table :data="riskTableData" stripe class="mt16">
           <el-table-column prop="name" label="风险名称" min-width="180">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/riskManage/form', row.id)">{{ row.name || '-' }}</el-button>
+              <el-button link type="primary" @click="goToDetail('/projectManage/riskManage/form', row.id)">{{ row.name || '-' }}</el-button>
             </template>
           </el-table-column>
           <el-table-column prop="category" label="分类" width="100">
@@ -1055,13 +1831,13 @@ function goToDetail(path, id, query = {}) {
           <el-table-column prop="mitigation" label="应对措施" min-width="180" show-overflow-tooltip />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="goToDetail('/riskManage/form', row.id)">详情</el-button>
+              <el-button link type="primary" @click="goToDetail('/projectManage/riskManage/form', row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="变更" name="changes">
+      <el-tab-pane v-if="!isProjectVisitor" label="变更" name="changes">
         <div v-if="changeFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { pending: '待审批变更', highImpact: '高影响变更', implemented: '已实施变更' }[changeFilter] || '变更' }}</span>
           <el-button link type="primary" @click="clearTabFilter('changes')">查看全部</el-button>
@@ -1112,7 +1888,7 @@ function goToDetail(path, id, query = {}) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="Sprint" name="sprints">
+      <el-tab-pane v-if="!isProjectVisitor" label="Sprint" name="sprints">
         <div v-if="sprintFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { active: '进行中 Sprint', planning: '计划中 Sprint', dueSoon: '临近结束 Sprint' }[sprintFilter] || 'Sprint' }}</span>
           <el-button link type="primary" @click="clearTabFilter('sprints')">查看全部</el-button>
@@ -1141,6 +1917,10 @@ function goToDetail(path, id, query = {}) {
           </el-table-column>
           <el-table-column prop="startDate" label="开始日期" width="120" />
           <el-table-column prop="endDate" label="结束日期" width="120" />
+          <el-table-column label="变更影响" width="100">
+            <template #default="{ row }">{{ row.changeImpactFlag === '1' ? '是' : '否' }}</template>
+          </el-table-column>
+          <el-table-column prop="healthScoreSnapshot" label="健康度快照" width="110" />
           <el-table-column label="节奏提示" width="120">
             <template #default="{ row }">
               <el-tag v-if="String(row.status || '') === '2' && (getDaysDiff(row.endDate) ?? 99) <= dueSoonDays && (getDaysDiff(row.endDate) ?? -1) >= 0" type="warning" size="small">临近结束</el-tag>
@@ -1160,6 +1940,100 @@ function goToDetail(path, id, query = {}) {
             </template>
           </el-table-column>
         </el-table>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="canViewGroup('projectKnowledge')" label="知识" name="knowledge">
+        <div class="tab-summary-grid">
+          <div class="tab-summary-card"><span>知识总数</span><strong>{{ projectKnowledgeSummary.total || 0 }}</strong></div>
+          <div class="tab-summary-card"><span>FAQ</span><strong>{{ projectKnowledgeSummary.faq || 0 }}</strong></div>
+          <div class="tab-summary-card"><span>项目经验</span><strong>{{ projectKnowledgeSummary.experience || 0 }}</strong></div>
+          <div class="tab-summary-card"><span>交付文档</span><strong>{{ projectKnowledgeSummary.delivery || 0 }}</strong></div>
+          <div class="tab-summary-card"><span>最近更新</span><strong>{{ projectKnowledgeSummary.recentUpdatedCount || 0 }}</strong></div>
+        </div>
+
+        <el-card shadow="hover" class="mt16 panel-card knowledge-summary-card">
+          <div class="knowledge-summary-card__header">
+            <div>
+              <div class="knowledge-summary-card__title">项目知识空间</div>
+              <div class="knowledge-summary-card__desc">统一沉淀项目概况、方案、交付、运维支持和复盘知识，让项目资料和经验可以持续积累与复用。{{ isProjectVisitor ? '当前以访客身份访问，可查看项目知识但不可编辑。' : '' }}</div>
+            </div>
+            <div class="knowledge-summary-card__actions">
+              <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeList">查看全部</el-button>
+              <el-button v-if="!isProjectVisitor" type="primary" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeCreate">新增知识</el-button>
+              <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('implementationGuide')">实施模板</el-button>
+              <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('faq')">FAQ 模板</el-button>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover" class="mt16 panel-card">
+          <template #header>
+            <div class="focus-card__header">
+              <span>最近更新知识</span>
+              <el-button link type="primary" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeList">进入知识空间</el-button>
+            </div>
+          </template>
+          <div v-if="latestKnowledgeArticles.length" class="knowledge-list">
+            <div v-for="item in latestKnowledgeArticles" :key="item.id" class="knowledge-list__item">
+              <el-button link type="primary" class="knowledge-list__title" @click="goToKnowledgeDetail(item.id)">{{ item.title || '-' }}</el-button>
+              <div class="knowledge-list__meta">
+                <span>{{ item.catalog?.name || '-' }}</span>
+                <span>{{ knowledgeTypeMap[item.knowledgeType] || '-' }}</span>
+                <span>{{ item.maintainer?.nickname || item.maintainer?.name || item.author?.nickname || item.author?.name || '-' }}</span>
+                <span>{{ item.updateTime || item.createTime || '-' }}</span>
+              </div>
+              <div class="knowledge-list__summary">{{ item.summary || item.desc || '暂无摘要' }}</div>
+            </div>
+          </div>
+          <div v-else class="focus-list__empty">当前项目暂无知识内容</div>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="!isProjectVisitor && canViewGroup('projectClosure')" label="结项" name="closure">
+        <div class="tab-summary-grid">
+          <div class="tab-summary-card"><span>验收日期</span><strong>{{ project.acceptanceDate || '-' }}</strong></div>
+          <div class="tab-summary-card"><span>验收说明</span><strong>{{ project.closeSummary ? '已补齐' : '待补齐' }}</strong></div>
+          <div class="tab-summary-card"><span>交付清单</span><strong>{{ project.closeDeliverables ? '已补齐' : '待补齐' }}</strong></div>
+          <div class="tab-summary-card"><span>遗留问题</span><strong>{{ project.closeOpenIssues ? '已记录' : '暂无' }}</strong></div>
+          <div class="tab-summary-card"><span>项目复盘</span><strong>{{ project.closeReview ? '已补齐' : '待补齐' }}</strong></div>
+        </div>
+
+        <el-card shadow="hover" class="mt16 panel-card plan-action-card">
+          <div class="plan-action-card__header">
+            <div>
+              <div class="plan-action-card__title">结项资料与复盘收口</div>
+              <div class="plan-action-card__desc">在提交结项审批前，先整理验收说明、交付清单、遗留问题和项目复盘，让结项审批建立在完整业务资料之上。</div>
+            </div>
+            <div class="plan-action-card__actions">
+              <el-button @click="goToEdit">去完善结项资料</el-button>
+              <el-button :loading="publishReviewLoading" :disabled="!project.closeReview" @click="handlePublishCloseReview">沉淀到知识中心</el-button>
+              <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('review')">复盘模板</el-button>
+              <el-button v-if="canProjectSubmitClose && project.status === '3'" type="warning" @click="handleSubmitClose">提交结项审批</el-button>
+            </div>
+          </div>
+        </el-card>
+
+        <div class="closure-grid mt16">
+          <el-card shadow="hover" class="panel-card">
+            <template #header>验收说明</template>
+            <div class="closure-content">{{ project.closeSummary || '暂未填写验收说明' }}</div>
+          </el-card>
+
+          <el-card shadow="hover" class="panel-card">
+            <template #header>交付清单</template>
+            <div class="closure-content">{{ project.closeDeliverables || '暂未填写交付清单' }}</div>
+          </el-card>
+
+          <el-card shadow="hover" class="panel-card">
+            <template #header>遗留问题</template>
+            <div class="closure-content">{{ project.closeOpenIssues || '暂无遗留问题记录' }}</div>
+          </el-card>
+
+          <el-card shadow="hover" class="panel-card">
+            <template #header>项目复盘</template>
+            <div class="closure-content">{{ project.closeReview || '暂未填写项目复盘' }}</div>
+          </el-card>
+        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -1215,13 +2089,16 @@ function goToDetail(path, id, query = {}) {
 
 .project-meta-item {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .project-meta-item__label {
-  display: block;
-  margin-bottom: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  flex-shrink: 0;
 }
 
 .project-meta-item__value {
@@ -1230,12 +2107,45 @@ function goToDetail(path, id, query = {}) {
   align-items: center;
   line-height: 1.6;
   color: var(--el-text-color-regular);
+  justify-content: flex-end;
+  text-align: right;
 }
 
 .project-hero__side {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.hero-action-card {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.hero-action-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.hero-action-card__desc {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.hero-action-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.hero-action-card__grid :deep(.el-button) {
+  margin-left: 0;
 }
 
 .hero-stat-card {
@@ -1294,6 +2204,64 @@ function goToDetail(path, id, query = {}) {
   font-size: 12px;
   line-height: 1.5;
   color: var(--el-text-color-secondary);
+}
+
+.project-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.project-alert-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.project-alert-card:hover {
+  transform: translateY(-2px);
+}
+
+.project-alert-card--danger {
+  background: rgba(245, 108, 108, 0.08);
+  border-color: rgba(245, 108, 108, 0.24);
+}
+
+.project-alert-card--warning {
+  background: rgba(230, 162, 60, 0.08);
+  border-color: rgba(230, 162, 60, 0.24);
+}
+
+.project-alert-card--info {
+  background: rgba(64, 158, 255, 0.08);
+  border-color: rgba(64, 158, 255, 0.22);
+}
+
+.project-alert-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.project-alert-card__header span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.project-alert-card__header strong {
+  font-size: 22px;
+  color: var(--el-text-color-primary);
+}
+
+.project-alert-card__desc {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
 }
 
 .focus-grid,
@@ -1366,6 +2334,354 @@ function goToDetail(path, id, query = {}) {
   line-height: 1.7;
 }
 
+.plan-intro-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.plan-action-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.plan-action-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.plan-action-card__desc {
+  margin-top: 8px;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-action-card__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.plan-impact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.plan-impact-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-impact-confirm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.plan-impact-confirm-item__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.plan-impact-confirm-item__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-impact-confirm-item__remark {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.plan-impact-confirm-item__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.plan-impact-confirm-item__scope-records {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
+}
+
+.focus-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.plan-impact-confirm-item__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.plan-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-alert-item {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.plan-alert-item--danger {
+  background: rgba(245, 108, 108, 0.08);
+  border-color: rgba(245, 108, 108, 0.24);
+}
+
+.plan-alert-item--warning {
+  background: rgba(230, 162, 60, 0.08);
+  border-color: rgba(230, 162, 60, 0.24);
+}
+
+.plan-alert-item--info {
+  background: rgba(64, 158, 255, 0.08);
+  border-color: rgba(64, 158, 255, 0.22);
+}
+
+.plan-alert-item--success {
+  background: rgba(103, 194, 58, 0.08);
+  border-color: rgba(103, 194, 58, 0.22);
+}
+
+.plan-alert-item__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.plan-alert-item__desc {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.plan-intro-card__block {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.plan-intro-card__label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-intro-card__value {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+}
+
+.plan-milestone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.plan-milestone-item {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.plan-milestone-item__date {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--Color) 4%, #f8fafc);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  text-align: center;
+}
+
+.plan-milestone-item__body {
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+}
+
+.plan-milestone-item__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.plan-milestone-item__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.plan-milestone-item__meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-milestone-item__desc {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.plan-milestone-item__tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.plan-milestone-item__task-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(64, 158, 255, 0.08);
+}
+
+.plan-sprint-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.plan-sprint-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+
+.plan-sprint-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.plan-sprint-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.plan-sprint-card__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-sprint-card__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.plan-sprint-card__stats > div {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.plan-sprint-card__stats span {
+  display: block;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.plan-sprint-card__stats strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+  color: var(--el-text-color-primary);
+}
+
+.plan-sprint-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.plan-sprint-card__link-item {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(64, 158, 255, 0.1);
+  color: var(--el-color-primary);
+  font-size: 12px;
+}
+
+.plan-sprint-card__task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+
+.plan-sprint-card__task-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.plan-sprint-card__task-name {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.plan-sprint-card__task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  align-items: center;
+}
+
+.plan-sprint-card__empty {
+  margin-top: 14px;
+}
+
 .panel-progress-list {
   display: flex;
   flex-direction: column;
@@ -1427,6 +2743,82 @@ function goToDetail(path, id, query = {}) {
   color: var(--el-text-color-secondary);
 }
 
+.health-score-card__main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.health-score-card__score {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--el-color-primary);
+}
+
+.health-score-card__desc {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
+}
+
+.health-dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.health-dimension-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.health-dimension-card span {
+  display: block;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.health-dimension-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
+  color: var(--el-text-color-primary);
+}
+
+.health-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.health-alert-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 108, 108, 0.16);
+  background: rgba(245, 108, 108, 0.06);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.closure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.closure-content {
+  min-height: 120px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+}
+
 .side-panel-block + .side-panel-block {
   margin-top: 20px;
 }
@@ -1480,6 +2872,14 @@ function goToDetail(path, id, query = {}) {
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
   background: #fff;
+}
+
+.tab-summary-card--warning {
+  background: rgba(230, 162, 60, 0.08);
+}
+
+.tab-summary-card--danger {
+  background: rgba(245, 108, 108, 0.08);
 }
 
 .tab-summary-card span {
@@ -1605,6 +3005,89 @@ function goToDetail(path, id, query = {}) {
   border-radius: 14px;
 }
 
+.knowledge-summary-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.knowledge-summary-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.knowledge-summary-card__desc {
+  margin-top: 8px;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
+}
+
+.knowledge-summary-card__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.knowledge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.knowledge-list__item {
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+
+.knowledge-list__title {
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.knowledge-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.knowledge-list__summary {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.plan-deviation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.plan-deviation-block {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.plan-deviation-block__title {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .project-tabs :deep(.el-tabs__content) {
   overflow: visible;
 }
@@ -1637,6 +3120,14 @@ function goToDetail(path, id, query = {}) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .project-alert-grid,
+  .hero-action-card__grid,
+  .closure-grid,
+  .health-dimension-grid,
+  .plan-deviation-grid,
+  .plan-intro-card,
+  .plan-sprint-list,
+  .plan-sprint-card__stats,
   .project-meta-grid,
   .cost-grid,
   .tab-summary-grid,
@@ -1654,10 +3145,22 @@ function goToDetail(path, id, query = {}) {
   .metric-grid,
   .focus-grid,
   .focus-board,
+  .project-alert-grid,
+  .hero-action-card__grid,
+  .closure-grid,
+  .health-dimension-grid,
+  .plan-deviation-grid,
+  .plan-intro-card,
+  .plan-sprint-list,
+  .plan-sprint-card__stats,
   .project-meta-grid,
   .cost-grid,
   .tab-summary-grid,
   .milestone-timeline-rail__body {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-milestone-item {
     grid-template-columns: 1fr;
   }
 

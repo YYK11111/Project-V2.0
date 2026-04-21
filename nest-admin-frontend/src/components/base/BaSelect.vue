@@ -36,6 +36,7 @@ export default defineComponent({
     <el-select
       class="BaSelect"
       clearable
+      style="width: 100%"
       :placeholder="placeholderTransfer"
       :empty-values="isAll ? ['', null] : undefined"
       v-bind="Object.assign({}, $attrs, { style: '', class: '', id: '' })">
