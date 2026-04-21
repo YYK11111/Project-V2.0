@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { watch } from 'vue'
+import { nextTick, onActivated, onBeforeUnmount, onDeactivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { applyArticleBorrow, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes } from './api'
+import { extractTocItems } from './viewToc'
 import { checkPermi } from '@/utils/permission'
 import { sourceTypeMap, templateTypeMap } from '@/views/business/projectManage/fieldMaps'
 
@@ -16,11 +17,16 @@ const statusMap = ref({})
 const accessDeniedInfo = ref<{ message?: string; canBorrow?: boolean } | null>(null)
 const borrowDialogVisible = ref(false)
 const borrowLoading = ref(false)
+const tocDrawerVisible = ref(false)
 const borrowForm = ref({
   articleId: '',
   requestedDays: 1,
   applyReason: '',
 })
+const contentRef = ref<HTMLElement | null>(null)
+const tocItems = ref<any[]>([])
+const activeHeadingId = ref('')
+const headingOffset = 24
 const canEditArticle = computed(() => checkPermi(['business/articles/update']) && article.value?.canEdit !== false)
 const canViewAiPreview = computed(() => checkPermi(['content/articles/aiDebug']) || checkPermi(['content/articles/viewAll']))
 
@@ -62,6 +68,93 @@ const readingTags = computed(() => article.value?.tags || [])
 getKnowledgeTypes().then(({ data }) => (knowledgeTypes.value = data || {}))
 getVisibilityTypes().then(({ data }) => (visibilityTypes.value = data || {}))
 getStatus().then(({ data }) => (statusMap.value = data || {}))
+
+function resetDetailState() {
+  tocItems.value = []
+  activeHeadingId.value = ''
+  tocDrawerVisible.value = false
+}
+
+function extractTocFromContent() {
+  if (!contentRef.value) {
+    tocItems.value = []
+    activeHeadingId.value = ''
+    return
+  }
+
+  tocItems.value = extractTocItems(contentRef.value)
+  activeHeadingId.value = tocItems.value[0]?.id || ''
+}
+
+function getHeadingElement(id: string) {
+  if (!contentRef.value) return null
+  return contentRef.value.querySelector<HTMLElement>(`#${CSS.escape(id)}`)
+}
+
+function updateActiveHeading() {
+  const container = contentRef.value?.parentElement
+  if (!container || !tocItems.value.length) {
+    activeHeadingId.value = ''
+    return
+  }
+
+  const containerTop = container.getBoundingClientRect().top
+  const threshold = containerTop + headingOffset
+  let currentId = tocItems.value[0].id
+
+  for (const item of tocItems.value) {
+    const heading = getHeadingElement(item.id)
+    if (!heading) continue
+    if (heading.getBoundingClientRect().top <= threshold) {
+      currentId = item.id
+      continue
+    }
+    break
+  }
+
+  activeHeadingId.value = currentId
+}
+
+function handleScroll() {
+  updateActiveHeading()
+}
+
+function bindScrollListeners() {
+  const container = contentRef.value?.parentElement
+  if (!container) return
+  container.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('resize', handleScroll)
+  container.addEventListener('scroll', handleScroll, { passive: true })
+  window.addEventListener('resize', handleScroll)
+}
+
+function unbindScrollListeners() {
+  contentRef.value?.parentElement?.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('resize', handleScroll)
+}
+
+function scrollToHeading(id: string) {
+  const heading = getHeadingElement(id)
+  const container = contentRef.value?.parentElement
+  if (!heading || !container) return
+
+  activeHeadingId.value = id
+  const containerTop = container.getBoundingClientRect().top
+  const headingTop = heading.getBoundingClientRect().top
+  const top = container.scrollTop + headingTop - containerTop - headingOffset
+  container.scrollTo({ top, behavior: 'smooth' })
+}
+
+function handleTocClick(id: string) {
+  tocDrawerVisible.value = false
+  scrollToHeading(id)
+}
+
+async function syncTocAfterRender() {
+  await nextTick()
+  extractTocFromContent()
+  updateActiveHeading()
+}
 
 function loadArticle() {
   if (!route.query.id) return
@@ -127,10 +220,47 @@ watch(
   () => route.query.id,
   () => {
     article.value = null
+    resetDetailState()
     loadArticle()
   },
   { immediate: true },
 )
+
+watch(
+  () => article.value?.content,
+  async (content) => {
+    if (!content) {
+      resetDetailState()
+      return
+    }
+    await syncTocAfterRender()
+  },
+)
+
+watch(
+  () => article.value?.id,
+  (id) => {
+    unbindScrollListeners()
+    if (!id) return
+    nextTick(() => {
+      bindScrollListeners()
+      updateActiveHeading()
+    })
+  },
+)
+
+onActivated(() => {
+  bindScrollListeners()
+  updateActiveHeading()
+})
+
+onDeactivated(() => {
+  unbindScrollListeners()
+})
+
+onBeforeUnmount(() => {
+  unbindScrollListeners()
+})
 </script>
 
 <template>
@@ -149,84 +279,103 @@ watch(
 
     <template v-else-if="article">
       <section class="knowledge-detail-hero Gcard">
-        <div class="knowledge-detail-hero__breadcrumbs">
-          <el-button text @click="router.back()">返回列表</el-button>
-          <span>/</span>
-          <span>{{ article.catalog?.name || '知识详情' }}</span>
-        </div>
-
         <div class="knowledge-detail-hero__header">
           <div class="knowledge-detail-hero__main">
-            <div class="knowledge-detail-hero__eyebrow">知识详情</div>
+            <div class="knowledge-detail-hero__eyebrow">{{ article.catalog?.name || '知识详情' }}</div>
             <h1 class="knowledge-detail-hero__title">{{ article.title }}</h1>
             <p class="knowledge-detail-hero__summary">{{ article.summary || article.desc || '暂无摘要' }}</p>
 
             <div class="knowledge-detail-hero__chips">
-              <el-tag v-for="item in articlePrimaryMetaList" :key="item.label" effect="plain" size="small">{{ item.label }}: {{ item.value }}</el-tag>
+              <div v-for="item in articlePrimaryMetaList" :key="item.label" class="knowledge-detail-chip">
+                <span class="knowledge-detail-chip__label">{{ item.label }}</span>
+                <span class="knowledge-detail-chip__value">{{ item.value }}</span>
+              </div>
             </div>
 
             <div v-if="readingTags.length" class="knowledge-detail-hero__tags">
               <el-tag v-for="item in readingTags" :key="item.id" size="small">{{ item.name }}</el-tag>
             </div>
-          </div>
-
-          <div class="knowledge-detail-hero__side">
-            <div class="knowledge-detail-meta-card">
-              <div class="knowledge-detail-meta-card__title">内容信息</div>
-              <div class="knowledge-detail-meta-card__list">
-                <div v-for="item in articleSecondaryMetaList" :key="item.label" class="knowledge-detail-meta-card__item">
-                  <span class="knowledge-detail-meta-card__label">{{ item.label }}</span>
-                  <span class="knowledge-detail-meta-card__value">{{ item.value }}</span>
-                </div>
+            <div class="knowledge-detail-hero__meta-grid">
+              <div v-for="item in articleSecondaryMetaList" :key="item.label" class="knowledge-detail-hero__meta-item">
+                <span class="knowledge-detail-hero__meta-label">{{ item.label }}</span>
+                <span class="knowledge-detail-hero__meta-value">{{ item.value }}</span>
               </div>
-              <div class="knowledge-detail-meta-card__actions">
-                <el-button @click="router.back()">返回</el-button>
-                <el-button v-if="article.sourceType && (article.sourceId || article.sourceProjectId)" @click="goToSource">查看来源</el-button>
-                <el-button v-if="canEditArticle" type="primary" @click="goEdit">编辑</el-button>
-              </div>
+            </div>
+            <div class="knowledge-detail-hero__actions">
+              <el-button v-if="article.sourceType && (article.sourceId || article.sourceProjectId)" @click="goToSource">查看来源</el-button>
+              <el-button v-if="canEditArticle" type="primary" @click="goEdit">编辑</el-button>
             </div>
           </div>
         </div>
       </section>
 
       <div class="knowledge-detail-layout">
-        <section class="knowledge-detail-reading Gcard">
-          <div class="knowledge-detail-reading__header">
-            <div>
-              <div class="knowledge-detail-reading__title">正文内容</div>
-              <div class="knowledge-detail-reading__desc">按阅读视角展示正文结构、重点说明和图文内容，让知识消费更自然。</div>
-            </div>
+        <aside class="knowledge-detail-sidebar Gcard">
+          <div class="knowledge-detail-sidebar__header">文章目录</div>
+          <div v-if="tocItems.length" class="knowledge-detail-toc__list">
+            <button
+              v-for="item in tocItems"
+              :key="item.id"
+              type="button"
+              class="knowledge-detail-toc__item"
+              :class="{ 'is-active': activeHeadingId === item.id }"
+              :style="{ paddingLeft: `${item.level * 14}px` }"
+              @click="scrollToHeading(item.id)"
+            >
+              <span class="knowledge-detail-toc__item-text">{{ item.text }}</span>
+            </button>
           </div>
-          <div class="knowledge-detail-reading__body" v-html="article.content || '<p>暂无内容</p>'"></div>
+          <div v-else class="knowledge-detail-toc__empty">暂无目录</div>
+        </aside>
+
+        <section class="knowledge-detail-content-shell">
+          <div class="knowledge-detail-content-shell__header">正文</div>
+          <div ref="contentRef" class="knowledge-detail-reading__body" v-html="article.content || '<p>暂无内容</p>'"></div>
         </section>
 
-        <aside v-if="canViewAiPreview" class="knowledge-detail-side">
-          <section class="knowledge-detail-ai Gcard">
-            <div class="knowledge-detail-ai__header">
-              <div>
-                <div class="knowledge-detail-ai__title">AI 检索诊断</div>
-                <div class="knowledge-detail-ai__desc">辅助检查切片、向量和摘要质量，确认内容是否适合检索和问答。</div>
-              </div>
-            </div>
-
-            <div class="knowledge-ai-stats">
-              <div v-for="item in aiStats" :key="item.label" class="knowledge-ai-stats__item">
-                <div class="knowledge-ai-stats__label">{{ item.label }}</div>
-                <div class="knowledge-ai-stats__value">{{ item.value }}</div>
-              </div>
-            </div>
-
-            <el-collapse class="knowledge-chunk-list">
-              <el-collapse-item v-for="chunk in article.contentChunks || []" :key="chunk.order" :name="String(chunk.order)" :title="`${chunk.title}（片段 ${chunk.order}）`">
-                <div class="knowledge-chunk-item">
-                  <div class="knowledge-chunk-item__summary">{{ chunk.summary || '暂无摘要' }}</div>
-                  <pre class="knowledge-chunk-item__text">{{ chunk.text }}</pre>
-                </div>
-              </el-collapse-item>
-            </el-collapse>
-          </section>
-        </aside>
       </div>
+
+      <section v-if="canViewAiPreview" class="knowledge-detail-ai Gcard">
+        <div class="knowledge-detail-ai__header">
+          <div>
+            <div class="knowledge-detail-ai__title">AI 检索诊断</div>
+            <div class="knowledge-detail-ai__desc">辅助检查切片、向量和摘要质量，确认内容是否适合检索和问答。</div>
+          </div>
+        </div>
+
+        <div class="knowledge-ai-stats">
+          <div v-for="item in aiStats" :key="item.label" class="knowledge-ai-stats__item">
+            <div class="knowledge-ai-stats__label">{{ item.label }}</div>
+            <div class="knowledge-ai-stats__value">{{ item.value }}</div>
+          </div>
+        </div>
+
+        <el-collapse class="knowledge-chunk-list">
+          <el-collapse-item v-for="chunk in article.contentChunks || []" :key="chunk.order" :name="String(chunk.order)" :title="`${chunk.title}（片段 ${chunk.order}）`">
+            <div class="knowledge-chunk-item">
+              <div class="knowledge-chunk-item__summary">{{ chunk.summary || '暂无摘要' }}</div>
+              <pre class="knowledge-chunk-item__text">{{ chunk.text }}</pre>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </section>
+
+      <el-drawer v-model="tocDrawerVisible" title="文章目录" size="82%" append-to-body>
+        <div v-if="tocItems.length" class="knowledge-detail-drawer-list">
+          <button
+            v-for="item in tocItems"
+            :key="item.id"
+            type="button"
+            class="knowledge-detail-toc__item"
+            :class="{ 'is-active': activeHeadingId === item.id }"
+            :style="{ paddingLeft: `${item.level * 14}px` }"
+            @click="handleTocClick(item.id)"
+          >
+            <span class="knowledge-detail-toc__item-text">{{ item.text }}</span>
+          </button>
+        </div>
+        <div v-else class="knowledge-detail-toc__empty">暂无目录</div>
+      </el-drawer>
     </template>
 
     <BaDialog v-model="borrowDialogVisible" title="申请借阅" width="520" @confirm="submitBorrow">
@@ -260,9 +409,9 @@ watch(
 }
 
 .knowledge-detail-hero,
-.knowledge-detail-reading,
+.knowledge-detail-content-shell,
 .knowledge-detail-ai,
-.knowledge-detail-meta-card,
+.knowledge-detail-meta-panel,
 .knowledge-ai-stats__item,
 .knowledge-chunk-item__text {
   border: 1px solid var(--detail-line);
@@ -274,31 +423,22 @@ watch(
   background: linear-gradient(180deg, color-mix(in srgb, var(--detail-paper) 36%, var(--cardBg)), color-mix(in srgb, var(--cardBg) 98%, transparent));
 }
 
-.knowledge-detail-hero__breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--detail-text-faint);
-  font-size: 13px;
-}
-
 .knowledge-detail-hero__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.72fr);
-  gap: 24px;
-  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .knowledge-detail-hero__eyebrow {
   display: inline-flex;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--detail-paper) 70%, var(--cardBg));
-  color: color-mix(in srgb, var(--detail-primary-deep) 72%, var(--detail-text-main));
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--detail-text-faint);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: none;
 }
 
 .knowledge-detail-hero__title {
@@ -325,85 +465,170 @@ watch(
 }
 
 .knowledge-detail-hero__chips {
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
-.knowledge-detail-hero__chips :deep(.el-tag),
 .knowledge-detail-hero__tags :deep(.el-tag) {
   border-color: var(--detail-line);
   background: color-mix(in srgb, var(--detail-paper) 55%, var(--cardBg));
   color: color-mix(in srgb, var(--detail-primary-deep) 70%, var(--detail-text-main));
 }
 
+.knowledge-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--detail-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--detail-paper) 42%, var(--cardBg));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.knowledge-detail-chip__label {
+  color: var(--detail-text-faint);
+}
+
+.knowledge-detail-chip__value {
+  color: var(--detail-text-main);
+  font-weight: 600;
+}
+
 .knowledge-detail-hero__tags {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
-.knowledge-detail-meta-card {
-  padding: 18px;
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--cardBg) 94%, transparent);
+.knowledge-detail-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
 }
 
-.knowledge-detail-meta-card__title,
-.knowledge-detail-reading__title,
 .knowledge-detail-ai__title {
   color: var(--detail-text-main);
   font-size: 18px;
   font-weight: 700;
 }
 
-.knowledge-detail-meta-card__list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.knowledge-detail-hero__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 18px;
   margin-top: 16px;
 }
 
-.knowledge-detail-meta-card__item {
+.knowledge-detail-hero__meta-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--detail-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--detail-paper) 28%, var(--cardBg));
 }
 
-.knowledge-detail-meta-card__label,
+.knowledge-detail-hero__meta-label,
 .knowledge-ai-stats__label {
   color: var(--detail-text-faint);
   font-size: 12px;
 }
 
-.knowledge-detail-meta-card__value,
+.knowledge-detail-hero__meta-value,
 .knowledge-ai-stats__value {
   color: var(--detail-text-main);
   font-weight: 700;
   line-height: 1.6;
 }
 
-.knowledge-detail-meta-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
 .knowledge-detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.75fr);
-  gap: 20px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
-.knowledge-detail-reading,
+.knowledge-detail-sidebar,
+.knowledge-detail-content-shell,
+.knowledge-detail-ai {
+  border-radius: 22px;
+}
+
+.knowledge-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 280px);
+  min-height: 560px;
+  padding: 24px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cardBg) 96%, transparent);
+}
+
+.knowledge-detail-toc__list,
+.knowledge-detail-drawer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 12px;
+  overflow-y: auto;
+}
+
+.knowledge-detail-toc__item {
+  width: 100%;
+  padding-top: 10px;
+  padding-right: 12px;
+  padding-bottom: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--detail-text-subtle);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.knowledge-detail-toc__item:hover,
+.knowledge-detail-toc__item.is-active {
+  background: var(--detail-paper);
+  color: var(--detail-primary-deep);
+}
+
+.knowledge-detail-toc__item-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.knowledge-detail-toc__empty {
+  padding: 28px 20px 8px;
+  font-size: 13px;
+  color: var(--detail-text-faint);
+}
+
+.knowledge-detail-content-shell,
 .knowledge-detail-ai {
   padding: 24px;
   background: color-mix(in srgb, var(--cardBg) 98%, transparent);
 }
 
-.knowledge-detail-reading__header,
+.knowledge-detail-content-shell__header,
+.knowledge-detail-sidebar__header {
+  padding-bottom: 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--detail-line);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--detail-text-main);
+}
+
 .knowledge-detail-ai__header {
   margin-bottom: 18px;
 }
 
-.knowledge-detail-reading__desc,
 .knowledge-detail-ai__desc,
 .knowledge-chunk-item__summary {
   margin-top: 8px;
@@ -411,9 +636,18 @@ watch(
   line-height: 1.74;
 }
 
+.knowledge-detail-content-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 280px);
+  min-height: 560px;
+  overflow: hidden;
+}
+
 .knowledge-detail-reading__body {
-  max-width: 72ch;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   color: var(--detail-text-main);
   font-size: 16px;
   line-height: 1.88;
@@ -495,15 +729,22 @@ watch(
 }
 
 @media (max-width: 1200px) {
-  .knowledge-detail-hero__header,
   .knowledge-detail-layout {
     grid-template-columns: 1fr;
+  }
+
+  .knowledge-detail-sidebar {
+    display: none;
+  }
+
+  .knowledge-detail-hero__meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
   .knowledge-detail-hero,
-  .knowledge-detail-reading,
+  .knowledge-detail-content-shell,
   .knowledge-detail-ai {
     padding: 18px;
   }
@@ -512,9 +753,16 @@ watch(
     font-size: 30px;
   }
 
+  .knowledge-detail-content-shell {
+    height: calc(100vh - 240px);
+    min-height: 420px;
+  }
+
+  .knowledge-detail-hero__meta-grid,
   .knowledge-ai-stats {
     grid-template-columns: 1fr;
   }
+
 }
 
 :global(html.dark) .knowledge-detail-page {

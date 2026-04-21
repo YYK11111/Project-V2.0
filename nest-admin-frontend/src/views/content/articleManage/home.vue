@@ -85,7 +85,7 @@ async function loadPageData() {
 
 function goDetail(item: any) {
   if (!item?.id) return
-  router.push({ path: '/content/articleManage/detail', query: { id: item.id } })
+  router.push({ path: '/content/articleManage/view', query: { id: item.id } })
 }
 
 function goSearch(extraParams: Record<string, any> = {}) {

@@ -151,7 +151,7 @@ function handlePageChange(pageNum: number) {
 }
 
 function goDetail(item: any) {
-  router.push({ path: '/content/articleManage/detail', query: { id: item.id } })
+  router.push({ path: '/content/articleManage/view', query: { id: item.id } })
 }
 
 function useHotKeyword(keyword: string) {

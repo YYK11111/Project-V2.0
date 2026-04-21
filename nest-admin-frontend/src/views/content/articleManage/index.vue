@@ -217,7 +217,7 @@ catalog.getTrees()
           </el-table-column>
           <el-table-column label="标题" prop="title" min-width="220" :show-overflow-tooltip="true">
             <template #default="{ row }">
-              <el-button link type="primary" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.id } })">{{ row.title }}</el-button>
+              <el-button link type="primary" @click="$router.push({ path: '/content/articleManage/view', query: { id: row.id } })">{{ row.title }}</el-button>
             </template>
           </el-table-column>
           <el-table-column label="分类" prop="catalog.name" width="140">

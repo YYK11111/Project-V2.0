@@ -9,7 +9,7 @@ const params = ref({})
 
 function goArticle(row: any) {
   if (!row?.articleId) return
-  router.push({ path: '/content/articleManage/detail', query: { id: row.articleId } })
+  router.push({ path: '/content/articleManage/view', query: { id: row.articleId } })
 }
 
 const statusMap = {

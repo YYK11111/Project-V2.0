@@ -317,41 +317,30 @@ onBeforeUnmount(() => {
       </section>
 
       <div class="knowledge-view-layout">
+        <aside class="knowledge-view-sidebar Gcard">
+          <div class="knowledge-view-sidebar__header">文章目录</div>
+
+          <div v-if="tocItems.length" class="knowledge-view-toc__list">
+            <button
+              v-for="item in tocItems"
+              :key="item.id"
+              type="button"
+              class="knowledge-view-toc__item"
+              :class="{ 'is-active': activeHeadingId === item.id }"
+              :style="{ paddingLeft: `${item.level * 14}px` }"
+              @click="scrollToHeading(item.id)"
+            >
+              <span class="knowledge-view-toc__item-text">{{ item.text }}</span>
+            </button>
+          </div>
+          <div v-else class="knowledge-view-toc__empty">暂无目录</div>
+        </aside>
+
         <main class="knowledge-view-main">
-          <section class="knowledge-view-reading Gcard">
-            <div class="knowledge-view-reading__header">
-              <div>
-                <div class="knowledge-view-reading__title">正文内容</div>
-                <div class="knowledge-view-reading__desc">按阅读视角展示知识内容，并支持通过目录快速定位到目标章节。</div>
-              </div>
-            </div>
+          <section class="knowledge-view-content-shell Gcard">
             <div ref="contentRef" class="knowledge-view-reading__body" v-html="article.content || '<p>暂无内容</p>'"></div>
           </section>
         </main>
-
-        <aside class="knowledge-view-side">
-          <section class="knowledge-view-toc Gcard">
-            <div class="knowledge-view-toc__header">
-              <div class="knowledge-view-toc__title">文章目录</div>
-              <div class="knowledge-view-toc__desc">完整展示 `h1-h6` 标题结构</div>
-            </div>
-
-            <div v-if="tocItems.length" class="knowledge-view-toc__list">
-              <button
-                v-for="item in tocItems"
-                :key="item.id"
-                type="button"
-                class="knowledge-view-toc__item"
-                :class="{ 'is-active': activeHeadingId === item.id }"
-                :style="{ paddingLeft: `${item.level * 14}px` }"
-                @click="scrollToHeading(item.id)"
-              >
-                <span class="knowledge-view-toc__item-text">{{ item.text }}</span>
-              </button>
-            </div>
-            <div v-else class="knowledge-view-toc__empty">暂无目录</div>
-          </section>
-        </aside>
       </div>
     </template>
 
@@ -466,49 +455,54 @@ onBeforeUnmount(() => {
 
 .knowledge-view-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
 
 .knowledge-view-main,
-.knowledge-view-side {
+.knowledge-view-sidebar {
   min-width: 0;
 }
 
-.knowledge-view-reading,
-.knowledge-view-toc {
+.knowledge-view-sidebar,
+.knowledge-view-content-shell {
   border: 1px solid var(--view-line);
   box-shadow: var(--view-shadow);
 }
 
-.knowledge-view-reading {
-  padding: 26px 30px;
+.knowledge-view-sidebar,
+.knowledge-view-content-shell {
+  height: calc(100vh - 240px);
+  min-height: 560px;
 }
 
-.knowledge-view-reading__header {
-  margin-bottom: 24px;
+.knowledge-view-sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.knowledge-view-reading__title,
-.knowledge-view-toc__title {
-  font-size: 18px;
+.knowledge-view-sidebar__header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--view-line);
+  font-size: 16px;
   font-weight: 700;
   color: var(--FontBlack);
 }
 
-.knowledge-view-reading__desc,
-.knowledge-view-toc__desc {
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--FontBlack5);
+.knowledge-view-content-shell {
+  overflow: hidden;
+  padding: 28px 30px;
 }
 
 .knowledge-view-reading__body {
+  height: 100%;
+  overflow-y: auto;
   font-size: 15px;
   line-height: 1.9;
   color: var(--FontBlack2);
+  padding-right: 10px;
 }
 
 .knowledge-view-reading__body :deep(h1),
@@ -556,29 +550,13 @@ onBeforeUnmount(() => {
   overflow: auto;
 }
 
-.knowledge-view-side {
-  position: sticky;
-  top: 96px;
-}
-
-.knowledge-view-toc {
-  padding: 22px 0;
-  max-height: calc(100vh - 120px);
-  overflow: hidden;
-}
-
-.knowledge-view-toc__header {
-  padding: 0 20px 16px;
-  border-bottom: 1px solid var(--view-line);
-}
-
 .knowledge-view-toc__list,
 .knowledge-view-drawer-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px 10px 0;
-  overflow: auto;
+  padding: 12px 10px;
+  overflow-y: auto;
 }
 
 .knowledge-view-toc__item {
@@ -621,7 +599,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .knowledge-view-side {
+  .knowledge-view-sidebar {
     display: none;
   }
 
@@ -636,12 +614,17 @@ onBeforeUnmount(() => {
   }
 
   .knowledge-view-hero,
-  .knowledge-view-reading {
+  .knowledge-view-content-shell {
     padding: 22px 18px;
   }
 
   .knowledge-view-hero__title {
     font-size: 26px;
+  }
+
+  .knowledge-view-content-shell {
+    height: calc(100vh - 220px);
+    min-height: 420px;
   }
 
   .knowledge-view-reading__body {
