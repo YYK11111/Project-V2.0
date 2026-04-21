@@ -475,7 +475,7 @@ catalog.getTrees()
   padding: 14px 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
-  background: #fff;
+  background: var(--el-bg-color);
 }
 
 .tag-panel__main {
@@ -525,7 +525,7 @@ catalog.getTrees()
 }
 
 .knowledge-catalog-tree__node:hover {
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   border-color: var(--el-border-color-lighter);
 }
 

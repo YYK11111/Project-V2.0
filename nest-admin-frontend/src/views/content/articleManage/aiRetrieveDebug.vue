@@ -172,7 +172,7 @@ onMounted(() => {
 .query-panel {
   padding: 20px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.84);
+  background: color-mix(in srgb, var(--el-bg-color) 84%, var(--el-fill-color-extra-light));
   border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
 }
 
@@ -213,7 +213,7 @@ onMounted(() => {
 }
 
 .top-result {
-  background: color-mix(in srgb, var(--Color) 3%, #ffffff);
+  background: color-mix(in srgb, var(--Color) 3%, var(--el-bg-color));
 }
 
 .top-result__header,
@@ -266,7 +266,7 @@ onMounted(() => {
 .result-card {
   border-radius: 14px;
   padding: 18px;
-  background: #fff;
+  background: var(--el-bg-color);
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,

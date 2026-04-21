@@ -132,7 +132,7 @@ function submitDialog() {
 .borrow-approval-statuses__item {
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
+  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
   border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
 }
 

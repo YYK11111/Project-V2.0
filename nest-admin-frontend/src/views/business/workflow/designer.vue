@@ -2466,7 +2466,7 @@ const onCanvasClick = () => {
   position: absolute;
   width: 10px;
   height: 10px;
-  background: #fff;
+  background: var(--el-bg-color);
   border: 2px solid #409eff;
   border-radius: 50%;
   cursor: crosshair;
@@ -2821,7 +2821,7 @@ const onCanvasClick = () => {
 
 .node-cc {
   background: #f4f4f5;
-  border-color: #909399;
+  border-color: var(--el-text-color-secondary);
 }
 
 .node-delay {

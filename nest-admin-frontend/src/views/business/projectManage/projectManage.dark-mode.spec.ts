@@ -10,6 +10,10 @@ function readBusinessViewSource(relativePath: string) {
   return readFileSync(resolve(__dirname, '..', relativePath), 'utf-8')
 }
 
+function readViewsSource(relativePath: string) {
+  return readFileSync(resolve(__dirname, '..', '..', relativePath), 'utf-8')
+}
+
 describe('projectManage 页面暗黑模式样式守卫', () => {
   it('approval 页面不再使用固定浅色样式值', () => {
     const source = readViewSource('approval')
@@ -98,7 +102,37 @@ describe('projectManage 页面暗黑模式样式守卫', () => {
     expect(workflowDesignerSource).not.toMatch(/\.canvas-hint\s*\{[^}]*color:\s*#999/is)
     expect(workflowDesignerSource).not.toMatch(/\.issue-item-title\s*\{[^}]*color:\s*#303133/is)
     expect(workflowDesignerSource).not.toMatch(/\.issue-item-meta\s*\{[^}]*color:\s*#909399/is)
+    expect(workflowDesignerSource).not.toMatch(/\.anchor\s*\{[^}]*background:\s*#fff\b/is)
+    expect(workflowDesignerSource).not.toMatch(/\.node-cc\s*\{[^}]*border-color:\s*#909399/is)
     expect(workflowDesignerSource).toMatch(/var\(--el-bg-color\)/)
     expect(workflowDesignerSource).toMatch(/var\(--el-text-color-secondary\)/)
+  })
+
+  it('内容管理页面不再写死白底和半透明白底卡片', () => {
+    const articleIndexSource = readViewsSource('content/articleManage/index.vue')
+    const articleAevSource = readViewsSource('content/articleManage/aev.vue')
+    const articleAiDebugSource = readViewsSource('content/articleManage/aiRetrieveDebug.vue')
+    const articleMyBorrowsSource = readViewsSource('content/articleManage/myBorrows.vue')
+    const articleBorrowApprovalSource = readViewsSource('content/articleManage/borrowApproval.vue')
+
+    expect(articleIndexSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(articleIndexSource).toMatch(/var\(--el-bg-color\)/)
+
+    expect(articleAevSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(articleAevSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(articleAevSource).toMatch(/var\(--el-bg-color\)/)
+    expect(articleAevSource).toMatch(/color-mix\(/)
+
+    expect(articleAiDebugSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(articleAiDebugSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(articleAiDebugSource).not.toMatch(/color-mix\(in srgb, var\(--Color\) 3%, #ffffff\)/i)
+    expect(articleAiDebugSource).toMatch(/var\(--el-bg-color\)/)
+    expect(articleAiDebugSource).toMatch(/color-mix\(/)
+
+    expect(articleMyBorrowsSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(articleMyBorrowsSource).toMatch(/color-mix\(/)
+
+    expect(articleBorrowApprovalSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(articleBorrowApprovalSource).toMatch(/color-mix\(/)
   })
 })
