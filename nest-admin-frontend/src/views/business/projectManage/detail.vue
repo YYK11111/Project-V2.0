@@ -511,7 +511,7 @@ function goToProjectKnowledgeTemplate(template) {
 
 function goToKnowledgeDetail(id) {
   if (!id) return
-  router.push({ path: '/content/articleManage/detail', query: { id } })
+  router.push({ path: '/content/articleManage/view', query: { id } })
 }
 
 function createProjectScopedRecord(path) {
@@ -556,7 +556,7 @@ function goToEdit() {
 }
 
 function goToCockpit() {
-  router.push({ path: '/cockpit', query: { projectId: projectId.value } })
+  router.push({ path: '/projectManage/cockpit', query: { projectId: projectId.value } })
 }
 
 function goToTab(tabName) {

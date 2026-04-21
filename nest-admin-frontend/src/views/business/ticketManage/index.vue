@@ -41,7 +41,7 @@ async function handlePublishKnowledge(row) {
 
 function openKnowledgeDetail(articleId) {
   if (!articleId) return
-  router.push({ path: '/content/articleManage/detail', query: { id: articleId } })
+  router.push({ path: '/content/articleManage/view', query: { id: articleId } })
 }
 
 function exportTicketList() {
@@ -139,7 +139,7 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="当前节点" prop="currentNodeName" min-width="140" :show-overflow-tooltip="true" />
         <el-table-column label="知识回流" width="100"><template #default="{ row }"><el-tag :type="row.knowledgeLinked === '1' ? 'success' : 'info'" size="small">{{ row.knowledgeLinked === '1' ? '已关联' : '未关联' }}</el-tag></template></el-table-column>
-        <el-table-column label="知识文章" width="120"><template #default="{ row }"><el-button v-if="row.knowledgeArticleId" link type="primary" @click="router.push({ path: '/content/articleManage/detail', query: { id: row.knowledgeArticleId } })">查看知识</el-button><span v-else>-</span></template></el-table-column>
+        <el-table-column label="知识文章" width="120"><template #default="{ row }"><el-button v-if="row.knowledgeArticleId" link type="primary" @click="router.push({ path: '/content/articleManage/view', query: { id: row.knowledgeArticleId } })">查看知识</el-button><span v-else>-</span></template></el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="160" />
       </template>
 

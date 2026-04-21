@@ -239,7 +239,7 @@ function scrollToWorkflowPanel() {
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canArticleAdd && canEditCurrentTicket" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
-          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
+          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
           <el-button v-if="route.query.id && canArticleAdd && canEditCurrentTicket" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
           <el-button v-if="route.query.id && canEditCurrentTicket" type="warning" plain @click="handleConvertToTask">转任务</el-button>
           <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>

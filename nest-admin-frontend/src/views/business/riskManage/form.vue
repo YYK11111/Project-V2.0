@@ -140,7 +140,7 @@ async function handleConvertToTask() {
     <div class="risk-form-shell__top">
       <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
         <template #extra>
-          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
+          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
           <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
           <el-button v-if="route.query.id && canEditCurrentRisk" type="warning" plain @click="handleConvertToTask">转任务</el-button>
         </template>

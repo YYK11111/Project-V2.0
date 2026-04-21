@@ -100,6 +100,12 @@ export const constantRoutes = [
         meta: { title: '项目审批' },
       },
       {
+        path: '/projectManage/cockpit',
+        component: () => import('@/views/business/projectManage/cockpit.vue'),
+        name: 'ProjectCockpitHidden',
+        meta: { title: '项目驾驶舱' },
+      },
+      {
         path: '/projectManage/userStoryManage/form',
         component: () => import('@/views/business/userStoryManage/form.vue'),
         name: 'UserStoryFormHidden',
@@ -182,6 +188,12 @@ export const constantRoutes = [
         component: () => import('@/views/content/articleManage/detail.vue'),
         name: 'ArticleDetailHidden',
         meta: { title: '知识详情' },
+      },
+      {
+        path: '/content/articleManage/view',
+        component: () => import('@/views/content/articleManage/view.vue'),
+        name: 'ArticleViewHidden',
+        meta: { title: '查看知识' },
       },
       {
         path: '/content/articleManage/borrowApproval',
