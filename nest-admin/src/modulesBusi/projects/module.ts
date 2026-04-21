@@ -28,6 +28,8 @@ import { ProjectFieldPermissionService } from "./project-field-permission.servic
 import { GoLiveRecord } from "../go-live-records/entity";
 import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
+import { Contract } from "../crm/contracts/entity";
+import { SalesOpportunity } from "../crm/opportunities/entity";
 
 @Module({
   imports: [
@@ -49,6 +51,8 @@ import { HandoverRecord } from "../handover-records/entity";
       GoLiveRecord,
       AcceptanceRecord,
       HandoverRecord,
+      Contract,
+      SalesOpportunity,
     ]),
     UsersModule,
     CrmModule,

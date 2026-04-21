@@ -12,6 +12,9 @@ import { Task } from "src/modulesBusi/tasks/entity";
 import { Ticket } from "src/modulesBusi/tickets/entity";
 import { ProjectChange } from "src/modulesBusi/changes/entity";
 import { Customer } from "src/modulesBusi/crm/customers/entity";
+import { GoLiveRecord } from "src/modulesBusi/go-live-records/entity";
+import { AcceptanceRecord } from "src/modulesBusi/acceptance-records/entity";
+import { HandoverRecord } from "src/modulesBusi/handover-records/entity";
 import { SystenConfigsModule } from "../configs/module";
 
 @Global()
@@ -20,7 +23,16 @@ import { SystenConfigsModule } from "../configs/module";
     LoginLogsModule,
     MenusModule,
     SystenConfigsModule,
-    TypeOrmModule.forFeature([Project, Task, Ticket, ProjectChange, Customer]),
+    TypeOrmModule.forFeature([
+      Project,
+      Task,
+      Ticket,
+      ProjectChange,
+      Customer,
+      GoLiveRecord,
+      AcceptanceRecord,
+      HandoverRecord,
+    ]),
     WorkflowModule,
     MilestonesModule,
     forwardRef(() => ProjectsModule),

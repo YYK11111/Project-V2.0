@@ -42,7 +42,7 @@ describe("AuthGuard", () => {
       reflector as unknown as Reflector,
       redisService as any,
     );
-    const request = {
+    const request: Record<string, any> = {
       headers: {
         cookie: "foo=bar; admin_session=token-from-cookie",
       },
@@ -75,7 +75,7 @@ describe("AuthGuard", () => {
       reflector as unknown as Reflector,
       redisService as any,
     );
-    const request = {
+    const request: Record<string, any> = {
       headers: {
         cookie: "admin_session=header.payload.signature",
       },

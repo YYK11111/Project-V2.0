@@ -26,10 +26,15 @@ describe("ProjectsService closure guards", () => {
       { findOne: jest.fn() } as any,
       { findOne: jest.fn(), findDescendants: jest.fn(), save: jest.fn() } as any,
       { findOne: jest.fn(), save: jest.fn() } as any,
+      { count: jest.fn(), find: jest.fn() } as any,
+      { count: jest.fn(), find: jest.fn() } as any,
+      { count: jest.fn(), find: jest.fn() } as any,
       { update: jest.fn() } as any,
       { getProjectWorkspacePrefs: jest.fn(), getOne: jest.fn() } as any,
       { getProjectFieldPermissions: jest.fn() } as any,
       { getOne: jest.fn() } as any,
+      { findOne: jest.fn() } as any,
+      { findOne: jest.fn() } as any,
       { getRepository: jest.fn(), transaction: jest.fn() } as any,
     );
 

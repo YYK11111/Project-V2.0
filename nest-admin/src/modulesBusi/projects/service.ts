@@ -387,15 +387,6 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     });
   }
 
-  async save(
-    dto: SaveDto<ProjectDto> & {
-      attachments?: string[];
-      members?: any[];
-      milestones?: any[];
-    },
-  ) {
-    return this.saveProjectGraph(dto, "save");
-
   private validateProjectSourceMutation(previousProject: Project | null, dto: SaveDto<ProjectDto>) {
     if (!previousProject) return;
 
