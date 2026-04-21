@@ -11,6 +11,9 @@ describe("ChangesService apply impact", () => {
       historyRepository as any,
       {} as any,
       {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
     );
 
     (service as any).taskRepository = taskRepository;
@@ -42,6 +45,9 @@ describe("ChangesService apply impact", () => {
       historyRepository as any,
       {} as any,
       {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
     );
 
     (service as any).milestoneRepository = milestoneRepository;
@@ -70,6 +76,9 @@ describe("ChangesService apply impact", () => {
       repository as any,
       {} as any,
       historyRepository as any,
+      {} as any,
+      {} as any,
+      {} as any,
       {} as any,
       {} as any,
     );

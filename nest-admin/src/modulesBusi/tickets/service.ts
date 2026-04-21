@@ -17,6 +17,7 @@ import { TasksService } from "../tasks/service";
 import { Article, Status as ArticleStatus } from "../articles/entity";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
+import { Task } from "../tasks/entity";
 
 @Injectable()
 export class TicketsService extends BaseService<Ticket, TicketDto> {
@@ -311,7 +312,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
         String((query as any)._operatorId),
       );
     }
-    const detail = this.buildTicketDetail(ticket);
+    const detail: any = this.buildTicketDetail(ticket);
     if (ticket.linkedTaskId) {
       detail.linkedTask = await this.repository.manager.findOne(Task as any, {
         where: { id: ticket.linkedTaskId } as any,
