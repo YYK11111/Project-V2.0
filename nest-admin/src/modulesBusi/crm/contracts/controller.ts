@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common'
+import { Controller, Get, Param, Post, Query } from '@nestjs/common'
 import { ContractsService } from './service'
 import { Contract, contractStatusMap } from './entity'
 import { BaseController } from 'src/common/BaseController'
@@ -17,5 +17,10 @@ export class ContractsController extends BaseController<Contract, ContractsServi
   @Get('getStatuses')
   getStatuses() {
     return contractStatusMap
+  }
+
+  @Post(':id/create-project-draft')
+  createProjectDraft(@Param('id') id: string) {
+    return this.service.createProjectDraft(id)
   }
 }

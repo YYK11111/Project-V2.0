@@ -13,6 +13,7 @@ import { ContractsService } from './contracts/service'
 import { ContractsController } from './contracts/controller'
 import { Contract } from './contracts/entity'
 import { UsersModule } from '../../modules/users/users.module'
+import { Project } from '../projects/entity'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsersModule } from '../../modules/users/users.module'
       CustomerInteraction,
       SalesOpportunity,
       Contract,
+      Project,
     ]),
     UsersModule,
   ],
@@ -36,6 +38,6 @@ import { UsersModule } from '../../modules/users/users.module'
     OpportunitiesService,
     ContractsService,
   ],
-  exports: [CustomersService, OpportunitiesService],
+  exports: [CustomersService, OpportunitiesService, ContractsService],
 })
 export class CrmModule {}

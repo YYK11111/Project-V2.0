@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { getList, getContractStatuses, del } from './api'
+import { getList, getContractStatuses, del, createProjectDraft } from './api'
 import { getList as getCustomerList } from '../customerManage/api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
@@ -21,9 +21,44 @@ const rctRef = ref()
 const canContractAdd = computed(() => checkPermi(['business/crm/contracts/add']))
 const canContractUpdate = computed(() => checkPermi(['business/crm/contracts/update']))
 const canContractDelete = computed(() => checkPermi(['business/crm/contracts/delete']))
+const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
+
+async function handleCreateProject(row) {
+  try {
+    const { data } = await createProjectDraft(row.id)
+    rctRef.value.goRoute({
+      fromContract: '1',
+      name: data?.name || '',
+      customerId: data?.customerId || '',
+      contractId: data?.contractId || '',
+      opportunityId: data?.opportunityId || '',
+      startDate: data?.startDate || '',
+      endDate: data?.endDate || '',
+      planStartDate: data?.planStartDate || '',
+      planEndDate: data?.planEndDate || '',
+      projectSource: data?.projectSource || 'contract',
+      contractName: data?.contract?.name || '',
+      contractCode: data?.contract?.code || '',
+      opportunityName: data?.opportunity?.name || '',
+      opportunityCode: data?.opportunity?.code || '',
+    }, '/projectManage/form')
+  } catch (error) {
+    const payload = error?.response?.data || {}
+    const message = String(payload?.message || error?.message || error?.msg || '')
+    const projectId = String(payload?.projectId || row.projectId || '')
+    if ((payload?.code === 'CONTRACT_PROJECT_EXISTS' || message.includes('已关联项目')) && projectId) {
+      $sdk.msgWarning('当前合同已关联项目，已为你跳转到项目详情')
+      rctRef.value.goRoute({ id: projectId }, '/projectManage/detail')
+      return
+    }
+    $sdk.msgError(message || '创建项目草稿失败')
+  }
+}
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/contractManage/form') },
+  canProjectAdd.value ? { key: 'createProject', label: '创建项目', type: 'success', onClick: () => handleCreateProject(row) } : null,
+  row.projectId ? { key: 'viewProject', label: '查看项目', onClick: () => rctRef.value.goRoute({ id: row.projectId }, '/projectManage/detail') } : null,
   canContractUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/contractManage/form') } : null,
   canContractDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)

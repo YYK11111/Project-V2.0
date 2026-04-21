@@ -463,8 +463,18 @@ function goToDetail(path, id, query = {}) {
             <ViewEntity :title="currentCustomer?.name" :subtitle="currentCustomer?.code" />
           </div>
           <div class="project-meta-item">
+            <span class="project-meta-item__label">来源合同</span>
+            <ViewEntity v-if="project.contract" :title="project.contract?.name" :subtitle="project.contract?.code" />
+            <div v-else class="project-meta-item__value">-</div>
+          </div>
+          <div class="project-meta-item">
             <span class="project-meta-item__label">项目类型</span>
             <div class="project-meta-item__value">{{ projectTypeMap[project.projectType] || '-' }}</div>
+          </div>
+          <div class="project-meta-item">
+            <span class="project-meta-item__label">来源商机</span>
+            <ViewEntity v-if="project.opportunity" :title="project.opportunity?.name" :subtitle="project.opportunity?.code" />
+            <div v-else class="project-meta-item__value">-</div>
           </div>
           <div class="project-meta-item">
             <span class="project-meta-item__label">当前审批节点</span>

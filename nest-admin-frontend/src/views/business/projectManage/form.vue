@@ -70,6 +70,11 @@ function createDefaultForm() {
     description: '',
     attachments: [],
     customerId: null,
+    contractId: '',
+    opportunityId: '',
+    projectSource: '',
+    contract: null,
+    opportunity: null,
     budget: 0,
     actualCost: 0,
     progress: 0,
@@ -134,6 +139,33 @@ getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => form.value.customer || customerMap.value.get(String(form.value.customerId || '')) || null)
 
+function hydrateFromContractQuery() {
+  if (String(route.query.fromContract || '') !== '1') return null
+  return {
+    name: String(route.query.name || ''),
+    customerId: route.query.customerId ? Number(route.query.customerId) : null,
+    contractId: String(route.query.contractId || ''),
+    opportunityId: String(route.query.opportunityId || ''),
+    startDate: String(route.query.startDate || ''),
+    endDate: String(route.query.endDate || ''),
+    projectSource: String(route.query.projectSource || 'contract'),
+    contract: route.query.contractId
+      ? {
+          id: String(route.query.contractId || ''),
+          code: String(route.query.contractCode || ''),
+          name: String(route.query.contractName || ''),
+        }
+      : null,
+    opportunity: route.query.opportunityId
+      ? {
+          id: String(route.query.opportunityId || ''),
+          code: String(route.query.opportunityCode || ''),
+          name: String(route.query.opportunityName || ''),
+        }
+      : null,
+  }
+}
+
 watch(
   () => form.value.projectType,
   (projectTypeValue, oldValue) => {
@@ -163,7 +195,10 @@ watch(
 async function loadProject() {
   milestonesManuallyEdited.value = false
   if (!(isEdit.value || isView.value)) {
-    form.value = createDefaultForm()
+    form.value = {
+      ...createDefaultForm(),
+      ...(hydrateFromContractQuery() || {}),
+    }
     return
   }
   const { data } = await getOne(route.query.id)
@@ -243,6 +278,8 @@ function resetMilestoneTemplate() {
 function normalizeSubmitPayload() {
   return {
     ...form.value,
+    contractId: form.value.contractId || null,
+    opportunityId: form.value.opportunityId || null,
     members: form.value.members
       .filter((item) => item.userId && item.role)
       .map((item, index) => ({
@@ -322,7 +359,9 @@ function saveProject(triggerApproval = false) {
         }
       })
       .catch((error) => {
-        $sdk.msgError(error?.message || '项目保存失败')
+        const payload = error?.response?.data || {}
+        const message = String(payload?.message || error?.message || '项目保存失败')
+        $sdk.msgError(message)
       })
       .finally(() => {
         saveLoading.value = false
@@ -381,6 +420,21 @@ function cancel() {
                   <el-select v-else v-model="form.customerId" placeholder="请选择客户" style="width: 100%" clearable>
                     <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id" />
                   </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="来源合同">
+                  <ViewEntity v-if="form.contract" :title="form.contract?.name" :subtitle="form.contract?.code" />
+                  <ViewField v-else value="-" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="来源商机">
+                  <ViewEntity v-if="form.opportunity" :title="form.opportunity?.name" :subtitle="form.opportunity?.code" />
+                  <ViewField v-else value="-" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">

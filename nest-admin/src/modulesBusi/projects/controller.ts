@@ -66,6 +66,7 @@ export class ProjectsController extends BaseController<Project, ProjectsService>
     @Req() req: any,
   ) {
     const userId = req.user?.id || req.user?.name || '1'
+    await this.service.ensureProjectApprovalReady(id)
     const instanceId = await this.workflowService.startProjectApproval(id, userId)
     return { success: true, instanceId }
   }
