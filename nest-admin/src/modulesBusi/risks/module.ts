@@ -7,10 +7,12 @@ import { UsersModule } from "src/modules/users/users.module";
 import { ProjectsModule } from "../projects/module";
 import { Article } from "../articles/entity";
 import { TasksBusiModule } from "../tasks/module";
+import { Task } from "../tasks/entity";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Risk, Article]),
+    TypeOrmModule.forFeature([Task]),
     UsersModule,
     ProjectsModule,
     TasksBusiModule,

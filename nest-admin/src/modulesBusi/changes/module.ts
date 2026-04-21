@@ -8,6 +8,9 @@ import { ProjectsModule } from "../projects/module";
 import { SysFileModule } from "src/modules/sys/file/module";
 import { Article } from "../articles/entity";
 import { ChangeImpactConfirmHistory } from "./entities/change-impact-confirm-history.entity";
+import { Task } from "../tasks/entity";
+import { Milestone } from "../milestones/entity";
+import { Sprint } from "../sprints/entity";
 
 @Module({
   imports: [
@@ -15,6 +18,9 @@ import { ChangeImpactConfirmHistory } from "./entities/change-impact-confirm-his
       ProjectChange,
       Article,
       ChangeImpactConfirmHistory,
+      Task,
+      Milestone,
+      Sprint,
     ]),
     UsersModule,
     ProjectsModule,
