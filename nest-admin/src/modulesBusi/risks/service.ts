@@ -75,6 +75,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
   }
 
   async save(dto: any) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertRiskEditPermission(
         String(dto.id),
@@ -85,6 +86,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
   }
 
   async update(dto: any) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertRiskEditPermission(
         String(dto.id),

@@ -287,6 +287,7 @@ export class ChangesService extends BaseService<
   }
 
   async save(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertChangeEditPermission(
         String(dto.id),
@@ -321,6 +322,7 @@ export class ChangesService extends BaseService<
   }
 
   async add(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     this.normalizeChangePayload(dto);
     const attachments = dto.attachments;
     delete dto.attachments;
@@ -343,6 +345,7 @@ export class ChangesService extends BaseService<
   }
 
   async update(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertChangeEditPermission(
         String(dto.id),

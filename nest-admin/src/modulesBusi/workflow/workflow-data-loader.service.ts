@@ -15,6 +15,8 @@ import { CustomerLoader } from "./loaders/customer.loader";
 import { TicketLoader } from "./loaders/ticket.loader";
 import { ChangeLoader } from "./loaders/change.loader";
 import { TaskLoader } from "./loaders/task.loader";
+import { GoLiveLoader } from "./loaders/go-live.loader";
+import { AcceptanceLoader } from "./loaders/acceptance.loader";
 
 @Injectable()
 export class WorkflowDataLoaderService {
@@ -28,6 +30,8 @@ export class WorkflowDataLoaderService {
     private ticketLoader: TicketLoader,
     private taskLoader: TaskLoader,
     private changeLoader: ChangeLoader,
+    private goLiveLoader: GoLiveLoader,
+    private acceptanceLoader: AcceptanceLoader,
   ) {
     this.registerDefaultLoaders();
   }
@@ -38,6 +42,8 @@ export class WorkflowDataLoaderService {
     this.loaders.set("ticket", this.ticketLoader);
     this.loaders.set("task", this.taskLoader);
     this.loaders.set("change", this.changeLoader);
+    this.loaders.set("goLive", this.goLiveLoader);
+    this.loaders.set("acceptance", this.acceptanceLoader);
   }
 
   async loadData(

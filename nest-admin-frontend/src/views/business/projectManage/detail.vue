@@ -2004,6 +2004,9 @@ function goToDetail(path, id, query = {}) {
           <div class="tab-summary-card"><span>验收日期</span><strong>{{ project.acceptanceDate || '-' }}</strong></div>
           <div class="tab-summary-card"><span>验收说明</span><strong>{{ project.closeSummary ? '已补齐' : '待补齐' }}</strong></div>
           <div class="tab-summary-card"><span>交付清单</span><strong>{{ project.closeDeliverables ? '已补齐' : '待补齐' }}</strong></div>
+          <div class="tab-summary-card"><span>上线记录</span><strong>{{ project.goLiveSummary?.successCount || 0 }} 条成功</strong></div>
+          <div class="tab-summary-card"><span>验收单</span><strong>{{ project.acceptanceSummary?.passedCount || 0 }} 条通过</strong></div>
+          <div class="tab-summary-card"><span>运维交接</span><strong>{{ project.handoverSummary?.confirmedCount || 0 }} 条确认</strong></div>
           <div class="tab-summary-card"><span>遗留问题</span><strong>{{ project.closeOpenIssues ? '已记录' : '暂无' }}</strong></div>
           <div class="tab-summary-card"><span>项目复盘</span><strong>{{ project.closeReview ? '已补齐' : '待补齐' }}</strong></div>
         </div>
@@ -2016,6 +2019,9 @@ function goToDetail(path, id, query = {}) {
             </div>
             <div class="plan-action-card__actions">
               <el-button @click="goToEdit">去完善结项资料</el-button>
+              <el-button @click="createProjectScopedRecord('/goLiveManage/form')">新增上线单</el-button>
+              <el-button @click="createProjectScopedRecord('/acceptanceManage/form')">新增验收单</el-button>
+              <el-button @click="createProjectScopedRecord('/handoverManage/form')">新增运维交接单</el-button>
               <el-button :loading="publishReviewLoading" :disabled="!project.closeReview" @click="handlePublishCloseReview">沉淀到知识中心</el-button>
               <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('review')">复盘模板</el-button>
               <el-button v-if="canProjectSubmitClose && project.status === '3'" type="warning" @click="handleSubmitClose">提交结项审批</el-button>

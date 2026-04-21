@@ -112,6 +112,24 @@ export const constantRoutes = [
         meta: { title: '风险表单' },
       },
       {
+        path: '/goLiveManage/form',
+        component: () => import('@/views/business/goLiveManage/form.vue'),
+        name: 'GoLiveFormHidden',
+        meta: { title: '上线单表单' },
+      },
+      {
+        path: '/acceptanceManage/form',
+        component: () => import('@/views/business/acceptanceManage/form.vue'),
+        name: 'AcceptanceFormHidden',
+        meta: { title: '验收单表单' },
+      },
+      {
+        path: '/handoverManage/form',
+        component: () => import('@/views/business/handoverManage/form.vue'),
+        name: 'HandoverFormHidden',
+        meta: { title: '运维交接单表单' },
+      },
+      {
         path: '/content/articleManage/aev',
         component: () => import('@/views/content/articleManage/aev.vue'),
         name: 'ArticleManageAevHidden',

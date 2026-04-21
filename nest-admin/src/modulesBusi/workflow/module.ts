@@ -16,6 +16,8 @@ import { CustomerLoader } from "./loaders/customer.loader";
 import { TicketLoader } from "./loaders/ticket.loader";
 import { TaskLoader } from "./loaders/task.loader";
 import { ChangeLoader } from "./loaders/change.loader";
+import { GoLiveLoader } from "./loaders/go-live.loader";
+import { AcceptanceLoader } from "./loaders/acceptance.loader";
 import { NodeHandlerFactory } from "./handler/node-handler.factory";
 import { StartNodeHandler } from "./handler/impl/start-node.handler";
 import { EndNodeHandler } from "./handler/impl/end-node.handler";
@@ -41,6 +43,8 @@ import { Customer } from "../crm/customers/entity";
 import { Ticket } from "../tickets/entity";
 import { Task } from "../tasks/entity";
 import { ProjectChange } from "../changes/entity";
+import { GoLiveRecord } from "../go-live-records/entity";
+import { AcceptanceRecord } from "../acceptance-records/entity";
 
 @Module({
   imports: [
@@ -59,6 +63,8 @@ import { ProjectChange } from "../changes/entity";
       Ticket,
       Task,
       ProjectChange,
+      GoLiveRecord,
+      AcceptanceRecord,
     ]),
     NoticesModule,
     MessagesModule,
@@ -89,6 +95,8 @@ import { ProjectChange } from "../changes/entity";
     TicketLoader,
     TaskLoader,
     ChangeLoader,
+    GoLiveLoader,
+    AcceptanceLoader,
   ],
   exports: [
     WorkflowService,

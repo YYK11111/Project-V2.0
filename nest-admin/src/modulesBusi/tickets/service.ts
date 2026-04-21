@@ -163,6 +163,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async save(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertTicketEditPermission(
         String(dto.id),
@@ -197,6 +198,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async add(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     this.normalizeTicketPayload(dto);
     const attachments = dto.attachments;
     delete dto.attachments;
@@ -219,6 +221,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async update(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
+    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
     if (dto.id && dto._operatorId) {
       await this.assertTicketEditPermission(
         String(dto.id),

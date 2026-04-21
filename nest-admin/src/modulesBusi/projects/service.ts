@@ -29,6 +29,9 @@ import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { Contract } from "../crm/contracts/entity";
 import { SalesOpportunity } from "../crm/opportunities/entity";
+import { GoLiveRecord, GoLiveRecordStatus } from "../go-live-records/entity";
+import { AcceptanceRecord, AcceptanceRecordResult } from "../acceptance-records/entity";
+import { HandoverRecord, HandoverRecordStatus } from "../handover-records/entity";
 import { MessagesService } from "src/modules/messages/service";
 import { SystenConfigsService } from "src/modules/configs/service";
 import { UsersService } from "src/modules/users/users.service";
@@ -58,6 +61,12 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private snapshotRepository: Repository<ProjectCockpitSnapshot>,
     @InjectRepository(ChangeImpactConfirmHistory)
     private changeConfirmHistoryRepository: Repository<ChangeImpactConfirmHistory>,
+    @InjectRepository(GoLiveRecord)
+    private goLiveRecordRepository: Repository<GoLiveRecord>,
+    @InjectRepository(AcceptanceRecord)
+    private acceptanceRecordRepository: Repository<AcceptanceRecord>,
+    @InjectRepository(HandoverRecord)
+    private handoverRecordRepository: Repository<HandoverRecord>,
     private readonly messagesService: MessagesService,
     private readonly systemConfigsService: SystenConfigsService,
     private readonly projectFieldPermissionService: ProjectFieldPermissionService,
@@ -723,9 +732,33 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     if (!project.closeReview || !String(project.closeReview).trim()) {
       throw new Error("发起结项审批前，请先补齐项目复盘");
     }
+    const [goLiveCount, acceptanceCount] = await Promise.all([
+      this.goLiveRecordRepository.count({
+        where: {
+          projectId,
+          status: GoLiveRecordStatus.succeeded,
+          isDelete: null as any,
+        } as any,
+      }),
+      this.acceptanceRecordRepository.count({
+        where: {
+          projectId,
+          result: AcceptanceRecordResult.passed,
+          isDelete: null as any,
+        } as any,
+      }),
+    ]);
+    if (!goLiveCount) {
+      throw new BadRequestException("发起结项审批前，请至少维护一条已成功的上线记录");
+    }
+    if (!acceptanceCount) {
+      throw new BadRequestException("发起结项审批前，请至少维护一条已通过的验收记录");
+    }
     return {
       projectId,
       acceptanceDate: project.acceptanceDate || null,
+      goLiveCount,
+      acceptanceCount,
     };
   }
 
@@ -1251,7 +1284,34 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
    * 归档项目
    */
   async archive(id: string): Promise<any> {
+    const project = await this.getOne({ id });
+    if (String(project?.status || "") !== ProjectStatus.completed) {
+      throw new BadRequestException("项目未结项，不允许归档");
+    }
+    await this.validateClosePlan(id);
+    const handoverCount = await this.handoverRecordRepository.count({
+      where: {
+        projectId: id,
+        status: HandoverRecordStatus.confirmed,
+        isDelete: null as any,
+      } as any,
+    });
+    if (!handoverCount) {
+      throw new BadRequestException("归档前，请至少维护一条已确认的运维交接记录");
+    }
     return this.repository.update(id, { isArchived: "1" });
+  }
+
+  async assertProjectNotArchived(projectId: string) {
+    if (!projectId) return;
+    const project = await this.repository.findOne({
+      where: { id: projectId, isDelete: null as any } as any,
+      select: ["id", "isArchived", "status"] as any,
+    });
+    if (!project) return;
+    if (String(project.isArchived || "0") === "1") {
+      throw new BadRequestException("项目已归档，不允许继续新增或修改执行对象");
+    }
   }
 
   async del(
@@ -1498,6 +1558,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       risks,
       changes,
       sprints,
+      goLiveRecords,
+      acceptanceRecords,
       knowledgeSummary,
       trendSignals,
     ] = await Promise.all([
@@ -1527,6 +1589,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       this.sprintRepository.find({
         where: { projectId: id },
         order: { startDate: "DESC", createTime: "DESC" },
+      }),
+      this.goLiveRecordRepository.find({
+        where: { projectId: id, isDelete: null as any } as any,
+        order: { createTime: "DESC" },
+      }),
+      this.acceptanceRecordRepository.find({
+        where: { projectId: id, isDelete: null as any } as any,
+        order: { createTime: "DESC" },
       }),
       this.getKnowledgeSummary(project),
       this.analyzeProjectTrendSignals(id),
@@ -1661,6 +1731,20 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         sprints.find((item) => item.status === SprintStatus.active) ||
         sprints.find((item) => item.status === SprintStatus.planning) ||
         null,
+    };
+    const goLiveSummary = {
+      total: goLiveRecords.length,
+      successCount: goLiveRecords.filter(
+        (item) => item.status === GoLiveRecordStatus.succeeded,
+      ).length,
+      latestRecord: goLiveRecords[0] || null,
+    };
+    const acceptanceSummary = {
+      total: acceptanceRecords.length,
+      passedCount: acceptanceRecords.filter(
+        (item) => item.result === AcceptanceRecordResult.passed,
+      ).length,
+      latestRecord: acceptanceRecords[0] || null,
     };
     const activeChangeImpacts = changes.filter((item) =>
       [ChangeStatus.approved, ChangeStatus.implemented].includes(item.status),
@@ -2089,6 +2173,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       risks,
       changes,
       sprints,
+      goLiveRecords,
+      acceptanceRecords,
       summary: {
         taskSummary,
         ticketSummary,
@@ -2096,6 +2182,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         changeSummary,
         milestoneSummary,
         sprintSummary,
+        goLiveSummary,
+        acceptanceSummary,
         knowledgeSummary,
         changeImpactSummary,
         healthSummary,

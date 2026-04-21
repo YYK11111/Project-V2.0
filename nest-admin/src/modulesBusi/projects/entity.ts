@@ -415,6 +415,24 @@ export class Project extends BaseEntity {
   @BaseColumn({ type: "int", nullable: true, comment: "关联客户ID" })
   customerId: number;
 
+  @BaseColumn({
+    type: "varchar",
+    length: 36,
+    nullable: true,
+    name: "contract_id",
+    comment: "来源合同ID",
+  })
+  contractId: string;
+
+  @BaseColumn({
+    type: "varchar",
+    length: 36,
+    nullable: true,
+    name: "opportunity_id",
+    comment: "来源商机ID",
+  })
+  opportunityId: string;
+
   @ManyToOne(() => Customer, { nullable: true })
   @JoinColumn({ name: "customer_id" })
   customer: Customer;
@@ -454,20 +472,3 @@ export class Project extends BaseEntity {
   })
   currentNodeName: string;
 }
-  @BaseColumn({
-    type: "varchar",
-    length: 36,
-    nullable: true,
-    name: "contract_id",
-    comment: "来源合同ID",
-  })
-  contractId: string;
-
-  @BaseColumn({
-    type: "varchar",
-    length: 36,
-    nullable: true,
-    name: "opportunity_id",
-    comment: "来源商机ID",
-  })
-  opportunityId: string;

@@ -72,6 +72,9 @@ const getBusinessRoute = (row: any) => {
   if (row.businessType === 'change') return { path: '/changeManage/form', query }
   if (row.businessType === 'ticket') return { path: '/ticketManage/form', query }
   if (row.businessType === 'task') return { path: '/taskManage/form', query }
+  if (row.businessType === 'goLive') return { path: '/goLiveManage/form', query }
+  if (row.businessType === 'acceptance') return { path: '/acceptanceManage/form', query }
+  if (row.businessType === 'handover') return { path: '/handoverManage/form', query }
   if (row.businessType === 'customer') return { path: '/crm/customerManage/form', query }
   return null
 }

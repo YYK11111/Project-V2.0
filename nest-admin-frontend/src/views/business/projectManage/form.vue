@@ -1066,6 +1066,9 @@ function cancel() {
               <div class="section-desc km-section-desc">在发起结项审批前，先沉淀验收说明、交付清单、遗留问题和项目复盘，让结项从流程动作变成业务闭环。</div>
             </div>
             <div v-if="!isView && isEdit" class="section-header__actions">
+              <el-button @click="router.push({ path: '/goLiveManage/form', query: { projectId: form.id || route.query.id } })">新增上线单</el-button>
+              <el-button @click="router.push({ path: '/acceptanceManage/form', query: { projectId: form.id || route.query.id } })">新增验收单</el-button>
+              <el-button @click="router.push({ path: '/handoverManage/form', query: { projectId: form.id || route.query.id } })">新增运维交接单</el-button>
               <el-button type="warning" @click="submitCloseApproval">提交结项审批</el-button>
             </div>
           </div>

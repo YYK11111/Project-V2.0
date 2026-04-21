@@ -7,6 +7,9 @@ import { Task, TaskStatus } from "src/modulesBusi/tasks/entity";
 import { Ticket, TicketStatus } from "src/modulesBusi/tickets/entity";
 import { ProjectChange, ChangeStatus } from "src/modulesBusi/changes/entity";
 import { Customer } from "src/modulesBusi/crm/customers/entity";
+import { GoLiveRecord, GoLiveRecordStatus } from "src/modulesBusi/go-live-records/entity";
+import { AcceptanceRecord, AcceptanceRecordResult } from "src/modulesBusi/acceptance-records/entity";
+import { HandoverRecord, HandoverRecordStatus } from "src/modulesBusi/handover-records/entity";
 import { WorkflowService } from "src/modulesBusi/workflow/service";
 
 @Injectable()
@@ -22,6 +25,12 @@ export class WorkflowIntegrationService {
     private readonly changeRepository: Repository<ProjectChange>,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    @InjectRepository(GoLiveRecord)
+    private readonly goLiveRecordRepository: Repository<GoLiveRecord>,
+    @InjectRepository(AcceptanceRecord)
+    private readonly acceptanceRecordRepository: Repository<AcceptanceRecord>,
+    @InjectRepository(HandoverRecord)
+    private readonly handoverRecordRepository: Repository<HandoverRecord>,
     private readonly workflowService: WorkflowService,
     private readonly projectsService: ProjectsService,
   ) {}
@@ -104,6 +113,81 @@ export class WorkflowIntegrationService {
     project.currentNodeName = "结项审批中";
     await this.projectRepository.save(project);
 
+    return instance.id;
+  }
+
+  async startGoLiveApproval(
+    recordId: string,
+    initiatorId: string,
+  ): Promise<string> {
+    const record = await this.goLiveRecordRepository.findOne({ where: { id: recordId } });
+    if (!record) throw new BadRequestException("上线单不存在");
+    const instance = await this.workflowService.startBusinessWorkflow(
+      {
+        businessType: "goLive",
+        businessScene: "approval",
+        businessKey: `goLive_${recordId}`,
+        variables: {
+          starterId: initiatorId,
+          businessType: "goLive",
+          workflowScene: "goLiveApproval",
+        },
+      },
+      initiatorId,
+    );
+    await this.goLiveRecordRepository.update(recordId, {
+      status: GoLiveRecordStatus.pendingApproval,
+    } as any);
+    return instance.id;
+  }
+
+  async startAcceptanceApproval(
+    recordId: string,
+    initiatorId: string,
+  ): Promise<string> {
+    const record = await this.acceptanceRecordRepository.findOne({ where: { id: recordId } });
+    if (!record) throw new BadRequestException("验收单不存在");
+    const instance = await this.workflowService.startBusinessWorkflow(
+      {
+        businessType: "acceptance",
+        businessScene: "approval",
+        businessKey: `acceptance_${recordId}`,
+        variables: {
+          starterId: initiatorId,
+          businessType: "acceptance",
+          workflowScene: "acceptanceApproval",
+        },
+      },
+      initiatorId,
+    );
+    await this.acceptanceRecordRepository.update(recordId, {
+      result: AcceptanceRecordResult.pending,
+    } as any);
+    return instance.id;
+  }
+
+  async startHandoverApproval(
+    recordId: string,
+    initiatorId: string,
+  ): Promise<string> {
+    const record = await this.handoverRecordRepository.findOne({ where: { id: recordId } });
+    if (!record) throw new BadRequestException("运维交接单不存在");
+    const instance = await this.workflowService.startBusinessWorkflow(
+      {
+        businessType: "handover",
+        businessScene: "approval",
+        businessKey: `handover_${recordId}`,
+        variables: {
+          starterId: initiatorId,
+          businessType: "handover",
+          workflowScene: "handoverApproval",
+        },
+      },
+      initiatorId,
+    );
+    await this.handoverRecordRepository.update(recordId, {
+      status: HandoverRecordStatus.draft,
+    } as any);
     return instance.id;
   }
 
@@ -198,6 +282,30 @@ export class WorkflowIntegrationService {
           status === "completed"
             ? "客户审批已通过，转为意向客户"
             : "客户审批已驳回，转为流失客户",
+      } as any);
+    } else if (businessKey?.startsWith("goLive_")) {
+      const recordId = businessKey.replace("goLive_", "");
+      await this.goLiveRecordRepository.update(recordId, {
+        status:
+          status === "completed"
+            ? GoLiveRecordStatus.approved
+            : GoLiveRecordStatus.cancelled,
+      } as any);
+    } else if (businessKey?.startsWith("acceptance_")) {
+      const recordId = businessKey.replace("acceptance_", "");
+      await this.acceptanceRecordRepository.update(recordId, {
+        result:
+          status === "completed"
+            ? AcceptanceRecordResult.passed
+            : AcceptanceRecordResult.rejected,
+      } as any);
+    } else if (businessKey?.startsWith("handover_")) {
+      const recordId = businessKey.replace("handover_", "");
+      await this.handoverRecordRepository.update(recordId, {
+        status:
+          status === "completed"
+            ? HandoverRecordStatus.confirmed
+            : HandoverRecordStatus.draft,
       } as any);
     }
   }

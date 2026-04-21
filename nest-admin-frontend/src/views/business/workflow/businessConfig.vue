@@ -35,6 +35,9 @@ const businessTypeOptions = [
   { label: '客户', value: 'customer' },
   { label: '工单', value: 'ticket' },
   { label: '变更请求', value: 'change' },
+  { label: '上线单', value: 'goLive' },
+  { label: '验收单', value: 'acceptance' },
+  { label: '运维交接单', value: 'handover' },
 ]
 
 const triggerEventOptions = [
@@ -51,6 +54,9 @@ const businessSceneOptions = {
   ticket: [{ label: '工单审批', value: 'approval' }],
   change: [{ label: '变更审批', value: 'approval' }],
   customer: [{ label: '客户审批', value: 'approval' }],
+  goLive: [{ label: '上线审批', value: 'approval' }],
+  acceptance: [{ label: '验收审批', value: 'approval' }],
+  handover: [{ label: '运维交接审批', value: 'approval' }],
 }
 
 const statusOptions = [

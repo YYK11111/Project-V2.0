@@ -38,6 +38,9 @@ import { ChangesModule } from "./modulesBusi/changes/module";
 import { SysFileModule } from "./modules/sys/file/module";
 import { WorkflowTriggerModule } from "./common/listeners/workflow-trigger.module";
 import { MessagesModule } from "./modules/messages/module";
+import { GoLiveRecordsModule } from "./modulesBusi/go-live-records/module";
+import { AcceptanceRecordsModule } from "./modulesBusi/acceptance-records/module";
+import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
 
 @Dependencies(DataSource)
 @Module({
@@ -77,6 +80,9 @@ import { MessagesModule } from "./modules/messages/module";
     SysFileModule,
     WorkflowTriggerModule,
     MessagesModule,
+    GoLiveRecordsModule,
+    AcceptanceRecordsModule,
+    HandoverRecordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
