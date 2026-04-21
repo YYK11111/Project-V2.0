@@ -97,6 +97,28 @@ export class UserStoryService extends BaseService<UserStory, any> {
     return result.data || [];
   }
 
+  async getTaskDraft(storyId: string) {
+    const story = await this.getOne({ id: storyId });
+    if (!story) {
+      throw new Error("用户故事不存在");
+    }
+    return {
+      name: story.title,
+      projectId: story.projectId,
+      sprintId: story.sprintId || "",
+      leaderId: story.assigneeId || "",
+      description: story.description || "",
+      acceptanceCriteria: story.acceptanceCriteria || "",
+      storyPoints: story.storyPoints || 0,
+      sourceType: "story",
+      sourceId: story.id,
+      sourceStory: {
+        id: story.id,
+        title: story.title,
+      },
+    };
+  }
+
   private mapUserSummary(user?: User | null) {
     if (!user) return null;
     return {

@@ -72,3 +72,7 @@ export function confirmPlanImpactScope(id, data = {}) {
 export function confirmPlanImpactTarget(id, data = {}) {
   return request.post(`/business/changes/${id}/confirm-plan-impact-target`, data)
 }
+
+export function applyPlanImpactTarget(id, data = {}) {
+  return request.post(`/business/changes/${id}/apply-plan-impact-target`, data)
+}

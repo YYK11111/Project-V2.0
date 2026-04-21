@@ -74,3 +74,7 @@ export function submitApproval(id) {
 export function publishKnowledge(id) {
   return request({ url: `${baseUrl}/${id}/publish-knowledge`, method: 'post' })
 }
+
+export function convertToTask(id) {
+  return request({ url: `${baseUrl}/${id}/convert-to-task`, method: 'post' })
+}

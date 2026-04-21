@@ -87,7 +87,27 @@ async function handleCompleteSprint() {
     await loadSprint()
     await loadBurndown()
   } catch (e) {
-    $sdk.msgError(e.message || '操作失败')
+    const message = e?.response?.data?.message || e.message || '操作失败'
+    if (String(message).includes('未完成任务')) {
+      try {
+        await $sdk.confirm(`${message}。是否将未完成任务结转回 backlog 后继续完成 Sprint？`)
+        const res = await completeSprint(sprintId.value, { carryOverMode: 'backlog' })
+        const carryOverCount = res?.data?.carryOverCount || res?.carryOverCount || 0
+        $sdk.msgSuccess('Sprint 已完成，未完成任务已结转回 backlog')
+        if (carryOverCount) {
+          $sdk.msgSuccess(`已结转 ${carryOverCount} 个未完成任务到 backlog`)
+        }
+        await loadSprint()
+        await loadBurndown()
+        return
+      } catch (confirmError) {
+        if (confirmError !== 'cancel') {
+          $sdk.msgError(confirmError?.response?.data?.message || confirmError?.message || '操作失败')
+        }
+        return
+      }
+    }
+    $sdk.msgError(message)
   }
 }
 

@@ -81,3 +81,7 @@ export function getChildren(id) {
     }
   })
 }
+
+export function getTaskDraft(id) {
+  return request({ url: `${baseUrl}/${id}/task-draft`, method: 'get' })
+}

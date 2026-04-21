@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindManyOptions, Repository } from "typeorm";
 import { Sprint, SprintStatus } from "./entity";
@@ -152,7 +152,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     return { success: true, committedPoints: totalPoints };
   }
 
-  async completeSprint(sprintId: string): Promise<any> {
+  async completeSprint(sprintId: string, options?: { carryOverMode?: "backlog" }): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
       throw new Error("Sprint不存在");
@@ -167,12 +167,33 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       .filter((t) => t.status === TaskStatus.completed)
       .reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
+    const unfinishedTaskCount = tasks.filter(
+      (t) => t.status !== TaskStatus.completed,
+    ).length;
+    if (unfinishedTaskCount > 0 && options?.carryOverMode !== "backlog") {
+      throw new BadRequestException(
+        `Sprint 下仍有 ${unfinishedTaskCount} 个未完成任务，不能直接完成`,
+      );
+    }
+
+    if (unfinishedTaskCount > 0 && options?.carryOverMode === "backlog") {
+      const unfinishedTasks = tasks.filter((t) => t.status !== TaskStatus.completed);
+      for (const task of unfinishedTasks) {
+        await this.taskRepository.update(task.id, { sprintId: null } as any);
+      }
+    }
+
     await this.repository.update(sprintId, {
       status: SprintStatus.completed,
       completedPoints,
     });
 
-    return { success: true, completedPoints };
+    return {
+      success: true,
+      completedPoints,
+      unfinishedTaskCount,
+      carryOverCount: options?.carryOverMode === "backlog" ? unfinishedTaskCount : 0,
+    };
   }
 
   private mapUserSummary(user?: User | null) {

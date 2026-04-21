@@ -57,4 +57,9 @@ export class UserStoryController extends BaseController<
   async getChildren(@Param("id") id: string) {
     return this.service.getChildren(id);
   }
+
+  @Get(":id/task-draft")
+  async getTaskDraft(@Param("id") id: string) {
+    return this.service.getTaskDraft(id);
+  }
 }

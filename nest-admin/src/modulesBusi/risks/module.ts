@@ -6,12 +6,14 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { UsersModule } from "src/modules/users/users.module";
 import { ProjectsModule } from "../projects/module";
 import { Article } from "../articles/entity";
+import { TasksBusiModule } from "../tasks/module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Risk, Article]),
     UsersModule,
     ProjectsModule,
+    TasksBusiModule,
   ],
   controllers: [RisksController],
   providers: [RisksService],

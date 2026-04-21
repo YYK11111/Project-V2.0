@@ -1,6 +1,6 @@
 <script setup>
 import { watch } from 'vue'
-import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory, publishKnowledge, submitApproval } from './api'
+import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory, publishKnowledge, submitApproval, convertToTask } from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import { ElMessageBox } from 'element-plus'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
@@ -194,6 +194,16 @@ async function handlePublishKnowledge() {
   reloadCurrent()
 }
 
+async function handleConvertToTask() {
+  if (!route.query.id) return
+  const res = await convertToTask(route.query.id)
+  const taskId = res?.data?.taskId || res?.taskId
+  $sdk.msgSuccess('工单已转为任务')
+  if (taskId) {
+    router.push({ path: '/taskManage/form', query: { id: taskId } })
+  }
+}
+
 async function handleCloseReturnedInstance() {
   const { value } = await ElMessageBox.prompt('结束后实例将进入已取消状态，业务对象将同步更新为最终驳回态。', '结束退回实例', {
     confirmButtonText: '确认结束',
@@ -230,6 +240,7 @@ function scrollToWorkflowPanel() {
           <el-button v-if="canArticleAdd && canEditCurrentTicket" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
           <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
           <el-button v-if="route.query.id && canArticleAdd && canEditCurrentTicket" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+          <el-button v-if="route.query.id && canEditCurrentTicket" type="warning" plain @click="handleConvertToTask">转任务</el-button>
           <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </template>
       </el-page-header>
@@ -284,8 +295,15 @@ function scrollToWorkflowPanel() {
               <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
             </el-select>
             </el-form-item>
-        </el-col>
-      </el-row>
+         </el-col>
+       </el-row>
+
+        <el-form-item label="处理任务" v-if="form.linkedTask">
+          <div class="linked-task-inline">
+            <ViewEntity :title="form.linkedTask?.name" :subtitle="form.linkedTask?.code" />
+            <el-button link type="primary" @click="router.push({ path: '/taskManage/form', query: { id: form.linkedTask?.id, action: 'view' } })">查看任务</el-button>
+          </div>
+        </el-form-item>
 
         <el-row :gutter="20">
           <el-col :span="8">

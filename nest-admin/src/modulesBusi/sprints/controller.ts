@@ -30,7 +30,7 @@ export class SprintsController extends BaseController<Sprint, SprintsService> {
   }
 
   @Post(":id/complete")
-  async completeSprint(@Param("id") id: string) {
-    return this.service.completeSprint(id);
+  async completeSprint(@Param("id") id: string, @Body() body?: { carryOverMode?: "backlog" }) {
+    return this.service.completeSprint(id, body);
   }
 }

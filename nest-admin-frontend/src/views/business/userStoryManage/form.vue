@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getList, save, update, getStatus, getType } from './api'
+import { getOne, getList, save, update, getStatus, getType, getTaskDraft } from './api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
 import UserSelect from '@/components/UserSelect.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
@@ -138,6 +138,27 @@ function submit() {
 function cancel() {
   router.back()
 }
+
+async function handleCreateTaskFromStory() {
+  if (!route.query.id) return
+  const { data } = await getTaskDraft(route.query.id)
+  router.push({
+    path: '/taskManage/form',
+    query: {
+      fromStory: '1',
+      name: data?.name || '',
+      projectId: data?.projectId || '',
+      sprintId: data?.sprintId || '',
+      leaderId: data?.leaderId || '',
+      sourceType: data?.sourceType || 'story',
+      sourceId: data?.sourceId || '',
+      storyPoints: String(data?.storyPoints || 0),
+      acceptanceCriteria: data?.acceptanceCriteria || '',
+      sourceStoryTitle: data?.sourceStory?.title || '',
+      description: data?.description || '',
+    },
+  })
+}
 </script>
 
 <template>
@@ -168,7 +189,11 @@ function cancel() {
 
     <div class="Gcard km-panel story-form-shell">
       <div class="story-form-shell__top">
-        <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'" />
+        <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'">
+          <template #extra>
+            <el-button v-if="hasStoryId" type="primary" @click="handleCreateTaskFromStory">从故事创建任务</el-button>
+          </template>
+        </el-page-header>
       </div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="story-form">

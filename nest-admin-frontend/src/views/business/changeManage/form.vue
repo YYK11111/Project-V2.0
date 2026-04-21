@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { getOne, save, update, getStatus, getType, getImpact, approve, reject, publishKnowledge, submitApproval, confirmPlanImpact, confirmPlanImpactScope } from './api'
+import { getOne, save, update, getStatus, getType, getImpact, approve, reject, publishKnowledge, submitApproval, confirmPlanImpact, confirmPlanImpactScope, applyPlanImpactTarget } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
@@ -13,6 +13,9 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { getList as getTaskList } from '@/views/business/taskManage/api'
+import { getList as getMilestoneList } from '@/views/business/milestoneManage/api'
+import { getList as getSprintList } from '@/views/business/sprintManage/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +69,9 @@ const workflowPanelRef = ref()
 const hasChangeId = computed(() => !!route.query.id)
 const confirmImpactLoading = ref(false)
 const confirmScopeLoading = ref(false)
+const taskOptions = ref([])
+const milestoneOptions = ref([])
+const sprintOptions = ref([])
 
 const defaultForm = () => ({
   title: '',
@@ -83,6 +89,9 @@ const defaultForm = () => ({
   approverId: '',
   approvalComment: '',
   sort: 0,
+  impactedTaskId: '',
+  impactedMilestoneId: '',
+  impactedSprintId: '',
 })
 
 async function loadChange() {
@@ -95,6 +104,24 @@ async function loadChange() {
   }
   const { data } = await getOne(route.query.id)
   form.value = data || {}
+  await loadImpactOptions(String(form.value.projectId || ''))
+}
+
+async function loadImpactOptions(projectId) {
+  if (!projectId) {
+    taskOptions.value = []
+    milestoneOptions.value = []
+    sprintOptions.value = []
+    return
+  }
+  const [taskRes, milestoneRes, sprintRes] = await Promise.all([
+    getTaskList({ pageNum: 1, pageSize: 1000, projectId }),
+    getMilestoneList({ pageNum: 1, pageSize: 1000, projectId }),
+    getSprintList({ pageNum: 1, pageSize: 1000, projectId }),
+  ])
+  taskOptions.value = taskRes.list || []
+  milestoneOptions.value = milestoneRes.list || []
+  sprintOptions.value = sprintRes.list || []
 }
 
 watch(
@@ -104,6 +131,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(() => form.value.projectId, (value) => {
+  loadImpactOptions(String(value || ''))
+})
 
 function reloadCurrent() {
   loadChange()
@@ -198,6 +229,31 @@ async function handleConfirmPlanImpactScope(scope) {
   }).catch(() => {})
 }
 
+async function handleApplyPlanImpact(scope) {
+  if (!route.query.id || !scope) return
+  const targetId = scope === 'task' ? form.value.impactedTaskId : scope === 'milestone' ? form.value.impactedMilestoneId : form.value.impactedSprintId
+  if (!targetId) {
+    return $sdk.msgWarning(`请先填写要应用的${scope === 'task' ? '任务' : scope === 'milestone' ? '里程碑' : 'Sprint'} ID`)
+  }
+  const { value } = await ElMessageBox.prompt('请输入新的计划日期', '应用计划调整', {
+    confirmButtonText: '确认应用',
+    cancelButtonText: '取消',
+    inputPlaceholder: 'YYYY-MM-DD',
+  })
+  const payload = {
+    scope,
+    targetId,
+    targetName: targetId,
+    remark: '已应用计划调整',
+  }
+  if (scope === 'task') payload.plannedEndDate = value
+  if (scope === 'milestone') payload.dueDate = value
+  if (scope === 'sprint') payload.endDate = value
+  await applyPlanImpactTarget(route.query.id, payload)
+  $sdk.msgSuccess('已应用计划调整')
+  reloadCurrent()
+}
+
 function goToEdit() {
   if (!route.query.id) return
   router.push({ path: '/changeManage/form', query: { id: route.query.id } })
@@ -239,8 +295,11 @@ function scrollToWorkflowPanel() {
           <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
           <el-button v-if="route.query.id && canArticleAdd" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
           <el-button v-if="route.query.id && !form.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('milestone')">确认里程碑已处理</el-button>
+          <el-button v-if="route.query.id" type="primary" plain @click="handleApplyPlanImpact('milestone')">应用到里程碑</el-button>
           <el-button v-if="route.query.id && !form.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('sprint')">确认 Sprint 已处理</el-button>
+          <el-button v-if="route.query.id" type="primary" plain @click="handleApplyPlanImpact('sprint')">应用到 Sprint</el-button>
           <el-button v-if="route.query.id && !form.planImpactScopes?.task?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('task')">确认任务已处理</el-button>
+          <el-button v-if="route.query.id" type="primary" plain @click="handleApplyPlanImpact('task')">应用到任务</el-button>
           <el-button v-if="route.query.id && String(form.planImpactConfirmed || '0') !== '1'" :loading="confirmImpactLoading" type="warning" plain @click="handleConfirmPlanImpact">确认计划影响已处理</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </template>
@@ -384,6 +443,33 @@ function scrollToWorkflowPanel() {
           <el-form-item label="进度影响(天)">
             <ViewField v-if="isReadonly" :value="form.scheduleImpact" />
             <el-input-number v-else v-model="form.scheduleImpact" :min="0" style="width: 100%" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <el-form-item label="影响任务">
+            <ViewField v-if="isReadonly" :value="form.impactedTaskId" />
+            <el-select v-else v-model="form.impactedTaskId" placeholder="请选择任务" style="width: 100%" clearable>
+              <el-option v-for="item in taskOptions" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="影响里程碑">
+            <ViewField v-if="isReadonly" :value="form.impactedMilestoneId" />
+            <el-select v-else v-model="form.impactedMilestoneId" placeholder="请选择里程碑" style="width: 100%" clearable>
+              <el-option v-for="item in milestoneOptions" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="影响Sprint">
+            <ViewField v-if="isReadonly" :value="form.impactedSprintId" />
+            <el-select v-else v-model="form.impactedSprintId" placeholder="请选择Sprint" style="width: 100%" clearable>
+              <el-option v-for="item in sprintOptions" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
           </el-form-item>
         </el-col>
       </el-row>

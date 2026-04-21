@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, save, update, getStatus, getLevel, getCategory, publishKnowledge } from './api'
+import { getOne, save, update, getStatus, getLevel, getCategory, publishKnowledge, convertToTask } from './api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
@@ -118,6 +118,16 @@ async function handlePublishKnowledge() {
   $sdk.msgSuccess('风险案例已沉淀到知识中心')
   await loadRisk()
 }
+
+async function handleConvertToTask() {
+  if (!route.query.id) return
+  const res = await convertToTask(route.query.id)
+  const taskId = res?.data?.taskId || res?.taskId
+  $sdk.msgSuccess('风险已转为任务')
+  if (taskId) {
+    router.push({ path: '/taskManage/form', query: { id: taskId } })
+  }
+}
 </script>
 
 <template>
@@ -127,6 +137,7 @@ async function handlePublishKnowledge() {
         <template #extra>
           <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/detail', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
           <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+          <el-button v-if="route.query.id && canEditCurrentRisk" type="warning" plain @click="handleConvertToTask">转任务</el-button>
         </template>
       </el-page-header>
     </div>
@@ -195,6 +206,13 @@ async function handlePublishKnowledge() {
 
       <el-form-item label="实际解决日期" v-if="isEdit.value">
         <el-date-picker v-model="form.resolvedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
+      </el-form-item>
+
+      <el-form-item label="关联任务" v-if="form.linkedTask">
+        <div class="linked-task-inline">
+          <ViewEntity :title="form.linkedTask?.name" :subtitle="form.linkedTask?.code" />
+          <el-button link type="primary" @click="router.push({ path: '/taskManage/form', query: { id: form.linkedTask?.id, action: 'view' } })">查看任务</el-button>
+        </div>
       </el-form-item>
 
       <el-form-item label="排序">

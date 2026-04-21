@@ -186,4 +186,13 @@ export class Risk extends BaseEntity {
     comment: "关联知识文章ID",
   })
   knowledgeArticleId: string;
+
+  @BaseColumn({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    name: "linked_task_id",
+    comment: "关联处理任务ID",
+  })
+  linkedTaskId: string;
 }

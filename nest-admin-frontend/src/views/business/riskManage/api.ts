@@ -52,3 +52,7 @@ export function resolve(id) {
 export function publishKnowledge(id) {
   return request.post(`/business/risks/${id}/publish-knowledge`)
 }
+
+export function convertToTask(id) {
+  return request.post(`/business/risks/${id}/convert-to-task`)
+}

@@ -191,6 +191,15 @@ export class Ticket extends BaseEntity {
 
   @BaseColumn({
     type: "varchar",
+    length: 64,
+    nullable: true,
+    name: "linked_task_id",
+    comment: "关联处理任务ID",
+  })
+  linkedTaskId: string;
+
+  @BaseColumn({
+    type: "varchar",
     length: 100,
     nullable: true,
     comment: "工作流实例ID",

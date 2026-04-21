@@ -20,6 +20,7 @@ export const phaseMap = {
 }
 
 export const sourceTypeMap = {
+  story: '用户故事',
   baseline: '基线',
   change: '变更',
   adhoc: '临时',

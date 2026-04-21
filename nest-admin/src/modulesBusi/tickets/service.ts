@@ -13,6 +13,7 @@ import { SysFileService } from "src/modules/sys/file/service";
 import { SaveDto } from "src/common/dto";
 import { User } from "src/modules/users/entities/user.entity";
 import { ProjectsService } from "../projects/service";
+import { TasksService } from "../tasks/service";
 import { Article, Status as ArticleStatus } from "../articles/entity";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
@@ -24,6 +25,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     @InjectRepository(Article) private articleRepository: Repository<Article>,
     private readonly sysFileService: SysFileService,
     private readonly projectsService: ProjectsService,
+    private readonly tasksService: TasksService,
   ) {
     super(Ticket, repository);
   }
@@ -310,6 +312,12 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       );
     }
     const detail = this.buildTicketDetail(ticket);
+    if (ticket.linkedTaskId) {
+      detail.linkedTask = await this.repository.manager.findOne(Task as any, {
+        where: { id: ticket.linkedTaskId } as any,
+        select: ["id", "code", "name"] as any,
+      });
+    }
     if ((query as any)._operatorId) {
       Object.assign(
         detail,
@@ -476,5 +484,30 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       successIds,
       failed,
     } as any;
+  }
+
+  async convertToTask(id: string, currentUser: { id?: string; name?: string } = {}) {
+    const ticket = await this.getOne({ id });
+    if (!ticket) throw new Error("工单不存在");
+    if (!ticket.projectId) throw new Error("未关联项目的工单不能转任务");
+
+    const result = await this.tasksService.add({
+      projectId: ticket.projectId,
+      name: `工单处理：${ticket.title}`,
+      description: [ticket.content || "", ticket.stepsToReproduce || "", ticket.solution || ticket.resolution || ""].filter(Boolean).join("\n\n"),
+      leaderId: ticket.handlerId || ticket.submitterId || "",
+      sourceType: "ticket",
+      sourceId: String(ticket.id || ""),
+      createUser: currentUser.name || "system",
+      _operatorId: currentUser.id,
+      _operatorName: currentUser.name,
+      _operatorPermissions: [],
+    } as any);
+    const task = Array.isArray(result) ? result[0] : result;
+    await this.repository.update(id, { linkedTaskId: String(task?.id || "") } as any);
+    return {
+      taskId: task?.id,
+      taskName: task?.name,
+    };
   }
 }

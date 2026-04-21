@@ -11,6 +11,9 @@ import { SysFileModule } from "src/modules/sys/file/module";
 import { User } from "src/modules/users/entities/user.entity";
 import { TaskComment } from "../task-comments/entity";
 import { Milestone } from "../milestones/entity";
+import { UserStory } from "../projects/entities/user-story.entity";
+import { Risk } from "../risks/entity";
+import { Ticket } from "../tickets/entity";
 
 @Module({
   imports: [
@@ -21,6 +24,9 @@ import { Milestone } from "../milestones/entity";
       TaskComment,
       User,
       Milestone,
+      UserStory,
+      Risk,
+      Ticket,
     ]),
     UsersModule,
     ProjectsModule,

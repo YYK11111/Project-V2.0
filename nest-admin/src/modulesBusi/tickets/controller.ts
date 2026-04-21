@@ -76,4 +76,12 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
       name: req.user?.name,
     });
   }
+
+  @Post(":id/convert-to-task")
+  async convertToTask(@Param("id") id: string, @Req() req: any) {
+    return this.service.convertToTask(id, {
+      id: req.user?.id,
+      name: req.user?.name,
+    });
+  }
 }

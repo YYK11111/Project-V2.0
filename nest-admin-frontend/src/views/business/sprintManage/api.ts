@@ -49,6 +49,6 @@ export function startSprint(id) {
   return request.post(`/business/sprints/${id}/start`)
 }
 
-export function completeSprint(id) {
-  return request.post(`/business/sprints/${id}/complete`)
+export function completeSprint(id, data) {
+  return request.post(`/business/sprints/${id}/complete`, data)
 }

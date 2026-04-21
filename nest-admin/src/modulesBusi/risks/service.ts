@@ -11,13 +11,17 @@ import { Article, Status as ArticleStatus } from "../articles/entity";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { ProjectsService } from "../projects/service";
+import { TasksService } from "../tasks/service";
+import { Task } from "../tasks/entity";
 
 @Injectable()
 export class RisksService extends BaseService<Risk, CreateRiskDto> {
   constructor(
     @InjectRepository(Risk) repository: Repository<Risk>,
     @InjectRepository(Article) private articleRepository: Repository<Article>,
+    @InjectRepository(Task) private taskRepository: Repository<Task>,
     private readonly projectsService: ProjectsService,
+    private readonly tasksService: TasksService,
   ) {
     super(Risk, repository);
   }
@@ -189,6 +193,12 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       ...risk,
       project: this.mapProjectSummary(risk.project),
       riskOwner: this.mapUserSummary(risk.riskOwner),
+      linkedTask: risk.linkedTaskId
+        ? await this.taskRepository.findOne({
+            where: { id: risk.linkedTaskId } as any,
+            select: ["id", "code", "name"] as any,
+          })
+        : null,
     };
     if ((query as any)._operatorId) {
       Object.assign(
@@ -355,6 +365,33 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       articleId: article.id,
       catalogId: reviewCatalog.id,
       title: article.title,
+    };
+  }
+
+  async convertToTask(id: string, currentUser: { id?: string; name?: string } = {}) {
+    const risk = await this.getOne({ id });
+    if (!risk) throw new Error("风险不存在");
+    if (!risk.projectId) throw new Error("未关联项目的风险不能转任务");
+
+    const result = await this.tasksService.add({
+      projectId: risk.projectId,
+      name: `风险应对：${risk.name}`,
+      description: [risk.description || "", risk.mitigation || ""].filter(Boolean).join("\n\n"),
+      leaderId: risk.riskOwnerId || "",
+      endDate: risk.dueDate || "",
+      plannedEndDate: risk.dueDate || "",
+      sourceType: "risk",
+      sourceId: String(risk.id || ""),
+      createUser: currentUser.name || "system",
+      _operatorId: currentUser.id,
+      _operatorName: currentUser.name,
+      _operatorPermissions: [],
+    } as any);
+    const task = Array.isArray(result) ? result[0] : result;
+    await this.repository.update(id, { linkedTaskId: String(task?.id || "") } as any);
+    return {
+      taskId: task?.id,
+      taskName: task?.name,
     };
   }
 }

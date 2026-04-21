@@ -5,6 +5,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { ChatDotRound, DocumentAdd } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
+import { getOne as getStoryOne } from '@/views/business/userStoryManage/api'
+import { getOne as getRiskOne } from '@/views/business/riskManage/api'
+import { getOne as getTicketOne } from '@/views/business/ticketManage/api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
 import { getList as getMilestoneList } from '@/views/business/milestoneManage/api'
@@ -125,6 +128,8 @@ const timeLogRules = {
 const currentUserId = computed(() => String(userStore.id || ''))
 const canCommentOnTask = computed(() => !!hasTaskId.value)
 const canAddTimeLog = computed(() => !!hasTaskId.value)
+const sourceStoryTitle = computed(() => String(route.query.sourceStoryTitle || form.value.sourceEntity?.title || form.value.sourceEntity?.name || ''))
+const sourceEntity = ref(null)
 
 function getDisplayUserName(user: any, fallback?: string) {
   return user?.nickname || user?.name || fallback || '-'
@@ -397,11 +402,22 @@ async function loadTask() {
     form.value = {
       ...defaultForm(),
       projectId: String(route.query.projectId || ''),
+      sprintId: String(route.query.sprintId || ''),
+      leaderId: String(route.query.leaderId || ''),
+      name: String(route.query.name || ''),
+      description: String(route.query.description || ''),
+      acceptanceCriteria: String(route.query.acceptanceCriteria || ''),
+      sourceType: String(route.query.sourceType || ''),
+      sourceId: String(route.query.sourceId || ''),
+      storyPoints: Number(route.query.storyPoints || 0),
     }
     dependencies.value = []
     dependents.value = []
     taskComments.value = []
     timeLogs.value = []
+    sourceEntity.value = route.query.sourceType === 'story' && route.query.sourceId
+      ? { type: 'story', id: String(route.query.sourceId), title: String(route.query.sourceStoryTitle || '') }
+      : null
     return
   }
   const { data } = await getOne(route.query.id)
@@ -416,6 +432,30 @@ async function loadTask() {
   loadTaskComments()
   loadTimeLogs()
   loadSprintOptions()
+  await loadSourceEntity()
+}
+
+async function loadSourceEntity() {
+  if (!form.value.sourceType || !form.value.sourceId) {
+    sourceEntity.value = null
+    return
+  }
+  if (form.value.sourceType === 'story') {
+    const { data } = await getStoryOne(form.value.sourceId)
+    sourceEntity.value = { type: 'story', id: data?.id, title: data?.title, code: data?.project?.code }
+    return
+  }
+  if (form.value.sourceType === 'risk') {
+    const { data } = await getRiskOne(form.value.sourceId)
+    sourceEntity.value = { type: 'risk', id: data?.id, title: data?.name, code: data?.project?.code }
+    return
+  }
+  if (form.value.sourceType === 'ticket') {
+    const { data } = await getTicketOne(form.value.sourceId)
+    sourceEntity.value = { type: 'ticket', id: data?.id, title: data?.title, code: data?.project?.code }
+    return
+  }
+  sourceEntity.value = null
 }
 
 watch(
@@ -782,8 +822,9 @@ watch(hasTaskId, (value) => {
         <el-row :gutter="20" class="task-info-row task-info-row--last">
           <el-col :xs="24" :sm="12">
             <el-form-item label="来源类型">
-              <ViewField v-if="isReadonly" :value="form.sourceType" />
+              <ViewField v-if="isReadonly" :value="sourceTypeMap[form.sourceType] || form.sourceType" />
               <el-select v-else v-model="form.sourceType" placeholder="请选择来源类型" style="width: 100%" clearable>
+                <el-option label="用户故事" value="story" />
                 <el-option label="基线" value="baseline" />
                 <el-option label="变更" value="change" />
                 <el-option label="临时" value="adhoc" />
@@ -797,6 +838,15 @@ watch(hasTaskId, (value) => {
             </el-form-item>
           </el-col>
         </el-row>
+
+        <el-form-item v-if="sourceEntity" label="来源对象">
+          <div class="source-entity-inline">
+            <ViewField :value="sourceEntity.title || sourceEntity.name || sourceStoryTitle || form.sourceId" />
+            <el-button v-if="sourceEntity.type === 'story'" link type="primary" @click="router.push({ path: '/projectManage/userStoryManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看故事</el-button>
+            <el-button v-if="sourceEntity.type === 'risk'" link type="primary" @click="router.push({ path: '/riskManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看风险</el-button>
+            <el-button v-if="sourceEntity.type === 'ticket'" link type="primary" @click="router.push({ path: '/ticketManage/form', query: { id: sourceEntity.id, action: 'view' } })">查看工单</el-button>
+          </div>
+        </el-form-item>
 
         <el-form-item label="任务描述" prop="description">
           <ViewRichText v-if="isReadonly" :html="form.description" />

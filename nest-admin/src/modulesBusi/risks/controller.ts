@@ -57,4 +57,12 @@ export class RisksController extends BaseController<Risk, RisksService> {
       name: req.user?.name,
     });
   }
+
+  @Post(":id/convert-to-task")
+  convertToTask(@Param("id") id: string, @Req() req: any) {
+    return this.service.convertToTask(id, {
+      id: req.user?.id,
+      name: req.user?.name,
+    });
+  }
 }

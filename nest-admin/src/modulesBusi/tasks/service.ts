@@ -19,6 +19,9 @@ import { TaskComment } from "../task-comments/entity";
 import { ProjectsService } from "../projects/service";
 import { BoolNum } from "src/common/type/base";
 import { Milestone } from "../milestones/entity";
+import { UserStory } from "../projects/entities/user-story.entity";
+import { Risk } from "../risks/entity";
+import { Ticket } from "../tickets/entity";
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -33,6 +36,12 @@ export class TasksService extends BaseService<Task, TaskDto> {
     @InjectRepository(User) private userRepository: Repository<User>,
     @InjectRepository(Milestone)
     private milestoneRepository: Repository<Milestone>,
+    @InjectRepository(UserStory)
+    private storyRepository: Repository<UserStory>,
+    @InjectRepository(Risk)
+    private riskRepository: Repository<Risk>,
+    @InjectRepository(Ticket)
+    private ticketRepository: Repository<Ticket>,
     private readonly sysFileService: SysFileService,
     private readonly projectsService: ProjectsService,
   ) {
@@ -407,6 +416,25 @@ export class TasksService extends BaseService<Task, TaskDto> {
   private async buildTaskDetail(task: Task) {
     await this.ensureTaskCode(task);
     const executors = await this.fillExecutors(task.executorIds || []);
+    let sourceEntity: any = null;
+    if (task.sourceType === "story" && task.sourceId) {
+      sourceEntity = await this.storyRepository.findOne({
+        where: { id: task.sourceId } as any,
+        select: ["id", "title"] as any,
+      });
+    }
+    if (task.sourceType === "risk" && task.sourceId) {
+      sourceEntity = await this.riskRepository.findOne({
+        where: { id: task.sourceId } as any,
+        select: ["id", "name", "linkedTaskId"] as any,
+      });
+    }
+    if (task.sourceType === "ticket" && task.sourceId) {
+      sourceEntity = await this.ticketRepository.findOne({
+        where: { id: task.sourceId } as any,
+        select: ["id", "title", "linkedTaskId"] as any,
+      });
+    }
 
     return {
       ...task,
@@ -415,6 +443,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       leader: this.mapUserSummary(task.leader),
       parent: this.mapTaskSummary(task.parent),
       executors,
+      sourceEntity,
     };
   }
 
@@ -449,6 +478,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       status,
       priority,
       sourceType,
+      sourceId,
       leaderId,
       projectId,
       parentId,
@@ -510,6 +540,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
     if (sourceType !== undefined && sourceType !== "") {
       taskQuery.andWhere("task.sourceType = :sourceType", { sourceType });
+    }
+    if (sourceId !== undefined && sourceId !== "") {
+      taskQuery.andWhere("task.sourceId = :sourceId", { sourceId });
     }
     if (leaderId !== undefined && leaderId !== "") {
       taskQuery.andWhere("task.leader_id = :leaderId", { leaderId });

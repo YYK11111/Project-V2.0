@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -22,6 +23,9 @@ import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { ProjectsService } from "../projects/service";
 import { ChangeImpactConfirmHistory } from "./entities/change-impact-confirm-history.entity";
+import { Task } from "../tasks/entity";
+import { Milestone } from "../milestones/entity";
+import { Sprint } from "../sprints/entity";
 
 @Injectable()
 export class ChangesService extends BaseService<
@@ -33,6 +37,12 @@ export class ChangesService extends BaseService<
     @InjectRepository(Article) private articleRepository: Repository<Article>,
     @InjectRepository(ChangeImpactConfirmHistory)
     private historyRepository: Repository<ChangeImpactConfirmHistory>,
+    @InjectRepository(Task)
+    private taskRepository: Repository<Task>,
+    @InjectRepository(Milestone)
+    private milestoneRepository: Repository<Milestone>,
+    @InjectRepository(Sprint)
+    private sprintRepository: Repository<Sprint>,
     private readonly sysFileService: SysFileService,
     private readonly projectsService: ProjectsService,
   ) {
@@ -279,6 +289,52 @@ export class ChangesService extends BaseService<
         operatorName,
         targetId,
         targetName,
+        remark: remark || null,
+        confirmedAt: new Date().toISOString().split("T")[0],
+      }),
+    );
+    return true;
+  }
+
+  async applyPlanImpactTarget(
+    id: string,
+    scope: "task" | "milestone" | "sprint",
+    targetId: string,
+    payload: { plannedStartDate?: string; plannedEndDate?: string; dueDate?: string; endDate?: string },
+    userId: string,
+    remark?: string,
+    operatorName?: string,
+  ) {
+    if (!targetId) {
+      throw new BadRequestException("请选择要应用的任务");
+    }
+    if (scope === "task") {
+      await this.taskRepository.update(targetId, {
+        plannedStartDate: payload.plannedStartDate || null,
+        plannedEndDate: payload.plannedEndDate || null,
+      } as any);
+    } else if (scope === "milestone") {
+      await this.milestoneRepository.update(targetId, {
+        dueDate: payload.dueDate || null,
+        changeImpactFlag: "1",
+      } as any);
+    } else if (scope === "sprint") {
+      await this.sprintRepository.update(targetId, {
+        endDate: payload.endDate || null,
+        changeImpactFlag: "1",
+      } as any);
+    } else {
+      throw new BadRequestException("不支持的计划应用范围");
+    }
+    await this.historyRepository.save(
+      new ChangeImpactConfirmHistory({
+        changeId: id,
+        scope,
+        action: "apply",
+        operatorId: userId,
+        operatorName,
+        targetId,
+        targetName: targetId,
         remark: remark || null,
         confirmedAt: new Date().toISOString().split("T")[0],
       }),

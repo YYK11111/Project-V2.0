@@ -130,6 +130,39 @@ export class ChangesController extends BaseController<
     );
   }
 
+  @Post(":id/apply-plan-impact-target")
+  applyPlanImpactTarget(
+    @Param("id") id: string,
+    @Req() req: any,
+    @Body()
+    body: {
+      scope: "milestone" | "sprint" | "task";
+      targetId: string;
+      targetName: string;
+      plannedStartDate?: string;
+      plannedEndDate?: string;
+      dueDate?: string;
+      endDate?: string;
+      remark?: string;
+    },
+  ) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.applyPlanImpactTarget(
+      id,
+      body?.scope,
+      body?.targetId,
+      {
+        plannedStartDate: body?.plannedStartDate,
+        plannedEndDate: body?.plannedEndDate,
+        dueDate: body?.dueDate,
+        endDate: body?.endDate,
+      },
+      userId,
+      body?.remark,
+      req.user?.name,
+    );
+  }
+
   @Post("approve/:id")
   approve(
     @Param("id") id: string,
