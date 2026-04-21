@@ -221,30 +221,10 @@ function submitBorrow() {
       <el-button v-if="accessDeniedInfo.canBorrow" type="primary" @click="borrowDialogVisible = true">申请借阅</el-button>
     </el-empty>
 
-    <div v-if="!accessDeniedInfo" class="knowledge-editor-hero Gcard km-hero">
-      <div class="knowledge-editor-hero__eyebrow km-hero__eyebrow">知识编辑</div>
-      <div class="knowledge-editor-hero__title km-hero__title">统一维护知识内容、可见范围与 AI 检索元信息</div>
-      <div class="knowledge-editor-hero__desc km-hero__desc">先补齐标题、摘要、分类和可见范围，再完善正文内容与 AI 检索相关配置，保证知识既可阅读，也能被检索系统稳定消费。</div>
-      <div class="knowledge-editor-hero__status">
-        <div class="knowledge-editor-hero__status-item">
-          <span class="knowledge-editor-hero__status-label">当前模式</span>
-          <span class="knowledge-editor-hero__status-value">{{ route.query.id ? '编辑已有知识' : '新增知识' }}</span>
-        </div>
-          <div class="knowledge-editor-hero__status-item">
-            <span class="knowledge-editor-hero__status-label">编辑状态</span>
-            <span class="knowledge-editor-hero__status-value">{{ isEdited ? '有未保存变更' : '内容已同步' }}</span>
-          </div>
-          <div class="knowledge-editor-hero__status-item" v-if="route.query.id">
-            <span class="knowledge-editor-hero__status-label">当前权限</span>
-            <span class="knowledge-editor-hero__status-value">{{ canEditCurrentArticle ? '可编辑' : '只读' }}</span>
-          </div>
-        </div>
-      </div>
-
     <BaForm ref="formRef" class="Gcard knowledge-editor-form km-panel" :model="form">
       <template v-if="!accessDeniedInfo">
         <div class="knowledge-form-grid">
-        <section class="knowledge-form-section">
+        <section class="knowledge-form-section knowledge-form-section--summary">
           <div class="section-header">
             <div>
               <div class="section-title">基础信息</div>
@@ -286,7 +266,7 @@ function submitBorrow() {
           </div>
         </section>
 
-        <section class="knowledge-form-section">
+        <section class="knowledge-form-section knowledge-form-section--summary">
           <div class="section-header">
             <div>
               <div class="section-title">治理信息</div>
@@ -337,7 +317,7 @@ function submitBorrow() {
         </section>
         </div>
 
-        <section class="knowledge-form-section knowledge-form-section--full">
+        <section class="knowledge-form-section knowledge-form-section--full knowledge-form-section--content-main">
           <div class="section-header">
             <div>
               <div class="section-title">知识内容</div>
@@ -420,44 +400,6 @@ function submitBorrow() {
   }
 }
 
-.knowledge-editor-hero__status {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  max-width: 720px;
-}
-
-.knowledge-editor-hero__status-item {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
-  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
-}
-
-.knowledge-editor-hero__status-label {
-  display: block;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 6px;
-}
-
-.knowledge-editor-hero__status-value {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.knowledge-editor-hero__title {
-  max-width: none;
-  white-space: nowrap;
-  margin-bottom: 12px;
-}
-
-.knowledge-editor-hero__desc {
-  margin-bottom: 24px;
-  max-width: none;
-  white-space: nowrap;
-}
-
 .knowledge-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -486,6 +428,14 @@ function submitBorrow() {
 }
 
 .knowledge-form-section--full + .knowledge-form-section--full {
+  margin-top: 24px;
+}
+
+.knowledge-form-section--summary {
+  margin-top: 0;
+}
+
+.knowledge-form-section--content-main {
   margin-top: 24px;
 }
 
@@ -534,11 +484,17 @@ function submitBorrow() {
 }
 
 .knowledge-editor-operate-bar :deep(.el-button) {
-  min-width: 108px;
+  min-width: 112px;
 }
 
 .knowledge-editor-operate-bar :deep(.el-button + .el-button) {
-  margin-left: 14px;
+  margin-left: 0;
+}
+
+.knowledge-editor-operate-bar :deep(.el-button-group),
+.knowledge-editor-operate-bar :deep(.el-space),
+.knowledge-editor-operate-bar {
+  gap: 12px;
 }
 
 .content-text-preview {
@@ -556,8 +512,7 @@ function submitBorrow() {
 @media (max-width: 1024px) {
   .knowledge-form-grid,
   .knowledge-top-grid,
-  .knowledge-ai-grid,
-  .knowledge-editor-hero__status {
+  .knowledge-ai-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -566,10 +521,6 @@ function submitBorrow() {
   .knowledge-form-section,
   .knowledge-empty-state {
     padding: 18px;
-  }
-
-  .knowledge-editor-hero__status {
-    max-width: none;
   }
 
   .knowledge-form-section,
@@ -586,14 +537,6 @@ function submitBorrow() {
     gap: 16px;
   }
 
-  .knowledge-editor-hero__title {
-    white-space: normal;
-  }
-
-  .knowledge-editor-hero__desc {
-    white-space: normal;
-  }
-
   .knowledge-form-section--full .section-desc {
     white-space: normal;
   }
@@ -603,7 +546,7 @@ function submitBorrow() {
   }
 
   .knowledge-editor-operate-bar :deep(.el-button + .el-button) {
-    margin-left: 10px;
+    margin-left: 0;
   }
 }
 </style>
