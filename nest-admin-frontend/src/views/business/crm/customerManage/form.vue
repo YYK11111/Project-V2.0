@@ -181,8 +181,9 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="customer-form-page">
+    <div class="Gcard customer-form-shell">
+    <div class="customer-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '客户详情' : isEdit ? '编辑客户' : '新增客户'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
@@ -209,6 +210,16 @@ function scrollToWorkflowPanel() {
     </el-alert>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" style="max-width: 1000px">
+      <div class="customer-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护客户名称、简称、类型和统一社会信用代码，先把主数据基础信息建立完整。</div>
+          </div>
+        </div>
+
+        <div class="customer-section-fields">
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="客户名称" prop="name">
@@ -260,27 +271,38 @@ function scrollToWorkflowPanel() {
         <ViewField v-if="isReadonly" :value="form.address" />
         <el-input v-else v-model="form.address" placeholder="请输入企业地址" maxlength="200" show-word-limit />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-row :gutter="20">
-        <el-col :span="8">
-          <el-form-item label="联系人" prop="contactPerson">
-            <ViewField v-if="isReadonly" :value="form.contactPerson" />
-            <el-input v-else v-model="form.contactPerson" placeholder="请输入联系人" maxlength="20" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="联系电话" prop="contactPhone">
-            <ViewField v-if="isReadonly" :value="form.contactPhone" />
-            <el-input v-else v-model="form.contactPhone" placeholder="请输入联系电话" maxlength="20" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="联系邮箱" prop="contactEmail">
-            <ViewField v-if="isReadonly" :value="form.contactEmail" />
-            <el-input v-else v-model="form.contactEmail" placeholder="请输入联系邮箱" maxlength="100" />
-          </el-form-item>
-        </el-col>
-      </el-row>
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">联系与归属</div>
+            <div class="section-desc">维护联系人、联系电话、联系邮箱以及销售负责人和所属部门。</div>
+          </div>
+        </div>
+
+        <div class="customer-section-fields">
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="联系人" prop="contactPerson">
+              <ViewField v-if="isReadonly" :value="form.contactPerson" />
+              <el-input v-else v-model="form.contactPerson" placeholder="请输入联系人" maxlength="20" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="联系电话" prop="contactPhone">
+              <ViewField v-if="isReadonly" :value="form.contactPhone" />
+              <el-input v-else v-model="form.contactPhone" placeholder="请输入联系电话" maxlength="20" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="联系邮箱" prop="contactEmail">
+              <ViewField v-if="isReadonly" :value="form.contactEmail" />
+              <el-input v-else v-model="form.contactEmail" placeholder="请输入联系邮箱" maxlength="100" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
       <el-row :gutter="20">
         <el-col :span="8">
@@ -339,6 +361,18 @@ function scrollToWorkflowPanel() {
           </el-form-item>
         </el-col>
       </el-row>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">客户属性与说明</div>
+            <div class="section-desc">维护客户等级、状态、客户价值和客户描述，便于后续销售与运营判断。</div>
+          </div>
+        </div>
+
+        <div class="customer-section-fields">
 
       <el-form-item label="客户描述" prop="description">
         <ViewField v-if="isReadonly" :value="form.description" />
@@ -351,12 +385,15 @@ function scrollToWorkflowPanel() {
           maxlength="1000"
           show-word-limit />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-form-item>
+      <el-form-item class="footer-actions">
         <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
         <el-button v-if="!isReadonly && isEdit && canCustomerUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       </el-form-item>
+      </div>
     </el-form>
 
     <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
@@ -368,10 +405,64 @@ function scrollToWorkflowPanel() {
         @approved="reloadCurrent"
       />
     </div>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
+.customer-form-page {
+  min-height: 100%;
+}
+
+.customer-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.customer-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.customer-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.customer-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
+.customer-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .workflow-panel-section {
   margin-top: 20px;
   max-width: 1000px;
@@ -390,5 +481,25 @@ function scrollToWorkflowPanel() {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+@media (max-width: 768px) {
+  .section-card {
+    padding: 18px;
+  }
 }
 </style>

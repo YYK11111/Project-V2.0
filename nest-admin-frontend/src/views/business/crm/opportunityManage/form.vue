@@ -103,12 +103,23 @@ function cancel() {
 </script>
 
 <template>
-  <div class="Gcard">
-    <div class="mb20">
+  <div class="opportunity-form-page">
+    <div class="Gcard opportunity-form-shell">
+    <div class="opportunity-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '销售机会详情' : isEdit ? '编辑销售机会' : '新增销售机会'" />
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px">
+      <div class="opportunity-sections">
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">基本信息</div>
+            <div class="section-desc">维护机会名称、客户、销售负责人和机会编号，先把销售机会主上下文建立完整。</div>
+          </div>
+        </div>
+
+        <div class="opportunity-section-fields">
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="机会名称" prop="name">
@@ -175,9 +186,70 @@ function cancel() {
               placeholder="选择预计成交时间"
               value-format="YYYY-MM-DD"
               style="width: 100%" />
-          </el-form-item>
-        </el-col>
-      </el-row>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">销售推进</div>
+            <div class="section-desc">统一维护预期金额、销售阶段、成功概率和预计成交时间，方便判断机会成熟度。</div>
+          </div>
+        </div>
+
+        <div class="opportunity-section-fields">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="预期金额(元)" prop="expectedAmount">
+              <ViewField v-if="isReadonly" :value="form.expectedAmount" />
+              <el-input-number v-else v-model="form.expectedAmount" :min="0" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="销售阶段" prop="stage">
+              <ViewTagField v-if="isReadonly" :text="stages[form.stage]" :type="form.stage === '5' ? 'success' : form.stage === '4' ? 'warning' : 'primary'" />
+              <el-select v-else v-model="form.stage" placeholder="请选择销售阶段" style="width: 100%">
+                <el-option v-for="(value, key) of stages" :key="key" :label="value" :value="key" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="成功概率(%)" prop="successRate">
+              <ViewField v-if="isReadonly" :value="form.successRate" />
+              <el-slider v-else v-model="form.successRate" :min="0" :max="100" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="预计成交时间" prop="expectedCloseDate">
+              <ViewField v-if="isReadonly" :value="form.expectedCloseDate" />
+              <el-date-picker
+                v-else
+                v-model="form.expectedCloseDate"
+                type="date"
+                placeholder="选择预计成交时间"
+                value-format="YYYY-MM-DD"
+                style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">描述与失败原因</div>
+            <div class="section-desc">补充机会背景、推进信息和失败原因，方便后续复盘与判断。</div>
+          </div>
+        </div>
+
+        <div class="opportunity-section-fields">
 
       <el-form-item label="机会描述" prop="description">
         <ViewField v-if="isReadonly" :value="form.description" />
@@ -202,14 +274,90 @@ function cancel() {
           maxlength="500"
           show-word-limit />
       </el-form-item>
+        </div>
+      </section>
 
-      <el-form-item>
+      <el-form-item class="footer-actions">
         <el-button v-if="!isReadonly && (isEdit ? canOpportunityUpdate : canOpportunityAdd)" type="primary" @click="submit">提交</el-button>
         <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
       </el-form-item>
+      </div>
     </el-form>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
+.opportunity-form-page {
+  min-height: 100%;
+}
+
+.opportunity-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.opportunity-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-card {
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.section-header {
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.opportunity-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.opportunity-form-page :deep(.el-form-item) {
+  margin: 0 !important;
+}
+
+.opportunity-form-page :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.footer-actions :deep(.el-form-item__content) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-actions :deep(.el-button) {
+  min-width: 112px;
+}
+
+.footer-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+@media (max-width: 768px) {
+  .section-card {
+    padding: 18px;
+  }
+}
 </style>
