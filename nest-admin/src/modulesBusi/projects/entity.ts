@@ -454,3 +454,20 @@ export class Project extends BaseEntity {
   })
   currentNodeName: string;
 }
+  @BaseColumn({
+    type: "varchar",
+    length: 36,
+    nullable: true,
+    name: "contract_id",
+    comment: "来源合同ID",
+  })
+  contractId: string;
+
+  @BaseColumn({
+    type: "varchar",
+    length: 36,
+    nullable: true,
+    name: "opportunity_id",
+    comment: "来源商机ID",
+  })
+  opportunityId: string;

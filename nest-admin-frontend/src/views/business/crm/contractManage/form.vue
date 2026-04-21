@@ -207,6 +207,11 @@ function cancel() {
         </el-select>
       </el-form-item>
 
+      <el-form-item label="关联项目">
+        <ViewEntity v-if="form.project" :title="form.project?.name" :subtitle="form.project?.code" />
+        <ViewField v-else value="-" />
+      </el-form-item>
+
       <el-form-item label="合同文件" prop="contractFile">
         <template v-if="isReadonly">
           <a v-if="form.contractFile" :href="form.contractFile" target="_blank">{{ form.contractFile }}</a>

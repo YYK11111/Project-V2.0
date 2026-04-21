@@ -92,6 +92,11 @@ function createDefaultForm() {
     acceptanceDate: '',
     attachments: [],
     customerId: null,
+    contractId: '',
+    opportunityId: '',
+    projectSource: '',
+    contract: null,
+    opportunity: null,
     budget: 0,
     actualCost: 0,
     currency: 'CNY',
@@ -245,6 +250,33 @@ function isGroupReadonly(groupCode) {
   return isView.value || !canEditGroup(groupCode)
 }
 
+function hydrateFromContractQuery() {
+  if (String(route.query.fromContract || '') !== '1') return null
+  return {
+    name: String(route.query.name || ''),
+    customerId: route.query.customerId ? Number(route.query.customerId) : null,
+    contractId: String(route.query.contractId || ''),
+    opportunityId: String(route.query.opportunityId || ''),
+    startDate: String(route.query.startDate || ''),
+    endDate: String(route.query.endDate || ''),
+    projectSource: String(route.query.projectSource || 'contract'),
+    contract: route.query.contractId
+      ? {
+          id: String(route.query.contractId || ''),
+          code: String(route.query.contractCode || ''),
+          name: String(route.query.contractName || ''),
+        }
+      : null,
+    opportunity: route.query.opportunityId
+      ? {
+          id: String(route.query.opportunityId || ''),
+          code: String(route.query.opportunityCode || ''),
+          name: String(route.query.opportunityName || ''),
+        }
+      : null,
+  }
+}
+
 watch(
   () => form.value.projectType,
   (projectTypeValue, oldValue) => {
@@ -288,7 +320,10 @@ watch(
 async function loadProject() {
   milestonesManuallyEdited.value = false
   if (!(isEdit.value || isView.value)) {
-    form.value = createDefaultForm()
+    form.value = {
+      ...createDefaultForm(),
+      ...(hydrateFromContractQuery() || {}),
+    }
     fieldPermissionResult.value = null
     return
   }
@@ -375,6 +410,8 @@ function resetMilestoneTemplate() {
 function normalizeSubmitPayload() {
   const payload = {
     ...form.value,
+    contractId: form.value.contractId || null,
+    opportunityId: form.value.opportunityId || null,
     members: form.value.members
       .filter((item) => item.userId && item.role)
       .map((item, index) => ({
@@ -505,7 +542,9 @@ function saveProject(triggerApproval = false) {
         }
       })
       .catch((error) => {
-        $sdk.msgError(error?.message || '项目保存失败')
+        const payload = error?.response?.data || {}
+        const message = String(payload?.message || error?.message || '项目保存失败')
+        $sdk.msgError(message)
       })
       .finally(() => {
         saveLoading.value = false
@@ -617,6 +656,21 @@ function cancel() {
                   <el-select v-else v-model="form.customerId" placeholder="请选择客户" style="width: 100%" clearable>
                     <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id" />
                   </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="来源合同">
+                  <ViewEntity v-if="form.contract" :title="form.contract?.name" :subtitle="form.contract?.code" />
+                  <ViewField v-else value="-" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20" class="basic-info-row">
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="来源商机">
+                  <ViewEntity v-if="form.opportunity" :title="form.opportunity?.name" :subtitle="form.opportunity?.code" />
+                  <ViewField v-else value="-" />
                 </el-form-item>
               </el-col>
               <el-col :xs="24" :sm="12">

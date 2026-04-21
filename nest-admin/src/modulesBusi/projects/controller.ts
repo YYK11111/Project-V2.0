@@ -139,6 +139,7 @@ export class ProjectsController extends BaseController<
       "submitApproval",
     );
     await this.service.validateBaselinePlan(id);
+    await this.service.ensureProjectApprovalReady(id);
     const instanceId = await this.workflowService.startProjectApproval(
       id,
       userId,

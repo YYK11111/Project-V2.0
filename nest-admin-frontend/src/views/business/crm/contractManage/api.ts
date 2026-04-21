@@ -39,3 +39,7 @@ export function del(ids) {
 export function getContractStatuses() {
   return request({ url: `${baseUrl}/getStatuses`, method: 'get' })
 }
+
+export function createProjectDraft(id) {
+  return request({ url: `${baseUrl}/${id}/create-project-draft`, method: 'post' })
+}
