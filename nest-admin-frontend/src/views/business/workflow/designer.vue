@@ -2557,7 +2557,7 @@ const onCanvasClick = () => {
   stroke: #fff;
   stroke-width: 3px;
   stroke-linejoin: round;
-  fill: #606266;
+  fill: var(--el-text-color-regular);
   pointer-events: none;
 }
 
@@ -2631,7 +2631,7 @@ const onCanvasClick = () => {
 }
 
 .condition-item {
-  background: #f5f5f5;
+  background: var(--el-fill-color-light);
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 10px;

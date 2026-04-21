@@ -104,6 +104,8 @@ describe('projectManage 页面暗黑模式样式守卫', () => {
     expect(workflowDesignerSource).not.toMatch(/\.issue-item-meta\s*\{[^}]*color:\s*#909399/is)
     expect(workflowDesignerSource).not.toMatch(/\.anchor\s*\{[^}]*background:\s*#fff\b/is)
     expect(workflowDesignerSource).not.toMatch(/\.node-cc\s*\{[^}]*border-color:\s*#909399/is)
+    expect(workflowDesignerSource).not.toMatch(/\.condition-item\s*\{[^}]*background:\s*#f5f5f5/is)
+    expect(workflowDesignerSource).not.toMatch(/\.flow-label\s*\{[^}]*fill:\s*#606266/is)
     expect(workflowDesignerSource).toMatch(/var\(--el-bg-color\)/)
     expect(workflowDesignerSource).toMatch(/var\(--el-text-color-secondary\)/)
   })
@@ -120,11 +122,13 @@ describe('projectManage 页面暗黑模式样式守卫', () => {
 
     expect(articleAevSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
     expect(articleAevSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(articleAevSource).not.toMatch(/background:\s*#f8fafc\b/i)
     expect(articleAevSource).toMatch(/var\(--el-bg-color\)/)
     expect(articleAevSource).toMatch(/color-mix\(/)
 
     expect(articleAiDebugSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
     expect(articleAiDebugSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(articleAiDebugSource).not.toMatch(/background:\s*#f8fafc\b/i)
     expect(articleAiDebugSource).not.toMatch(/color-mix\(in srgb, var\(--Color\) 3%, #ffffff\)/i)
     expect(articleAiDebugSource).toMatch(/var\(--el-bg-color\)/)
     expect(articleAiDebugSource).toMatch(/color-mix\(/)
@@ -134,5 +138,12 @@ describe('projectManage 页面暗黑模式样式守卫', () => {
 
     expect(articleBorrowApprovalSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
     expect(articleBorrowApprovalSource).toMatch(/color-mix\(/)
+  })
+
+  it('系统菜单树节点 hover 使用主题变量而不是浅色常量', () => {
+    const menuSource = readViewsSource('system/menus/index.vue')
+
+    expect(menuSource).not.toMatch(/\.menu-tree-node:hover\s*\{[^}]*background:\s*#f8fafc/is)
+    expect(menuSource).toMatch(/var\(--el-fill-color-extra-light\)/)
   })
 })

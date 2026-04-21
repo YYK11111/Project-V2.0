@@ -547,7 +547,7 @@ function submitBorrow() {
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   white-space: pre-wrap;
   line-height: 1.6;
   color: var(--el-text-color-regular);

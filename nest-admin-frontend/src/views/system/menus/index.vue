@@ -650,7 +650,7 @@ export default {
 }
 
 .menu-tree-node:hover {
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   border-color: var(--el-border-color-lighter);
 }
 

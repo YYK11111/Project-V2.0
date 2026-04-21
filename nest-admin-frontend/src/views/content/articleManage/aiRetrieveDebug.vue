@@ -296,7 +296,7 @@ onMounted(() => {
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.7;
@@ -311,7 +311,7 @@ onMounted(() => {
   min-width: 88px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--el-fill-color-extra-light);
   border: 1px solid var(--el-border-color-lighter);
 }
 
