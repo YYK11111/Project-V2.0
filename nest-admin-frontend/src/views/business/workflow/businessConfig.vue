@@ -311,7 +311,7 @@ const getButtons = (row: any) => [
 }
 
 .text-gray {
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .ml-8 {

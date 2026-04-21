@@ -345,8 +345,8 @@ async function handleCreateTaskFromStory() {
 .story-form-hero__stat {
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(64, 158, 255, 0.12);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 14%, var(--el-border-color-lighter));
+  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
 }
 
 .story-form-hero__stat-label {
@@ -377,7 +377,7 @@ async function handleCreateTaskFromStory() {
 
 .section-card {
   padding: 22px;
-  background: #fff;
+  background: var(--el-bg-color);
   border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
   border-radius: 14px;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);

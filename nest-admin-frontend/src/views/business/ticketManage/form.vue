@@ -463,7 +463,7 @@ function scrollToWorkflowPanel() {
 <style lang="scss" scoped>
 :deep(.el-divider__text) {
   font-weight: bold;
-  color: #409eff;
+  color: var(--el-color-primary);
 }
 
 .workflow-panel-section {

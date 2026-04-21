@@ -214,7 +214,7 @@ function getSprintName(sprintId) {
 
 .project-section {
   margin-bottom: 16px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   border-radius: 4px;
 }
 
@@ -223,7 +223,7 @@ function getSprintName(sprintId) {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-extra-light);
   cursor: pointer;
 }
 
@@ -238,7 +238,7 @@ function getSprintName(sprintId) {
 .project-name {
   flex: 1;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .story-list {
@@ -251,8 +251,8 @@ function getSprintName(sprintId) {
   align-items: center;
   padding: 10px;
   margin-bottom: 8px;
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
   border-radius: 4px;
 }
 
@@ -264,7 +264,7 @@ function getSprintName(sprintId) {
 
 .story-title {
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .story-actions {
@@ -278,14 +278,14 @@ function getSprintName(sprintId) {
 
 .empty-tip {
   text-align: center;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   padding: 20px;
 }
 
 .sprint-section {
   padding: 12px;
   margin-bottom: 12px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-extra-light);
   border-radius: 4px;
 }
 
@@ -298,13 +298,13 @@ function getSprintName(sprintId) {
 
 .sprint-name {
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .sprint-info {
   display: flex;
   gap: 20px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 </style>

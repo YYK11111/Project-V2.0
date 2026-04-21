@@ -157,10 +157,10 @@ function handleStoryClick(story) {
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="承诺故事点">{{ sprint.committedPoints || 0 }}</el-descriptions-item>
             <el-descriptions-item label="已完成故事点">
-              <span style="color: #67C23A">{{ sprint.completedPoints || 0 }}</span>
+              <span style="color: var(--el-color-success)">{{ sprint.completedPoints || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="剩余故事点">
-              <span style="color: #E6A23C">{{ (sprint.committedPoints || 0) - (sprint.completedPoints || 0) }}</span>
+              <span style="color: var(--el-color-warning)">{{ (sprint.committedPoints || 0) - (sprint.completedPoints || 0) }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>

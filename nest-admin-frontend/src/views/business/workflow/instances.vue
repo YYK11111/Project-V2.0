@@ -316,7 +316,7 @@ onMounted(async () => {
 .workflow-instance-index-operation__left { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .workflow-instance-index-panel :deep(.el-table__header-wrapper),
 .workflow-instance-index-panel :deep(.el-table__body-wrapper) { scroll-behavior: auto; }
-.code-block { background-color: #f5f7fa; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+.code-block { background-color: var(--el-fill-color-extra-light); padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
 .variables-collapse { margin-top: 16px; }
 .history-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
 .history-card__title { font-weight: 600; color: var(--el-text-color-primary); }

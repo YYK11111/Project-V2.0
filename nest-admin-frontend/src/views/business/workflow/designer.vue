@@ -2321,13 +2321,13 @@ const onCanvasClick = () => {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 60px);
-  background: #f5f5f5;
+  background: var(--el-fill-color-light);
 }
 
 .designer-toolbar {
   padding: 10px 20px;
-  background: #fff;
-  border-bottom: 1px solid #ddd;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
 }
@@ -2340,32 +2340,32 @@ const onCanvasClick = () => {
 
 .designer-palette {
   width: 200px;
-  background: #fff;
+  background: var(--el-bg-color);
   padding: 10px;
   overflow-y: auto;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--el-border-color);
 }
 
 .panel-title {
   font-weight: bold;
   font-size: 14px;
   margin: 15px 0 10px;
-  color: #666;
+  color: var(--el-text-color-regular);
 }
 
 .palette-node {
   padding: 10px;
   margin: 5px 0;
-  border: 1px solid #ddd;
+  border: 1px solid var(--el-border-color);
   border-radius: 4px;
   cursor: move;
   display: flex;
   align-items: center;
-  background: #fff;
+  background: var(--el-bg-color);
 }
 
 .palette-node:hover {
-  background: #f5f5f5;
+  background: var(--el-fill-color-light);
   border-color: #409eff;
 }
 
@@ -2390,7 +2390,7 @@ const onCanvasClick = () => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
+  color: var(--el-text-color-secondary);
   font-size: 16px;
 }
 
@@ -2412,9 +2412,9 @@ const onCanvasClick = () => {
 .canvas-node {
   position: absolute;
   padding: 15px 20px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--el-border-color);
   border-radius: 8px;
-  background: #fff;
+  background: var(--el-bg-color);
   cursor: pointer;
   min-width: 120px;
   text-align: center;
@@ -2458,7 +2458,7 @@ const onCanvasClick = () => {
 
 .canvas-node .node-type {
   font-size: 12px;
-  color: #999;
+  color: var(--el-text-color-secondary);
 }
 
 /* 连接点样式 */
@@ -2581,8 +2581,8 @@ const onCanvasClick = () => {
 
 .designer-properties {
   width: 320px;
-  background: #fff;
-  border-left: 1px solid #ddd;
+  background: var(--el-bg-color);
+  border-left: 1px solid var(--el-border-color);
   padding: 10px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -2614,14 +2614,14 @@ const onCanvasClick = () => {
 }
 
 .issue-item-title {
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-size: 13px;
   line-height: 1.5;
 }
 
 .issue-item-meta {
   margin-top: 4px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
 }
 
@@ -2652,8 +2652,8 @@ const onCanvasClick = () => {
   margin-top: 8px;
   padding: 6px 8px;
   border-radius: 6px;
-  background: #f5f7fa;
-  color: #909399;
+  background: var(--el-fill-color-extra-light);
+  color: var(--el-text-color-secondary);
   font-size: 12px;
 }
 
@@ -2686,7 +2686,7 @@ const onCanvasClick = () => {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-  color: #666;
+  color: var(--el-text-color-regular);
   font-size: 12px;
 }
 
@@ -2694,7 +2694,7 @@ const onCanvasClick = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #666;
+  color: var(--el-text-color-regular);
   font-size: 12px;
   min-width: 0;
   word-break: break-word;
@@ -2708,7 +2708,7 @@ const onCanvasClick = () => {
 
 .template-hint {
   margin-top: 6px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.5;
   word-break: break-word;
@@ -2729,8 +2729,8 @@ const onCanvasClick = () => {
 
 .summary-card {
   padding: 12px;
-  background: #f8fafc;
-  border: 1px solid #ebeef5;
+  background: color-mix(in srgb, var(--el-bg-color) 88%, var(--el-fill-color-extra-light));
+  border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
 }
 
@@ -2743,7 +2743,7 @@ const onCanvasClick = () => {
 }
 
 .summary-content {
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.6;
   font-size: 13px;
   word-break: break-word;
@@ -2773,7 +2773,7 @@ const onCanvasClick = () => {
 /* 流程预览样式 */
 .flow-preview {
   min-height: 400px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-extra-light);
   border-radius: 4px;
   padding: 20px;
   overflow: auto;
@@ -2781,7 +2781,7 @@ const onCanvasClick = () => {
 
 .node-preview-summary {
   margin-top: 6px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 12px;
   line-height: 1.4;
 }

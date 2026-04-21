@@ -1105,7 +1105,7 @@ watch(hasTaskId, (value) => {
 <style lang="scss" scoped>
 .dependency-section {
   padding: 16px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-extra-light);
   border-radius: 4px;
 }
 
@@ -1131,8 +1131,8 @@ watch(hasTaskId, (value) => {
 .task-form-hero__stat {
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(64, 158, 255, 0.12);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid color-mix(in srgb, var(--el-color-primary) 14%, var(--el-border-color-lighter));
+  background: color-mix(in srgb, var(--el-bg-color) 82%, var(--el-fill-color-extra-light));
 }
 
 .task-form-hero__stat-label {
@@ -1371,7 +1371,7 @@ watch(hasTaskId, (value) => {
 
 .dependency-title {
   font-weight: 500;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .dependency-list {
@@ -1385,7 +1385,7 @@ watch(hasTaskId, (value) => {
 }
 
 .no-data {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
   padding: 8px 0;
 }

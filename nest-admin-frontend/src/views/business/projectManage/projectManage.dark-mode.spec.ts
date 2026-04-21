@@ -6,6 +6,10 @@ function readViewSource(name: string) {
   return readFileSync(resolve(__dirname, `${name}.vue`), 'utf-8')
 }
 
+function readBusinessViewSource(relativePath: string) {
+  return readFileSync(resolve(__dirname, '..', relativePath), 'utf-8')
+}
+
 describe('projectManage 页面暗黑模式样式守卫', () => {
   it('approval 页面不再使用固定浅色样式值', () => {
     const source = readViewSource('approval')
@@ -36,5 +40,65 @@ describe('projectManage 页面暗黑模式样式守卫', () => {
 
     expect(source).toMatch(/color-mix\(/)
     expect(source).toMatch(/var\(--el-/)
+  })
+
+  it('任务与工单相关页面不再写死浅色面板和文字色', () => {
+    const taskSource = readBusinessViewSource('taskManage/form.vue')
+    const ticketSource = readBusinessViewSource('ticketManage/form.vue')
+    const sprintSource = readBusinessViewSource('sprintManage/detail.vue')
+
+    expect(taskSource).not.toMatch(/#f5f7fa\b/i)
+    expect(taskSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(taskSource).not.toMatch(/#303133\b/i)
+    expect(taskSource).not.toMatch(/#909399\b/i)
+    expect(taskSource).toMatch(/color-mix\(/)
+    expect(taskSource).toMatch(/var\(--el-/)
+
+    expect(ticketSource).not.toMatch(/color:\s*#409eff\b/i)
+    expect(ticketSource).toMatch(/var\(--el-color-primary\)/)
+
+    expect(sprintSource).not.toMatch(/color:\s*#67C23A/i)
+    expect(sprintSource).not.toMatch(/color:\s*#E6A23C/i)
+    expect(sprintSource).toMatch(/var\(--el-color-success\)/)
+    expect(sprintSource).toMatch(/var\(--el-color-warning\)/)
+  })
+
+  it('故事与常规工作流页面不再写死浅色背景和浅色文字', () => {
+    const storyFormSource = readBusinessViewSource('userStoryManage/form.vue')
+    const storyBacklogSource = readBusinessViewSource('userStoryManage/backlog.vue')
+    const workflowConfigSource = readBusinessViewSource('workflow/businessConfig.vue')
+    const workflowInstancesSource = readBusinessViewSource('workflow/instances.vue')
+
+    expect(storyFormSource).not.toMatch(/background:\s*#fff\b/i)
+    expect(storyFormSource).not.toMatch(/rgba\(255,\s*255,\s*255/i)
+    expect(storyFormSource).not.toMatch(/border:\s*1px solid rgba\(64,\s*158,\s*255/i)
+    expect(storyFormSource).toMatch(/var\(--el-bg-color\)/)
+    expect(storyFormSource).toMatch(/color-mix\(/)
+
+    expect(storyBacklogSource).not.toMatch(/#f5f7fa\b/i)
+    expect(storyBacklogSource).not.toMatch(/#fff\b/i)
+    expect(storyBacklogSource).not.toMatch(/#303133\b/i)
+    expect(storyBacklogSource).not.toMatch(/#909399\b/i)
+    expect(storyBacklogSource).toMatch(/var\(--el-/)
+
+    expect(workflowConfigSource).not.toMatch(/#909399\b/i)
+    expect(workflowConfigSource).toMatch(/var\(--el-text-color-secondary\)/)
+
+    expect(workflowInstancesSource).not.toMatch(/#f5f7fa\b/i)
+    expect(workflowInstancesSource).toMatch(/var\(--el-fill-color-extra-light\)/)
+  })
+
+  it('工作流设计器外壳与提示文案使用暗黑兼容主题变量', () => {
+    const workflowDesignerSource = readBusinessViewSource('workflow/designer.vue')
+
+    expect(workflowDesignerSource).not.toMatch(/\.workflow-designer\s*\{[^}]*background:\s*#f5f5f5/is)
+    expect(workflowDesignerSource).not.toMatch(/\.designer-toolbar\s*\{[^}]*background:\s*#fff\b/is)
+    expect(workflowDesignerSource).not.toMatch(/\.designer-palette\s*\{[^}]*background:\s*#fff\b/is)
+    expect(workflowDesignerSource).not.toMatch(/\.designer-properties\s*\{[^}]*background:\s*#fff\b/is)
+    expect(workflowDesignerSource).not.toMatch(/\.canvas-hint\s*\{[^}]*color:\s*#999/is)
+    expect(workflowDesignerSource).not.toMatch(/\.issue-item-title\s*\{[^}]*color:\s*#303133/is)
+    expect(workflowDesignerSource).not.toMatch(/\.issue-item-meta\s*\{[^}]*color:\s*#909399/is)
+    expect(workflowDesignerSource).toMatch(/var\(--el-bg-color\)/)
+    expect(workflowDesignerSource).toMatch(/var\(--el-text-color-secondary\)/)
   })
 })
