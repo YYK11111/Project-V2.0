@@ -7,7 +7,10 @@ import { GoLiveRecordDto } from "./dto";
 import { GoLiveRecord, goLiveRecordStatusMap } from "./entity";
 
 @Injectable()
-export class GoLiveRecordsService extends BaseService<GoLiveRecord, GoLiveRecordDto> {
+export class GoLiveRecordsService extends BaseService<
+  GoLiveRecord,
+  GoLiveRecordDto
+> {
   constructor(
     @InjectRepository(GoLiveRecord) repository: Repository<GoLiveRecord>,
   ) {

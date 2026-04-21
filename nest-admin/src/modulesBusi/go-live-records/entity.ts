@@ -67,13 +67,28 @@ export class GoLiveRecord extends BaseEntity {
   })
   actualGoLiveTime: string;
 
-  @BaseColumn({ type: "text", nullable: true, name: "rollback_plan", comment: "回退预案" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "rollback_plan",
+    comment: "回退预案",
+  })
   rollbackPlan: string;
 
-  @BaseColumn({ type: "text", nullable: true, name: "checklist_summary", comment: "检查项摘要" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "checklist_summary",
+    comment: "检查项摘要",
+  })
   checklistSummary: string;
 
-  @BaseColumn({ type: "json", nullable: true, name: "duty_members", comment: "值守成员" })
+  @BaseColumn({
+    type: "json",
+    nullable: true,
+    name: "duty_members",
+    comment: "值守成员",
+  })
   dutyMembers: string[];
 
   @BaseColumn({

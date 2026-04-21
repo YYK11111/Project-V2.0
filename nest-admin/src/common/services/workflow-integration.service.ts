@@ -7,9 +7,18 @@ import { Task, TaskStatus } from "src/modulesBusi/tasks/entity";
 import { Ticket, TicketStatus } from "src/modulesBusi/tickets/entity";
 import { ProjectChange, ChangeStatus } from "src/modulesBusi/changes/entity";
 import { Customer } from "src/modulesBusi/crm/customers/entity";
-import { GoLiveRecord, GoLiveRecordStatus } from "src/modulesBusi/go-live-records/entity";
-import { AcceptanceRecord, AcceptanceRecordResult } from "src/modulesBusi/acceptance-records/entity";
-import { HandoverRecord, HandoverRecordStatus } from "src/modulesBusi/handover-records/entity";
+import {
+  GoLiveRecord,
+  GoLiveRecordStatus,
+} from "src/modulesBusi/go-live-records/entity";
+import {
+  AcceptanceRecord,
+  AcceptanceRecordResult,
+} from "src/modulesBusi/acceptance-records/entity";
+import {
+  HandoverRecord,
+  HandoverRecordStatus,
+} from "src/modulesBusi/handover-records/entity";
 import { WorkflowService } from "src/modulesBusi/workflow/service";
 
 @Injectable()
@@ -120,7 +129,9 @@ export class WorkflowIntegrationService {
     recordId: string,
     initiatorId: string,
   ): Promise<string> {
-    const record = await this.goLiveRecordRepository.findOne({ where: { id: recordId } });
+    const record = await this.goLiveRecordRepository.findOne({
+      where: { id: recordId },
+    });
     if (!record) throw new BadRequestException("上线单不存在");
     const instance = await this.workflowService.startBusinessWorkflow(
       {
@@ -145,7 +156,9 @@ export class WorkflowIntegrationService {
     recordId: string,
     initiatorId: string,
   ): Promise<string> {
-    const record = await this.acceptanceRecordRepository.findOne({ where: { id: recordId } });
+    const record = await this.acceptanceRecordRepository.findOne({
+      where: { id: recordId },
+    });
     if (!record) throw new BadRequestException("验收单不存在");
     const instance = await this.workflowService.startBusinessWorkflow(
       {
@@ -170,7 +183,9 @@ export class WorkflowIntegrationService {
     recordId: string,
     initiatorId: string,
   ): Promise<string> {
-    const record = await this.handoverRecordRepository.findOne({ where: { id: recordId } });
+    const record = await this.handoverRecordRepository.findOne({
+      where: { id: recordId },
+    });
     if (!record) throw new BadRequestException("运维交接单不存在");
     const instance = await this.workflowService.startBusinessWorkflow(
       {

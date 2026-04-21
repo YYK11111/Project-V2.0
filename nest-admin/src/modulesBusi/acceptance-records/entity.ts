@@ -36,7 +36,12 @@ export class AcceptanceRecord extends BaseEntity {
   @MaxLength(120)
   title: string;
 
-  @BaseColumn({ type: "text", nullable: true, name: "acceptance_scope", comment: "验收范围" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "acceptance_scope",
+    comment: "验收范围",
+  })
   acceptanceScope: string;
 
   @BaseColumn({
@@ -51,7 +56,12 @@ export class AcceptanceRecord extends BaseEntity {
   })
   acceptanceDate: string;
 
-  @BaseColumn({ length: 100, nullable: true, name: "customer_approver", comment: "客户验收人" })
+  @BaseColumn({
+    length: 100,
+    nullable: true,
+    name: "customer_approver",
+    comment: "客户验收人",
+  })
   customerApprover: string;
 
   @BaseColumn({
@@ -62,7 +72,12 @@ export class AcceptanceRecord extends BaseEntity {
   })
   result: AcceptanceRecordResult;
 
-  @BaseColumn({ type: "text", nullable: true, name: "attachment_summary", comment: "附件摘要" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "attachment_summary",
+    comment: "附件摘要",
+  })
   attachmentSummary: string;
 
   @BaseColumn({ type: "text", nullable: true, comment: "备注" })

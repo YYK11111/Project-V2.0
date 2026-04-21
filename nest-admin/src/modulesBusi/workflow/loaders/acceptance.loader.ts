@@ -1,7 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { BusinessDataLoader, BusinessData, FieldDefinition } from "./business-data-loader.interface";
+import {
+  BusinessDataLoader,
+  BusinessData,
+  FieldDefinition,
+} from "./business-data-loader.interface";
 import { AcceptanceRecord } from "src/modulesBusi/acceptance-records/entity";
 
 @Injectable()

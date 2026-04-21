@@ -3,7 +3,11 @@ import { TicketsService } from "./service";
 describe("TicketsService convert to task", () => {
   it("可将工单转换为任务并写入来源字段", async () => {
     const repository = { findOne: jest.fn(), update: jest.fn() };
-    const tasksService = { add: jest.fn().mockResolvedValue({ id: "t2", name: "工单处理：登录异常" }) };
+    const tasksService = {
+      add: jest
+        .fn()
+        .mockResolvedValue({ id: "t2", name: "工单处理：登录异常" }),
+    };
     const service = new TicketsService(
       repository as any,
       {} as any,
@@ -23,7 +27,10 @@ describe("TicketsService convert to task", () => {
       submitterId: "u3",
     } as any);
 
-    const result = await service.convertToTask("tk1", { id: "u2", name: "tester" });
+    const result = await service.convertToTask("tk1", {
+      id: "u2",
+      name: "tester",
+    });
 
     expect(tasksService.add).toHaveBeenCalledWith(
       expect.objectContaining({

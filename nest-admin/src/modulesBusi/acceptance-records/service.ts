@@ -7,7 +7,10 @@ import { AcceptanceRecordDto } from "./dto";
 import { AcceptanceRecord, acceptanceRecordResultMap } from "./entity";
 
 @Injectable()
-export class AcceptanceRecordsService extends BaseService<AcceptanceRecord, AcceptanceRecordDto> {
+export class AcceptanceRecordsService extends BaseService<
+  AcceptanceRecord,
+  AcceptanceRecordDto
+> {
   constructor(
     @InjectRepository(AcceptanceRecord)
     repository: Repository<AcceptanceRecord>,

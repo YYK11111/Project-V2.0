@@ -152,7 +152,10 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     return { success: true, committedPoints: totalPoints };
   }
 
-  async completeSprint(sprintId: string, options?: { carryOverMode?: "backlog" }): Promise<any> {
+  async completeSprint(
+    sprintId: string,
+    options?: { carryOverMode?: "backlog" },
+  ): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
       throw new Error("Sprint不存在");
@@ -177,7 +180,9 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     }
 
     if (unfinishedTaskCount > 0 && options?.carryOverMode === "backlog") {
-      const unfinishedTasks = tasks.filter((t) => t.status !== TaskStatus.completed);
+      const unfinishedTasks = tasks.filter(
+        (t) => t.status !== TaskStatus.completed,
+      );
       for (const task of unfinishedTasks) {
         await this.taskRepository.update(task.id, { sprintId: null } as any);
       }
@@ -192,7 +197,8 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       success: true,
       completedPoints,
       unfinishedTaskCount,
-      carryOverCount: options?.carryOverMode === "backlog" ? unfinishedTaskCount : 0,
+      carryOverCount:
+        options?.carryOverMode === "backlog" ? unfinishedTaskCount : 0,
     };
   }
 

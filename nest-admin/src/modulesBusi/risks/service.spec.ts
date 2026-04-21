@@ -3,7 +3,11 @@ import { RisksService } from "./service";
 describe("RisksService convert to task", () => {
   it("可将风险转换为任务并写入来源字段", async () => {
     const repository = { findOne: jest.fn(), update: jest.fn() };
-    const tasksService = { add: jest.fn().mockResolvedValue({ id: "t1", name: "风险应对：接口性能风险" }) };
+    const tasksService = {
+      add: jest
+        .fn()
+        .mockResolvedValue({ id: "t1", name: "风险应对：接口性能风险" }),
+    };
     const service = new RisksService(
       repository as any,
       {} as any,
@@ -22,7 +26,10 @@ describe("RisksService convert to task", () => {
       dueDate: "2026-05-01",
     } as any);
 
-    const result = await service.convertToTask("r1", { id: "u1", name: "tester" });
+    const result = await service.convertToTask("r1", {
+      id: "u1",
+      name: "tester",
+    });
 
     expect(tasksService.add).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -24,7 +24,11 @@ describe("ProjectsService closure guards", () => {
       { find: jest.fn() } as any,
       { findOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
-      { findOne: jest.fn(), findDescendants: jest.fn(), save: jest.fn() } as any,
+      {
+        findOne: jest.fn(),
+        findDescendants: jest.fn(),
+        save: jest.fn(),
+      } as any,
       { findOne: jest.fn(), save: jest.fn() } as any,
       { count: jest.fn(), find: jest.fn() } as any,
       { count: jest.fn(), find: jest.fn() } as any,
@@ -34,11 +38,51 @@ describe("ProjectsService closure guards", () => {
       {
         getProjectFieldPermissions: jest.fn(),
         getGroupFieldMap: jest.fn().mockReturnValue({
-          projectBasic: ["name", "code", "projectType", "priority", "description", "category", "tags", "departmentId", "leaderId", "creatorId"],
+          projectBasic: [
+            "name",
+            "code",
+            "projectType",
+            "priority",
+            "description",
+            "category",
+            "tags",
+            "departmentId",
+            "leaderId",
+            "creatorId",
+          ],
           projectMember: ["members"],
-          projectPlan: ["startDate", "endDate", "planStartDate", "planEndDate", "actualStartDate", "actualEndDate", "phase", "phaseStartDate", "phaseEndDate", "baselinePlanNote", "scopeBoundary", "baselineDeliverables", "milestones"],
-          projectBusiness: ["customerId", "budget", "actualCost", "currency", "spentHours", "businessLine", "industry", "projectSource"],
-          projectClosure: ["closeSummary", "closeDeliverables", "closeOpenIssues", "closeReview", "acceptanceDate"],
+          projectPlan: [
+            "startDate",
+            "endDate",
+            "planStartDate",
+            "planEndDate",
+            "actualStartDate",
+            "actualEndDate",
+            "phase",
+            "phaseStartDate",
+            "phaseEndDate",
+            "baselinePlanNote",
+            "scopeBoundary",
+            "baselineDeliverables",
+            "milestones",
+          ],
+          projectBusiness: [
+            "customerId",
+            "budget",
+            "actualCost",
+            "currency",
+            "spentHours",
+            "businessLine",
+            "industry",
+            "projectSource",
+          ],
+          projectClosure: [
+            "closeSummary",
+            "closeDeliverables",
+            "closeOpenIssues",
+            "closeReview",
+            "acceptanceDate",
+          ],
           projectKnowledge: [],
         }),
       } as any,
@@ -51,14 +95,54 @@ describe("ProjectsService closure guards", () => {
     (service as any).projectFieldPermissionService = {
       getProjectFieldPermissions: jest.fn(),
       getGroupFieldMap: jest.fn().mockReturnValue({
-        projectBasic: ["name", "code", "projectType", "priority", "description", "category", "tags", "departmentId", "leaderId", "creatorId"],
+        projectBasic: [
+          "name",
+          "code",
+          "projectType",
+          "priority",
+          "description",
+          "category",
+          "tags",
+          "departmentId",
+          "leaderId",
+          "creatorId",
+        ],
         projectMember: ["members"],
-        projectPlan: ["startDate", "endDate", "planStartDate", "planEndDate", "actualStartDate", "actualEndDate", "phase", "phaseStartDate", "phaseEndDate", "baselinePlanNote", "scopeBoundary", "baselineDeliverables", "milestones"],
-        projectBusiness: ["customerId", "budget", "actualCost", "currency", "spentHours", "businessLine", "industry", "projectSource"],
-        projectClosure: ["closeSummary", "closeDeliverables", "closeOpenIssues", "closeReview", "acceptanceDate"],
+        projectPlan: [
+          "startDate",
+          "endDate",
+          "planStartDate",
+          "planEndDate",
+          "actualStartDate",
+          "actualEndDate",
+          "phase",
+          "phaseStartDate",
+          "phaseEndDate",
+          "baselinePlanNote",
+          "scopeBoundary",
+          "baselineDeliverables",
+          "milestones",
+        ],
+        projectBusiness: [
+          "customerId",
+          "budget",
+          "actualCost",
+          "currency",
+          "spentHours",
+          "businessLine",
+          "industry",
+          "projectSource",
+        ],
+        projectClosure: [
+          "closeSummary",
+          "closeDeliverables",
+          "closeOpenIssues",
+          "closeReview",
+          "acceptanceDate",
+        ],
         projectKnowledge: [],
       }),
-    }
+    };
 
     return { service, repository };
   };
@@ -134,20 +218,18 @@ describe("ProjectsService closure guards", () => {
   it("立项后不允许编辑项目基础字段", () => {
     const { service } = createService();
     expect(() =>
-      (service as any).assertProjectLifecycleEditable(
-        { status: "3" },
-        ["name"],
-      ),
+      (service as any).assertProjectLifecycleEditable({ status: "3" }, [
+        "name",
+      ]),
     ).toThrow(ForbiddenException);
   });
 
   it("立项后不允许编辑里程碑集合", () => {
     const { service } = createService();
     expect(() =>
-      (service as any).assertProjectLifecycleEditable(
-        { status: "3" },
-        ["milestones"],
-      ),
+      (service as any).assertProjectLifecycleEditable({ status: "3" }, [
+        "milestones",
+      ]),
     ).toThrow(ForbiddenException);
   });
 });

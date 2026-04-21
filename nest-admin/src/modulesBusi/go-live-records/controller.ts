@@ -6,7 +6,10 @@ import { GoLiveRecordsService } from "./service";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
 @Controller("business/go-live-records")
-export class GoLiveRecordsController extends BaseController<GoLiveRecord, GoLiveRecordsService> {
+export class GoLiveRecordsController extends BaseController<
+  GoLiveRecord,
+  GoLiveRecordsService
+> {
   constructor(
     readonly service: GoLiveRecordsService,
     private readonly workflowService: WorkflowIntegrationService,
@@ -29,7 +32,10 @@ export class GoLiveRecordsController extends BaseController<GoLiveRecord, GoLive
   @Post(":id/submit-approval")
   async submitApproval(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name || "1";
-    const instanceId = await this.workflowService.startGoLiveApproval(id, userId);
+    const instanceId = await this.workflowService.startGoLiveApproval(
+      id,
+      userId,
+    );
     return { success: true, instanceId };
   }
 }

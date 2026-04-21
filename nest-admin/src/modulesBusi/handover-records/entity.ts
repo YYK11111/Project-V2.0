@@ -32,7 +32,12 @@ export class HandoverRecord extends BaseEntity {
   @MaxLength(120)
   title: string;
 
-  @BaseColumn({ length: 100, nullable: true, name: "handover_to", comment: "接维对象" })
+  @BaseColumn({
+    length: 100,
+    nullable: true,
+    name: "handover_to",
+    comment: "接维对象",
+  })
   handoverTo: string;
 
   @BaseColumn({
@@ -47,16 +52,32 @@ export class HandoverRecord extends BaseEntity {
   })
   handoverDate: string;
 
-  @BaseColumn({ type: "text", nullable: true, name: "service_window", comment: "服务窗口说明" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "service_window",
+    comment: "服务窗口说明",
+  })
   serviceWindow: string;
 
   @BaseColumn({ type: "text", nullable: true, comment: "联系人与渠道" })
   contacts: string;
 
-  @BaseColumn({ type: "text", nullable: true, name: "known_issues", comment: "已知问题" })
+  @BaseColumn({
+    type: "text",
+    nullable: true,
+    name: "known_issues",
+    comment: "已知问题",
+  })
   knownIssues: string;
 
-  @BaseColumn({ type: "char", length: 1, default: "0", name: "knowledge_ready", comment: "知识准备完成" })
+  @BaseColumn({
+    type: "char",
+    length: 1,
+    default: "0",
+    name: "knowledge_ready",
+    comment: "知识准备完成",
+  })
   knowledgeReady: string;
 
   @BaseColumn({

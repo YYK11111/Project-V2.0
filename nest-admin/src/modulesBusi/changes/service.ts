@@ -300,7 +300,12 @@ export class ChangesService extends BaseService<
     id: string,
     scope: "task" | "milestone" | "sprint",
     targetId: string,
-    payload: { plannedStartDate?: string; plannedEndDate?: string; dueDate?: string; endDate?: string },
+    payload: {
+      plannedStartDate?: string;
+      plannedEndDate?: string;
+      dueDate?: string;
+      endDate?: string;
+    },
     userId: string,
     remark?: string,
     operatorName?: string,
@@ -343,7 +348,9 @@ export class ChangesService extends BaseService<
   }
 
   async save(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertChangeEditPermission(
         String(dto.id),
@@ -378,7 +385,9 @@ export class ChangesService extends BaseService<
   }
 
   async add(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     this.normalizeChangePayload(dto);
     const attachments = dto.attachments;
     delete dto.attachments;
@@ -401,7 +410,9 @@ export class ChangesService extends BaseService<
   }
 
   async update(dto: SaveDto<CreateChangeDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertChangeEditPermission(
         String(dto.id),

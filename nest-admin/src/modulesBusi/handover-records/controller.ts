@@ -6,7 +6,10 @@ import { HandoverRecordsService } from "./service";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
 @Controller("business/handover-records")
-export class HandoverRecordsController extends BaseController<HandoverRecord, HandoverRecordsService> {
+export class HandoverRecordsController extends BaseController<
+  HandoverRecord,
+  HandoverRecordsService
+> {
   constructor(
     readonly service: HandoverRecordsService,
     private readonly workflowService: WorkflowIntegrationService,
@@ -29,7 +32,10 @@ export class HandoverRecordsController extends BaseController<HandoverRecord, Ha
   @Post(":id/submit-approval")
   async submitApproval(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name || "1";
-    const instanceId = await this.workflowService.startHandoverApproval(id, userId);
+    const instanceId = await this.workflowService.startHandoverApproval(
+      id,
+      userId,
+    );
     return { success: true, instanceId };
   }
 }

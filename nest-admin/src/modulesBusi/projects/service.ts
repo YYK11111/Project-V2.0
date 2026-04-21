@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   DataSource,
@@ -30,8 +35,14 @@ import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { Contract } from "../crm/contracts/entity";
 import { SalesOpportunity } from "../crm/opportunities/entity";
 import { GoLiveRecord, GoLiveRecordStatus } from "../go-live-records/entity";
-import { AcceptanceRecord, AcceptanceRecordResult } from "../acceptance-records/entity";
-import { HandoverRecord, HandoverRecordStatus } from "../handover-records/entity";
+import {
+  AcceptanceRecord,
+  AcceptanceRecordResult,
+} from "../acceptance-records/entity";
+import {
+  HandoverRecord,
+  HandoverRecordStatus,
+} from "../handover-records/entity";
 import { MessagesService } from "src/modules/messages/service";
 import { SystenConfigsService } from "src/modules/configs/service";
 import { UsersService } from "src/modules/users/users.service";
@@ -71,8 +82,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private readonly systemConfigsService: SystenConfigsService,
     private readonly projectFieldPermissionService: ProjectFieldPermissionService,
     private readonly usersService: UsersService,
-    @InjectRepository(Contract) private contractRepository: Repository<Contract>,
-    @InjectRepository(SalesOpportunity) private opportunityRepository: Repository<SalesOpportunity>,
+    @InjectRepository(Contract)
+    private contractRepository: Repository<Contract>,
+    @InjectRepository(SalesOpportunity)
+    private opportunityRepository: Repository<SalesOpportunity>,
     private readonly sysFileService: SysFileService,
     private readonly dataSource: DataSource,
   ) {
@@ -212,8 +225,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         fields: changedFields.filter((field) =>
           blockedGroups.some((groupCode) =>
             this.projectFieldPermissionService
-              .getGroupFieldMap()[groupCode]
-              ?.includes(field),
+              .getGroupFieldMap()
+              [groupCode]?.includes(field),
           ),
         ),
       },
@@ -385,9 +398,9 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
     const previousProject = dto.id
       ? await this.repository.findOne({ where: { id: dto.id } as any })
-      : null
+      : null;
 
-    this.validateProjectSourceMutation(previousProject, dto)
+    this.validateProjectSourceMutation(previousProject, dto);
 
     return this.dataSource.transaction(async (manager) => {
       const projectRepository = manager.getRepository(Project);
@@ -425,15 +438,24 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     });
   }
 
-  private validateProjectSourceMutation(previousProject: Project | null, dto: SaveDto<ProjectDto>) {
+  private validateProjectSourceMutation(
+    previousProject: Project | null,
+    dto: SaveDto<ProjectDto>,
+  ) {
     if (!previousProject) return;
 
-    if (String(previousProject.status || '') !== ProjectStatus.draft) {
-      if (String(previousProject.contractId || '') !== String(dto.contractId || '')) {
-        throw new BadRequestException('项目进入审批后不允许修改来源合同');
+    if (String(previousProject.status || "") !== ProjectStatus.draft) {
+      if (
+        String(previousProject.contractId || "") !==
+        String(dto.contractId || "")
+      ) {
+        throw new BadRequestException("项目进入审批后不允许修改来源合同");
       }
-      if (String(previousProject.opportunityId || '') !== String(dto.opportunityId || '')) {
-        throw new BadRequestException('项目进入审批后不允许修改来源商机');
+      if (
+        String(previousProject.opportunityId || "") !==
+        String(dto.opportunityId || "")
+      ) {
+        throw new BadRequestException("项目进入审批后不允许修改来源商机");
       }
     }
   }
@@ -445,75 +467,111 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
   ) {
     const contractRepository = manager.getRepository(Contract);
     const opportunityRepository = manager.getRepository(SalesOpportunity);
-    const previousContractId = String(previousProject?.contractId || '');
-    const currentContractId = String(savedProject.contractId || '');
+    const previousContractId = String(previousProject?.contractId || "");
+    const currentContractId = String(savedProject.contractId || "");
 
     if (previousContractId && previousContractId !== currentContractId) {
-      const previousContract = await contractRepository.findOne({ where: { id: previousContractId } as any });
-      if (previousContract && String(previousContract.projectId || '') === String(savedProject.id)) {
-        await contractRepository.update(previousContract.id, { projectId: null as any });
+      const previousContract = await contractRepository.findOne({
+        where: { id: previousContractId } as any,
+      });
+      if (
+        previousContract &&
+        String(previousContract.projectId || "") === String(savedProject.id)
+      ) {
+        await contractRepository.update(previousContract.id, {
+          projectId: null as any,
+        });
       }
     }
 
     if (currentContractId) {
-      const contract = await contractRepository.findOne({ where: { id: currentContractId } as any });
+      const contract = await contractRepository.findOne({
+        where: { id: currentContractId } as any,
+      });
       if (!contract) {
-        throw new BadRequestException('来源合同不存在或已失效');
+        throw new BadRequestException("来源合同不存在或已失效");
       }
-      if (String(contract.projectId || '') && String(contract.projectId || '') !== String(savedProject.id)) {
+      if (
+        String(contract.projectId || "") &&
+        String(contract.projectId || "") !== String(savedProject.id)
+      ) {
         throw new ConflictException({
-          message: '当前合同已关联其他项目',
-          code: 'CONTRACT_PROJECT_CONFLICT',
+          message: "当前合同已关联其他项目",
+          code: "CONTRACT_PROJECT_CONFLICT",
           projectId: contract.projectId,
         });
       }
-      await contractRepository.update(contract.id, { projectId: String(savedProject.id) });
+      await contractRepository.update(contract.id, {
+        projectId: String(savedProject.id),
+      });
     }
 
     if (savedProject.opportunityId) {
-      const opportunity = await opportunityRepository.findOne({ where: { id: savedProject.opportunityId } as any });
+      const opportunity = await opportunityRepository.findOne({
+        where: { id: savedProject.opportunityId } as any,
+      });
       if (!opportunity) {
-        throw new BadRequestException('来源商机不存在或已失效');
+        throw new BadRequestException("来源商机不存在或已失效");
       }
-      if (String(opportunity.projectId || '') && String(opportunity.projectId || '') !== String(savedProject.id)) {
+      if (
+        String(opportunity.projectId || "") &&
+        String(opportunity.projectId || "") !== String(savedProject.id)
+      ) {
         throw new ConflictException({
-          message: '当前商机已关联其他项目',
-          code: 'OPPORTUNITY_PROJECT_CONFLICT',
+          message: "当前商机已关联其他项目",
+          code: "OPPORTUNITY_PROJECT_CONFLICT",
           projectId: opportunity.projectId,
         });
       }
-      await opportunityRepository.update(opportunity.id, { projectId: String(savedProject.id) });
+      await opportunityRepository.update(opportunity.id, {
+        projectId: String(savedProject.id),
+      });
     }
   }
 
   private async validateProjectSourceChain(project: Project) {
     if (!project.contractId) return;
 
-    const contract = await this.contractRepository.findOne({ where: { id: project.contractId } as any });
+    const contract = await this.contractRepository.findOne({
+      where: { id: project.contractId } as any,
+    });
     if (!contract) {
-      throw new BadRequestException('来源合同不存在或已失效');
+      throw new BadRequestException("来源合同不存在或已失效");
     }
-    if (String(project.customerId || '') !== String(contract.customerId || '')) {
-      throw new BadRequestException('项目客户与来源合同不一致');
+    if (
+      String(project.customerId || "") !== String(contract.customerId || "")
+    ) {
+      throw new BadRequestException("项目客户与来源合同不一致");
     }
-    if (String(project.opportunityId || '') !== String(contract.opportunityId || '')) {
-      throw new BadRequestException('项目商机与来源合同不一致');
+    if (
+      String(project.opportunityId || "") !==
+      String(contract.opportunityId || "")
+    ) {
+      throw new BadRequestException("项目商机与来源合同不一致");
     }
-    if (String(contract.projectId || '') && String(contract.projectId || '') !== String(project.id)) {
+    if (
+      String(contract.projectId || "") &&
+      String(contract.projectId || "") !== String(project.id)
+    ) {
       throw new ConflictException({
-        message: '来源合同已被其他项目占用',
-        code: 'CONTRACT_PROJECT_OCCUPIED',
+        message: "来源合同已被其他项目占用",
+        code: "CONTRACT_PROJECT_OCCUPIED",
         projectId: contract.projectId,
       });
     }
 
     if (project.opportunityId) {
-      const opportunity = await this.opportunityRepository.findOne({ where: { id: project.opportunityId } as any });
+      const opportunity = await this.opportunityRepository.findOne({
+        where: { id: project.opportunityId } as any,
+      });
       if (!opportunity) {
-        throw new BadRequestException('来源商机不存在或已失效');
+        throw new BadRequestException("来源商机不存在或已失效");
       }
-      if (String(opportunity.customerId || '') !== String(project.customerId || '')) {
-        throw new BadRequestException('项目客户与来源商机不一致');
+      if (
+        String(opportunity.customerId || "") !==
+        String(project.customerId || "")
+      ) {
+        throw new BadRequestException("项目客户与来源商机不一致");
       }
     }
   }
@@ -521,14 +579,20 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
   async ensureProjectApprovalReady(id: string) {
     const project = await this.repository.findOne({ where: { id } as any });
     if (!project) {
-      throw new BadRequestException('项目不存在');
+      throw new BadRequestException("项目不存在");
     }
     await this.validateProjectSourceChain(project);
     return project;
   }
 
-  async save(dto: SaveDto<ProjectDto> & { attachments?: string[]; members?: any[]; milestones?: any[] }) {
-    return this.saveProjectGraph(dto, 'save');
+  async save(
+    dto: SaveDto<ProjectDto> & {
+      attachments?: string[];
+      members?: any[];
+      milestones?: any[];
+    },
+  ) {
+    return this.saveProjectGraph(dto, "save");
   }
 
   async add(
@@ -778,10 +842,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       }),
     ]);
     if (!goLiveCount) {
-      throw new BadRequestException("发起结项审批前，请至少维护一条已成功的上线记录");
+      throw new BadRequestException(
+        "发起结项审批前，请至少维护一条已成功的上线记录",
+      );
     }
     if (!acceptanceCount) {
-      throw new BadRequestException("发起结项审批前，请至少维护一条已通过的验收记录");
+      throw new BadRequestException(
+        "发起结项审批前，请至少维护一条已通过的验收记录",
+      );
     }
     return {
       projectId,
@@ -1169,12 +1237,16 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
     const [contract, opportunity] = await Promise.all([
       project.contractId
-        ? this.contractRepository.findOne({ where: { id: project.contractId } as any })
+        ? this.contractRepository.findOne({
+            where: { id: project.contractId } as any,
+          })
         : Promise.resolve(null),
       project.opportunityId
-        ? this.opportunityRepository.findOne({ where: { id: project.opportunityId } as any })
+        ? this.opportunityRepository.findOne({
+            where: { id: project.opportunityId } as any,
+          })
         : Promise.resolve(null),
-    ])
+    ]);
 
     return {
       ...project,
@@ -1326,7 +1398,9 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       } as any,
     });
     if (!handoverCount) {
-      throw new BadRequestException("归档前，请至少维护一条已确认的运维交接记录");
+      throw new BadRequestException(
+        "归档前，请至少维护一条已确认的运维交接记录",
+      );
     }
     return this.repository.update(id, { isArchived: "1" });
   }

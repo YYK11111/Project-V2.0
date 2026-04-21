@@ -79,7 +79,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
   }
 
   async save(dto: any) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertRiskEditPermission(
         String(dto.id),
@@ -90,7 +92,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
   }
 
   async update(dto: any) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertRiskEditPermission(
         String(dto.id),
@@ -368,7 +372,10 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     };
   }
 
-  async convertToTask(id: string, currentUser: { id?: string; name?: string } = {}) {
+  async convertToTask(
+    id: string,
+    currentUser: { id?: string; name?: string } = {},
+  ) {
     const risk = await this.getOne({ id });
     if (!risk) throw new Error("风险不存在");
     if (!risk.projectId) throw new Error("未关联项目的风险不能转任务");
@@ -376,7 +383,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     const result = await this.tasksService.add({
       projectId: risk.projectId,
       name: `风险应对：${risk.name}`,
-      description: [risk.description || "", risk.mitigation || ""].filter(Boolean).join("\n\n"),
+      description: [risk.description || "", risk.mitigation || ""]
+        .filter(Boolean)
+        .join("\n\n"),
       leaderId: risk.riskOwnerId || "",
       endDate: risk.dueDate || "",
       plannedEndDate: risk.dueDate || "",
@@ -388,7 +397,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       _operatorPermissions: [],
     } as any);
     const task = Array.isArray(result) ? result[0] : result;
-    await this.repository.update(id, { linkedTaskId: String(task?.id || "") } as any);
+    await this.repository.update(id, {
+      linkedTaskId: String(task?.id || ""),
+    } as any);
     return {
       taskId: task?.id,
       taskName: task?.name,

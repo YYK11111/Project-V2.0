@@ -6,7 +6,10 @@ import { AcceptanceRecordsService } from "./service";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
 @Controller("business/acceptance-records")
-export class AcceptanceRecordsController extends BaseController<AcceptanceRecord, AcceptanceRecordsService> {
+export class AcceptanceRecordsController extends BaseController<
+  AcceptanceRecord,
+  AcceptanceRecordsService
+> {
   constructor(
     readonly service: AcceptanceRecordsService,
     private readonly workflowService: WorkflowIntegrationService,
@@ -29,7 +32,10 @@ export class AcceptanceRecordsController extends BaseController<AcceptanceRecord
   @Post(":id/submit-approval")
   async submitApproval(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name || "1";
-    const instanceId = await this.workflowService.startAcceptanceApproval(id, userId);
+    const instanceId = await this.workflowService.startAcceptanceApproval(
+      id,
+      userId,
+    );
     return { success: true, instanceId };
   }
 }

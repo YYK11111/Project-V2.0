@@ -7,7 +7,10 @@ import { HandoverRecordDto } from "./dto";
 import { HandoverRecord, handoverRecordStatusMap } from "./entity";
 
 @Injectable()
-export class HandoverRecordsService extends BaseService<HandoverRecord, HandoverRecordDto> {
+export class HandoverRecordsService extends BaseService<
+  HandoverRecord,
+  HandoverRecordDto
+> {
   constructor(
     @InjectRepository(HandoverRecord)
     repository: Repository<HandoverRecord>,

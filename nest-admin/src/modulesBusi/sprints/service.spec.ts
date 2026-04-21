@@ -14,8 +14,13 @@ describe("SprintsService completeSprint guards", () => {
       ]),
     };
 
-    const service = new SprintsService(repository as any, taskRepository as any);
-    jest.spyOn(service, "getOne").mockResolvedValue({ id: "s1", status: "2" } as any);
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+    );
+    jest
+      .spyOn(service, "getOne")
+      .mockResolvedValue({ id: "s1", status: "2" } as any);
 
     await expect(service.completeSprint("s1")).rejects.toThrow(
       new BadRequestException("Sprint 下仍有 1 个未完成任务，不能直接完成"),
@@ -35,12 +40,21 @@ describe("SprintsService completeSprint guards", () => {
       update: jest.fn(),
     };
 
-    const service = new SprintsService(repository as any, taskRepository as any);
-    jest.spyOn(service, "getOne").mockResolvedValue({ id: "s1", status: "2" } as any);
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+    );
+    jest
+      .spyOn(service, "getOne")
+      .mockResolvedValue({ id: "s1", status: "2" } as any);
 
-    const result = await service.completeSprint("s1", { carryOverMode: "backlog" } as any);
+    const result = await service.completeSprint("s1", {
+      carryOverMode: "backlog",
+    } as any);
 
-    expect(taskRepository.update).toHaveBeenCalledWith("t2", { sprintId: null });
+    expect(taskRepository.update).toHaveBeenCalledWith("t2", {
+      sprintId: null,
+    });
     expect(result.carryOverCount).toBe(1);
   });
 });

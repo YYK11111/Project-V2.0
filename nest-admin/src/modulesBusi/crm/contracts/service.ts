@@ -1,14 +1,18 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { FindManyOptions, Repository } from 'typeorm'
-import { Contract } from './entity'
-import { QueryListDto, ResponseListDto } from 'src/common/dto'
-import { BaseService } from 'src/common/BaseService'
-import { ContractDto } from './dto'
-import { Customer } from '../customers/entity'
-import { User } from 'src/modules/users/entities/user.entity'
-import { SalesOpportunity } from '../opportunities/entity'
-import { Project } from '../../projects/entity'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindManyOptions, Repository } from "typeorm";
+import { Contract } from "./entity";
+import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { BaseService } from "src/common/BaseService";
+import { ContractDto } from "./dto";
+import { Customer } from "../customers/entity";
+import { User } from "src/modules/users/entities/user.entity";
+import { SalesOpportunity } from "../opportunities/entity";
+import { Project } from "../../projects/entity";
 
 @Injectable()
 export class ContractsService extends BaseService<Contract, ContractDto> {
@@ -19,7 +23,7 @@ export class ContractsService extends BaseService<Contract, ContractDto> {
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
   ) {
-    super(Contract, repository)
+    super(Contract, repository);
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<Contract>> {
@@ -82,68 +86,70 @@ export class ContractsService extends BaseService<Contract, ContractDto> {
   }
 
   private mapProjectSummary(project?: Project | null) {
-    if (!project) return null
+    if (!project) return null;
     return {
       id: project.id,
       code: project.code,
       name: project.name,
-    }
+    };
   }
 
   private mapContractSummary(contract?: Contract | null) {
-    if (!contract) return null
+    if (!contract) return null;
     return {
       id: contract.id,
       code: contract.code,
       name: contract.name,
-    }
+    };
   }
 
   private mapOpportunitySummary(opportunity?: SalesOpportunity | null) {
-    if (!opportunity) return null
+    if (!opportunity) return null;
     return {
       id: opportunity.id,
       code: opportunity.code,
       name: opportunity.name,
-    }
+    };
   }
 
   async createProjectDraft(contractId: string) {
     const contract = await this.repository.findOne({
       where: { id: contractId } as any,
-      relations: ['customer'],
-    })
+      relations: ["customer"],
+    });
     if (!contract) {
-      throw new BadRequestException('来源合同不存在或已失效')
+      throw new BadRequestException("来源合同不存在或已失效");
     }
     if (!contract.customerId) {
-      throw new BadRequestException('来源合同缺少客户信息，无法创建项目')
+      throw new BadRequestException("来源合同缺少客户信息，无法创建项目");
     }
     if (contract.projectId) {
       throw new ConflictException({
-        message: '当前合同已关联项目，不能重复创建项目',
-        code: 'CONTRACT_PROJECT_EXISTS',
+        message: "当前合同已关联项目，不能重复创建项目",
+        code: "CONTRACT_PROJECT_EXISTS",
         projectId: contract.projectId,
-      })
+      });
     }
 
     const opportunity = contract.opportunityId
-      ? await this.opportunityRepository.findOne({ where: { id: contract.opportunityId } as any })
-      : null
+      ? await this.opportunityRepository.findOne({
+          where: { id: contract.opportunityId } as any,
+        })
+      : null;
 
     return {
       name: contract.name,
       customerId: contract.customerId,
       contractId: contract.id,
       opportunityId: contract.opportunityId || null,
-      startDate: contract.startDate || '',
-      endDate: contract.endDate || '',
-      planStartDate: contract.startDate || '',
-      planEndDate: contract.endDate || '',
-      projectSource: 'contract',
+      startDate: contract.startDate || "",
+      endDate: contract.endDate || "",
+      planStartDate: contract.startDate || "",
+      planEndDate: contract.endDate || "",
+      projectSource: "contract",
       contract: this.mapContractSummary(contract),
       opportunity: this.mapOpportunitySummary(opportunity),
-    }
+    };
   }
 
   async getOne(query, isError = true): Promise<any | null> {
@@ -157,11 +163,15 @@ export class ContractsService extends BaseService<Contract, ContractDto> {
     if (!contract) return contract;
 
     const project = contract.projectId
-      ? await this.projectRepository.findOne({ where: { id: contract.projectId } as any })
-      : null
+      ? await this.projectRepository.findOne({
+          where: { id: contract.projectId } as any,
+        })
+      : null;
     const opportunity = contract.opportunityId
-      ? await this.opportunityRepository.findOne({ where: { id: contract.opportunityId } as any })
-      : null
+      ? await this.opportunityRepository.findOne({
+          where: { id: contract.opportunityId } as any,
+        })
+      : null;
 
     return {
       ...contract,
@@ -169,6 +179,6 @@ export class ContractsService extends BaseService<Contract, ContractDto> {
       owner: this.mapUserSummary(contract.owner),
       project: this.mapProjectSummary(project),
       opportunity: this.mapOpportunitySummary(opportunity),
-    }
+    };
   }
 }

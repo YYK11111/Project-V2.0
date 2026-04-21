@@ -166,7 +166,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async save(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertTicketEditPermission(
         String(dto.id),
@@ -201,7 +203,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async add(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     this.normalizeTicketPayload(dto);
     const attachments = dto.attachments;
     delete dto.attachments;
@@ -224,7 +228,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   async update(dto: SaveDto<TicketDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertTicketEditPermission(
         String(dto.id),
@@ -487,7 +493,10 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     } as any;
   }
 
-  async convertToTask(id: string, currentUser: { id?: string; name?: string } = {}) {
+  async convertToTask(
+    id: string,
+    currentUser: { id?: string; name?: string } = {},
+  ) {
     const ticket = await this.getOne({ id });
     if (!ticket) throw new Error("工单不存在");
     if (!ticket.projectId) throw new Error("未关联项目的工单不能转任务");
@@ -495,7 +504,13 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     const result = await this.tasksService.add({
       projectId: ticket.projectId,
       name: `工单处理：${ticket.title}`,
-      description: [ticket.content || "", ticket.stepsToReproduce || "", ticket.solution || ticket.resolution || ""].filter(Boolean).join("\n\n"),
+      description: [
+        ticket.content || "",
+        ticket.stepsToReproduce || "",
+        ticket.solution || ticket.resolution || "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       leaderId: ticket.handlerId || ticket.submitterId || "",
       sourceType: "ticket",
       sourceId: String(ticket.id || ""),
@@ -505,7 +520,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       _operatorPermissions: [],
     } as any);
     const task = Array.isArray(result) ? result[0] : result;
-    await this.repository.update(id, { linkedTaskId: String(task?.id || "") } as any);
+    await this.repository.update(id, {
+      linkedTaskId: String(task?.id || ""),
+    } as any);
     return {
       taskId: task?.id,
       taskName: task?.name,

@@ -164,7 +164,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async save(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertTaskEditPermission(
         String(dto.id),
@@ -214,7 +216,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async add(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     this.normalizeTaskPayload(dto);
     if (!dto.code) {
       dto.code = await this.generateTaskCode();
@@ -243,7 +247,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async update(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
-    await this.projectsService.assertProjectNotArchived(String(dto.projectId || ""));
+    await this.projectsService.assertProjectNotArchived(
+      String(dto.projectId || ""),
+    );
     if (dto.id && dto._operatorId) {
       await this.assertTaskEditPermission(
         String(dto.id),
