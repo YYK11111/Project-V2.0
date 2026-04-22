@@ -262,33 +262,35 @@ onMounted(() => {
 
     <RequestChartTable ref="rctRef" class="project-member-index-panel" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview" :is-selection="viewMode === 'member'">
       <template #query="{ query }">
-        <BaInput v-model="query.keyword" label="关键词" prop="keyword" placeholder="项目名/姓名/昵称" />
-        <div class="query-select-item">
-          <div class="query-select-label">所属项目</div>
-          <ProjectSelect v-model="query.projectId" placeholder="请选择项目" clearable />
+        <div class="query-grid">
+          <BaInput v-model="query.keyword" label="关键词" prop="keyword" placeholder="项目名/姓名/昵称" />
+          <div class="query-select-item">
+            <div class="query-select-label">所属项目</div>
+            <ProjectSelect v-model="query.projectId" placeholder="请选择项目" clearable />
+          </div>
+          <div class="query-select-item">
+            <div class="query-select-label">项目成员</div>
+            <UserSelect v-model="query.userId" placeholder="请选择成员" filter-dept clearable />
+          </div>
+          <BaSelect v-if="viewMode === 'member'" v-model="query.role" filterable label="角色" prop="role">
+            <el-option v-for="(value, key) of roles" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-if="viewMode === 'member'" v-model="query.isCore" filterable label="核心成员" prop="isCore">
+            <el-option label="是" value="1"></el-option>
+            <el-option label="否" value="0"></el-option>
+          </BaSelect>
+          <BaSelect v-if="viewMode === 'member'" v-model="query.isActive" filterable label="状态" prop="isActive">
+            <el-option label="激活" value="1"></el-option>
+            <el-option label="禁用" value="0"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.projectStatus" filterable label="项目状态" prop="projectStatus">
+            <el-option v-for="(label, key) of projectStatusMap" :key="key" :label="label" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.issueType" filterable label="异常筛选" prop="issueType">
+            <el-option label="缺少项目经理" value="missingManager"></el-option>
+            <el-option label="缺少核心成员" value="missingCore"></el-option>
+          </BaSelect>
         </div>
-        <div class="query-select-item">
-          <div class="query-select-label">项目成员</div>
-          <UserSelect v-model="query.userId" placeholder="请选择成员" filter-dept clearable />
-        </div>
-        <BaSelect v-if="viewMode === 'member'" v-model="query.role" filterable label="角色" prop="role">
-          <el-option v-for="(value, key) of roles" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-if="viewMode === 'member'" v-model="query.isCore" filterable label="核心成员" prop="isCore">
-          <el-option label="是" value="1"></el-option>
-          <el-option label="否" value="0"></el-option>
-        </BaSelect>
-        <BaSelect v-if="viewMode === 'member'" v-model="query.isActive" filterable label="状态" prop="isActive">
-          <el-option label="激活" value="1"></el-option>
-          <el-option label="禁用" value="0"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.projectStatus" filterable label="项目状态" prop="projectStatus">
-          <el-option v-for="(label, key) of projectStatusMap" :key="key" :label="label" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.issueType" filterable label="异常筛选" prop="issueType">
-          <el-option label="缺少项目经理" value="missingManager"></el-option>
-          <el-option label="缺少核心成员" value="missingCore"></el-option>
-        </BaSelect>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -542,17 +544,56 @@ onMounted(() => {
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input),
+.query-grid :deep(.project-select),
+.query-grid :deep(.user-select) {
+  width: 100%;
+  flex: 1;
+}
+
 .query-select-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
-  min-width: 220px;
+  min-width: 0;
+  width: 100%;
 }
 
 .query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.query-select-item :deep(.project-select),
+.query-select-item :deep(.user-select),
+.query-select-item :deep(.el-select),
+.query-select-item :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
 }
 
 .project-member-project-cell {
@@ -616,9 +657,19 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .project-member-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .project-member-index-operation,

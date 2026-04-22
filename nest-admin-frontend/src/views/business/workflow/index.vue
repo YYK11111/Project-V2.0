@@ -137,11 +137,13 @@ const getButtons = (row: any) => [
   <div class="workflow-index-page">
     <RequestChartTable ref="rctRef" class="workflow-index-panel" :params="params" :request="getWorkflowDefinitions" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="流程名称" prop="name" />
-        <BaInput v-model="query.code" label="流程编码" prop="code" />
-        <BaSelect v-model="query.isActive" label="状态" prop="isActive" isAll>
-          <el-option label="已发布" value="1" /><el-option label="未发布" value="0" />
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.name" label="流程名称" prop="name" />
+          <BaInput v-model="query.code" label="流程编码" prop="code" />
+          <BaSelect v-model="query.isActive" label="状态" prop="isActive" isAll>
+            <el-option label="已发布" value="1" /><el-option label="未发布" value="0" />
+          </BaSelect>
+        </div>
       </template>
       <template #operation="{ selectedIds }">
         <div class="workflow-index-operation">
@@ -253,9 +255,44 @@ const getButtons = (row: any) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .workflow-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .workflow-index-operation,

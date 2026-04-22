@@ -115,20 +115,31 @@ const getButtons = (row) => [
   <div class="sprint-index-page">
     <RequestChartTable ref="rctRef" class="sprint-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <el-select v-model="query.projectId" placeholder="所属项目" clearable style="width: 200px; margin-right: 10px">
-          <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-        </el-select>
-        <div class="query-user-item">
-          <div class="query-user-label">负责人</div>
-          <UserSelect v-model="query.ownerId" placeholder="请选择负责人" clearable @change="handleQueryChange" />
+        <div class="native-query-grid">
+          <div class="native-query-item">
+            <div class="native-query-label">所属项目</div>
+            <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
+              <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
+            </el-select>
+          </div>
+          <div class="native-query-item">
+            <div class="native-query-label">负责人</div>
+            <UserSelect v-model="query.ownerId" placeholder="请选择负责人" clearable @change="handleQueryChange" />
+          </div>
+          <div class="native-query-item">
+            <div class="native-query-label">变更影响</div>
+            <el-select v-model="query.changeImpactFlag" placeholder="请选择变更影响" clearable @change="handleQueryChange">
+              <el-option label="是" value="1" />
+              <el-option label="否" value="0" />
+            </el-select>
+          </div>
+          <div class="native-query-item">
+            <div class="native-query-label">状态</div>
+            <el-select v-model="query.status" placeholder="请选择状态" clearable @change="handleQueryChange">
+              <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+            </el-select>
+          </div>
         </div>
-        <el-select v-model="query.changeImpactFlag" placeholder="变更影响" clearable style="width: 120px; margin-right: 10px" @change="handleQueryChange">
-          <el-option label="是" value="1" />
-          <el-option label="否" value="0" />
-        </el-select>
-        <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px" @change="handleQueryChange">
-          <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
-        </el-select>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -174,6 +185,11 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.sprint-index-panel :deep(th.el-table__cell) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .sprint-index-operation {
   display: flex;
   justify-content: space-between;
@@ -189,18 +205,41 @@ const getButtons = (row) => [
   flex-wrap: wrap;
 }
 
-.query-user-item {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 220px;
-  margin-right: 10px;
+.native-query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
 }
 
-.query-user-label {
+.native-query-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.native-query-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.native-query-grid :deep(.el-select),
+.native-query-grid :deep(.el-input),
+.native-query-grid :deep(.user-select) {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .native-query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .sprint-index-panel :deep(.el-table__header-wrapper),
@@ -211,6 +250,10 @@ const getButtons = (row) => [
 @media (max-width: 768px) {
   .sprint-index-panel {
     padding-top: 18px;
+  }
+
+  .native-query-grid {
+    grid-template-columns: 1fr;
   }
 
   .sprint-index-operation,

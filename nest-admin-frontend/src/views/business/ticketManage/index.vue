@@ -85,17 +85,19 @@ const getButtons = (row) => [
   <div class="ticket-index-page">
     <RequestChartTable ref="rctRef" class="ticket-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.title" label="工单标题" prop="title"></BaInput>
-        <BaSelect v-model="query.type" filterable label="类型" prop="type">
-          <el-option v-for="(value, key) of type" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.status" filterable label="状态" prop="status">
-          <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.knowledgeLinked" filterable label="知识回流" prop="knowledgeLinked">
-          <el-option label="已关联" value="1"></el-option>
-          <el-option label="未关联" value="0"></el-option>
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.title" label="工单标题" prop="title" />
+          <BaSelect v-model="query.type" filterable label="类型" prop="type">
+            <el-option v-for="(value, key) of type" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.status" filterable label="状态" prop="status">
+            <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.knowledgeLinked" filterable label="知识回流" prop="knowledgeLinked">
+            <el-option label="已关联" value="1"></el-option>
+            <el-option label="未关联" value="0"></el-option>
+          </BaSelect>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -180,9 +182,44 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .ticket-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .ticket-index-operation,

@@ -101,8 +101,10 @@ const getButtons = (row: any) => [
   <div class="task-comment-index-page">
     <RequestChartTable ref="rctRef" class="task-comment-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.taskId" label="任务ID" prop="taskId"></BaInput>
-        <BaInput v-model="query.userId" label="用户ID" prop="userId"></BaInput>
+        <div class="query-grid">
+          <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
+          <BaInput v-model="query.userId" label="用户ID" prop="userId" />
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -191,9 +193,44 @@ const getButtons = (row: any) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .task-comment-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .task-comment-index-operation,

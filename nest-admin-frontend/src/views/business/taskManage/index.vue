@@ -66,27 +66,29 @@ const getButtons = (row) => [
   <div class="task-index-page">
     <RequestChartTable ref="rctRef" class="task-index-panel" :params="params" :request="getList" :key="$route.fullPath" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="任务名称" prop="name"></BaInput>
-        <BaSelect v-model="query.status" filterable label="状态" prop="status">
-          <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
-          <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
-          <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
-          <el-option label="有评论" value="1"></el-option>
-          <el-option label="无评论" value="0"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.hasReport" filterable label="汇报情况" prop="hasReport" isAll>
-          <el-option label="有汇报" value="1"></el-option>
-          <el-option label="无汇报" value="0"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.reportFreshness" filterable label="汇报时效" prop="reportFreshness" isAll>
-          <el-option label="最近7天未汇报" value="stale7d"></el-option>
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.name" label="任务名称" prop="name" />
+          <BaSelect v-model="query.status" filterable label="状态" prop="status">
+            <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
+            <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+            <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
+            <el-option label="有评论" value="1"></el-option>
+            <el-option label="无评论" value="0"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.hasReport" filterable label="汇报情况" prop="hasReport" isAll>
+            <el-option label="有汇报" value="1"></el-option>
+            <el-option label="无汇报" value="0"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.reportFreshness" filterable label="汇报时效" prop="reportFreshness" isAll>
+            <el-option label="最近7天未汇报" value="stale7d"></el-option>
+          </BaSelect>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -217,9 +219,44 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .task-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .task-index-operation,

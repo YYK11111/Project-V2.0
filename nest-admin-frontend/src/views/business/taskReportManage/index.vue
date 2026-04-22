@@ -135,10 +135,12 @@ const getButtons = (row: any) => [
   <div class="task-report-index-page">
     <RequestChartTable ref="rctRef" class="task-report-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
-        <BaInput v-model="query.userId" label="用户ID" prop="userId" />
-        <BaDatePicker v-model="query.beginDate" label="开始日期" prop="beginDate" value-format="YYYY-MM-DD" />
-        <BaDatePicker v-model="query.endDate" label="结束日期" prop="endDate" value-format="YYYY-MM-DD" />
+        <div class="query-grid">
+          <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
+          <BaInput v-model="query.userId" label="用户ID" prop="userId" />
+          <BaDatePicker v-model="query.beginDate" label="开始日期" prop="beginDate" value-format="YYYY-MM-DD" />
+          <BaDatePicker v-model="query.endDate" label="结束日期" prop="endDate" value-format="YYYY-MM-DD" />
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -243,6 +245,38 @@ const getButtons = (row: any) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input),
+.query-grid :deep(.el-date-editor) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .report-form-tip {
   margin-top: 8px;
   font-size: 12px;
@@ -253,6 +287,10 @@ const getButtons = (row: any) => [
 @media (max-width: 768px) {
   .task-report-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .task-report-index-operation,

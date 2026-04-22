@@ -304,7 +304,7 @@ const getButtons = (row) => [
 
 .query-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 20px;
   align-items: start;
   width: 100%;
@@ -333,17 +333,29 @@ const getButtons = (row) => [
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
 }
 
-.query-select-item .el-select,
-.query-select-item .el-input {
+.query-select-item :deep(.el-select),
+.query-select-item :deep(.el-input),
+.query-select-item :deep(.user-select) {
   flex: 1;
   min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
   .project-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .project-index-operation,

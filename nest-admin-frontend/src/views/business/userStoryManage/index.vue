@@ -139,12 +139,14 @@ function getTypeTag(type) {
       @selection-change="handleSelectionChange"
     >
       <template #query="{ query }">
-        <BaSelect v-model="query.type" filterable label="类型" prop="type">
-          <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
-        </BaSelect>
-        <BaSelect v-model="query.status" filterable label="状态" prop="status">
-          <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
-        </BaSelect>
+        <div class="query-grid">
+          <BaSelect v-model="query.type" filterable label="类型" prop="type">
+            <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
+          </BaSelect>
+          <BaSelect v-model="query.status" filterable label="状态" prop="status">
+            <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
+          </BaSelect>
+        </div>
       </template>
 
       <template #operation>
@@ -205,8 +207,44 @@ function getTypeTag(type) {
   padding-top: 20px;
 }
 
+.user-story-index-panel :deep(th.el-table__cell) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .filter-container {
   margin-bottom: 16px;
+}
+
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .user-story-index-operation {
@@ -215,7 +253,6 @@ function getTypeTag(type) {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
 .user-story-index-operation__left {
@@ -233,6 +270,10 @@ function getTypeTag(type) {
 @media (max-width: 768px) {
   .user-story-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .user-story-index-operation,

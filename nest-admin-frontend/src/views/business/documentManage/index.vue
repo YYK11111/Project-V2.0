@@ -36,10 +36,12 @@ const getButtons = (row) => [
   <div class="document-index-page">
     <RequestChartTable ref="rctRef" class="document-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="文档名称" prop="name"></BaInput>
-        <BaSelect v-model="query.type" filterable label="类型" prop="type">
-          <el-option v-for="(value, key) of docType" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.name" label="文档名称" prop="name" />
+          <BaSelect v-model="query.type" filterable label="类型" prop="type">
+            <el-option v-for="(value, key) of docType" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -113,9 +115,44 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .document-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .document-index-operation,

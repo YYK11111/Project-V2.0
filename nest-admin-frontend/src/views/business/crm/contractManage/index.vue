@@ -68,13 +68,15 @@ const getButtons = (row) => [
   <div class="contract-index-page">
     <RequestChartTable ref="rctRef" class="contract-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="合同名称" prop="name"></BaInput>
-        <BaSelect v-model="query.customerId" filterable label="客户" prop="customerId">
-          <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id"></el-option>
-        </BaSelect>
-        <BaSelect v-model="query.status" filterable label="合同状态" prop="status">
-          <el-option v-for="(value, key) of contractStatuses" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
+        <div class="query-grid">
+          <BaInput v-model="query.name" label="合同名称" prop="name"></BaInput>
+          <BaSelect v-model="query.customerId" filterable label="客户" prop="customerId">
+            <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id"></el-option>
+          </BaSelect>
+          <BaSelect v-model="query.status" filterable label="合同状态" prop="status">
+            <el-option v-for="(value, key) of contractStatuses" :key="key" :label="value" :value="key"></el-option>
+          </BaSelect>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -123,6 +125,11 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.contract-index-panel :deep(th.el-table__cell) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .contract-index-operation {
   display: flex;
   justify-content: space-between;
@@ -138,14 +145,57 @@ const getButtons = (row) => [
   flex-wrap: wrap;
 }
 
+.contract-index-operation :deep(.el-button) {
+  min-width: 112px;
+}
+
 .contract-index-panel :deep(.el-table__header-wrapper),
 .contract-index-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
 }
 
+.contract-index-panel :deep(.el-tag) {
+  font-weight: 500;
+}
+
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
+  width: 100%;
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .contract-index-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .contract-index-operation,

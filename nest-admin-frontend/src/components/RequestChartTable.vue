@@ -321,7 +321,6 @@ export default defineComponent({
   <div class="RequestChartTable" :class="$slots.query || 'Gcard'" v-loading="loading">
     <!-- 顶部查询框 -->
     <div v-if="$slots.query" class="query-outer">
-      <slot name="query" v-bind="{ query }"></slot>
       <el-form
         :model="query"
         ref="queryForm"
@@ -330,6 +329,7 @@ export default defineComponent({
         :label-width="labelWidth || 'auto'"
         class="GtopSearch"
         @keyup.enter.prevent="getList(1)">
+        <slot name="query" v-bind="{ query }"></slot>
         <slot name="extraButtons" v-bind="{ query }"></slot>
         <SearchResetButton @search="getList(1)" @reset="reset('queryForm')"></SearchResetButton>
       </el-form>
@@ -451,6 +451,13 @@ export default defineComponent({
   // display: flex;
   // align-items: center;
   margin-bottom: var(--Card-margin, 16px);
+}
+
+::v-deep(.GtopSearch) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 20px;
 }
 ::v-deep.queryFormMiddle {
   display: inline-flex;

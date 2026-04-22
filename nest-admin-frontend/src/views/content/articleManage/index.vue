@@ -168,28 +168,30 @@ catalog.getTrees()
       <el-tab-pane label="知识列表" name="articles">
         <RequestChartTable ref="rctRef" class="knowledge-article-table-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
-          <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
-          <BaSelect v-model="query.status" filterable label="状态" prop="status">
-            <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.knowledgeType" filterable label="知识类型" prop="knowledgeType">
-            <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.visibilityType" filterable label="可见范围" prop="visibilityType">
-            <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
-            <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
-          </BaSelect>
-          <BaInput v-model="query.sourceProjectId" label="来源项目ID" prop="sourceProjectId"></BaInput>
-          <BaSelect v-model="query.templateType" filterable label="模板类型" prop="templateType">
-            <el-option v-for="(label, key) in templateTypeMap" :key="key" :label="label" :value="key"></el-option>
-          </BaSelect>
-          <BaFormItem label="标签" prop="tagIds">
-            <el-select v-model="query.tagIds" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="选择标签" style="width: 240px">
-              <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id"></el-option>
-            </el-select>
-          </BaFormItem>
+          <div class="query-grid">
+            <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
+            <BaSelect v-model="query.status" filterable label="状态" prop="status">
+              <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+            </BaSelect>
+            <BaSelect v-model="query.knowledgeType" filterable label="知识类型" prop="knowledgeType">
+              <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key"></el-option>
+            </BaSelect>
+            <BaSelect v-model="query.visibilityType" filterable label="可见范围" prop="visibilityType">
+              <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
+            </BaSelect>
+            <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+              <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
+            </BaSelect>
+            <BaInput v-model="query.sourceProjectId" label="来源项目ID" prop="sourceProjectId"></BaInput>
+            <BaSelect v-model="query.templateType" filterable label="模板类型" prop="templateType">
+              <el-option v-for="(label, key) in templateTypeMap" :key="key" :label="label" :value="key"></el-option>
+            </BaSelect>
+            <BaFormItem label="标签" prop="tagIds">
+              <el-select v-model="query.tagIds" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="选择标签">
+                <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id"></el-option>
+              </el-select>
+            </BaFormItem>
+          </div>
         </template>
 
         <template #operation="{ selectedIds }">
@@ -439,9 +441,46 @@ catalog.getTrees()
   scroll-behavior: auto;
 }
 
+.query-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.query-grid :deep(.el-form-item) {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.query-grid :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input),
+.query-grid :deep(.el-date-editor) {
+  width: 100%;
+  flex: 1;
+}
+
+.knowledge-article-table-panel :deep(th.el-table__cell) {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .knowledge-article-table-panel :deep(.el-table__header-wrapper),
 .knowledge-article-table-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
+}
+
+@media (max-width: 1200px) {
+  .query-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .title-name {
@@ -552,6 +591,10 @@ catalog.getTrees()
 @media (max-width: 768px) {
   .knowledge-article-table-panel {
     padding-top: 18px;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
   }
 
   .knowledge-panel__header,
