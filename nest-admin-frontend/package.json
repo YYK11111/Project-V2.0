@@ -44,6 +44,8 @@
     "quill": "^2.0.3",
     "sass": "^1.97.2",
     "tailwindcss": "^4.1.18",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2",
     "vue": "^3.5.26",
     "vue-cropper": "^1.1.4",
     "vue-router": "^4.6.4",

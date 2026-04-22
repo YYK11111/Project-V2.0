@@ -10,6 +10,7 @@
 import Quill from 'quill'
 import 'quill/dist/quill.core.css'
 import 'quill/dist/quill.snow.css'
+import { looksLikeMarkdown, markdownToHtml } from './markdownInterop'
 // import "quill/dist/quill.bubble.css";
 
 export default {
@@ -29,6 +30,7 @@ export default {
       content: '',
       uploadLoading: false,
       imgUrl: '',
+      editorRoot: null,
       options: {
         placeholder: '请输入内容',
         theme: 'snow',
@@ -106,12 +108,21 @@ export default {
     })
   },
   beforeUnmount() {
+    if (this.editorRoot) {
+      this.editorRoot.removeEventListener('paste', this.handlePaste)
+      this.editorRoot = null
+    }
     this.quill = null
   },
   methods: {
     init() {
       const editor = this.$refs.editor
       this.quill = new Quill(editor, this.options)
+      const editorRoot = this.quill.root
+
+      this.editorRoot = editorRoot
+      editorRoot.addEventListener('paste', this.handlePaste)
+
       if (this.disabled) {
         this.quill.enable(false)
       }
@@ -128,6 +139,55 @@ export default {
       this.quill.on('editor-change', (eventName, ...args) => {
         this.$emit('editor-change', eventName, ...args)
       })
+    },
+    handlePaste(event) {
+      if (this.disabled || !this.quill) {
+        return
+      }
+
+      const clipboardData = event.clipboardData
+
+      if (!clipboardData) {
+        return
+      }
+
+      const clipboardTypes = Array.from(clipboardData.types)
+
+      if (clipboardTypes.includes('text/html')) {
+        return
+      }
+
+      const hasPlainText = clipboardTypes.includes('text/plain')
+
+      if (!hasPlainText) {
+        return
+      }
+
+      const text = clipboardData.getData('text/plain')
+
+      if (!text) {
+        return
+      }
+
+      if (!looksLikeMarkdown(text)) {
+        return
+      }
+
+      event.preventDefault()
+
+      const range = this.quill.getSelection(true) || { index: this.quill.getLength(), length: 0 }
+
+      if (range.length > 0) {
+        this.quill.deleteText(range.index, range.length, 'user')
+      }
+
+      this.quill.clipboard.dangerouslyPasteHTML(range.index, markdownToHtml(text), 'user')
+
+      const nextSelection = this.quill.getSelection(true)
+
+      if (nextSelection) {
+        this.quill.setSelection(nextSelection.index, nextSelection.length, 'silent')
+      }
     },
     onProgress(percent) {
       this.uploadLoading = percent > 0 && percent < 100

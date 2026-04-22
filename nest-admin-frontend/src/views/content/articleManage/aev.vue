@@ -23,6 +23,7 @@ articleTagApi.getList({ pageNum: 1, pageSize: 1000 }).then(({ list = [] }: any) 
 import { getTrees } from './api.catalog'
 import { watch } from 'vue'
 import UserSelect from '@/components/UserSelect.vue'
+import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
 import { useUserStore } from '@/stores/user'
 import { getArticleTemplate, getArticleTemplateOptions } from './templates'
 const trees = ref([])
@@ -191,6 +192,21 @@ function cancel() {
         router.back()
       })
     : router.back()
+}
+
+async function handleCopyMarkdown() {
+  if (!navigator.clipboard?.writeText) {
+    $sdk.msgError('当前环境不支持复制 Markdown')
+    return
+  }
+
+  const markdown = htmlToMarkdown(form.value.content || '')
+  try {
+    await navigator.clipboard.writeText(markdown)
+    $sdk.msgSuccess('已复制 Markdown')
+  } catch {
+    $sdk.msgError('复制 Markdown 失败，请重试')
+  }
 }
 
 function submitBorrow() {
@@ -373,6 +389,7 @@ function submitBorrow() {
     </BaForm>
       <OperateBar v-if="!accessDeniedInfo && canEditCurrentArticle" class="knowledge-editor-operate-bar">
         <ElButton type="primary" @click="cancel">取消</ElButton>
+        <ElButton @click="handleCopyMarkdown">复制 Markdown</ElButton>
         <ElButton type="primary" @click="submit('draft')">保存草稿</ElButton>
         <ElButton type="primary" @click="submit()">发布</ElButton>
       </OperateBar>
