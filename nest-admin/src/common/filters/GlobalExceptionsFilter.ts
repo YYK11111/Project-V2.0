@@ -29,11 +29,27 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
       exception.message = `${match[1]} 已存在`;
     }
 
+    const exceptionResponse =
+      exception instanceof HttpException ? exception.getResponse() : null;
+    const responseBody =
+      exceptionResponse && typeof exceptionResponse === "object"
+        ? (exceptionResponse as Record<string, unknown>)
+        : null;
+    const businessCode =
+      responseBody && typeof responseBody.code === "string"
+        ? responseBody.code
+        : undefined;
+    const message =
+      responseBody && typeof responseBody.message === "string"
+        ? responseBody.message
+        : exception.message;
+
     response.status(200).json({
       code: status,
+      errorCode: businessCode,
       timestamp: new Date().toISOString(),
       path: request.url,
-      msg: exception.message,
+      msg: message,
     });
   }
 }

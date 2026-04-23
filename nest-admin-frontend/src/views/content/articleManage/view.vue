@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
+import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
 import { applyArticleBorrow, getKnowledgeTypes, getOne } from './api'
+import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems, type TocItem } from './viewToc'
 
 interface BorrowForm {
@@ -36,6 +39,9 @@ interface KnowledgeArticle {
   summary?: string
   desc?: string
   content?: string
+  contentJson?: Record<string, unknown> | null
+  contentVersion?: number | null
+  contentStatus?: string | null
   updateTime?: string
   knowledgeType?: string
   catalog?: KnowledgeCatalog
@@ -63,6 +69,18 @@ const tocDrawerVisible = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 
 const headingOffset = 24
+const documentState = computed(() => resolveKnowledgeViewMode(article.value || {}))
+
+const editor = useEditor({
+  content: '',
+  editable: false,
+  extensions: createDocumentExtensions(''),
+  editorProps: {
+    attributes: {
+      class: 'knowledge-editor-prose',
+    },
+  },
+})
 
 const articleId = computed(() => {
   const rawId = route.query.id
@@ -125,7 +143,7 @@ function loadArticle() {
     })
     .catch((error) => {
       const payload = error?.response?.data || {}
-      if (payload?.code === 'KNOWLEDGE_FORBIDDEN') {
+      if ((payload?.errorCode || payload?.code) === 'KNOWLEDGE_FORBIDDEN') {
         accessDeniedInfo.value = {
           message: payload.message,
           canBorrow: payload.canBorrow,
@@ -218,6 +236,11 @@ function handleTocClick(id: string) {
 }
 
 async function syncTocAfterRender() {
+  if (documentState.value.kind === 'ready') {
+    editor.value?.commands.setContent(documentState.value.contentJson, {
+      emitUpdate: false,
+    })
+  }
   await nextTick()
   syncScrollContainer()
   extractTocFromContent()
@@ -238,14 +261,20 @@ watch(
 )
 
 watch(
-  () => article.value?.content,
-  async (content) => {
-    if (!content) {
+  documentState,
+  async (state) => {
+    if (!article.value) {
+      resetViewState()
+      return
+    }
+    if (state.kind !== 'ready') {
+      await nextTick()
       resetViewState()
       return
     }
     await syncTocAfterRender()
   },
+  { immediate: true },
 )
 
 watch(
@@ -273,6 +302,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   unbindScrollListeners()
+  editor.value?.destroy()
 })
 </script>
 
@@ -332,7 +362,17 @@ onBeforeUnmount(() => {
 
         <main class="knowledge-view-main">
           <section class="knowledge-view-content-shell Gcard">
-            <div ref="contentRef" class="knowledge-view-reading__body rich-content rich-content--view" v-html="article.content || '<p>暂无内容</p>'"></div>
+            <div ref="contentRef" class="knowledge-view-reading__body rich-content rich-content--view">
+              <EditorContent v-if="documentState.kind === 'ready'" :editor="editor" class="knowledge-document-viewer" />
+              <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
+                <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
+                <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>
+              </div>
+              <div v-else-if="documentState.kind === 'invalid'" class="knowledge-document-blocked">
+                <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
+                <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>
+              </div>
+            </div>
           </section>
         </main>
       </div>
@@ -497,6 +537,38 @@ onBeforeUnmount(() => {
   line-height: 1.9;
   color: var(--FontBlack2);
   padding-right: 10px;
+}
+
+.knowledge-document-viewer {
+  min-height: 100%;
+}
+
+.knowledge-document-viewer :deep(.ProseMirror) {
+  min-height: 100%;
+  outline: none;
+}
+
+.knowledge-document-blocked {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  border: 1px dashed var(--view-line-strong);
+  border-radius: 18px;
+  background: var(--view-paper);
+  padding: 28px;
+  color: var(--FontBlack5);
+}
+
+.knowledge-document-blocked__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--FontBlack);
+}
+
+.knowledge-document-blocked__desc {
+  line-height: 1.8;
 }
 
 .knowledge-view-reading__body :deep(h1),

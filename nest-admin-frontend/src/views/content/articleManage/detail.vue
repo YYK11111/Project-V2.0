@@ -1,20 +1,56 @@
 <script setup lang="ts">
-// @ts-nocheck
-import { nextTick, onActivated, onBeforeUnmount, onDeactivated, watch } from 'vue'
+import { EditorContent, useEditor } from '@tiptap/vue-3'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
+import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
 import { applyArticleBorrow, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes } from './api'
+import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems } from './viewToc'
 import { checkPermi } from '@/utils/permission'
 import { sourceTypeMap, templateTypeMap } from '@/views/business/projectManage/fieldMaps'
 
+interface KnowledgeArticle {
+  id?: string | number
+  title?: string
+  summary?: string
+  desc?: string
+  content?: string
+  contentJson?: Record<string, unknown> | null
+  contentVersion?: number | null
+  contentStatus?: string | null
+  status?: string
+  knowledgeType?: string
+  visibilityType?: string
+  sourceType?: string
+  sourceId?: string
+  sourceProjectId?: string
+  templateType?: string
+  updateTime?: string
+  canEdit?: boolean
+  embeddingStatus?: string
+  embeddingVersion?: number
+  retrievalWeight?: number
+  contentChunks?: Array<{ order?: string | number; title?: string; summary?: string; text?: string }>
+  tags?: Array<{ id?: string | number; name?: string }>
+  catalog?: { name?: string }
+  author?: { nickname?: string; name?: string }
+  maintainer?: { nickname?: string; name?: string }
+}
+
+type ArticleStatusMap = Record<string, string>
+
+function getSingleQueryValue(value: string | string[] | null | undefined): string {
+  return Array.isArray(value) ? String(value[0] || '') : String(value || '')
+}
+
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
-const article = ref<any>(null)
-const knowledgeTypes = ref({})
-const visibilityTypes = ref({})
-const statusMap = ref({})
+const article = ref<KnowledgeArticle | null>(null)
+const knowledgeTypes = ref<Record<string, string>>({})
+const visibilityTypes = ref<Record<string, string>>({})
+const statusMap = ref<ArticleStatusMap>({})
 const accessDeniedInfo = ref<{ message?: string; canBorrow?: boolean } | null>(null)
 const borrowDialogVisible = ref(false)
 const borrowLoading = ref(false)
@@ -25,11 +61,23 @@ const borrowForm = ref({
   applyReason: '',
 })
 const contentRef = ref<HTMLElement | null>(null)
-const tocItems = ref<any[]>([])
+const tocItems = ref<Array<{ id: string; text: string; level: number }>>([])
 const activeHeadingId = ref('')
 const headingOffset = 24
 const canEditArticle = computed(() => checkPermi(['business/articles/update']) && article.value?.canEdit !== false)
 const canViewAiPreview = computed(() => checkPermi(['content/articles/aiDebug']) || checkPermi(['content/articles/viewAll']))
+const documentState = computed(() => resolveKnowledgeViewMode(article.value || {}))
+
+const editor = useEditor({
+  content: '',
+  editable: false,
+  extensions: createDocumentExtensions(''),
+  editorProps: {
+    attributes: {
+      class: 'knowledge-editor-prose',
+    },
+  },
+})
 
 const articlePrimaryMetaList = computed(() => {
   if (!article.value) return []
@@ -152,6 +200,11 @@ function handleTocClick(id: string) {
 }
 
 async function syncTocAfterRender() {
+  if (documentState.value.kind === 'ready') {
+    editor.value?.commands.setContent(documentState.value.contentJson, {
+      emitUpdate: false,
+    })
+  }
   await nextTick()
   extractTocFromContent()
   updateActiveHeading()
@@ -160,14 +213,14 @@ async function syncTocAfterRender() {
 function loadArticle() {
   if (!route.query.id) return
   loading.value = true
-  getOne(route.query.id)
+  getOne(getSingleQueryValue(route.query.id))
     .then(({ data }) => {
       article.value = data
       accessDeniedInfo.value = null
     })
     .catch((error) => {
       const payload = error?.response?.data || {}
-      if (payload?.code === 'KNOWLEDGE_FORBIDDEN') {
+      if ((payload?.errorCode || payload?.code) === 'KNOWLEDGE_FORBIDDEN') {
         accessDeniedInfo.value = {
           message: payload.message,
           canBorrow: payload.canBorrow,
@@ -228,14 +281,20 @@ watch(
 )
 
 watch(
-  () => article.value?.content,
-  async (content) => {
-    if (!content) {
+  documentState,
+  async (state) => {
+    if (!article.value) {
+      resetDetailState()
+      return
+    }
+    if (state.kind !== 'ready') {
+      await nextTick()
       resetDetailState()
       return
     }
     await syncTocAfterRender()
   },
+  { immediate: true },
 )
 
 watch(
@@ -261,6 +320,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   unbindScrollListeners()
+  editor.value?.destroy()
 })
 </script>
 
@@ -331,7 +391,17 @@ onBeforeUnmount(() => {
 
         <section class="knowledge-detail-content-shell">
           <div class="knowledge-detail-content-shell__header">正文</div>
-          <div ref="contentRef" class="knowledge-detail-reading__body rich-content rich-content--detail" v-html="article.content || '<p>暂无内容</p>'"></div>
+          <div ref="contentRef" class="knowledge-detail-reading__body rich-content rich-content--detail">
+            <EditorContent v-if="documentState.kind === 'ready'" :editor="editor" class="knowledge-document-viewer" />
+            <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
+              <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
+              <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>
+            </div>
+            <div v-else-if="documentState.kind === 'invalid'" class="knowledge-document-blocked">
+              <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
+              <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>
+            </div>
+          </div>
         </section>
 
       </div>
@@ -652,6 +722,38 @@ onBeforeUnmount(() => {
   color: var(--detail-text-main);
   font-size: 16px;
   line-height: 1.88;
+}
+
+.knowledge-document-viewer {
+  min-height: 100%;
+}
+
+.knowledge-document-viewer :deep(.ProseMirror) {
+  min-height: 100%;
+  outline: none;
+}
+
+.knowledge-document-blocked {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  border: 1px dashed var(--detail-line-strong);
+  border-radius: 18px;
+  background: var(--detail-paper);
+  padding: 28px;
+  color: var(--detail-text-subtle);
+}
+
+.knowledge-document-blocked__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--detail-text-strong);
+}
+
+.knowledge-document-blocked__desc {
+  line-height: 1.8;
 }
 
 .knowledge-detail-reading__body :deep(img) {
