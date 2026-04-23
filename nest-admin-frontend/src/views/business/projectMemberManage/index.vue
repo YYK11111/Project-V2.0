@@ -584,6 +584,7 @@ onMounted(() => {
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1;
+  width: 80px;
   white-space: nowrap;
   flex-shrink: 0;
 }

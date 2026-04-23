@@ -13,6 +13,7 @@ describe('changeManage 列表局部治理守卫', () => {
     expect(source).toContain('class="native-query-grid"')
     expect(source).toContain('class="native-query-item"')
     expect(source).toContain('class="native-query-label"')
+    expect(source).toMatch(/\.native-query-label\s*\{[\s\S]*width:\s*80px/)
     expect(source).toContain('变更类型')
     expect(source).toContain('知识回流')
     expect(source).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)

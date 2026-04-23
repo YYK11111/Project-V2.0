@@ -241,6 +241,7 @@ const getButtons = (row) => [
 .native-query-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
+  width: 80px;
   white-space: nowrap;
   flex-shrink: 0;
 }

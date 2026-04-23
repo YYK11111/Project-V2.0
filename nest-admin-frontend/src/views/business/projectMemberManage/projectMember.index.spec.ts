@@ -14,6 +14,7 @@ describe('projectMemberManage 列表治理守卫', () => {
     expect(source).toContain('v-if="viewMode === \'member\'"')
     expect(source).toContain('<el-table-column type="index" label="序号" width="70" />')
     expect(source).toMatch(/class="query-grid"/)
+    expect(source).toMatch(/\.query-select-label\s*\{[\s\S]*width:\s*80px/)
     expect(source).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)
     expect(source).toMatch(/@media \(max-width:\s*1200px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/)
     expect(source).toMatch(/@media \(max-width:\s*768px\)[\s\S]*grid-template-columns:\s*1fr/)

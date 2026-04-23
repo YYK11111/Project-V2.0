@@ -13,6 +13,7 @@ describe('milestoneManage 列表局部治理守卫', () => {
     expect(source).toContain('class="native-query-grid"')
     expect(source).toContain('class="native-query-item"')
     expect(source).toContain('class="native-query-label"')
+    expect(source).toMatch(/\.native-query-label\s*\{[\s\S]*width:\s*80px/)
     expect(source).toContain('所属项目')
     expect(source).toContain('责任人')
     expect(source).toContain('里程碑阶段')

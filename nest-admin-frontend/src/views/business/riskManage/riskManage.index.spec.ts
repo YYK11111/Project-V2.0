@@ -13,6 +13,7 @@ describe('riskManage 列表局部治理守卫', () => {
     expect(source).toContain('class="native-query-grid"')
     expect(source).toContain('class="native-query-item"')
     expect(source).toContain('class="native-query-label"')
+    expect(source).toMatch(/\.native-query-label\s*\{[\s\S]*width:\s*80px/)
     expect(source).toContain('<template #extraButtons>')
     expect(source).toContain('风险矩阵')
     expect(source).toContain('所属项目')
