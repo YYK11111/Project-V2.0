@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import '@/styles/richContent.scss'
 import { applyArticleBorrow, getKnowledgeTypes, getOne } from './api'
 import { extractTocItems, type TocItem } from './viewToc'
 
@@ -86,14 +87,7 @@ function resetViewState() {
 }
 
 function getScrollContainer() {
-  if (!contentRef.value) return null
-  const routerPage = contentRef.value.closest('.RouterPage')
-  if (routerPage instanceof HTMLElement) return routerPage
-
-  const pageContainer = contentRef.value.closest('.page')
-  if (pageContainer instanceof HTMLElement) return pageContainer
-
-  return null
+  return contentRef.value
 }
 
 function syncScrollContainer() {
@@ -338,7 +332,7 @@ onBeforeUnmount(() => {
 
         <main class="knowledge-view-main">
           <section class="knowledge-view-content-shell Gcard">
-            <div ref="contentRef" class="knowledge-view-reading__body" v-html="article.content || '<p>暂无内容</p>'"></div>
+            <div ref="contentRef" class="knowledge-view-reading__body rich-content rich-content--view" v-html="article.content || '<p>暂无内容</p>'"></div>
           </section>
         </main>
       </div>
@@ -512,42 +506,10 @@ onBeforeUnmount(() => {
 .knowledge-view-reading__body :deep(h5),
 .knowledge-view-reading__body :deep(h6) {
   scroll-margin-top: 32px;
-  color: var(--FontBlack);
-}
-
-.knowledge-view-reading__body :deep(h1) {
-  margin: 1.8em 0 0.7em;
-  font-size: 30px;
-}
-
-.knowledge-view-reading__body :deep(h2) {
-  margin: 1.6em 0 0.65em;
-  font-size: 24px;
-}
-
-.knowledge-view-reading__body :deep(h3) {
-  margin: 1.4em 0 0.6em;
-  font-size: 20px;
-}
-
-.knowledge-view-reading__body :deep(h4) {
-  margin: 1.3em 0 0.55em;
-  font-size: 17px;
-}
-
-.knowledge-view-reading__body :deep(h5),
-.knowledge-view-reading__body :deep(h6) {
-  margin: 1.2em 0 0.5em;
-  font-size: 15px;
 }
 
 .knowledge-view-reading__body :deep(img) {
-  max-width: 100%;
-  border-radius: 14px;
-}
-
-.knowledge-view-reading__body :deep(pre) {
-  overflow: auto;
+  box-shadow: 0 12px 28px rgba(27, 39, 61, 0.08);
 }
 
 .knowledge-view-toc__list,

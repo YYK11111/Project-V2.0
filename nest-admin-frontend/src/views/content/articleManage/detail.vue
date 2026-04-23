@@ -2,6 +2,7 @@
 // @ts-nocheck
 import { nextTick, onActivated, onBeforeUnmount, onDeactivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import '@/styles/richContent.scss'
 import { applyArticleBorrow, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes } from './api'
 import { extractTocItems } from './viewToc'
 import { checkPermi } from '@/utils/permission'
@@ -92,7 +93,7 @@ function getHeadingElement(id: string) {
 }
 
 function updateActiveHeading() {
-  const container = contentRef.value?.parentElement
+  const container = contentRef.value
   if (!container || !tocItems.value.length) {
     activeHeadingId.value = ''
     return
@@ -120,7 +121,7 @@ function handleScroll() {
 }
 
 function bindScrollListeners() {
-  const container = contentRef.value?.parentElement
+  const container = contentRef.value
   if (!container) return
   container.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
@@ -129,13 +130,13 @@ function bindScrollListeners() {
 }
 
 function unbindScrollListeners() {
-  contentRef.value?.parentElement?.removeEventListener('scroll', handleScroll)
+  contentRef.value?.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleScroll)
 }
 
 function scrollToHeading(id: string) {
   const heading = getHeadingElement(id)
-  const container = contentRef.value?.parentElement
+  const container = contentRef.value
   if (!heading || !container) return
 
   activeHeadingId.value = id
@@ -330,7 +331,7 @@ onBeforeUnmount(() => {
 
         <section class="knowledge-detail-content-shell">
           <div class="knowledge-detail-content-shell__header">正文</div>
-          <div ref="contentRef" class="knowledge-detail-reading__body" v-html="article.content || '<p>暂无内容</p>'"></div>
+          <div ref="contentRef" class="knowledge-detail-reading__body rich-content rich-content--detail" v-html="article.content || '<p>暂无内容</p>'"></div>
         </section>
 
       </div>
@@ -654,10 +655,6 @@ onBeforeUnmount(() => {
 }
 
 .knowledge-detail-reading__body :deep(img) {
-  max-width: 100%;
-  display: block;
-  margin: 28px auto;
-  border-radius: 16px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -665,34 +662,7 @@ onBeforeUnmount(() => {
 .knowledge-detail-reading__body :deep(h2),
 .knowledge-detail-reading__body :deep(h3),
 .knowledge-detail-reading__body :deep(h4) {
-  margin: 1.8em 0 0.75em;
-  line-height: 1.3;
-  color: var(--detail-text-strong);
-}
-
-.knowledge-detail-reading__body :deep(blockquote) {
-  margin: 24px 0;
-  padding: 14px 18px;
-  border-left: 4px solid var(--detail-primary);
-  border-radius: 0 14px 14px 0;
-  background: color-mix(in srgb, var(--detail-primary) 6%, var(--cardBg));
-  color: var(--detail-text-subtle);
-}
-
-.knowledge-detail-reading__body :deep(pre) {
-  padding: 18px 20px;
-  border-radius: 16px;
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #1e293b;
-  overflow: auto;
-}
-
-.knowledge-detail-reading__body :deep(code) {
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--detail-primary) 10%, var(--cardBg));
-  color: color-mix(in srgb, var(--detail-primary-deep) 88%, #1f2937);
+  scroll-margin-top: 32px;
 }
 
 .knowledge-ai-stats {

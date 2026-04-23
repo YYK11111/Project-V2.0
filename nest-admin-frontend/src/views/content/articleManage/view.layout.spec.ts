@@ -17,4 +17,12 @@ describe('knowledge view layout', () => {
     expect(source).not.toContain('正文内容')
     expect(source).not.toContain('按阅读视角展示知识内容，并支持通过目录快速定位到目标章节。')
   })
+
+  it('目录联动应绑定正文滚动区，而不是外层页面容器', () => {
+    const source = readSource()
+
+    expect(source).toContain('return contentRef.value')
+    expect(source).not.toContain("closest('.RouterPage')")
+    expect(source).not.toContain("closest('.page')")
+  })
 })

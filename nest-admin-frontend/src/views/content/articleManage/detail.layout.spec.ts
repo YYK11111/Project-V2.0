@@ -31,4 +31,11 @@ describe('knowledge detail layout', () => {
     expect(source).not.toContain('.knowledge-detail-reading__body {\n  max-width: 72ch;')
     expect(source).not.toContain('.knowledge-detail-reading__body {\n  margin: 0 auto;')
   })
+
+  it('目录联动应绑定正文滚动区本身', () => {
+    const source = readSource()
+
+    expect(source).toContain('const container = contentRef.value')
+    expect(source).not.toContain('contentRef.value?.parentElement')
+  })
 })
