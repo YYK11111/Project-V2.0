@@ -49,4 +49,33 @@ describe('知识编辑页结构治理守卫', () => {
     expect(copyButton).toBeLessThan(draftButton)
     expect(draftButton).toBeLessThan(publishButton)
   })
+
+  it('页面正文应直连 Tiptap，并脱离旧公共 Editor', () => {
+    const source = readAev()
+
+    expect(source).toMatch(/@tiptap\/vue-3/)
+    expect(source).toMatch(/(useEditor|EditorContent)/)
+    expect(source).not.toContain("@/components/Editor/index.vue")
+    expect(source).not.toContain('<Editor v-model="form.content"')
+  })
+
+  it('保存时只提交 JSON 正文字段', () => {
+    const source = readAev()
+
+    expect(source).toContain('contentJson')
+    expect(source).toContain('contentVersion')
+    expect(source).toContain('contentStatus')
+    expect(source).not.toContain('save(_form)')
+    expect(source).not.toContain('form.content?.replace(/<[^>]+>/g, \' \' )')
+  })
+
+  it('正文区域应覆盖 ready、legacy_html、invalid 三种状态渲染', () => {
+    const source = readAev()
+
+    expect(source).toContain('const readyEditor = computed')
+    expect(source).toContain("documentState.kind === 'legacy_html'")
+    expect(source).toContain("documentState.kind === 'invalid'")
+    expect(source).toContain('getKnowledgeDocumentBlockMessage')
+    expect(source).toContain('showEditBlockedMessage')
+  })
 })

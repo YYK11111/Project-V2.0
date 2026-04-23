@@ -1,50 +1,188 @@
 <script setup lang="ts">
-// @ts-nocheck
+import type { JSONContent } from '@tiptap/core'
+import { Editor as VueTiptapEditor, EditorContent } from '@tiptap/vue-3'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-const router = useRouter()
-const route = useRoute()
 import { yesOrNO, KEY_NO, KEY_YES } from '@/utils/dictionary'
 import { listRole } from '@/api/system/role'
+import { bridgeTiptapMarkdownPaste } from '@/components/Editor/tiptapPasteBridge'
+import { htmlToMarkdown, looksLikeMarkdown, markdownToHtml } from '@/components/Editor/markdownInterop'
+import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
 
 import { applyArticleBorrow, articleTagApi, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes, save } from './api'
-const formRef = ref()
+import {
+  createStructuredTemplateDocument,
+  DOCUMENT_CONTENT_VERSION,
+  getDocumentPlainText,
+  getKnowledgeDocumentBlockMessage,
+  isKnowledgeDocumentBlocked,
+  mapKnowledgeDocumentErrorCode,
+  resolveKnowledgeDocumentState,
+} from './aev.document'
+
+const router = useRouter()
+const route = useRoute()
+const formRef = ref<{ $refs: { formRef: { validate: () => Promise<void> } } } | null>(null)
 const isEdited = ref(false)
-const status = ref([])
+const status = ref<Array<Record<string, unknown>>>([])
 getStatus().then(({ data }) => (status.value = data))
-const knowledgeTypes = ref([])
+const knowledgeTypes = ref<Record<string, string>>({})
 getKnowledgeTypes().then(({ data }) => (knowledgeTypes.value = data))
-const visibilityTypes = ref([])
+const visibilityTypes = ref<Record<string, string>>({})
 getVisibilityTypes().then(({ data }) => (visibilityTypes.value = data))
-const roles = ref([])
-listRole({ pageNum: 1, pageSize: 1000 }).then((res: any) => (roles.value = res.data || []))
-const tags = ref([])
-articleTagApi.getList({ pageNum: 1, pageSize: 1000 }).then(({ list = [] }: any) => (tags.value = list))
+const roles = ref<RoleOption[]>([])
+listRole({ pageNum: 1, pageSize: 1000 }).then((res: { data?: RoleOption[] }) => (roles.value = res.data || []))
+const tags = ref<TagOption[]>([])
+articleTagApi.getList({ pageNum: 1, pageSize: 1000 }).then(({ list = [] }: { list?: TagOption[] }) => (tags.value = list))
 
 import { getTrees } from './api.catalog'
-import { watch } from 'vue'
 import UserSelect from '@/components/UserSelect.vue'
-import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
 import { useUserStore } from '@/stores/user'
 import { getArticleTemplate, getArticleTemplateOptions } from './templates'
-const trees = ref([])
-getTrees().then(({ data }) => (trees.value = data))
+
+type RoleOption = {
+  id: string | number
+  name: string
+}
+
+type TagOption = {
+  id: string | number
+  name: string
+}
+
+type TreeNode = {
+  id: string | number
+  name: string
+  defaultVisibilityType?: string
+  defaultVisibleRoleIds?: string[]
+  defaultVisibleUserIds?: string[]
+  children?: TreeNode[]
+}
+
+type AccessDeniedInfo = {
+  message?: string
+  canBorrow?: boolean
+} | null
+
+type ArticleForm = {
+  title?: string
+  summary?: string
+  content?: string
+  contentJson: JSONContent
+  contentVersion: number
+  contentStatus: string
+  contentText?: string
+  tagIds: string[]
+  visibilityType: string
+  visibleRoleIds: string[]
+  visibleUserIds: string[]
+  knowledgeType: string
+  versionNo: number
+  retrievalWeight: number
+  aiPreferred: string
+  authorityLevel: string
+  isTop: string
+  topSort: number
+  topStartTime: string
+  topEndTime: string
+  authorId: string
+  maintainerId: string
+  sourceType: string
+  sourceId: string
+  sourceProjectId: string
+  templateType: string
+  publishTime?: string
+  order?: number
+  thumb?: string
+  keywords?: string
+  status?: string
+  catalogId?: string | number
+  canEdit?: boolean
+}
+
+const trees = ref<TreeNode[]>([])
+getTrees({}).then(({ data }) => (trees.value = data as TreeNode[]))
 const userStore = useUserStore()
 const templateOptions = ref(getArticleTemplateOptions())
 const inheritedVisibility = ref(false)
-const accessDeniedInfo = ref<{ message?: string; canBorrow?: boolean } | null>(null)
+const accessDeniedInfo = ref<AccessDeniedInfo>(null)
 const isHydratingForm = ref(false)
 const borrowDialogVisible = ref(false)
 const borrowLoading = ref(false)
 const canEditCurrentArticle = computed(() => !route.query.id || form.value?.canEdit !== false)
+const isSyncingEditor = ref(false)
 const borrowForm = ref({
   articleId: '',
   requestedDays: 1,
   applyReason: '',
 })
 
-function createDefaultForm() {
-  return {
+const documentState = computed(() => resolveKnowledgeDocumentState(form.value))
+const readyEditor = computed(() => (documentState.value.kind === 'ready' ? editor.value : null))
+const editBlockedMessage = computed(() => {
+  if (!isKnowledgeDocumentBlocked(documentState.value.kind)) return null
+  return getKnowledgeDocumentBlockMessage('edit', documentState.value.kind)
+})
+
+function getSingleQueryValue(value: string | string[] | null | undefined): string {
+  return Array.isArray(value) ? String(value[0] || '') : String(value || '')
+}
+
+const editor = ref<VueTiptapEditor | null>(null)
+
+function createKnowledgeEditor() {
+  return new VueTiptapEditor({
     content: '',
+    editable: false,
+    extensions: createDocumentExtensions('请输入结构化知识正文'),
+    onUpdate: ({ editor: currentEditor }) => {
+      if (isSyncingEditor.value) return
+
+      const contentJson = currentEditor.getJSON()
+      form.value.contentJson = contentJson
+      form.value.contentVersion = DOCUMENT_CONTENT_VERSION
+      form.value.contentStatus = 'ready'
+      form.value.contentText = currentEditor.getText().trim()
+    },
+    editorProps: {
+      attributes: {
+        class: 'knowledge-editor-prose',
+      },
+      handlePaste: (_view, event) => {
+        const currentEditor = editor.value
+        if (!currentEditor) {
+          return false
+        }
+
+        const result = bridgeTiptapMarkdownPaste({
+          disabled: !canEditCurrentArticle.value || documentState.value.kind !== 'ready',
+          clipboardData: event.clipboardData,
+          looksLikeMarkdown,
+          markdownToHtml,
+          insertHtml: (html) => {
+            currentEditor.chain().focus().insertContent(html).run()
+          },
+        })
+
+        if (result.handled) {
+          event.preventDefault()
+        }
+
+        return result.handled
+      },
+    },
+  })
+}
+
+function createDefaultForm(): ArticleForm {
+  return {
+    title: '',
+    summary: '',
+    content: '',
+    contentJson: createStructuredTemplateDocument(''),
+    contentVersion: DOCUMENT_CONTENT_VERSION,
+    contentStatus: 'ready',
+    contentText: '',
     tagIds: [],
     visibilityType: 'public',
     visibleRoleIds: [],
@@ -58,16 +196,45 @@ function createDefaultForm() {
     topSort: 0,
     topStartTime: '',
     topEndTime: '',
-    authorId: userStore.id,
-    maintainerId: userStore.id,
+    authorId: String(userStore.id || ''),
+    maintainerId: String(userStore.id || ''),
     sourceType: '',
     sourceId: '',
-    sourceProjectId: String(route.query.projectId || ''),
-    templateType: String(route.query.template || ''),
+    sourceProjectId: getSingleQueryValue(route.query.projectId),
+    templateType: getSingleQueryValue(route.query.template),
+    publishTime: '',
+    order: 0,
+    thumb: '',
+    keywords: '',
+    catalogId: '',
   }
 }
 
-const form = ref(createDefaultForm())
+const form = ref<ArticleForm>(createDefaultForm())
+
+function syncEditorFromState() {
+  const currentEditor = editor.value
+  if (!currentEditor || documentState.value.kind !== 'ready') {
+    return
+  }
+
+  isSyncingEditor.value = true
+  currentEditor.commands.setContent(documentState.value.contentJson, {
+    emitUpdate: false,
+  })
+  currentEditor.setEditable(canEditCurrentArticle.value)
+  isSyncingEditor.value = false
+}
+
+function showEditBlockedMessage() {
+  if (!editBlockedMessage.value) return
+  $sdk.msgError(editBlockedMessage.value.title)
+}
+
+function getDocumentErrorMessage(error: unknown): string {
+  const payload = (error as { response?: { data?: { code?: string | number; errorCode?: string } } })?.response?.data
+  return mapKnowledgeDocumentErrorCode(payload?.errorCode || String(payload?.code || ''))
+}
 
 async function loadArticle() {
   isHydratingForm.value = true
@@ -82,12 +249,27 @@ async function loadArticle() {
   }
 
   try {
-    const { data } = await getOne(route.query.id)
-    form.value = data
+    const { data } = await getOne(getSingleQueryValue(route.query.id))
+    const nextForm = {
+      ...createDefaultForm(),
+      ...(data as Partial<ArticleForm>),
+    }
+    const nextState = resolveKnowledgeDocumentState(nextForm)
+    form.value = {
+      ...nextForm,
+      contentJson: nextState.kind === 'ready' ? nextState.contentJson : nextForm.contentJson,
+      contentVersion: nextState.kind === 'ready' ? nextState.contentVersion : nextForm.contentVersion,
+      contentStatus: nextState.kind,
+      contentText:
+        nextState.kind === 'ready'
+          ? getDocumentPlainText(nextState.contentJson)
+          : nextForm.contentText || '',
+    }
     isEdited.value = false
   } catch (error) {
-    const payload = error?.response?.data || {}
-    if (payload?.code === 'KNOWLEDGE_FORBIDDEN') {
+    const payload = (error as { response?: { data?: { code?: string | number; errorCode?: string; message?: string; canBorrow?: boolean; articleId?: string } } })
+      .response?.data || {}
+    if ((payload?.errorCode || payload?.code) === 'KNOWLEDGE_FORBIDDEN') {
       accessDeniedInfo.value = {
         message: payload.message,
         canBorrow: payload.canBorrow,
@@ -102,29 +284,43 @@ async function loadArticle() {
 }
 
 function applyTemplateFromRoute() {
-  const templateKey = String(route.query.template || '')
+  const templateKey = getSingleQueryValue(route.query.template)
   const template = getArticleTemplate(templateKey)
   if (!template) return
+  const contentJson = createStructuredTemplateDocument(template.content)
   form.value = {
     ...form.value,
     title: form.value.title || template.title,
     summary: form.value.summary || template.summary,
     knowledgeType: template.knowledgeType || form.value.knowledgeType,
-    content: form.value.content || template.content,
+    contentJson: form.value.contentText ? form.value.contentJson : contentJson,
+    contentVersion: DOCUMENT_CONTENT_VERSION,
+    contentStatus: 'ready',
+    contentText: form.value.contentText || getDocumentPlainText(contentJson),
     templateType: form.value.templateType || templateKey,
   }
 }
 
-function handleApplyTemplate(templateKey: string) {
-  const template = getArticleTemplate(templateKey)
+function handleApplyTemplate(templateKey: string | number | boolean | undefined) {
+  if (documentState.value.kind !== 'ready') {
+    showEditBlockedMessage()
+    return
+  }
+
+  const normalizedTemplateKey = typeof templateKey === 'string' ? templateKey : String(templateKey || '')
+  const template = getArticleTemplate(normalizedTemplateKey)
   if (!template) return
+  const contentJson = createStructuredTemplateDocument(template.content)
   form.value = {
     ...form.value,
     title: template.title,
     summary: template.summary,
     knowledgeType: template.knowledgeType || form.value.knowledgeType,
-    content: template.content,
-    templateType: templateKey,
+    contentJson,
+    contentVersion: DOCUMENT_CONTENT_VERSION,
+    contentStatus: 'ready',
+    contentText: getDocumentPlainText(contentJson),
+    templateType: normalizedTemplateKey,
   }
   isEdited.value = true
 }
@@ -147,6 +343,28 @@ watch(
 )
 
 watch(
+  documentState,
+  (state) => {
+    if (state.kind !== 'ready') {
+      editor.value?.destroy()
+      editor.value = null
+      return
+    }
+
+    if (!editor.value) {
+      editor.value = createKnowledgeEditor()
+    }
+
+    syncEditorFromState()
+  },
+  { immediate: true },
+)
+
+watch(canEditCurrentArticle, (value) => {
+  editor.value?.setEditable(value && documentState.value.kind === 'ready')
+})
+
+watch(
   () => form.value.catalogId,
   (catalogId) => {
     if (!catalogId || route.query.id || inheritedVisibility.value) return
@@ -165,24 +383,38 @@ watch(
   },
 )
 
-function submit(type) {
+function submit(type?: string) {
   if (!canEditCurrentArticle.value) {
     $sdk.msgError('当前无编辑该知识的权限')
     return
   }
-  formRef.value.$refs.formRef.validate().then(() => {
-    let _form = JSON.parse(JSON.stringify(form.value))
-    type == 'draft' && (_form.status = '0')
+  if (isKnowledgeDocumentBlocked(documentState.value.kind)) {
+    showEditBlockedMessage()
+    return
+  }
+  formRef.value?.$refs.formRef.validate().then(() => {
+    const payload = JSON.parse(JSON.stringify(form.value)) as ArticleForm
+    type == 'draft' && (payload.status = '0')
 
-    if (_form.publishTime && +new Date(_form.publishTime) <= +new Date()) {
+    if (payload.publishTime && +new Date(payload.publishTime) <= +new Date()) {
       $sdk.msgError('定时发布时间不得早于当前时间')
       return
     }
 
-    save(_form).then(() => {
-      $sdk.msgSuccess()
-      router.back()
-    })
+    payload.contentJson = editor.value?.getJSON() || form.value.contentJson
+    payload.contentVersion = DOCUMENT_CONTENT_VERSION
+    payload.contentStatus = 'ready'
+    payload.contentText = editor.value?.getText().trim() || form.value.contentText || ''
+    delete payload.content
+
+    save(payload)
+      .then(() => {
+        $sdk.msgSuccess()
+        router.back()
+      })
+      .catch((error) => {
+        $sdk.msgError(getDocumentErrorMessage(error))
+      })
   })
 }
 
@@ -200,7 +432,12 @@ async function handleCopyMarkdown() {
     return
   }
 
-  const markdown = htmlToMarkdown(form.value.content || '')
+  if (isKnowledgeDocumentBlocked(documentState.value.kind)) {
+    showEditBlockedMessage()
+    return
+  }
+
+  const markdown = htmlToMarkdown(editor.value?.getHTML() || '')
   try {
     await navigator.clipboard.writeText(markdown)
     $sdk.msgSuccess('已复制 Markdown')
@@ -221,6 +458,10 @@ function submitBorrow() {
       borrowLoading.value = false
     })
 }
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
 </script>
 
 <template>
@@ -340,8 +581,22 @@ function submitBorrow() {
               <div class="section-desc">正文是知识复用的核心，建议按清晰的小节结构编写，减少大段堆叠。</div>
             </div>
           </div>
-          <el-form-item prop="content" label="正文" style="max-width: none !important">
-            <Editor v-model="form.content" style="min-height: 500px; height: auto" :disabled="!canEditCurrentArticle"></Editor>
+          <el-form-item prop="contentJson" label="正文" style="max-width: none !important">
+            <div v-if="readyEditor" class="knowledge-document-shell">
+              <EditorContent :editor="readyEditor as unknown as VueTiptapEditor" class="knowledge-document-editor" />
+            </div>
+            <el-alert
+              v-else-if="documentState.kind === 'legacy_html'"
+              type="warning"
+              :closable="false"
+              :title="editBlockedMessage?.title"
+              :description="editBlockedMessage?.description" />
+            <el-alert
+              v-else-if="documentState.kind === 'invalid'"
+              type="error"
+              :closable="false"
+              :title="editBlockedMessage?.title"
+              :description="editBlockedMessage?.description" />
           </el-form-item>
         </section>
 
@@ -382,7 +637,7 @@ function submitBorrow() {
             </BaFormItem>
           </div>
           <BaFormItem label="纯文本预览">
-            <pre class="content-text-preview">{{ form.contentText || form.content?.replace(/<[^>]+>/g, ' ') || '保存后自动生成纯文本索引' }}</pre>
+            <pre class="content-text-preview">{{ form.contentText || '保存后自动生成纯文本索引' }}</pre>
           </BaFormItem>
         </section>
       </template>
@@ -495,9 +750,43 @@ function submitBorrow() {
   border-radius: 12px;
 }
 
-.knowledge-form-section :deep(.tox-tinymce) {
-  border: 1px solid var(--el-border-color-lighter) !important;
+.knowledge-document-shell {
+  min-height: 500px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
   overflow: hidden;
+}
+
+.knowledge-document-editor :deep(.tiptap) {
+  min-height: 500px;
+  padding: 18px 20px;
+  line-height: 1.75;
+  outline: none;
+  white-space: pre-wrap;
+}
+
+.knowledge-document-editor :deep(.tiptap p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.knowledge-document-editor :deep(.tiptap table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.knowledge-document-editor :deep(.tiptap th),
+.knowledge-document-editor :deep(.tiptap td) {
+  border: 1px solid var(--el-border-color);
+  padding: 8px;
+}
+
+.knowledge-document-editor :deep(.tiptap img) {
+  max-width: 100%;
 }
 
 .knowledge-editor-operate-bar :deep(.el-button) {

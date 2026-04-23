@@ -16,6 +16,16 @@ import dayjs from "dayjs";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { Project } from "../projects/entity";
 import { ProjectMember, ProjectMemberRole } from "../project-members/entity";
+import { DocumentNode } from "./document.schema";
+import {
+  DOCUMENT_READY_STATUS,
+  DOCUMENT_SCHEMA_VERSION,
+} from "./document.schema";
+import {
+  ensureDocumentEditable,
+  validateDocumentJson,
+  validateDocumentSchemaVersion,
+} from "./document.validator";
 
 @Injectable()
 export class ArticlesService extends BaseService<Article, ArticleDto> {
@@ -39,10 +49,30 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
   async save(dto) {
     const currentUserId = dto._operatorId ? String(dto._operatorId) : "";
     await this.validateProjectKnowledgePermissionForSave(dto, currentUserId);
+    const existing = dto.id
+      ? await this.repository.findOne({
+          where: { id: dto.id } as any,
+          relations: ["catalog"],
+        })
+      : null;
+
+    if (dto.id) {
+      ensureDocumentEditable(existing?.contentStatus);
+    }
+
+    validateDocumentSchemaVersion(
+      dto.contentVersion ?? existing?.contentVersion,
+    );
+    validateDocumentJson(dto.contentJson);
+
     dto.summary = dto.summary || dto.desc || "";
     dto.desc = dto.summary || dto.desc || "";
-    dto.contentText = this.extractPlainTextFromHtml(dto.content);
+    dto.contentText =
+      this.extractPlainTextFromDocument(dto.contentJson) ||
+      this.extractPlainTextFromHtml(dto.content);
     dto.contentChunks = this.buildContentChunks(dto.contentText);
+    dto.contentVersion = DOCUMENT_SCHEMA_VERSION;
+    dto.contentStatus = DOCUMENT_READY_STATUS;
     const operatorId = dto._operatorId ? String(dto._operatorId) : "";
     if (!dto.authorId && operatorId) {
       dto.authorId = operatorId;
@@ -505,6 +535,39 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       .trim();
   }
 
+  private extractPlainTextFromDocument(
+    contentJson?: DocumentNode | Record<string, unknown> | null,
+  ) {
+    if (!contentJson || typeof contentJson !== "object") {
+      return "";
+    }
+
+    const collectText = (node: DocumentNode | undefined): string[] => {
+      if (!node || typeof node !== "object") {
+        return [];
+      }
+
+      const parts: string[] = [];
+
+      if (typeof node.text === "string" && node.text.trim()) {
+        parts.push(node.text.trim());
+      }
+
+      if (Array.isArray(node.content)) {
+        node.content.forEach((child) => {
+          parts.push(...collectText(child));
+        });
+      }
+
+      return parts;
+    };
+
+    return collectText(contentJson as DocumentNode)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   private buildContentChunks(contentText = "") {
     const paragraphs = String(contentText || "")
       .split(/(?<=[。！？\.!?])\s+/)
@@ -603,7 +666,9 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     if (!access.hasAccess) {
       throw new Error("当前无重建切片权限");
     }
-    article.contentText = this.extractPlainTextFromHtml(article.content);
+    article.contentText =
+      this.extractPlainTextFromDocument(article.contentJson) ||
+      this.extractPlainTextFromHtml(article.content);
     article.contentChunks = this.buildContentChunks(article.contentText);
     article.embeddingStatus = "pending";
     article.embeddingVersion = Number(article.embeddingVersion || 1) + 1;
@@ -917,7 +982,9 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       summary: "当前知识受限，暂无查看权限",
       desc: "当前知识受限，暂无查看权限",
       content: "",
+      contentJson: null,
       contentText: "",
+      contentChunks: [],
     });
   }
 }

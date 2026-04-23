@@ -92,6 +92,20 @@ export class Article extends BaseEntity {
     summary: string;
   }>;
 
+  @Column({ type: "json", nullable: true, comment: "结构化正文协议" })
+  contentJson: Record<string, unknown> | null;
+
+  @BaseColumn({ type: "int", default: 0, comment: "正文协议版本号" })
+  contentVersion: number;
+
+  @BaseColumn({
+    type: "varchar",
+    length: 32,
+    default: "legacy_html",
+    comment: "正文协议状态",
+  })
+  contentStatus: string;
+
   @BaseColumn({
     type: "enum",
     enum: KnowledgeType,
