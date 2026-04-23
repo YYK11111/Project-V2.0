@@ -1,0 +1,178 @@
+.rich-content {
+  --rich-content-text: var(--el-text-color-primary);
+  --rich-content-heading: var(--el-text-color-primary);
+  --rich-content-muted: var(--el-text-color-regular);
+  --rich-content-line: var(--el-border-color);
+  --rich-content-line-strong: var(--el-border-color-darker);
+  --rich-content-surface: var(--el-fill-color-light);
+  --rich-content-surface-strong: var(--el-fill-color);
+  --rich-content-code-bg: #0f172a;
+  --rich-content-code-fg: #e2e8f0;
+  --rich-content-link: var(--el-color-primary);
+  --rich-content-quote: var(--el-color-primary);
+  color: var(--rich-content-text);
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.rich-content > :first-child {
+  margin-top: 0;
+}
+
+.rich-content > :last-child {
+  margin-bottom: 0;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+  margin: 1.6em 0 0.65em;
+  color: var(--rich-content-heading);
+  line-height: 1.28;
+  font-weight: 700;
+}
+
+.rich-content h1 {
+  font-size: 2em;
+}
+
+.rich-content h2 {
+  font-size: 1.65em;
+}
+
+.rich-content h3 {
+  font-size: 1.35em;
+}
+
+.rich-content h4 {
+  font-size: 1.15em;
+}
+
+.rich-content h5,
+.rich-content h6 {
+  font-size: 1em;
+}
+
+.rich-content p,
+.rich-content ul,
+.rich-content ol,
+.rich-content blockquote,
+.rich-content pre,
+.rich-content table,
+.rich-content hr {
+  margin: 1em 0;
+}
+
+.rich-content ul,
+.rich-content ol {
+  padding-left: 1.5em;
+}
+
+.rich-content li + li {
+  margin-top: 0.35em;
+}
+
+.rich-content a {
+  color: var(--rich-content-link);
+  text-decoration: none;
+}
+
+.rich-content a:hover {
+  text-decoration: underline;
+}
+
+.rich-content table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--rich-content-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--rich-content-surface) 52%, transparent);
+}
+
+.rich-content th,
+.rich-content td {
+  padding: 10px 12px;
+  border: 1px solid var(--rich-content-line);
+  vertical-align: top;
+  text-align: left;
+}
+
+.rich-content th {
+  font-weight: 600;
+  color: var(--rich-content-heading);
+  background: color-mix(in srgb, var(--rich-content-surface-strong) 80%, white);
+}
+
+.rich-content blockquote {
+  padding: 14px 18px;
+  border-left: 4px solid var(--rich-content-quote);
+  border-radius: 0 14px 14px 0;
+  background: color-mix(in srgb, var(--rich-content-surface) 82%, transparent);
+  color: var(--rich-content-muted);
+}
+
+.rich-content pre {
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--rich-content-code-bg) 88%, white);
+  border-radius: 14px;
+  overflow: auto;
+  background: var(--rich-content-code-bg);
+  color: var(--rich-content-code-fg);
+}
+
+.rich-content pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.rich-content code {
+  padding: 0.15em 0.45em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--rich-content-surface-strong) 70%, transparent);
+  color: color-mix(in srgb, var(--rich-content-heading) 88%, #1f2937);
+  font-size: 0.92em;
+}
+
+.rich-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.4em auto;
+  border-radius: 14px;
+}
+
+.rich-content hr {
+  border: 0;
+  border-top: 1px solid var(--rich-content-line-strong);
+}
+
+.rich-content.rich-content--view {
+  --rich-content-heading: var(--FontBlack);
+  --rich-content-text: var(--FontBlack2);
+  --rich-content-muted: var(--FontBlack5);
+  --rich-content-line: color-mix(in srgb, var(--ColorLight8) 42%, var(--cardBg));
+  --rich-content-line-strong: color-mix(in srgb, var(--ColorLight6) 50%, var(--cardBg));
+  --rich-content-surface: color-mix(in srgb, var(--ColorLight11) 52%, var(--cardBg));
+  --rich-content-surface-strong: color-mix(in srgb, var(--ColorLight10) 58%, var(--cardBg));
+  --rich-content-link: var(--ColorDark);
+  --rich-content-quote: var(--Color);
+}
+
+.rich-content.rich-content--detail {
+  --rich-content-heading: var(--detail-text-strong, var(--FontBlack));
+  --rich-content-text: var(--detail-text-main, var(--FontBlack2));
+  --rich-content-muted: var(--detail-text-subtle, var(--FontBlack5));
+  --rich-content-line: var(--detail-line, var(--el-border-color));
+  --rich-content-line-strong: var(--detail-line-strong, var(--el-border-color-darker));
+  --rich-content-surface: var(--detail-paper, var(--el-fill-color-light));
+  --rich-content-surface-strong: color-mix(in srgb, var(--detail-paper, var(--el-fill-color)) 72%, var(--cardBg, #fff));
+  --rich-content-link: var(--detail-primary-deep, var(--el-color-primary));
+  --rich-content-quote: var(--detail-primary, var(--el-color-primary));
+}

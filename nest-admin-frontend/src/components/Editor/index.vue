@@ -1,235 +1,247 @@
 <template>
   <div class="Editor flexCol" v-loading="uploadLoading">
-    <div class="quillEditor flexAuto" ref="editor" :class="editorClass" @click="quill.focus"></div>
-    <Upload v-show="false" v-model:fileUrl="imgUrl" @loadingChange="(val) => (uploadLoading = val)"></Upload>
-    <SelectEmoji ref="emoji" @select="insertContent" />
+    <div v-if="!disabled" class="editorToolbar">
+      <button type="button" class="toolbarButton" @click="triggerImageUpload">图片</button>
+      <SelectEmoji ref="emojiRef" @select="insertContent">
+        <button type="button" class="toolbarButton">emoji</button>
+      </SelectEmoji>
+      <button type="button" class="toolbarButton" @click="insertTable">插入表格</button>
+    </div>
+    <div class="editorShell flexAuto" :class="editorClass" @click="focusEditor">
+      <EditorContent v-if="editor" :editor="editor" class="editorContent" />
+    </div>
+    <div class="editorUploadHost">
+      <Upload ref="uploadRef" v-model:fileUrl="imgUrl" @loadingChange="handleLoadingChange"></Upload>
+    </div>
   </div>
 </template>
 
-<script>
-import Quill from 'quill'
-import 'quill/dist/quill.core.css'
-import 'quill/dist/quill.snow.css'
-// import "quill/dist/quill.bubble.css";
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { EditorContent, useEditor } from '@tiptap/vue-3'
+import type { Editor } from '@tiptap/core'
+import Upload from '../Upload.vue'
+import SelectEmoji from '../SelectEmoji.vue'
+import { looksLikeMarkdown, markdownToHtml } from './markdownInterop'
+import { bridgeTiptapMarkdownPaste } from './tiptapPasteBridge'
+import { createEditorExtensions } from './tiptapExtensions'
+import { createInitialEditorHtml, getEditorHtml } from './tiptapHtml'
 
-export default {
-  props: {
-    modelValue: {
-      type: String,
-      default: '',
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    disabled?: boolean
+  }>(),
+  {
+    modelValue: '',
+    disabled: false,
+  },
+)
+
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: string): void
+}>()
+
+const uploadLoading = ref(false)
+const imgUrl = ref('')
+
+type UploadPublicInstance = InstanceType<typeof Upload> & {
+  openPicker?: () => void
+}
+
+const uploadRef = ref<UploadPublicInstance | null>(null)
+const emojiRef = ref<InstanceType<typeof SelectEmoji> | null>(null)
+
+const editorClass = computed(() => ({
+  'is-disabled': props.disabled,
+}))
+
+function emitEditorHtml(currentEditor: Editor) {
+  emit('update:modelValue', getEditorHtml(currentEditor))
+}
+
+function insertHtmlContent(currentEditor: Editor, html: string) {
+  currentEditor.chain().focus().insertContent(html).run()
+}
+
+function handlePaste(event: ClipboardEvent, currentEditor: Editor) {
+  const result = bridgeTiptapMarkdownPaste({
+    disabled: props.disabled,
+    clipboardData: event.clipboardData,
+    looksLikeMarkdown,
+    markdownToHtml,
+    insertHtml: (html) => insertHtmlContent(currentEditor, html),
+  })
+
+  if (result.handled) {
+    event.preventDefault()
+  }
+}
+
+const editor = useEditor({
+  content: createInitialEditorHtml(props.modelValue),
+  editable: !props.disabled,
+  extensions: createEditorExtensions('请输入内容'),
+  onUpdate: ({ editor: currentEditor }) => {
+    emitEditorHtml(currentEditor)
+  },
+  editorProps: {
+    attributes: {
+      class: 'editorProse',
     },
-    disabled: {
-      type: Boolean,
-      default: false,
+    handlePaste: (_view, event) => {
+      const currentEditor = editor.value
+
+      if (!currentEditor) {
+        return false
+      }
+
+      handlePaste(event, currentEditor)
+      return event.defaultPrevented
     },
   },
-  data() {
-    return {
-      // quill: '',
-      content: '',
-      uploadLoading: false,
-      imgUrl: '',
-      options: {
-        placeholder: '请输入内容',
-        theme: 'snow',
-        // bounds: document.body,
-        // readOnly: false,
-        debug: 'warn',
-        modules: {
-          // 工具栏配置
-          toolbar: {
-            container: [
-              ['bold', 'italic', 'underline', 'strike'], // 加粗 斜体 下划线 删除线
-              ['blockquote', 'code-block'], // 引用  代码块
-              [{ header: 1 }, { header: 2 }],
-              [{ list: 'ordered' }, { list: 'bullet' }], // 有序、无序列表
-              [{ script: 'sub' }, { script: 'super' }],
-              [{ indent: '-1' }, { indent: '+1' }], // 缩进
-              [{ direction: 'rtl' }],
-              [{ size: ['small', false, 'large', 'huge'] }], // 字体大小
-              [{ header: [1, 2, 3, 4, 5, 6, false] }], // 标题
-              [{ color: [] }, { background: [] }], // 字体颜色、字体背景颜色
-              [{ font: [] }],
-              [{ align: [] }], // 对齐方式
-              ['clean'], // 清除文本格式
-              ['link', 'image', 'video', 'emoji'], // 链接、图片、视频
-            ],
-            handlers: {
-              image: function (value) {
-                if (value) {
-                  document.querySelector('.Editor .el-upload__input').click()
-                } else {
-                  this.quill.format('image', false)
-                }
-              },
-            },
-          },
-        },
-      },
+})
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    const currentEditor = editor.value
+
+    if (!currentEditor) {
+      return
     }
-  },
-  computed: {
-    editorClass() {
-      return { 'is-disabled': this.disabled }
-    },
-  },
-  watch: {
-    disabled: {
-      handler(val) {
-        if (this.quill) {
-          this.quill.enable(!val)
-        }
-      },
-    },
-    modelValue: {
-      immediate: true,
-      handler(val) {
-        if (val !== this.content) {
-          this.content = val
-          if (this.quill) {
-            this.$refs.editor.children[0].innerHTML = this.content
-          }
-        }
-      },
-    },
-    imgUrl(val) {
-      let quill = this.quill
-      let length = quill.getSelection().index
-      quill.insertEmbed(length, 'image', val)
-      quill.setSelection(length + 1)
-    },
-  },
-  mounted() {
-    this.init()
-    this.$nextTick(() => {
-      this.$refs.editor.previousElementSibling.querySelector('.ql-emoji').appendChild(this.$refs.emoji.$el)
+
+    const nextHtml = createInitialEditorHtml(value)
+
+    if (nextHtml === getEditorHtml(currentEditor)) {
+      return
+    }
+
+    currentEditor.commands.setContent(nextHtml, {
+      emitUpdate: false,
     })
   },
-  beforeUnmount() {
-    this.quill = null
-  },
-  methods: {
-    init() {
-      const editor = this.$refs.editor
-      this.quill = new Quill(editor, this.options)
-      if (this.disabled) {
-        this.quill.enable(false)
-      }
-      editor.children[0].innerHTML = this.content
-      this.quill.on('text-change', (delta, oldDelta, source) => {
-        const html = editor.children[0].innerHTML
-        this.content = html
-        this.$emit('update:modelValue', html)
-      })
+)
 
-      this.quill.on('selection-change', (range, oldRange, source) => {
-        this.$emit('selection-change', range, oldRange, source)
-      })
-      this.quill.on('editor-change', (eventName, ...args) => {
-        this.$emit('editor-change', eventName, ...args)
-      })
-    },
-    onProgress(percent) {
-      this.uploadLoading = percent > 0 && percent < 100
-    },
-    insertContent(emoji) {
-      let quill = this.quill
-      quill.focus()
-      let length = quill.getSelection().index //光标位置
-      quill.insertText(length, emoji)
-      quill.setSelection(length + 2) //光标后移，表情占2位。所以+2
-    },
+watch(
+  () => props.disabled,
+  (value) => {
+    editor.value?.setEditable(!value)
   },
+  { immediate: true },
+)
+
+watch(imgUrl, (value) => {
+  if (!value) {
+    return
+  }
+
+  editor.value?.chain().focus().setImage({ src: value }).run()
+  imgUrl.value = ''
+})
+
+function focusEditor() {
+  editor.value?.chain().focus().run()
 }
+
+function handleLoadingChange(value: boolean) {
+  uploadLoading.value = value
+}
+
+function triggerImageUpload() {
+  uploadRef.value?.openPicker?.()
+}
+
+function insertContent(emoji: string) {
+  editor.value?.chain().focus().insertContent(emoji).run()
+}
+
+function insertTable() {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertTable({
+      rows: 3,
+      cols: 3,
+      withHeaderRow: true,
+    })
+    .run()
+}
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
 </script>
 
 <style>
-.quillEditor {
-  white-space: pre-wrap !important;
-  line-height: normal !important;
+.editorToolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
 }
-.quillEditor.is-disabled {
+
+.toolbarButton {
+  padding: 6px 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  cursor: pointer;
+}
+
+.editorUploadHost {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.editorShell {
+  min-height: 240px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background: var(--el-bg-color);
+}
+
+.editorShell.is-disabled {
   pointer-events: none;
   opacity: 0.6;
 }
-.quillEditor.is-disabled .ql-toolbar {
-  display: none;
-}
-.ql-snow .ql-tooltip {
-  left: 20px !important;
-}
-.quill-img {
-  display: none;
-}
-.ql-snow .ql-tooltip[data-mode='link']::before {
-  content: '请输入链接地址:';
-}
-.ql-snow .ql-tooltip.ql-editing a.ql-action::after {
-  border-right: 0px;
-  content: '保存';
-  padding-right: 0px;
+
+.editorContent {
+  height: 100%;
 }
 
-.ql-snow .ql-tooltip[data-mode='video']::before {
-  content: '请输入视频地址:';
+.editorContent .tiptap {
+  min-height: 240px;
+  padding: 12px;
+  white-space: pre-wrap;
+  line-height: normal;
+  outline: none;
 }
 
-.ql-snow .ql-picker.ql-size .ql-picker-label::before,
-.ql-snow .ql-picker.ql-size .ql-picker-item::before {
-  content: '14px';
-}
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value='small']::before,
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value='small']::before {
-  content: '10px';
-}
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value='large']::before,
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value='large']::before {
-  content: '18px';
-}
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value='huge']::before,
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value='huge']::before {
-  content: '32px';
+.editorContent .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder);
+  pointer-events: none;
+  float: left;
+  height: 0;
 }
 
-.ql-snow .ql-picker.ql-header .ql-picker-label::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item::before {
-  content: '文本';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='1']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='1']::before {
-  content: '标题1';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='2']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before {
-  content: '标题2';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before {
-  content: '标题3';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='4']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='4']::before {
-  content: '标题4';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='5']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='5']::before {
-  content: '标题5';
-}
-.ql-snow .ql-picker.ql-header .ql-picker-label[data-value='6']::before,
-.ql-snow .ql-picker.ql-header .ql-picker-item[data-value='6']::before {
-  content: '标题6';
+.editorContent .tiptap table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.ql-snow .ql-picker.ql-font .ql-picker-label::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item::before {
-  content: '标准字体';
+.editorContent .tiptap th,
+.editorContent .tiptap td {
+  border: 1px solid var(--el-border-color);
+  padding: 8px;
 }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value='serif']::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value='serif']::before {
-  content: '衬线字体';
-}
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value='monospace']::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value='monospace']::before {
-  content: '等宽字体';
+
+.editorContent .tiptap img {
+  max-width: 100%;
 }
 </style>

@@ -55,6 +55,12 @@ export default {
     },
   },
   methods: {
+    openPicker() {
+      const uploadRoot = this.$refs.uploadRoot?.$el
+      const input = uploadRoot?.querySelector('input[type="file"]')
+
+      input?.click()
+    },
     resolveUrl(url) {
       if (!url) return ''
       if (/^https?:\/\//.test(url)) return url
@@ -211,6 +217,7 @@ export default {
 
     <!-- 上传按钮 -->
     <el-upload
+      ref="uploadRoot"
       v-if="!multiple || !limit || fileListWatch.length < limit"
       class="uploader"
       :class="{ 'file-uploader': type === 'file' }"
