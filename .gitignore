@@ -26,6 +26,7 @@ dist/
 # Local tool state
 .opencode/
 .lingma/
+.worktrees/
 
 # Runtime uploads
 nest-admin/upload/default/
