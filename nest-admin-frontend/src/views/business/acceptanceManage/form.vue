@@ -6,6 +6,7 @@ import ProjectSelect from '@/components/ProjectSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,13 +43,19 @@ getResults().then(({ data }) => {
   resultMap.value = data || {}
 })
 
+const isAcceptanceFormRoute = useCurrentRouteGuard(route, '/acceptanceManage/form')
+
 async function loadData() {
+  if (!isAcceptanceFormRoute()) return
   if (!route.query.id) return
   const { data } = await getOne(route.query.id)
   form.value = { ...form.value, ...(data || {}) }
 }
 
-watch(() => route.query.id, loadData, { immediate: true })
+watch(() => route.query.id, () => {
+  if (!isAcceptanceFormRoute()) return
+  loadData()
+}, { immediate: true })
 
 function submit() {
   formRef.value.validate((valid) => {

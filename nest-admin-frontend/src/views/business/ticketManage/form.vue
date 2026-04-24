@@ -17,6 +17,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,6 +95,8 @@ const workflowPanelRef = ref()
 const hasTicketId = computed(() => !!route.query.id)
 const normalizedAttachments = computed(() => Array.isArray(form.value.attachments) ? form.value.attachments : [])
 
+const isTicketFormRoute = useCurrentRouteGuard(route, '/ticketManage/form')
+
 const defaultForm = () => ({
   title: '',
   type: '1',
@@ -118,6 +121,7 @@ const defaultForm = () => ({
 })
 
 async function loadTicket() {
+  if (!isTicketFormRoute()) return
   if (!hasTicketId.value) {
     form.value = {
       ...defaultForm(),
@@ -136,6 +140,7 @@ async function loadTicket() {
 watch(
   () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
   () => {
+    if (!isTicketFormRoute()) return
     loadTicket()
   },
   { immediate: true },

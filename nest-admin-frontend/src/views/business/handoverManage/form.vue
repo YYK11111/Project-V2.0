@@ -6,6 +6,7 @@ import ProjectSelect from '@/components/ProjectSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,13 +44,19 @@ getStatuses().then(({ data }) => {
   statusMap.value = data || {}
 })
 
+const isHandoverFormRoute = useCurrentRouteGuard(route, '/handoverManage/form')
+
 async function loadData() {
+  if (!isHandoverFormRoute()) return
   if (!route.query.id) return
   const { data } = await getOne(route.query.id)
   form.value = { ...form.value, ...(data || {}) }
 }
 
-watch(() => route.query.id, loadData, { immediate: true })
+watch(() => route.query.id, () => {
+  if (!isHandoverFormRoute()) return
+  loadData()
+}, { immediate: true })
 
 function submit() {
   formRef.value.validate((valid) => {

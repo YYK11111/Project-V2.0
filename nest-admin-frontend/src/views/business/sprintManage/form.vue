@@ -12,6 +12,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,6 +63,8 @@ const sprintImpactTips = computed(() => {
   })
 })
 
+const isSprintFormRoute = useCurrentRouteGuard(route, '/sprintManage/form')
+
 const defaultForm = () => ({
   name: '',
   projectId: '',
@@ -82,6 +85,7 @@ const defaultForm = () => ({
 })
 
 async function loadSprint() {
+  if (!isSprintFormRoute()) return
   if (!hasSprintId.value) {
     form.value = {
       ...defaultForm(),
@@ -106,6 +110,7 @@ async function loadSprintTasks() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isSprintFormRoute()) return
     loadSprint()
   },
   { immediate: true },

@@ -10,6 +10,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,6 +56,8 @@ const isReadonly = computed(() => isView.value)
 const canContractAdd = computed(() => checkPermi(['business/crm/contracts/add']))
 const canContractUpdate = computed(() => checkPermi(['business/crm/contracts/update']))
 
+const isContractFormRoute = useCurrentRouteGuard(route, '/crm/contractManage/form')
+
 const defaultForm = () => ({
   name: '',
   code: '',
@@ -73,6 +76,7 @@ const defaultForm = () => ({
 })
 
 async function loadContract() {
+  if (!isContractFormRoute()) return
   if (!hasContractId.value) {
     form.value = defaultForm()
     return
@@ -84,6 +88,7 @@ async function loadContract() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isContractFormRoute()) return
     loadContract()
   },
   { immediate: true },

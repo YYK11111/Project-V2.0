@@ -5,7 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { yesOrNO, KEY_NO, KEY_YES } from '@/utils/dictionary'
 import { listRole } from '@/api/system/role'
 import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
-import DocumentEditorV2 from '@/features/document-editor-v2/DocumentEditorV2.vue'
+import KnowledgeEditorHost from '@/features/knowledge-editor-host/KnowledgeEditorHost.vue'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 import { applyArticleBorrow, articleTagApi, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes, save } from './api'
 import {
@@ -108,7 +109,6 @@ const isHydratingForm = ref(false)
 const borrowDialogVisible = ref(false)
 const borrowLoading = ref(false)
 const canEditCurrentArticle = computed(() => !route.query.id || form.value?.canEdit !== false)
-const isSyncingEditor = ref(false)
 const borrowForm = ref({
   articleId: '',
   requestedDays: 1,
@@ -116,6 +116,7 @@ const borrowForm = ref({
 })
 
 const documentState = computed(() => resolveKnowledgeDocumentState(form.value))
+const isArticleEditorRoute = useCurrentRouteGuard(route, ['/content/aev', '/content/articleManage/aev'])
 const editBlockedMessage = computed(() => {
   if (!isKnowledgeDocumentBlocked(documentState.value.kind)) return null
   return getKnowledgeDocumentBlockMessage('edit', documentState.value.kind)
@@ -124,7 +125,6 @@ const editBlockedMessage = computed(() => {
 function getSingleQueryValue(value: string | string[] | null | undefined): string {
   return Array.isArray(value) ? String(value[0] || '') : String(value || '')
 }
-
 function createDefaultForm(): ArticleForm {
   return {
     title: '',
@@ -163,16 +163,16 @@ function createDefaultForm(): ArticleForm {
 
 const form = ref<ArticleForm>(createDefaultForm())
 
-function handleDocumentEditorV2Update(contentJson: JSONContent) {
-  form.value.contentJson = contentJson
-  form.value.contentVersion = DOCUMENT_CONTENT_VERSION
-  form.value.contentStatus = 'ready'
-  form.value.contentText = getDocumentPlainText(contentJson)
-}
-
 function showEditBlockedMessage() {
   if (!editBlockedMessage.value) return
   $sdk.msgError(editBlockedMessage.value.title)
+}
+
+function handleKnowledgeEditorContentUpdate(contentJson: JSONContent) {
+  form.value.contentJson = contentJson
+  form.value.contentText = getDocumentPlainText(contentJson)
+  form.value.contentVersion = DOCUMENT_CONTENT_VERSION
+  form.value.contentStatus = 'ready'
 }
 
 function getDocumentErrorMessage(error: unknown): string {
@@ -181,6 +181,7 @@ function getDocumentErrorMessage(error: unknown): string {
 }
 
 async function loadArticle() {
+  if (!isArticleEditorRoute()) return
   isHydratingForm.value = true
   accessDeniedInfo.value = null
   inheritedVisibility.value = false
@@ -279,20 +280,9 @@ watch(
 )
 
 watch(
-  () => form.value.contentJson,
-  (value) => {
-    if (!value || isHydratingForm.value) {
-      return
-    }
-
-    form.value.contentText = getDocumentPlainText(value)
-  },
-  { deep: true },
-)
-
-watch(
   () => route.query.id,
   () => {
+    if (!isArticleEditorRoute()) return
     loadArticle()
   },
   { immediate: true },
@@ -335,6 +325,7 @@ function submit(type?: string) {
       return
     }
 
+    payload.contentJson = form.value.contentJson
     payload.contentVersion = DOCUMENT_CONTENT_VERSION
     payload.contentStatus = 'ready'
     payload.contentText = form.value.contentText || ''
@@ -391,6 +382,7 @@ function submitBorrow() {
       borrowLoading.value = false
     })
 }
+
 </script>
 
 <template>
@@ -511,11 +503,25 @@ function submitBorrow() {
             </div>
           </div>
           <el-form-item prop="contentJson" label="正文" style="max-width: none !important">
-            <DocumentEditorV2
-              v-model:content-json="form.contentJson"
-              :disabled="!canEditCurrentArticle"
-              :placeholder="'请输入结构化知识正文'"
-              @update:content-json="handleDocumentEditorV2Update" />
+            <div v-if="documentState.kind === 'ready'" class="knowledge-document-shell">
+              <KnowledgeEditorHost
+                :content-json="form.contentJson"
+                :disabled="!canEditCurrentArticle"
+                class="knowledge-document-editor"
+                @update:content-json="handleKnowledgeEditorContentUpdate" />
+            </div>
+            <el-alert
+              v-else-if="documentState.kind === 'legacy_html'"
+              type="warning"
+              :closable="false"
+              :title="editBlockedMessage?.title"
+              :description="editBlockedMessage?.description" />
+            <el-alert
+              v-else-if="documentState.kind === 'invalid'"
+              type="error"
+              :closable="false"
+              :title="editBlockedMessage?.title"
+              :description="editBlockedMessage?.description" />
           </el-form-item>
         </section>
 
@@ -667,6 +673,45 @@ function submitBorrow() {
 .knowledge-form-section :deep(.w-e-text-container),
 .knowledge-form-section :deep(.w-e-bar) {
   border-radius: 12px;
+}
+
+.knowledge-document-shell {
+  min-height: 500px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+  overflow: hidden;
+}
+
+.knowledge-document-editor :deep(.tiptap) {
+  min-height: 500px;
+  padding: 18px 20px;
+  line-height: 1.75;
+  outline: none;
+  white-space: pre-wrap;
+}
+
+.knowledge-document-editor :deep(.tiptap p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.knowledge-document-editor :deep(.tiptap table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.knowledge-document-editor :deep(.tiptap th),
+.knowledge-document-editor :deep(.tiptap td) {
+  border: 1px solid var(--el-border-color);
+  padding: 8px;
+}
+
+.knowledge-document-editor :deep(.tiptap img) {
+  max-width: 100%;
 }
 
 .knowledge-editor-operate-bar :deep(.el-button) {

@@ -34,4 +34,19 @@ describe('CRM 表单治理守卫', () => {
     expect(interactionSource).toMatch(/ViewFileList/)
     expect(interactionSource).toMatch(/attachments/)
   })
+
+  it('高风险 CRM 表单页仅在自身路由下响应 id 变化', () => {
+    const routeGuards = [
+      { file: 'customerManage/form.vue', routePath: '/crm/customerManage/form' },
+      { file: 'opportunityManage/form.vue', routePath: '/crm/opportunityManage/form' },
+      { file: 'contractManage/form.vue', routePath: '/crm/contractManage/form' },
+      { file: 'interactionManage/form.vue', routePath: '/crm/interactionManage/form' },
+    ]
+
+    routeGuards.forEach(({ file, routePath }) => {
+      const source = readCrmView(file)
+      expect(source).toContain('useCurrentRouteGuard')
+      expect(source).toContain(`'${routePath}'`)
+    })
+  })
 })

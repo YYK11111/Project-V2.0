@@ -12,6 +12,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,6 +56,8 @@ const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const canEditCurrentRisk = computed(() => !hasRiskId.value || form.value?.canEdit !== false)
 
+const isRiskFormRoute = useCurrentRouteGuard(route, '/riskManage/form')
+
 const defaultForm = () => ({
   name: '',
   projectId: '',
@@ -73,6 +76,7 @@ const defaultForm = () => ({
 })
 
 async function loadRisk() {
+  if (!isRiskFormRoute()) return
   if (!hasRiskId.value) {
     form.value = {
       ...defaultForm(),
@@ -87,6 +91,7 @@ async function loadRisk() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isRiskFormRoute()) return
     loadRisk()
   },
   { immediate: true },

@@ -10,6 +10,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,6 +83,8 @@ const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/upd
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
+
+const isCustomerFormRoute = useCurrentRouteGuard(route, '/crm/customerManage/form')
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map(dept => [String(dept.id), dept.name])))
 
 const defaultForm = () => ({
@@ -105,6 +108,7 @@ const defaultForm = () => ({
 })
 
 async function loadCustomer() {
+  if (!isCustomerFormRoute()) return
   if (!hasCustomerId.value) {
     form.value = defaultForm()
     return
@@ -116,6 +120,7 @@ async function loadCustomer() {
 watch(
   () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
   () => {
+    if (!isCustomerFormRoute()) return
     loadCustomer()
   },
   { immediate: true },

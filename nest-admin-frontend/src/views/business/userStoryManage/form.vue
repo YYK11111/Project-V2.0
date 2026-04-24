@@ -12,6 +12,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,6 +52,8 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const canStoryAdd = computed(() => checkPermi(['business/stories/add']))
 const canStoryUpdate = computed(() => checkPermi(['business/stories/update']))
 
+const isUserStoryFormRoute = useCurrentRouteGuard(route, '/userStoryManage/form')
+
 onMounted(async () => {
   await loadOptions()
   if (hasStoryId.value) {
@@ -70,6 +73,7 @@ async function loadOptions() {
 }
 
 function loadData() {
+  if (!isUserStoryFormRoute()) return
   getOne(route.query.id).then(({ data }) => {
     form.value = {
       ...data,
@@ -85,6 +89,7 @@ function loadData() {
 watch(
   () => [route.query.id, route.query.action],
   async () => {
+    if (!isUserStoryFormRoute()) return
     if (hasStoryId.value) {
       loadData()
     } else {

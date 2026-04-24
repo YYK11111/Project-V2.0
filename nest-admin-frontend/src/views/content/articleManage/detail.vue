@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
-import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
+import KnowledgeViewerHost from '@/features/knowledge-editor-host/KnowledgeViewerHost.vue'
 import { applyArticleBorrow, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes } from './api'
 import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems } from './viewToc'
 import { checkPermi } from '@/utils/permission'
 import { sourceTypeMap, templateTypeMap } from '@/views/business/projectManage/fieldMaps'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 interface KnowledgeArticle {
   id?: string | number
@@ -67,17 +67,7 @@ const headingOffset = 24
 const canEditArticle = computed(() => checkPermi(['business/articles/update']) && article.value?.canEdit !== false)
 const canViewAiPreview = computed(() => checkPermi(['content/articles/aiDebug']) || checkPermi(['content/articles/viewAll']))
 const documentState = computed(() => resolveKnowledgeViewMode(article.value || {}))
-
-const editor = useEditor({
-  content: '',
-  editable: false,
-  extensions: createDocumentExtensions(''),
-  editorProps: {
-    attributes: {
-      class: 'knowledge-editor-prose',
-    },
-  },
-})
+const isKnowledgeDetailRoute = useCurrentRouteGuard(route, '/content/articleManage/detail')
 
 const articlePrimaryMetaList = computed(() => {
   if (!article.value) return []
@@ -200,17 +190,13 @@ function handleTocClick(id: string) {
 }
 
 async function syncTocAfterRender() {
-  if (documentState.value.kind === 'ready') {
-    editor.value?.commands.setContent(documentState.value.contentJson, {
-      emitUpdate: false,
-    })
-  }
   await nextTick()
   extractTocFromContent()
   updateActiveHeading()
 }
 
 function loadArticle() {
+  if (!isKnowledgeDetailRoute()) return
   if (!route.query.id) return
   loading.value = true
   getOne(getSingleQueryValue(route.query.id))
@@ -273,6 +259,7 @@ function goToSource() {
 watch(
   () => route.query.id,
   () => {
+    if (!isKnowledgeDetailRoute()) return
     article.value = null
     resetDetailState()
     loadArticle()
@@ -310,6 +297,7 @@ watch(
 )
 
 onActivated(() => {
+  if (!isKnowledgeDetailRoute()) return
   bindScrollListeners()
   updateActiveHeading()
 })
@@ -320,7 +308,6 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   unbindScrollListeners()
-  editor.value?.destroy()
 })
 </script>
 
@@ -392,7 +379,10 @@ onBeforeUnmount(() => {
         <section class="knowledge-detail-content-shell">
           <div class="knowledge-detail-content-shell__header">正文</div>
           <div ref="contentRef" class="knowledge-detail-reading__body rich-content rich-content--detail">
-            <EditorContent v-if="documentState.kind === 'ready'" :editor="editor" class="knowledge-document-viewer" />
+            <KnowledgeViewerHost
+              v-if="documentState.kind === 'ready'"
+              :content-json="documentState.contentJson"
+              class="knowledge-document-viewer" />
             <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
               <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
               <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
-import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
+import KnowledgeViewerHost from '@/features/knowledge-editor-host/KnowledgeViewerHost.vue'
 import { applyArticleBorrow, getKnowledgeTypes, getOne } from './api'
 import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems, type TocItem } from './viewToc'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 interface BorrowForm {
   articleId: string
@@ -70,17 +70,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 
 const headingOffset = 24
 const documentState = computed(() => resolveKnowledgeViewMode(article.value || {}))
-
-const editor = useEditor({
-  content: '',
-  editable: false,
-  extensions: createDocumentExtensions(''),
-  editorProps: {
-    attributes: {
-      class: 'knowledge-editor-prose',
-    },
-  },
-})
+const isKnowledgeViewRoute = useCurrentRouteGuard(route, '/content/articleManage/view')
 
 const articleId = computed(() => {
   const rawId = route.query.id
@@ -133,6 +123,7 @@ function loadKnowledgeTypes() {
 }
 
 function loadArticle() {
+  if (!isKnowledgeViewRoute()) return
   if (!articleId.value) return
   loading.value = true
   getOne(articleId.value)
@@ -236,11 +227,6 @@ function handleTocClick(id: string) {
 }
 
 async function syncTocAfterRender() {
-  if (documentState.value.kind === 'ready') {
-    editor.value?.commands.setContent(documentState.value.contentJson, {
-      emitUpdate: false,
-    })
-  }
   await nextTick()
   syncScrollContainer()
   extractTocFromContent()
@@ -252,6 +238,7 @@ loadKnowledgeTypes()
 watch(
   () => route.query.id,
   () => {
+    if (!isKnowledgeViewRoute()) return
     article.value = null
     accessDeniedInfo.value = null
     resetViewState()
@@ -291,6 +278,7 @@ watch(
 )
 
 onActivated(() => {
+  if (!isKnowledgeViewRoute()) return
   syncScrollContainer()
   bindScrollListeners()
   updateActiveHeading()
@@ -302,7 +290,6 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   unbindScrollListeners()
-  editor.value?.destroy()
 })
 </script>
 
@@ -363,7 +350,10 @@ onBeforeUnmount(() => {
         <main class="knowledge-view-main">
           <section class="knowledge-view-content-shell Gcard">
             <div ref="contentRef" class="knowledge-view-reading__body rich-content rich-content--view">
-              <EditorContent v-if="documentState.kind === 'ready'" :editor="editor" class="knowledge-document-viewer" />
+              <KnowledgeViewerHost
+                v-if="documentState.kind === 'ready'"
+                :content-json="documentState.contentJson"
+                class="knowledge-document-viewer" />
               <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
                 <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
                 <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>

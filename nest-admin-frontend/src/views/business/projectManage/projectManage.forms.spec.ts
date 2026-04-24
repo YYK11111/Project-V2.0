@@ -42,4 +42,22 @@ describe('项目链路表单结构整改守卫', () => {
       expect(source).toMatch(/attachments/)
     })
   })
+
+  it('高风险项目链路表单页仅在自身路由下响应 id 变化', () => {
+    const routeGuards = [
+      { file: 'projectManage/form.vue', routePath: '/projectManage/form' },
+      { file: 'ticketManage/form.vue', routePath: '/ticketManage/form' },
+      { file: 'changeManage/form.vue', routePath: '/changeManage/form' },
+      { file: 'riskManage/form.vue', routePath: '/riskManage/form' },
+      { file: 'milestoneManage/form.vue', routePath: '/milestoneManage/form' },
+      { file: 'sprintManage/form.vue', routePath: '/sprintManage/form' },
+      { file: 'userStoryManage/form.vue', routePath: '/userStoryManage/form' },
+    ]
+
+    routeGuards.forEach(({ file, routePath }) => {
+      const source = readBusinessView(file)
+      expect(source).toContain('useCurrentRouteGuard')
+      expect(source).toContain(`'${routePath}'`)
+    })
+  })
 })

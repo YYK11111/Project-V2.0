@@ -8,6 +8,7 @@ import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,6 +48,8 @@ const isReadonly = computed(() => isView.value)
 const canInteractionAdd = computed(() => checkPermi(['business/crm/interactions/add']))
 const canInteractionUpdate = computed(() => checkPermi(['business/crm/interactions/update']))
 
+const isInteractionFormRoute = useCurrentRouteGuard(route, '/crm/interactionManage/form')
+
 const defaultForm = () => ({
   customerId: '',
   interactionType: '1',
@@ -59,6 +62,7 @@ const defaultForm = () => ({
 })
 
 async function loadInteraction() {
+  if (!isInteractionFormRoute()) return
   if (!hasInteractionId.value) {
     form.value = defaultForm()
     return
@@ -70,6 +74,7 @@ async function loadInteraction() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isInteractionFormRoute()) return
     loadInteraction()
   },
   { immediate: true },

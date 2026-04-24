@@ -8,6 +8,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,6 +51,8 @@ const isReadonly = computed(() => isView.value)
 const canOpportunityAdd = computed(() => checkPermi(['business/crm/opportunities/add']))
 const canOpportunityUpdate = computed(() => checkPermi(['business/crm/opportunities/update']))
 
+const isOpportunityFormRoute = useCurrentRouteGuard(route, '/crm/opportunityManage/form')
+
 const defaultForm = () => ({
   name: '',
   code: '',
@@ -66,6 +69,7 @@ const defaultForm = () => ({
 })
 
 async function loadOpportunity() {
+  if (!isOpportunityFormRoute()) return
   if (!hasOpportunityId.value) {
     form.value = defaultForm()
     return
@@ -77,6 +81,7 @@ async function loadOpportunity() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isOpportunityFormRoute()) return
     loadOpportunity()
   },
   { immediate: true },

@@ -25,6 +25,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import ViewUserList from '@/components/view/ViewUserList.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,6 +88,8 @@ const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId &&
 const workflowPanelRef = ref()
 const reportSectionRef = ref()
 const commentSectionRef = ref()
+
+const isTaskFormRoute = useCurrentRouteGuard(route, '/taskManage/form')
 
 const dependencies = ref([])
 const dependents = ref([])
@@ -398,6 +401,7 @@ const defaultForm = () => ({
 })
 
 async function loadTask() {
+  if (!isTaskFormRoute()) return
   if (!hasTaskId.value) {
     form.value = {
       ...defaultForm(),
@@ -461,6 +465,7 @@ async function loadSourceEntity() {
 watch(
   () => [route.query.id, route.query.action, route.query.tab, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
   () => {
+    if (!isTaskFormRoute()) return
     loadTask()
   },
   { immediate: true },

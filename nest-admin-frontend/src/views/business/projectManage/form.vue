@@ -6,6 +6,7 @@ import { getOne, save, update, getStatus, getPriority, getProjectType, submitApp
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 import UserSelect from '@/components/UserSelect.vue'
 import Editor from '@/components/Editor/index.vue'
 import Upload from '@/components/Upload.vue'
@@ -279,6 +280,8 @@ function hydrateFromContractQuery() {
   }
 }
 
+const isProjectFormRoute = useCurrentRouteGuard(route, '/projectManage/form')
+
 watch(
   () => form.value.projectType,
   (projectTypeValue, oldValue) => {
@@ -320,6 +323,7 @@ watch(
 )
 
 async function loadProject() {
+  if (!isProjectFormRoute()) return
   milestonesManuallyEdited.value = false
   if (!(isEdit.value || isView.value)) {
     form.value = {
@@ -355,6 +359,7 @@ async function loadProject() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isProjectFormRoute()) return
     loadProject()
   },
   { immediate: true },

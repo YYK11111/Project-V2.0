@@ -12,6 +12,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +70,8 @@ const milestoneTimeStatus = computed(() => {
   return '按计划推进'
 })
 
+const isMilestoneFormRoute = useCurrentRouteGuard(route, '/milestoneManage/form')
+
 const defaultForm = () => ({
   name: '',
   projectId: '',
@@ -87,6 +90,7 @@ const defaultForm = () => ({
 })
 
 async function loadMilestone() {
+  if (!isMilestoneFormRoute()) return
   if (!hasMilestoneId.value) {
     form.value = defaultForm()
     return
@@ -108,6 +112,7 @@ async function loadAffectedTasks() {
 watch(
   () => [route.query.id, route.query.action],
   () => {
+    if (!isMilestoneFormRoute()) return
     loadMilestone()
   },
   { immediate: true },

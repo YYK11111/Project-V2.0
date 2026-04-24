@@ -15,6 +15,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import { getList as getMilestoneList } from '@/views/business/milestoneManage/api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
@@ -75,6 +76,8 @@ const taskOptions = ref([])
 const milestoneOptions = ref([])
 const sprintOptions = ref([])
 
+const isChangeFormRoute = useCurrentRouteGuard(route, '/changeManage/form')
+
 const defaultForm = () => ({
   title: '',
   projectId: '',
@@ -97,6 +100,7 @@ const defaultForm = () => ({
 })
 
 async function loadChange() {
+  if (!isChangeFormRoute()) return
   if (!hasChangeId.value) {
     form.value = {
       ...defaultForm(),
@@ -129,6 +133,7 @@ async function loadImpactOptions(projectId) {
 watch(
   () => [route.query.id, route.query.action, route.query.taskId, route.query.instanceId, route.query.fromWorkflow],
   () => {
+    if (!isChangeFormRoute()) return
     loadChange()
   },
   { immediate: true },
