@@ -4,6 +4,7 @@ import {
   DOCUMENT_SCHEMA_VERSION,
   DocumentMark,
   DocumentNode,
+  DocumentNodeRule,
   DocumentNodeType,
   DocumentRoot,
   documentMarkWhitelist,
@@ -34,6 +35,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getNodeRule(nodeType: DocumentNodeType): DocumentNodeRule {
+  return documentNodeWhitelist[nodeType] as DocumentNodeRule;
+}
+
+function isDocumentRoot(node: unknown): node is DocumentRoot {
+  return isRecord(node) && node.type === "doc" && Array.isArray(node.content);
+}
+
 function validateMarks(
   node: DocumentNode,
   path: string,
@@ -50,7 +59,7 @@ function validateMarks(
     );
   }
 
-  const nodeSchema = documentNodeWhitelist[nodeType];
+  const nodeSchema = getNodeRule(nodeType);
   const allowedMarks =
     nodeSchema.allowedMarks === undefined
       ? documentMarkSet
@@ -88,7 +97,7 @@ function validateChildren(
   path: string,
   nodeType: DocumentNodeType,
 ) {
-  const nodeSchema = documentNodeWhitelist[nodeType];
+  const nodeSchema = getNodeRule(nodeType);
   const hasContent = node.content !== undefined;
 
   if (hasContent && !Array.isArray(node.content)) {
@@ -165,7 +174,7 @@ function validateText(
   path: string,
   nodeType: DocumentNodeType,
 ) {
-  const nodeSchema = documentNodeWhitelist[nodeType];
+  const nodeSchema = getNodeRule(nodeType);
   if (nodeSchema.allowText) {
     if (typeof node.text !== "string") {
       throw createDocumentException(
@@ -250,6 +259,14 @@ export function validateDocumentJson(
     );
   }
 
-  validateDocumentNode(contentJson as DocumentNode, { path: "root" });
-  return contentJson as DocumentRoot;
+  if (!isDocumentRoot(contentJson)) {
+    throw createDocumentException(
+      DOCUMENT_ERROR_CODES.invalidRoot,
+      "文档根节点必须包含 content 数组",
+      { nodeType: contentJson.type },
+    );
+  }
+
+  validateDocumentNode(contentJson, { path: "root" });
+  return contentJson;
 }

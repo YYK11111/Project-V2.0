@@ -92,6 +92,11 @@ export const upload = (data: { new (): FormData }) => {
   return request.post(`${serve}/upload`, data)
 }
 
+export const importWord = (data: FormData) => {
+  const request = getRequestSync()
+  return request.post(`${serve}/import-word`, data)
+}
+
 // 获取视频第一帧
 export const getVideoPic = (params) => {
   const request = getRequestSync()

@@ -53,8 +53,7 @@ describe('知识编辑页结构治理守卫', () => {
   it('页面正文应直连 Tiptap，并脱离旧公共 Editor', () => {
     const source = readAev()
 
-    expect(source).toMatch(/@tiptap\/vue-3/)
-    expect(source).toMatch(/(useEditor|EditorContent)/)
+    expect(source).toContain('NotionDocumentEditor')
     expect(source).not.toContain("@/components/Editor/index.vue")
     expect(source).not.toContain('<Editor v-model="form.content"')
   })
@@ -72,10 +71,17 @@ describe('知识编辑页结构治理守卫', () => {
   it('正文区域应覆盖 ready、legacy_html、invalid 三种状态渲染', () => {
     const source = readAev()
 
-    expect(source).toContain('const readyEditor = computed')
-    expect(source).toContain("documentState.kind === 'legacy_html'")
-    expect(source).toContain("documentState.kind === 'invalid'")
+    expect(source).toContain('contentStatus')
     expect(source).toContain('getKnowledgeDocumentBlockMessage')
     expect(source).toContain('showEditBlockedMessage')
+  })
+
+  it('知识页应接入 slash menu 所需的 Notion-like 编辑器组件', () => {
+    const source = readAev()
+
+    expect(source).toContain('@/features/document-editor/NotionDocumentEditor.vue')
+    expect(source).toContain('<NotionDocumentEditor')
+    expect(source).toContain('v-model:content-json="form.contentJson"')
+    expect(source).toContain(':content-status="form.contentStatus as')
   })
 })

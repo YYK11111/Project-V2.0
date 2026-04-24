@@ -99,6 +99,14 @@ export const documentNodeWhitelist = {
   },
 } as const;
 
+export interface DocumentNodeRule {
+  blockChildren?: readonly string[];
+  inlineChildren?: readonly string[];
+  allowText: boolean;
+  allowContent?: boolean;
+  allowedMarks?: readonly string[];
+}
+
 export const documentMarkWhitelist = [
   "bold",
   "italic",

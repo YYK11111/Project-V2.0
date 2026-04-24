@@ -215,8 +215,10 @@ export class UsersService extends BaseService<User, CreateUserDto> {
     const targetIsAdmin = row.roles?.some(
       (role) => role.permissionKey === config.adminKey,
     );
+    const updatingSelf = String(row.id) === String(data.updateUser);
     if (
       targetIsAdmin &&
+      !updatingSelf &&
       !this.hasPermission(data.permissions || [], "system/users/manageAdmin")
     ) {
       throw new HttpException("接口无权限", 403);

@@ -21,6 +21,7 @@ const menuRef = ref<any>(null)
 const menuOptions = ref<any[]>([])
 const menuExpand = ref(false)
 const menuNodeAll = ref(false)
+const menuKeyword = ref('')
 
 const yesOrNo = {
   1: '正常',
@@ -90,17 +91,31 @@ function handleCheckedTreeNodeAll(value: boolean) {
   menuRef.value?.setCheckedNodes(value ? menuOptions.value : [])
 }
 
+function filterMenuNode(keyword: string, data: any) {
+  if (!keyword) return true
+  const normalizedKeyword = String(keyword).trim().toLowerCase()
+  if (!normalizedKeyword) return true
+  return [data?.name, data?.permissionKey, data?.path]
+    .filter(Boolean)
+    .some((item) => String(item).toLowerCase().includes(normalizedKeyword))
+}
+
+function handleMenuKeywordChange(value: string) {
+  menuRef.value?.filter?.(value)
+}
+
 function getMenuAllCheckedKeys() {
   const checkedKeys = menuRef.value?.getCheckedKeys?.() || []
   const halfCheckedKeys = menuRef.value?.getHalfCheckedKeys?.() || []
   checkedKeys.unshift.apply(checkedKeys, halfCheckedKeys)
-  return checkedKeys
+  return [...new Set(checkedKeys.map((id: any) => String(id)).filter(Boolean))]
 }
 
 function resetForm() {
   menuRef.value?.setCheckedKeys?.([])
   menuExpand.value = false
   menuNodeAll.value = false
+  menuKeyword.value = ''
   dialogRef.value.form = {
     id: undefined,
     name: '',
@@ -137,8 +152,11 @@ async function handleEdit(row: any) {
   menuOptions.value = menuData.menus || []
   dialogRef.value.visible = true
   nextTick(() => {
+    menuExpand.value = false
+    handleCheckedTreeExpand(false)
+    menuRef.value?.filter?.('')
     ;(menuData.checkedKeys || []).forEach((id: any) => {
-      menuRef.value?.setChecked?.(id, true, false)
+      menuRef.value?.setChecked?.(id, true)
     })
   })
 }
@@ -219,15 +237,22 @@ function submit({ form, visible, loading }: any) {
               <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand">展开/折叠</el-checkbox>
               <el-checkbox class="ml-10" v-model="menuNodeAll" @change="handleCheckedTreeNodeAll">全选/全不选</el-checkbox>
             </div>
+            <el-input
+              v-model="menuKeyword"
+              class="mb10"
+              clearable
+              placeholder="搜索名称 / 权限字符 / 路径"
+              @input="handleMenuKeywordChange"
+            />
             <el-tree
               ref="menuRef"
               class="tree-border"
               :data="menuOptions"
               show-checkbox
               node-key="id"
-              :check-strictly="true"
-              default-expand-all
+              :check-strictly="false"
               empty-text="加载中，请稍候"
+              :filter-node-method="filterMenuNode"
               :props="{ label: 'name', children: 'children' }"
             />
           </div>

@@ -33,6 +33,18 @@ export const ticketStatusMap = {
   [TicketStatus.closed]: "已关闭",
 };
 
+export enum TicketPriority {
+  high = "1",
+  medium = "2",
+  low = "3",
+}
+
+export const ticketPriorityMap = {
+  [TicketPriority.high]: "高",
+  [TicketPriority.medium]: "中",
+  [TicketPriority.low]: "低",
+};
+
 // 严重程度枚举
 export enum TicketSeverity {
   critical = "1", // 致命

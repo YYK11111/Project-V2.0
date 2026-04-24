@@ -90,6 +90,7 @@ export class UsersController extends BaseController<User, UsersService> {
   async updateTheme(@Req() req, @Body() body: { themeHsl: string }) {
     await this.usersService.update({
       id: req.user.id,
+      updateUser: req.user.id,
       themeHsl: body.themeHsl,
     });
     return { success: true };
@@ -110,6 +111,7 @@ export class UsersController extends BaseController<User, UsersService> {
   ) {
     await this.usersService.update({
       id: req.user.id,
+      updateUser: req.user.id,
       projectReminderPreference: body.projectReminderPreference,
     });
     return { success: true };

@@ -11,6 +11,7 @@ import { Reflector } from "@nestjs/core";
 import { RedisService } from "../global/redis.service";
 import { config } from "config";
 import { PERMISSION_KEY } from "./permission.decorator";
+import { RolesService } from "../roles/service";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -18,6 +19,7 @@ export class AuthGuard implements CanActivate {
     private jwtService: JwtService,
     private reflector: Reflector,
     private redisService: RedisService,
+    private rolesService: RolesService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,6 +49,7 @@ export class AuthGuard implements CanActivate {
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       payload.session = token.split(".").at(-1);
+      payload.permissions = await this.resolveUserPermissions(payload);
       request["user"] = payload;
     } catch {
       throw new UnauthorizedException();
@@ -61,9 +64,7 @@ export class AuthGuard implements CanActivate {
     // 按钮/接口权限校验
     let permissions = await this.redisService.getPermissions();
     let api = request.path.replace(config.apiBase, "").replace(/^\//g, "");
-    const isSuper = payload.permissions?.[0] === "*";
     if (
-      !isSuper &&
       requiredPermission &&
       permissions.includes(requiredPermission) &&
       !payload.permissions?.includes(requiredPermission)
@@ -72,7 +73,6 @@ export class AuthGuard implements CanActivate {
     }
 
     if (
-      !isSuper &&
       !requiredPermission &&
       permissions.includes(api) &&
       !payload.permissions?.includes(api)
@@ -134,6 +134,11 @@ export class AuthGuard implements CanActivate {
       ["PUT", /^system\/users\/resetPassword$/, "system/users/resetPassword"],
       ["GET", /^system\/users\/getTheme$/, "system/users/getOne"],
       ["PUT", /^system\/users\/updateTheme$/, "system/users/update"],
+      [
+        "PUT",
+        /^system\/users\/updateProjectReminderPreference$/,
+        "system/users/update",
+      ],
 
       ["GET", /^system\/dept\/getTrees$/, "system/dept/tree"],
       ["GET", /^system\/dept\/getOne\/[^/]+$/, "system/dept/getOne"],
@@ -187,6 +192,8 @@ export class AuthGuard implements CanActivate {
         /^system\/roles\/authUser\/cancelAll$/,
         "system/roles/authUser/cancelAll",
       ],
+      ["GET", /^system\/roles\/getLoginUserMenus$/, "system/roles/list"],
+      ["GET", /^system\/roles\/getDataPermissionType$/, "system/roles/list"],
 
       ["GET", /^system\/menus\/list$/, "system/menus/list"],
       ["GET", /^system\/menus\/getOne\/[^/]+$/, "system/menus/getOne"],
@@ -260,6 +267,11 @@ export class AuthGuard implements CanActivate {
         "POST",
         /^business\/projects\/[^/]+\/submit-close$/,
         "business/projects/submitClose",
+      ],
+      [
+        "GET",
+        /^business\/projects\/dashboard\/[^/]+$/,
+        "business/projects/dashboard",
       ],
 
       ["GET", /^business\/tasks\/list$/, "business/tasks/list"],
@@ -439,33 +451,13 @@ export class AuthGuard implements CanActivate {
       [
         "POST",
         /^business\/changes\/approve\/[^/]+$/,
-        "business/changes/update",
+        "business/changes/approve",
       ],
       ["POST", /^business\/changes\/reject\/[^/]+$/, "business/changes/update"],
-
-      ["GET", /^business\/documents\/list$/, "business/documents/list"],
-      [
-        "GET",
-        /^business\/documents\/getOne\/[^/]+$/,
-        "business/documents/getOne",
-      ],
-      ["POST", /^business\/documents\/add$/, "business/documents/add"],
       [
         "POST",
-        /^business\/documents\/save$/,
-        (req) =>
-          req.body?.id ? "business/documents/update" : "business/documents/add",
-      ],
-      ["PUT", /^business\/documents\/update$/, "business/documents/update"],
-      [
-        "DELETE",
-        /^business\/documents\/del\/[^/]+$/,
-        "business/documents/delete",
-      ],
-      [
-        "POST",
-        /^business\/documents\/version\/[^/]+$/,
-        "business/documents/update",
+        /^business\/changes\/[^/]+\/confirm-plan-impact$/,
+        "business/changes/confirmPlanImpact",
       ],
 
       ["GET", /^business\/articles\/list$/, "business/articles/list"],
@@ -776,6 +768,11 @@ export class AuthGuard implements CanActivate {
         /^workflow\/instances\/[^/]+\/tasks$/,
         "business/workflow/instances/tasks",
       ],
+      [
+        "POST",
+        /^workflow\/instances\/[^/]+\/close-returned$/,
+        "business/workflow/closeReturned",
+      ],
       ["GET", /^workflow\/tasks\/my$/, "business/workflow/tasks/list"],
       [
         "POST",
@@ -842,6 +839,18 @@ export class AuthGuard implements CanActivate {
       }
     }
     return undefined;
+  }
+
+  private async resolveUserPermissions(payload: Record<string, any>) {
+    const menus = await this.rolesService.getUserMenus({
+      name: payload?.name,
+      roles: payload?.roles,
+    });
+    return [
+      ...new Set(
+        menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean),
+      ),
+    ];
   }
 
   private isPublicRoute(request: Request): boolean {

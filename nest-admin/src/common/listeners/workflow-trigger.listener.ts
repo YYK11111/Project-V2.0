@@ -13,6 +13,15 @@ import { WorkflowService } from "../../modulesBusi/workflow/service";
 @Injectable()
 @EventSubscriber()
 export class WorkflowTriggerListener implements EntitySubscriberInterface {
+  private readonly supportedEntities = new Set([
+    "Project",
+    "Task",
+    "Customer",
+    "Ticket",
+    "ProjectChange",
+    "Change",
+  ]);
+
   constructor(
     @Inject(forwardRef(() => WorkflowDataLoaderService))
     private dataLoader: WorkflowDataLoaderService,
@@ -42,6 +51,9 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
   async afterInsert(event: InsertEvent<any>): Promise<void> {
     const entity = event.entity;
     const entityName = event.metadata.name;
+    if (!this.supportedEntities.has(entityName) || !entity?.id) {
+      return;
+    }
     const businessType = this.mapEntityName(entityName);
 
     console.log(
@@ -76,13 +88,14 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
   async afterUpdate(event: UpdateEvent<any>): Promise<void> {
     const entity = event.entity;
     const entityName = event.metadata.name;
+    if (!this.supportedEntities.has(entityName) || !entity?.id) {
+      return;
+    }
     const businessType = this.mapEntityName(entityName);
 
     console.log(
       `[WorkflowTrigger] Entity updated: ${entityName}, ID: ${entity?.id}`,
     );
-
-    if (!entity) return;
 
     const oldEntity = event.databaseEntity;
     if (oldEntity && entity.status !== oldEntity.status) {

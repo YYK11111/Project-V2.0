@@ -88,12 +88,6 @@ export const constantRoutes = [
         meta: { title: '消息中心', icon: 'bell' },
       },
       {
-        path: '/documentManage/form',
-        component: () => import('@/views/business/documentManage/form.vue'),
-        name: 'DocumentFormHidden',
-        meta: { title: '文档表单' },
-      },
-      {
         path: '/projectManage/approval',
         component: () => import('@/views/business/projectManage/approval.vue'),
         name: 'ProjectApprovalHidden',

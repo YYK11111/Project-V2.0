@@ -23,7 +23,6 @@ import { ProjectMembersModule } from "./modulesBusi/project-members/module";
 import { TasksBusiModule } from "./modulesBusi/tasks/module";
 import { TaskCommentsModule } from "./modulesBusi/task-comments/module";
 import { TicketsModule } from "./modulesBusi/tickets/module";
-import { DocumentsModule } from "./modulesBusi/documents/module";
 import { WorkflowModule } from "./modulesBusi/workflow/module";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TasksModule } from "./common/tasks/tasks.module";
@@ -68,7 +67,6 @@ import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
     TasksBusiModule,
     TaskCommentsModule,
     TicketsModule,
-    DocumentsModule,
     WorkflowModule,
     AiModule,
     SystemLogModule,

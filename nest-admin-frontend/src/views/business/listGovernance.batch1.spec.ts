@@ -13,7 +13,6 @@ describe('第一批列表页治理守卫', () => {
       'taskManage/index.vue',
       'taskCommentManage/index.vue',
       'taskReportManage/index.vue',
-      'documentManage/index.vue',
     ]
 
     files.forEach((file) => {

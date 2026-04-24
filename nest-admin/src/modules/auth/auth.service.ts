@@ -52,18 +52,7 @@ export class AuthService {
       }
 
       user = await this.usersService.getOne({ name: body.account });
-      if (
-        user.roles?.some?.((role) => role.permissionKey === config.adminKey)
-      ) {
-        user.permissions = ["*"];
-      } else {
-        const menus = await this.rolesService.getUserMenus(user);
-        user.permissions = [
-          ...new Set(
-            menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean),
-          ),
-        ];
-      }
+      await this.rolesService.getUserMenus(user);
 
       if (!(await verifyPassword(body.password, user?.password))) {
         throw new Error("密码错误");
@@ -83,12 +72,14 @@ export class AuthService {
       req.headers["x-forwarded-for"] || req.connection.remoteAddress,
     );
 
+    const { permissions: _permissions, ...resultWithoutPermissions } = result;
+
     const payload = {
       sub: user.id,
       account: user.name,
       address,
       loginTime: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-      ...result,
+      ...resultWithoutPermissions,
     };
     const sessionExpireMinutes =
       await this.systemConfigsService.getSessionExpireMinutes();
@@ -142,8 +133,11 @@ export class AuthService {
   }
 
   ensureAdmin(user: Record<string, any>) {
-    const permissions = user?.permissions || [];
-    if (!permissions.includes("*")) {
+    const hasAdminRole = user?.roles?.some(
+      (role: { permissionKey?: string }) =>
+        role?.permissionKey === config.adminKey,
+    );
+    if (!hasAdminRole) {
       throw new ForbiddenException("接口无权限");
     }
   }

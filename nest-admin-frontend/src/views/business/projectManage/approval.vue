@@ -69,6 +69,13 @@ const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
 const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
 const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
 
+function getProjectApprovalText(project) {
+  const hasApprovalStarted = Boolean(project?.workflowInstanceId) || !['', '0', undefined, null].includes(project?.approvalStatus)
+  if (!hasApprovalStarted) return '-'
+  if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
+  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
+}
+
 function getApprovalType(status) {
   if (status === '2') return 'success'
   if (status === '1') return 'warning'
@@ -272,7 +279,7 @@ watch(
           </el-col>
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="审批状态">
-              <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project.approvalStatus] || '无需审批'" :type="getApprovalType(project.approvalStatus)" />
+              <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalStatus)" />
             </el-form-item>
           </el-col>
         </el-row>

@@ -749,6 +749,13 @@ function goToDetail(path, id, query = {}) {
   if (!id) return
   router.push({ path, query: { id, action: 'view', ...query } })
 }
+
+function getProjectApprovalText(project) {
+  const hasApprovalStarted = Boolean(project?.workflowInstanceId) || !['', '0', undefined, null].includes(project?.approvalStatus)
+  if (!hasApprovalStarted) return '-'
+  if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
+  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
+}
 </script>
 
 <template>
@@ -768,11 +775,11 @@ function goToDetail(path, id, query = {}) {
             <div class="project-hero__title">{{ project.name || '-' }}</div>
             <div class="project-hero__code">{{ project.code || '-' }}</div>
           </div>
-          <div class="project-hero__tags">
-            <ViewTagField :text="statusMap[project.status]" :type="getProjectStatusType(project.status)" />
-            <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project.approvalStatus] || '无需审批'" :type="getApprovalType(project.approvalStatus)" />
-            <ViewTagField :text="priorityMap[project.priority]" :type="getPriorityType(project.priority)" />
-          </div>
+            <div class="project-hero__tags">
+              <ViewTagField :text="statusMap[project.status]" :type="getProjectStatusType(project.status)" />
+              <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalStatus)" />
+              <ViewTagField :text="priorityMap[project.priority]" :type="getPriorityType(project.priority)" />
+            </div>
         </div>
 
         <div class="project-meta-grid">

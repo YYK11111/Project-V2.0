@@ -26,7 +26,6 @@ export enum BusinessType {
   Task = "task",
   Ticket = "ticket",
   Change = "change",
-  Document = "document",
 }
 
 export const businessTypeMap = {
@@ -35,7 +34,6 @@ export const businessTypeMap = {
   [BusinessType.Task]: "任务附件",
   [BusinessType.Ticket]: "工单附件",
   [BusinessType.Change]: "变更附件",
-  [BusinessType.Document]: "文档附件",
 };
 
 @MyEntity("sys_file")

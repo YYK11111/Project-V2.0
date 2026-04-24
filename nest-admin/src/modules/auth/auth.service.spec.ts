@@ -105,6 +105,45 @@ describe("AuthService", () => {
     expect(redisService.setRedisOnlineUser).toHaveBeenCalled();
   });
 
+  it("超级管理员登录时不再把全量 permissions 写入 JWT", async () => {
+    const service = createService();
+    jest.spyOn(passwordUtils, "verifyPassword").mockResolvedValue(true);
+    const req = {
+      body: {
+        account: "NestAdmin",
+        password: "Password@123",
+        uuid: "uuid-1",
+        code: "1234",
+      },
+      headers: {},
+      connection: { remoteAddress: "127.0.0.1" },
+    };
+    const res = {
+      cookie: jest.fn(),
+    };
+
+    usersService.getOne.mockResolvedValue({
+      id: "1",
+      name: "NestAdmin",
+      password: "scrypt$hash",
+      roles: [{ id: "1", permissionKey: "admin", isActive: 1 }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { id: "m1", permissionKey: "system/users/getOne" },
+      { id: "m2", permissionKey: "system/users/update" },
+      { id: "m3", permissionKey: "system/users/update" },
+    ]);
+
+    await service.login(req as any, res as any);
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        permissions: expect.anything(),
+      }),
+      expect.any(Object),
+    );
+  });
+
   it("退出登录时清理 Cookie 并删除在线会话", async () => {
     const service = createService();
     const req = {
@@ -149,6 +188,17 @@ describe("AuthService", () => {
       ForbiddenException,
     );
     expect(redisService.delRedisOnlineUser).not.toHaveBeenCalled();
+  });
+
+  it("拥有 admin 角色时允许执行管理员限定能力", () => {
+    const service = createService();
+
+    expect(() =>
+      service.ensureAdmin({
+        roles: [{ permissionKey: "admin" }],
+        permissions: [],
+      } as any),
+    ).not.toThrow();
   });
 
   it("登录失败时记录失败日志", async () => {

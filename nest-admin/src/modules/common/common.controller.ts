@@ -15,6 +15,7 @@ import {
   ParseFilePipe,
   UploadedFiles,
 } from "@nestjs/common";
+import mammoth from "mammoth";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { CommonService } from "./common.service";
 import { MulterFileInterceptor } from "src/common/interceptor/file.interceptor";
@@ -52,6 +53,22 @@ export class CommonController {
     });
 
     return { url: file.filename };
+  }
+
+  @Post("import-word")
+  @MulterFileInterceptor("word", ["docx"])
+  async importWord(@UploadedFile() file: Express.Multer.File): Promise<{
+    html: string;
+    messages: Array<{ type: string; message: string }>;
+  }> {
+    const result = await mammoth.convertToHtml({ path: file.path });
+    return {
+      html: result.value || "",
+      messages: (result.messages || []).map((item) => ({
+        type: String(item.type || "info"),
+        message: String(item.message || ""),
+      })),
+    };
   }
 
   @Get("getOsInfo")

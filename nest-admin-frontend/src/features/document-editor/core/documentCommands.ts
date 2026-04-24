@@ -1,5 +1,4 @@
-import type { ChainedCommands } from '@tiptap/core'
-import type { Editor } from '@tiptap/vue-3'
+import type { ChainedCommands, Editor } from '@tiptap/core'
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6
 

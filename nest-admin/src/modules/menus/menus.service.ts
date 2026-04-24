@@ -39,7 +39,6 @@ type MenuDiagnosticSummary = {
 @Injectable()
 export class MenusService extends BaseService<Menu, CreateMenuDto> {
   private readonly constantHiddenPaths = new Set([
-    "/documentManage/form",
     "/projectManage/approval",
     "/content/articleManage/aev",
     "/content/aev",

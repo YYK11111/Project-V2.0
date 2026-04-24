@@ -24,7 +24,7 @@ export class BaseController<T, K> {
   async save(@Body() body, @Req() req) {
     if (body.id) {
       delete body.createUser;
-      body.updateUser = req.user.name;
+      body.updateUser = req.user.id;
     } else {
       delete body.updateUser;
       body.createUser = req.user.name;
@@ -50,7 +50,7 @@ export class BaseController<T, K> {
   @Put("update")
   async update(@Body() body, @Req() req) {
     delete body.createUser;
-    body.updateUser = req.user.name;
+    body.updateUser = req.user.id;
     body._operatorPermissions = req.user.permissions || [];
     body._operatorName = req.user.name;
     body._operatorId = req.user.id;

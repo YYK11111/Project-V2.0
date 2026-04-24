@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import type { JSONContent } from '@tiptap/core'
-import { Editor as VueTiptapEditor, EditorContent } from '@tiptap/vue-3'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { yesOrNO, KEY_NO, KEY_YES } from '@/utils/dictionary'
 import { listRole } from '@/api/system/role'
-import { bridgeTiptapMarkdownPaste } from '@/components/Editor/tiptapPasteBridge'
-import { htmlToMarkdown, looksLikeMarkdown, markdownToHtml } from '@/components/Editor/markdownInterop'
-import { createDocumentExtensions } from '@/features/document-editor/core/documentExtensions'
+import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
+import DocumentEditorV2 from '@/features/document-editor-v2/DocumentEditorV2.vue'
 
 import { applyArticleBorrow, articleTagApi, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes, save } from './api'
 import {
@@ -118,7 +116,6 @@ const borrowForm = ref({
 })
 
 const documentState = computed(() => resolveKnowledgeDocumentState(form.value))
-const readyEditor = computed(() => (documentState.value.kind === 'ready' ? editor.value : null))
 const editBlockedMessage = computed(() => {
   if (!isKnowledgeDocumentBlocked(documentState.value.kind)) return null
   return getKnowledgeDocumentBlockMessage('edit', documentState.value.kind)
@@ -126,52 +123,6 @@ const editBlockedMessage = computed(() => {
 
 function getSingleQueryValue(value: string | string[] | null | undefined): string {
   return Array.isArray(value) ? String(value[0] || '') : String(value || '')
-}
-
-const editor = ref<VueTiptapEditor | null>(null)
-
-function createKnowledgeEditor() {
-  return new VueTiptapEditor({
-    content: '',
-    editable: false,
-    extensions: createDocumentExtensions('请输入结构化知识正文'),
-    onUpdate: ({ editor: currentEditor }) => {
-      if (isSyncingEditor.value) return
-
-      const contentJson = currentEditor.getJSON()
-      form.value.contentJson = contentJson
-      form.value.contentVersion = DOCUMENT_CONTENT_VERSION
-      form.value.contentStatus = 'ready'
-      form.value.contentText = currentEditor.getText().trim()
-    },
-    editorProps: {
-      attributes: {
-        class: 'knowledge-editor-prose',
-      },
-      handlePaste: (_view, event) => {
-        const currentEditor = editor.value
-        if (!currentEditor) {
-          return false
-        }
-
-        const result = bridgeTiptapMarkdownPaste({
-          disabled: !canEditCurrentArticle.value || documentState.value.kind !== 'ready',
-          clipboardData: event.clipboardData,
-          looksLikeMarkdown,
-          markdownToHtml,
-          insertHtml: (html) => {
-            currentEditor.chain().focus().insertContent(html).run()
-          },
-        })
-
-        if (result.handled) {
-          event.preventDefault()
-        }
-
-        return result.handled
-      },
-    },
-  })
 }
 
 function createDefaultForm(): ArticleForm {
@@ -212,18 +163,11 @@ function createDefaultForm(): ArticleForm {
 
 const form = ref<ArticleForm>(createDefaultForm())
 
-function syncEditorFromState() {
-  const currentEditor = editor.value
-  if (!currentEditor || documentState.value.kind !== 'ready') {
-    return
-  }
-
-  isSyncingEditor.value = true
-  currentEditor.commands.setContent(documentState.value.contentJson, {
-    emitUpdate: false,
-  })
-  currentEditor.setEditable(canEditCurrentArticle.value)
-  isSyncingEditor.value = false
+function handleDocumentEditorV2Update(contentJson: JSONContent) {
+  form.value.contentJson = contentJson
+  form.value.contentVersion = DOCUMENT_CONTENT_VERSION
+  form.value.contentStatus = 'ready'
+  form.value.contentText = getDocumentPlainText(contentJson)
 }
 
 function showEditBlockedMessage() {
@@ -335,34 +279,24 @@ watch(
 )
 
 watch(
+  () => form.value.contentJson,
+  (value) => {
+    if (!value || isHydratingForm.value) {
+      return
+    }
+
+    form.value.contentText = getDocumentPlainText(value)
+  },
+  { deep: true },
+)
+
+watch(
   () => route.query.id,
   () => {
     loadArticle()
   },
   { immediate: true },
 )
-
-watch(
-  documentState,
-  (state) => {
-    if (state.kind !== 'ready') {
-      editor.value?.destroy()
-      editor.value = null
-      return
-    }
-
-    if (!editor.value) {
-      editor.value = createKnowledgeEditor()
-    }
-
-    syncEditorFromState()
-  },
-  { immediate: true },
-)
-
-watch(canEditCurrentArticle, (value) => {
-  editor.value?.setEditable(value && documentState.value.kind === 'ready')
-})
 
 watch(
   () => form.value.catalogId,
@@ -401,10 +335,9 @@ function submit(type?: string) {
       return
     }
 
-    payload.contentJson = editor.value?.getJSON() || form.value.contentJson
     payload.contentVersion = DOCUMENT_CONTENT_VERSION
     payload.contentStatus = 'ready'
-    payload.contentText = editor.value?.getText().trim() || form.value.contentText || ''
+    payload.contentText = form.value.contentText || ''
     delete payload.content
 
     save(payload)
@@ -437,7 +370,7 @@ async function handleCopyMarkdown() {
     return
   }
 
-  const markdown = htmlToMarkdown(editor.value?.getHTML() || '')
+  const markdown = htmlToMarkdown(form.value.contentText || '')
   try {
     await navigator.clipboard.writeText(markdown)
     $sdk.msgSuccess('已复制 Markdown')
@@ -458,10 +391,6 @@ function submitBorrow() {
       borrowLoading.value = false
     })
 }
-
-onBeforeUnmount(() => {
-  editor.value?.destroy()
-})
 </script>
 
 <template>
@@ -582,21 +511,11 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <el-form-item prop="contentJson" label="正文" style="max-width: none !important">
-            <div v-if="readyEditor" class="knowledge-document-shell">
-              <EditorContent :editor="readyEditor as unknown as VueTiptapEditor" class="knowledge-document-editor" />
-            </div>
-            <el-alert
-              v-else-if="documentState.kind === 'legacy_html'"
-              type="warning"
-              :closable="false"
-              :title="editBlockedMessage?.title"
-              :description="editBlockedMessage?.description" />
-            <el-alert
-              v-else-if="documentState.kind === 'invalid'"
-              type="error"
-              :closable="false"
-              :title="editBlockedMessage?.title"
-              :description="editBlockedMessage?.description" />
+            <DocumentEditorV2
+              v-model:content-json="form.contentJson"
+              :disabled="!canEditCurrentArticle"
+              :placeholder="'请输入结构化知识正文'"
+              @update:content-json="handleDocumentEditorV2Update" />
           </el-form-item>
         </section>
 
@@ -748,45 +667,6 @@ onBeforeUnmount(() => {
 .knowledge-form-section :deep(.w-e-text-container),
 .knowledge-form-section :deep(.w-e-bar) {
   border-radius: 12px;
-}
-
-.knowledge-document-shell {
-  min-height: 500px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  background: var(--el-bg-color);
-  overflow: hidden;
-}
-
-.knowledge-document-editor :deep(.tiptap) {
-  min-height: 500px;
-  padding: 18px 20px;
-  line-height: 1.75;
-  outline: none;
-  white-space: pre-wrap;
-}
-
-.knowledge-document-editor :deep(.tiptap p.is-editor-empty:first-child::before) {
-  content: attr(data-placeholder);
-  color: var(--el-text-color-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
-.knowledge-document-editor :deep(.tiptap table) {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.knowledge-document-editor :deep(.tiptap th),
-.knowledge-document-editor :deep(.tiptap td) {
-  border: 1px solid var(--el-border-color);
-  padding: 8px;
-}
-
-.knowledge-document-editor :deep(.tiptap img) {
-  max-width: 100%;
 }
 
 .knowledge-editor-operate-bar :deep(.el-button) {

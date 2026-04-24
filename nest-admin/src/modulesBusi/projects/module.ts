@@ -10,7 +10,6 @@ import { UsersModule } from "src/modules/users/users.module";
 import { CrmModule } from "../crm/module";
 import { Task } from "../tasks/entity";
 import { Ticket } from "../tickets/entity";
-import { Document } from "../documents/entity";
 import { SysFileModule } from "src/modules/sys/file/module";
 import { ProjectMilestoneTemplateService } from "./milestone-template.service";
 import { ProjectMember } from "../project-members/entity";
@@ -37,7 +36,6 @@ import { SalesOpportunity } from "../crm/opportunities/entity";
       Project,
       Task,
       Ticket,
-      Document,
       UserStory,
       ProjectMember,
       Milestone,

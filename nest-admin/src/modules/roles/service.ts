@@ -34,6 +34,7 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
 
   async save(createDto: SaveRoleDto) {
     const operatorPermissions = (createDto as any)._operatorPermissions || [];
+    const operatorName = (createDto as any)._operatorName;
     const isAdminRole = (createDto as any).permissionKey === config.adminKey;
     if (
       isAdminRole &&
@@ -47,7 +48,11 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
       ...createDto,
       menus: createDto.menuIds.map((id) => Object.assign(new Menu(), { id })),
     });
-    return super.save(data as any);
+    return super.save({
+      ...(data as any),
+      _operatorPermissions: operatorPermissions,
+      _operatorName: operatorName,
+    });
   }
 
   async list(query: ListRoleDto) {
@@ -88,18 +93,6 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
     },
     isTree = false,
   ): Promise<Menu[]> {
-    if (
-      user?.name === config.adminKey ||
-      user?.roles?.some?.((role) => role.permissionKey === config.adminKey)
-    ) {
-      return this.menuRepository
-        .find({
-          where: { isActive: BoolNum.Yes },
-          order: { order: "ASC", createTime: "DESC" },
-        })
-        .then((menus) => (isTree ? arrayToTree(menus) : menus));
-    }
-
     const roleKeys = (user?.roles || [])
       .filter((role) => role?.isActive === BoolNum.Yes)
       .map((role) => role.permissionKey)

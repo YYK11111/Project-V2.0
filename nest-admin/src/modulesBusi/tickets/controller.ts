@@ -3,6 +3,7 @@ import { TicketsService } from "./service";
 import { QueryListDto } from "src/common/dto";
 import {
   Ticket,
+  ticketPriorityMap,
   ticketTypeMap,
   ticketStatusMap,
   ticketSeverityMap,
@@ -28,6 +29,11 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
   @Get("getStatus")
   getStatus() {
     return ticketStatusMap;
+  }
+
+  @Get("getPriority")
+  getPriority() {
+    return ticketPriorityMap;
   }
 
   @Get("getSeverity")
