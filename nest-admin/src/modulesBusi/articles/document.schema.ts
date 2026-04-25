@@ -22,10 +22,14 @@ export const documentNodeWhitelist = {
       "heading",
       "bulletList",
       "orderedList",
+      "taskList",
       "blockquote",
       "codeBlock",
       "horizontalRule",
+      "divider",
       "image",
+      "attachment",
+      "video",
       "table",
     ],
     allowText: false,
@@ -46,8 +50,16 @@ export const documentNodeWhitelist = {
     blockChildren: ["listItem"],
     allowText: false,
   },
+  taskList: {
+    blockChildren: ["taskItem"],
+    allowText: false,
+  },
   listItem: {
-    blockChildren: ["paragraph", "bulletList", "orderedList"],
+    blockChildren: ["paragraph", "bulletList", "orderedList", "taskList"],
+    allowText: false,
+  },
+  taskItem: {
+    blockChildren: ["paragraph", "bulletList", "orderedList", "taskList"],
     allowText: false,
   },
   blockquote: {
@@ -56,6 +68,7 @@ export const documentNodeWhitelist = {
       "heading",
       "bulletList",
       "orderedList",
+      "taskList",
       "codeBlock",
     ],
     allowText: false,
@@ -69,7 +82,19 @@ export const documentNodeWhitelist = {
     allowText: false,
     allowContent: false,
   },
+  divider: {
+    allowText: false,
+    allowContent: false,
+  },
   image: {
+    allowText: false,
+    allowContent: false,
+  },
+  attachment: {
+    allowText: false,
+    allowContent: false,
+  },
+  video: {
     allowText: false,
     allowContent: false,
   },
@@ -82,11 +107,11 @@ export const documentNodeWhitelist = {
     allowText: false,
   },
   tableHeader: {
-    blockChildren: ["paragraph", "bulletList", "orderedList"],
+    blockChildren: ["paragraph", "bulletList", "orderedList", "taskList"],
     allowText: false,
   },
   tableCell: {
-    blockChildren: ["paragraph", "bulletList", "orderedList"],
+    blockChildren: ["paragraph", "bulletList", "orderedList", "taskList"],
     allowText: false,
   },
   text: {

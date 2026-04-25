@@ -14,13 +14,14 @@ function readDetailSource() {
 }
 
 describe('knowledge document view rendering', () => {
-  it('ready 状态时返回 JSON 文档查看态', () => {
+  it('ready 状态时返回 Isle 文档查看态', () => {
     const mode = resolveKnowledgeViewMode({
       contentJson: {
         type: 'doc',
         content: [
           {
             type: 'paragraph',
+            content: [{ type: 'text', text: '正文' }],
           },
         ],
       },
@@ -30,11 +31,12 @@ describe('knowledge document view rendering', () => {
 
     expect(mode).toEqual({
       kind: 'ready',
-      contentJson: {
+      document: {
         type: 'doc',
         content: [
           {
             type: 'paragraph',
+            content: [{ type: 'text', text: '正文' }],
           },
         ],
       },
@@ -56,13 +58,14 @@ describe('knowledge document view rendering', () => {
   it('invalid 状态时返回文档内容异常提示', () => {
     const mode = resolveKnowledgeViewMode({
       contentJson: {
-        type: 'doc',
+        type: 'paragraph',
         content: [
           {
-            type: 'paragraph',
+            type: 'text',
+            text: '坏数据',
           },
         ],
-      },
+      } as never,
       contentVersion: DOCUMENT_CONTENT_VERSION,
       contentStatus: 'invalid',
     })

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
-import KnowledgeViewerHost from '@/features/knowledge-editor-host/KnowledgeViewerHost.vue'
+import IsleArticleViewer from '@/features/isle-editor/components/IsleArticleViewer.vue'
 import { applyArticleBorrow, getKnowledgeTypes, getOne } from './api'
 import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems, type TocItem } from './viewToc'
@@ -39,7 +40,7 @@ interface KnowledgeArticle {
   summary?: string
   desc?: string
   content?: string
-  contentJson?: Record<string, unknown> | null
+  contentJson?: IsleContentDocument | null
   contentVersion?: number | null
   contentStatus?: string | null
   updateTime?: string
@@ -350,10 +351,10 @@ onBeforeUnmount(() => {
         <main class="knowledge-view-main">
           <section class="knowledge-view-content-shell Gcard">
             <div ref="contentRef" class="knowledge-view-reading__body rich-content rich-content--view">
-              <KnowledgeViewerHost
-                v-if="documentState.kind === 'ready'"
-                :content-json="documentState.contentJson"
-                class="knowledge-document-viewer" />
+                <IsleArticleViewer
+                  v-if="documentState.kind === 'ready'"
+                  :content="documentState.document"
+                  class="knowledge-document-viewer" />
               <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
                 <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>
                 <div class="knowledge-document-blocked__desc">{{ documentState.description }}</div>

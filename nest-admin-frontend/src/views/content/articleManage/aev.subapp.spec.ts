@@ -7,10 +7,11 @@ function readAev() {
 }
 
 describe('aev subapp replacement', () => {
-  it('aev 正文区使用 KnowledgeEditorHost', () => {
+  it('aev 正文区使用 IsleArticleEditor', () => {
     const source = readAev()
 
-    expect(source).toContain('KnowledgeEditorHost')
+    expect(source).toContain('IsleArticleEditor')
+    expect(source).not.toContain('KnowledgeEditorHost')
     expect(source).not.toContain('DocumentEditorV2')
     expect(source).not.toContain('NotionDocumentEditor')
   })

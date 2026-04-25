@@ -13,10 +13,13 @@ import {
 
 const documentMarkSet = new Set<string>(documentMarkWhitelist);
 
+const emptyMarkSet = new Set<string>();
+
 const documentNodeSet = new Set<string>(Object.keys(documentNodeWhitelist));
 
 interface ValidationContext {
   path: string;
+  marksOwnerType?: DocumentNodeType;
 }
 
 function createDocumentException(
@@ -47,7 +50,16 @@ function validateMarks(
   node: DocumentNode,
   path: string,
   nodeType: DocumentNodeType,
+  marksOwnerType?: DocumentNodeType,
 ) {
+  if (node.attrs !== undefined && !isRecord(node.attrs)) {
+    throw createDocumentException(
+      DOCUMENT_ERROR_CODES.invalidSchema,
+      "文档 attrs 结构非法",
+      { path: `${path}.attrs` },
+    );
+  }
+
   if (node.marks === undefined) {
     return;
   }
@@ -59,10 +71,13 @@ function validateMarks(
     );
   }
 
-  const nodeSchema = getNodeRule(nodeType);
+  const effectiveMarkOwnerType = marksOwnerType ?? nodeType;
+  const nodeSchema = getNodeRule(effectiveMarkOwnerType);
   const allowedMarks =
     nodeSchema.allowedMarks === undefined
-      ? documentMarkSet
+      ? nodeType === "text"
+        ? documentMarkSet
+        : emptyMarkSet
       : new Set<string>(nodeSchema.allowedMarks);
 
   node.marks.forEach((mark: DocumentMark, index) => {
@@ -71,6 +86,14 @@ function validateMarks(
         DOCUMENT_ERROR_CODES.invalidSchema,
         "文档 marks 结构非法",
         { path: `${path}.marks[${index}]` },
+      );
+    }
+
+    if (mark.attrs !== undefined && !isRecord(mark.attrs)) {
+      throw createDocumentException(
+        DOCUMENT_ERROR_CODES.invalidSchema,
+        "文档 marks 结构非法",
+        { path: `${path}.marks[${index}].attrs` },
       );
     }
 
@@ -96,6 +119,7 @@ function validateChildren(
   node: DocumentNode,
   path: string,
   nodeType: DocumentNodeType,
+  marksOwnerType?: DocumentNodeType,
 ) {
   const nodeSchema = getNodeRule(nodeType);
   const hasContent = node.content !== undefined;
@@ -109,7 +133,7 @@ function validateChildren(
   }
 
   if (nodeSchema.allowContent === false) {
-    if (Array.isArray(node.content) && node.content.length > 0) {
+    if (node.content !== undefined) {
       throw createDocumentException(
         DOCUMENT_ERROR_CODES.invalidSchema,
         `节点 ${node.type} 不允许包含子节点`,
@@ -139,6 +163,7 @@ function validateChildren(
     ...(nodeSchema.blockChildren || []),
     ...(nodeSchema.inlineChildren || []),
   ]);
+  const nextMarksOwnerType = nodeType === "text" ? marksOwnerType : nodeType;
 
   node.content.forEach((child, index) => {
     if (!isRecord(child) || typeof child.type !== "string") {
@@ -165,7 +190,10 @@ function validateChildren(
       );
     }
 
-    validateDocumentNode(child, { path: `${path}.content[${index}]` });
+    validateDocumentNode(child, {
+      path: `${path}.content[${index}]`,
+      marksOwnerType: nextMarksOwnerType,
+    });
   });
 }
 
@@ -206,8 +234,8 @@ function validateDocumentNode(node: DocumentNode, context: ValidationContext) {
 
   const nodeType = node.type as DocumentNodeType;
   validateText(node, context.path, nodeType);
-  validateMarks(node, context.path, nodeType);
-  validateChildren(node, context.path, nodeType);
+  validateMarks(node, context.path, nodeType, context.marksOwnerType);
+  validateChildren(node, context.path, nodeType, context.marksOwnerType);
 }
 
 export function validateDocumentSchemaVersion(contentVersion?: number | null) {

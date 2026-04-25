@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { JSONContent } from '@tiptap/core'
+import type { IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 
 import {
   createStructuredTemplateDocument,
@@ -11,7 +11,7 @@ import {
 
 describe('知识编辑页正文状态机', () => {
   it('ready 状态返回结构化 JSON 文档并保留版本号', () => {
-    const contentJson: JSONContent = {
+    const contentJson: IsleContentDocument = {
       type: 'doc',
       content: [
         {
@@ -68,7 +68,7 @@ describe('知识编辑页正文状态机', () => {
       resolveKnowledgeDocumentState({
         contentJson: {
           type: 'paragraph',
-        },
+        } as unknown as IsleContentDocument,
         contentVersion: 0,
         contentStatus: 'ready',
       }),
@@ -79,11 +79,12 @@ describe('知识编辑页正文状态机', () => {
   })
 
   it('invalid 状态优先于看起来合法的 ready 文档', () => {
-    const contentJson: JSONContent = {
+    const contentJson: IsleContentDocument = {
       type: 'doc',
       content: [
         {
           type: 'paragraph',
+          content: [],
         },
       ],
     }
@@ -139,9 +140,7 @@ describe('知识编辑页正文状态机', () => {
       content: [
         {
           type: 'heading',
-          attrs: {
-            level: 2,
-          },
+          attrs: { level: 2 },
           content: [
             {
               type: 'text',
@@ -172,6 +171,70 @@ describe('知识编辑页正文状态机', () => {
                       text: '检查项 A',
                     },
                   ],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: '检查项 B',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  })
+
+  it('模板转换保留空占位无序和有序列表项', () => {
+    expect(createStructuredTemplateDocument('- \n- 检查项 A\n\n1. \n2. 检查项 B')).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: '检查项 A',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'orderedList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [],
                 },
               ],
             },

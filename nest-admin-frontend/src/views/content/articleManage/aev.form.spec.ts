@@ -50,10 +50,11 @@ describe('知识编辑页结构治理守卫', () => {
     expect(draftButton).toBeLessThan(publishButton)
   })
 
-  it('页面正文应直连 Tiptap，并脱离旧公共 Editor', () => {
+  it('页面正文已切到 Isle 编辑器，不再依赖旧公共 Editor', () => {
     const source = readAev()
 
-    expect(source).toContain('NotionDocumentEditor')
+    expect(source).toContain('IsleArticleEditor')
+    expect(source).not.toContain('KnowledgeEditorHost')
     expect(source).not.toContain("@/components/Editor/index.vue")
     expect(source).not.toContain('<Editor v-model="form.content"')
   })
@@ -76,12 +77,12 @@ describe('知识编辑页结构治理守卫', () => {
     expect(source).toContain('showEditBlockedMessage')
   })
 
-  it('知识页应接入 slash menu 所需的 Notion-like 编辑器组件', () => {
+  it('知识页应接入 Isle 正文编辑器组件', () => {
     const source = readAev()
 
-    expect(source).toContain('@/features/document-editor/NotionDocumentEditor.vue')
-    expect(source).toContain('<NotionDocumentEditor')
-    expect(source).toContain('v-model:content-json="form.contentJson"')
-    expect(source).toContain(':content-status="form.contentStatus as')
+    expect(source).toContain("@/features/isle-editor/components/IsleArticleEditor.vue")
+    expect(source).toContain('<IsleArticleEditor')
+    expect(source).toContain('v-model="form.contentJson"')
+    expect(source).toContain('@update:model-value="handleArticleContentUpdate"')
   })
 })

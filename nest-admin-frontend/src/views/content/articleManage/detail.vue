@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import '@/styles/richContent.scss'
-import KnowledgeViewerHost from '@/features/knowledge-editor-host/KnowledgeViewerHost.vue'
+import IsleArticleViewer from '@/features/isle-editor/components/IsleArticleViewer.vue'
 import { applyArticleBorrow, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes } from './api'
 import { resolveKnowledgeViewMode } from './view.document'
 import { extractTocItems } from './viewToc'
@@ -16,7 +17,7 @@ interface KnowledgeArticle {
   summary?: string
   desc?: string
   content?: string
-  contentJson?: Record<string, unknown> | null
+  contentJson?: IsleContentDocument | null
   contentVersion?: number | null
   contentStatus?: string | null
   status?: string
@@ -379,9 +380,9 @@ onBeforeUnmount(() => {
         <section class="knowledge-detail-content-shell">
           <div class="knowledge-detail-content-shell__header">正文</div>
           <div ref="contentRef" class="knowledge-detail-reading__body rich-content rich-content--detail">
-            <KnowledgeViewerHost
+            <IsleArticleViewer
               v-if="documentState.kind === 'ready'"
-              :content-json="documentState.contentJson"
+              :content="documentState.document"
               class="knowledge-document-viewer" />
             <div v-else-if="documentState.kind === 'legacy_html'" class="knowledge-document-blocked">
               <div class="knowledge-document-blocked__title">{{ documentState.title }}</div>

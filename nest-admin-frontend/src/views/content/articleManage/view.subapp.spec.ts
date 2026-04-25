@@ -7,10 +7,12 @@ function readView() {
 }
 
 describe('knowledge view subapp replacement', () => {
-  it('view 页面使用 KnowledgeViewerHost', () => {
+  it('view 页面使用 IsleArticleViewer', () => {
     const source = readView()
 
-    expect(source).toContain('KnowledgeViewerHost')
+    expect(source).toContain('IsleArticleViewer')
+    expect(source).toContain(':content="documentState.document"')
+    expect(source).not.toContain('KnowledgeViewerHost')
     expect(source).not.toContain('useEditor(')
     expect(source).not.toContain('EditorContent')
   })

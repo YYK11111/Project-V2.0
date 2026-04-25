@@ -1,6 +1,9 @@
-import type { JSONContent } from '@tiptap/core'
-
-import { createEmptyDocument } from '@/features/document-editor/core/documentContent'
+import {
+  createEmptyIsleContent,
+  extractIslePlainText,
+  type IsleContentDocument,
+  type IsleContentNode,
+} from '@/features/isle-editor/adapters/isleContent'
 
 export const DOCUMENT_CONTENT_VERSION = 1
 
@@ -16,7 +19,7 @@ type KnowledgeDocumentBlockMessage = {
 export type KnowledgeDocumentState =
   | {
       kind: 'ready'
-      contentJson: JSONContent
+      contentJson: IsleContentDocument
       contentVersion: number
     }
   | {
@@ -79,30 +82,48 @@ export function mapKnowledgeDocumentErrorCode(code: string | null | undefined): 
 
 type KnowledgeDocumentInput = {
   content?: string | null
-  contentJson?: JSONContent | null
+  contentJson?: IsleContentDocument | null
   contentVersion?: number | null
   contentStatus?: string | null
 }
 
-function isDocumentNode(value: JSONContent | null | undefined): value is JSONContent {
-  return value?.type === 'doc' && Array.isArray(value.content)
+function isIsleNode(value: unknown): value is IsleContentNode {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const node = value as { type?: unknown; text?: unknown; attrs?: unknown; marks?: unknown; content?: unknown }
+  const typeValid = typeof node.type === 'string'
+  const textValid = node.text == null || typeof node.text === 'string'
+  const attrsValid = node.attrs == null || typeof node.attrs === 'object'
+  const marksValid = node.marks == null || Array.isArray(node.marks)
+  const contentValid = node.content == null || (Array.isArray(node.content) && node.content.every((item) => isIsleNode(item)))
+
+  return typeValid && textValid && attrsValid && marksValid && contentValid
 }
 
-function createTextNode(text: string): JSONContent {
+function isIsleDocument(value: IsleContentDocument | null | undefined): value is IsleContentDocument {
+  return !!value
+    && value.type === 'doc'
+    && Array.isArray(value.content)
+    && value.content.every((item) => isIsleNode(item))
+}
+
+function createTextNode(text: string) {
   return {
     type: 'text',
     text,
   }
 }
 
-function createParagraphNode(text: string): JSONContent {
+function createParagraphNode(text: string): IsleContentNode {
   return {
     type: 'paragraph',
-    content: text ? [createTextNode(text)] : undefined,
+    content: text ? [createTextNode(text)] : [],
   }
 }
 
-function createListNode(type: 'bulletList' | 'orderedList', items: string[]): JSONContent {
+function createListNode(type: 'bulletList' | 'orderedList', items: string[]): IsleContentNode {
   return {
     type,
     content: items.map((item) => ({
@@ -110,6 +131,26 @@ function createListNode(type: 'bulletList' | 'orderedList', items: string[]): JS
       content: [createParagraphNode(item)],
     })),
   }
+}
+
+function createHeadingNode(level: number, text: string): IsleContentNode {
+  return {
+    type: 'heading',
+    attrs: {
+      level,
+    },
+    content: text ? [createTextNode(text)] : [],
+  }
+}
+
+function getBulletItemText(line: string): string | null {
+  const matched = line.match(/^\s*[-*+]\s(.*)$/)
+  return matched ? matched[1] : null
+}
+
+function getOrderedItemText(line: string): string | null {
+  const matched = line.match(/^\s*\d+\.\s(.*)$/)
+  return matched ? matched[1] : null
 }
 
 export function resolveKnowledgeDocumentState(input: KnowledgeDocumentInput): KnowledgeDocumentState {
@@ -127,7 +168,7 @@ export function resolveKnowledgeDocumentState(input: KnowledgeDocumentInput): Kn
     }
   }
 
-  if (isDocumentNode(input.contentJson) && Number(input.contentVersion) >= DOCUMENT_CONTENT_VERSION) {
+  if (isIsleDocument(input.contentJson) && Number(input.contentVersion) >= DOCUMENT_CONTENT_VERSION) {
     return {
       kind: 'ready',
       contentJson: input.contentJson,
@@ -151,14 +192,14 @@ export function resolveKnowledgeDocumentState(input: KnowledgeDocumentInput): Kn
 
   return {
     kind: 'ready',
-    contentJson: createEmptyDocument(),
+    contentJson: createEmptyIsleContent(),
     contentVersion: DOCUMENT_CONTENT_VERSION,
   }
 }
 
-export function createStructuredTemplateDocument(markdown: string): JSONContent {
+export function createStructuredTemplateDocument(markdown: string): IsleContentDocument {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const content: JSONContent[] = []
+  const content: IsleContentNode[] = []
 
   let index = 0
   while (index < lines.length) {
@@ -172,22 +213,16 @@ export function createStructuredTemplateDocument(markdown: string): JSONContent 
 
     const headingMatch = line.match(/^(#{1,6})\s+(.*)$/)
     if (headingMatch) {
-      content.push({
-        type: 'heading',
-        attrs: {
-          level: headingMatch[1].length,
-        },
-        content: headingMatch[2] ? [createTextNode(headingMatch[2])] : undefined,
-      })
+      content.push(createHeadingNode(headingMatch[1].length, headingMatch[2]))
       index += 1
       continue
     }
 
     const bulletItems: string[] = []
     while (index < lines.length) {
-      const bulletMatch = lines[index].trim().match(/^[-*+]\s+(.*)$/)
-      if (!bulletMatch) break
-      bulletItems.push(bulletMatch[1])
+      const bulletItemText = getBulletItemText(lines[index])
+      if (bulletItemText == null) break
+      bulletItems.push(bulletItemText)
       index += 1
     }
     if (bulletItems.length) {
@@ -197,9 +232,9 @@ export function createStructuredTemplateDocument(markdown: string): JSONContent 
 
     const orderedItems: string[] = []
     while (index < lines.length) {
-      const orderedMatch = lines[index].trim().match(/^\d+\.\s+(.*)$/)
-      if (!orderedMatch) break
-      orderedItems.push(orderedMatch[1])
+      const orderedItemText = getOrderedItemText(lines[index])
+      if (orderedItemText == null) break
+      orderedItems.push(orderedItemText)
       index += 1
     }
     if (orderedItems.length) {
@@ -215,21 +250,14 @@ export function createStructuredTemplateDocument(markdown: string): JSONContent 
     content.push(createParagraphNode(paragraphLines.join(' ')))
   }
 
-  return {
-    type: 'doc',
-    content: content.length ? content : createEmptyDocument().content,
-  }
+  return content.length
+    ? {
+        type: 'doc',
+        content,
+      }
+    : createEmptyIsleContent()
 }
 
-export function getDocumentPlainText(contentJson: JSONContent | null | undefined): string {
-  if (!contentJson) {
-    return ''
-  }
-
-  if (typeof contentJson.text === 'string') {
-    return contentJson.text
-  }
-
-  const children = Array.isArray(contentJson.content) ? contentJson.content : []
-  return children.map((item) => getDocumentPlainText(item)).filter(Boolean).join(' ').trim()
+export function getDocumentPlainText(contentJson: IsleContentDocument | null | undefined): string {
+  return extractIslePlainText(contentJson)
 }
