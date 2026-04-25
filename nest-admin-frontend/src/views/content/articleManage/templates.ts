@@ -1,4 +1,12 @@
-export const articleTemplateMap = {
+export interface ArticleTemplate {
+  label: string
+  knowledgeType: string
+  title: string
+  summary: string
+  content: string
+}
+
+export const articleTemplateMap: Record<string, ArticleTemplate> = {
   implementationGuide: {
     label: '实施说明',
     knowledgeType: 'guide',

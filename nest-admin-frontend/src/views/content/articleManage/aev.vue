@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { JSONContent } from '@tiptap/core'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { yesOrNO, KEY_NO, KEY_YES } from '@/utils/dictionary'
 import { listRole } from '@/api/system/role'
 import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
-import KnowledgeEditorHost from '@/features/knowledge-editor-host/KnowledgeEditorHost.vue'
+import IsleArticleEditor from '@/features/isle-editor/components/IsleArticleEditor.vue'
+import { type IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 import { applyArticleBorrow, articleTagApi, getKnowledgeTypes, getOne, getStatus, getVisibilityTypes, save } from './api'
@@ -67,7 +67,7 @@ type ArticleForm = {
   title?: string
   summary?: string
   content?: string
-  contentJson: JSONContent
+  contentJson: IsleContentDocument
   contentVersion: number
   contentStatus: string
   contentText?: string
@@ -168,7 +168,7 @@ function showEditBlockedMessage() {
   $sdk.msgError(editBlockedMessage.value.title)
 }
 
-function handleKnowledgeEditorContentUpdate(contentJson: JSONContent) {
+function handleArticleContentUpdate(contentJson: IsleContentDocument) {
   form.value.contentJson = contentJson
   form.value.contentText = getDocumentPlainText(contentJson)
   form.value.contentVersion = DOCUMENT_CONTENT_VERSION
@@ -504,11 +504,11 @@ function submitBorrow() {
           </div>
           <el-form-item prop="contentJson" label="正文" style="max-width: none !important">
             <div v-if="documentState.kind === 'ready'" class="knowledge-document-shell">
-              <KnowledgeEditorHost
-                :content-json="form.contentJson"
+              <IsleArticleEditor
+                v-model="form.contentJson"
                 :disabled="!canEditCurrentArticle"
                 class="knowledge-document-editor"
-                @update:content-json="handleKnowledgeEditorContentUpdate" />
+                @update:model-value="handleArticleContentUpdate" />
             </div>
             <el-alert
               v-else-if="documentState.kind === 'legacy_html'"

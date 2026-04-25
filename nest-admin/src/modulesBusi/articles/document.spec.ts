@@ -115,6 +115,123 @@ describe("validateDocumentJson", () => {
       }),
     ).not.toThrow();
   });
+
+  it("合法 Isle 扩展节点可通过校验", () => {
+    expect(() =>
+      validateDocumentJson({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "任务说明",
+                marks: [{ type: "underline" }, { type: "link" }],
+              },
+            ],
+          },
+          {
+            type: "taskList",
+            content: [
+              {
+                type: "taskItem",
+                attrs: { checked: true },
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "完成 Isle 接入" }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "attachment",
+            attrs: {
+              url: "https://example.com/spec.pdf",
+              name: "spec.pdf",
+            },
+          },
+          {
+            type: "video",
+            attrs: {
+              url: "https://example.com/demo.mp4",
+            },
+          },
+          {
+            type: "divider",
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("叶子节点即使带空 content 也应拒绝", () => {
+    expect(() =>
+      validateDocumentJson({
+        type: "doc",
+        content: [
+          {
+            type: "divider",
+            content: [],
+          },
+        ],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: "DOCUMENT_INVALID_SCHEMA",
+        }),
+      }),
+    );
+  });
+
+  it("codeBlock 内 text 带 mark 应拒绝", () => {
+    expect(() =>
+      validateDocumentJson({
+        type: "doc",
+        content: [
+          {
+            type: "codeBlock",
+            content: [
+              {
+                type: "text",
+                text: "const value = 1",
+                marks: [{ type: "bold" }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: "DOCUMENT_INVALID_SCHEMA",
+        }),
+      }),
+    );
+  });
+
+  it("非法 Isle 节点仍拒绝", () => {
+    expect(() =>
+      validateDocumentJson({
+        type: "doc",
+        content: [
+          {
+            type: "callout",
+            content: [{ type: "text", text: "未支持节点" }],
+          },
+        ],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: "DOCUMENT_UNSUPPORTED_NODE",
+        }),
+      }),
+    );
+  });
 });
 
 describe("ArticlesService document guards", () => {
@@ -149,6 +266,172 @@ describe("ArticlesService document guards", () => {
 
     return { service, repository };
   };
+
+  it("提取 Isle JSON 嵌套节点纯文本并按块分隔", () => {
+    const { service } = createService();
+
+    const plainText = (service as never).extractPlainTextFromDocument({
+      type: "doc",
+      content: [
+        {
+          type: "heading",
+          content: [
+            { type: "text", text: "主" },
+            { type: "text", text: "标题" },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "第一段" },
+            { type: "text", text: "说明" },
+          ],
+        },
+        {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "待办一" }],
+                },
+              ],
+            },
+            {
+              type: "taskItem",
+              attrs: { checked: true },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "待办二" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(plainText).toBe("主标题 第一段说明 待办一 待办二");
+  });
+
+  it("中文连续文本被拆成多个 text 节点时不插空格", () => {
+    const { service } = createService();
+
+    const plainText = (service as never).extractPlainTextFromDocument({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "这是" },
+            { type: "text", text: "一段" },
+            { type: "text", text: "连续" },
+            { type: "text", text: "中文" },
+          ],
+        },
+      ],
+    });
+
+    expect(plainText).toBe("这是一段连续中文");
+  });
+
+  it("标点前不额外插入空格", () => {
+    const { service } = createService();
+
+    const plainText = (service as never).extractPlainTextFromDocument({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "你好" },
+            { type: "text", text: "，世界" },
+            { type: "text", text: "！" },
+          ],
+        },
+      ],
+    });
+
+    expect(plainText).toBe("你好，世界！");
+  });
+
+  it("提取纯文本时忽略非文本节点且不抛异常", () => {
+    const { service } = createService();
+
+    expect(() =>
+      (service as never).extractPlainTextFromDocument({
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            content: [{ type: "text", text: "标题" }],
+          },
+          {
+            type: "image",
+            attrs: { src: "https://example.com/demo.png" },
+          },
+          {
+            type: "taskList",
+            content: [
+              {
+                type: "taskItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      { type: "text", text: "任务正文" },
+                      { type: "divider" },
+                      { type: "attachment", attrs: { name: "spec.pdf" } },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).not.toThrow();
+
+    expect(
+      (service as never).extractPlainTextFromDocument({
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: "https://example.com/demo.png" },
+          },
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "保留正文" },
+              { type: "divider" },
+            ],
+          },
+          {
+            type: "taskList",
+            content: [
+              {
+                type: "taskItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      { type: "attachment", attrs: { name: "附件" } },
+                      { type: "text", text: "任务内容" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe("保留正文 任务内容");
+  });
 
   it("新增合法文档时写入 ready 状态和版本", async () => {
     const { service, repository } = createService();

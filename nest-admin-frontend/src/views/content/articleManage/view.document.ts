@@ -1,11 +1,11 @@
-import type { JSONContent } from '@tiptap/core'
+import type { IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 
 import { getKnowledgeDocumentBlockMessage, resolveKnowledgeDocumentState } from './aev.document'
 
 export type KnowledgeViewMode =
   | {
       kind: 'ready'
-      contentJson: JSONContent
+      document: IsleContentDocument
     }
   | {
       kind: 'legacy_html'
@@ -20,7 +20,7 @@ export type KnowledgeViewMode =
 
 type KnowledgeArticleLike = {
   content?: string | null
-  contentJson?: JSONContent | null
+  contentJson?: IsleContentDocument | null
   contentVersion?: number | null
   contentStatus?: string | null
 }
@@ -31,7 +31,7 @@ export function resolveKnowledgeViewMode(article: KnowledgeArticleLike): Knowled
   if (documentState.kind === 'ready') {
     return {
       kind: 'ready',
-      contentJson: documentState.contentJson,
+      document: documentState.contentJson,
     }
   }
 

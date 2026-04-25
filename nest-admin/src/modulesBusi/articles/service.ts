@@ -542,29 +542,67 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       return "";
     }
 
-    const collectText = (node: DocumentNode | undefined): string[] => {
+    const blockNodeTypes = new Set([
+      "heading",
+      "paragraph",
+      "taskItem",
+      "blockquote",
+      "codeBlock",
+      "tableCell",
+      "tableHeader",
+    ]);
+
+    const normalizeInlineText = (text: string) => text.replace(/\s+/g, " ");
+
+    const collectInlineText = (node: unknown): string => {
+      if (!node || typeof node !== "object") {
+        return "";
+      }
+
+      const documentNode = node as Record<string, unknown>;
+      let text = "";
+
+      if (
+        typeof documentNode.text === "string" &&
+        documentNode.text.length
+      ) {
+        text += normalizeInlineText(documentNode.text);
+      }
+
+      if (Array.isArray(documentNode.content)) {
+        documentNode.content.forEach((child) => {
+          text += collectInlineText(child);
+        });
+      }
+
+      return text;
+    };
+
+    const collectBlockTexts = (node: unknown): string[] => {
       if (!node || typeof node !== "object") {
         return [];
       }
 
-      const parts: string[] = [];
+      const documentNode = node as Record<string, unknown>;
+      const nodeType =
+        typeof documentNode.type === "string" ? documentNode.type : "";
 
-      if (typeof node.text === "string" && node.text.trim()) {
-        parts.push(node.text.trim());
+      if (blockNodeTypes.has(nodeType)) {
+        const blockText = collectInlineText(node).trim();
+        return blockText ? [blockText] : [];
       }
 
-      if (Array.isArray(node.content)) {
-        node.content.forEach((child) => {
-          parts.push(...collectText(child));
-        });
+      if (!Array.isArray(documentNode.content)) {
+        return [];
       }
 
-      return parts;
+      return documentNode.content.flatMap((child) => collectBlockTexts(child));
     };
 
-    return collectText(contentJson as DocumentNode)
+    return collectBlockTexts(contentJson)
       .join(" ")
       .replace(/\s+/g, " ")
+      .replace(/\s+([,.;!?，。；：！？])/g, "$1")
       .trim();
   }
 
