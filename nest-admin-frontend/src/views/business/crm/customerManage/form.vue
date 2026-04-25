@@ -67,7 +67,7 @@ getDeptTrees().then((res) => {
     })
     return result
   }
-  deptList.value = res.data ? flattenDepts(res.data) : []
+  deptList.value = res.data ? flattenDepts(res.data).map(d => ({...d, id: Number(d.id)})) : []
 })
 
 const isView = computed(() => route.query.action === 'view')

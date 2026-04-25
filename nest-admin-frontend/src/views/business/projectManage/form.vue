@@ -230,10 +230,10 @@ getStatus().then(({ data }) => (status.value = data || {}))
 getPriority().then(({ data }) => (priority.value = data || {}))
 getProjectType().then(({ data }) => (projectType.value = data || {}))
 getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
-  customerList.value = res.list || []
+  customerList.value = (res.list || []).map(c => ({...c, id: Number(c.id)}))
 })
 getDeptTrees({}).then((res) => {
-  deptList.value = res.data ? flattenDepts(res.data) : []
+  deptList.value = (res.data ? flattenDepts(res.data) : []).map(d => ({...d, id: Number(d.id)}))
 })
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))

@@ -41,7 +41,7 @@ getStages().then(({ data }) => (stages.value = data))
 // 获取客户列表
 const customerList = ref([])
 getCustomerList({ pageNum: 1, pageSize: 1000 }).then((res) => {
-  customerList.value = res.list || []
+  customerList.value = (res.list || []).map(c => ({...c, id: Number(c.id)}))
 })
 
 const isView = computed(() => route.query.action === 'view')
