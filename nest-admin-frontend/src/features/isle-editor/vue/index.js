@@ -1,2 +1,5 @@
-export { Editor } from './editor.js'
-export { default as IsleEditor } from './isle-editor.js'
+export { Editor } from '../editor.js'
+export { default as IsleEditor } from '../isle-editor.js'
+export * from '../kit/index.js'
+export * from '../utils/index.js'
+export * from '../components/index.js'

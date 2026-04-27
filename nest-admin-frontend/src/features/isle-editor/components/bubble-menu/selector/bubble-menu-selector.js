@@ -1,0 +1,119 @@
+import { defineComponent, h } from "vue";
+import { prefixClass, t } from '../../../core/index.js'
+import ButtonLink from '../../special-button/button-link.js'
+import ButtonColor from '../../special-button/button-color.js'
+import ButtonBackground from '../../special-button/button-background.js'
+import ButtonTextAlign from '../../special-button/button-text-align.js'
+import ButtonFontFamily from '../../special-button/button-font-family.js'
+import ButtonFontSize from '../../special-button/button-font-size.js'
+import { ITooltip, IButton, IDivider, IIcon } from '../../ui/index.js'
+
+export default defineComponent({
+  name: "BubbleSelector",
+  props: {
+    menus: {
+      type: Array,
+      required: true,
+    },
+    editor: {
+      type: Object,
+      required: true,
+    },
+  },
+  setup(props, { slots }) {
+    const slotPrefix = slots["prefix"];
+    const slotSuffix = slots["suffix"];
+
+    return () =>
+      h("div", { class: `${prefixClass}-bubble-menu` }, [
+        slotPrefix && slotPrefix({ editor: props.editor }),
+        ...props.menus.map((menu) => {
+          // 检查是否存在对应的具名插槽
+          const slotName = slots[menu.name];
+
+          if (slotName) {
+            // 如果存在具名插槽，使用插槽内容
+            return slotName({
+              editor: props.editor,
+              ...menu,
+            });
+          }
+
+          if (menu.name === "|") {
+            return h(IDivider, {
+              type: "vertical",
+              style: { height: "1.5rem" },
+            });
+          }
+
+          if (menu.name === "link") {
+            return h(ButtonLink, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          if (menu.name === "color") {
+            return h(ButtonColor, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          if (menu.name === "background") {
+            return h(ButtonBackground, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          if (menu.name === "textAlign") {
+            return h(ButtonTextAlign, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          if (menu.name === "fontFamily") {
+            return h(ButtonFontFamily, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          if (menu.name === "fontSize") {
+            return h(ButtonFontSize, {
+              editor: props.editor,
+              menu,
+            });
+          }
+
+          // 默认渲染逻辑
+          return h(
+            ITooltip,
+            {
+              text: t(menu.name),
+              shortcutkeys: menu.shortcutkeys,
+            },
+            {
+              default: () =>
+                h(
+                  IButton,
+                  {
+                    disabled:
+                      menu?.isDisabled &&
+                      menu?.isDisabled({ editor: props.editor }),
+                    active: menu?.isActive({ editor: props.editor }),
+                    onClick: () => menu.command({ editor: props.editor }),
+                  },
+                  {
+                    icon: () => h(IIcon, { name: menu.name, size: 14 }),
+                  },
+                ),
+            },
+          );
+        }),
+        slotSuffix && slotSuffix({ editor: props.editor }),
+      ]);
+  },
+});

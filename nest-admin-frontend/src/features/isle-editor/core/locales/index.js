@@ -1,59 +1,37 @@
-const defaultLocaleStore = Object.freeze({
-  zh: {
-    editor: {
-      placeholder: '请输入内容',
-    },
-  },
-  en: {
-    editor: {
-      placeholder: 'Please enter content',
-    },
-  },
-})
+import Locales from "i18next";
+import zh from "./zh.json";
+import en from "./en.json";
 
-function cloneLocaleStore() {
-  return JSON.parse(JSON.stringify(defaultLocaleStore))
+const NS = "translation";
+
+Locales.init({
+  lng: "zh",
+  // debug: true,
+  resources: {},
+});
+addLocale("zh", zh);
+addLocale("en", en);
+
+export function addLocale(lng, resources) {
+  Locales.addResourceBundle(lng, NS, resources, true, true);
 }
 
-export function addLocale(localeStore, lng, resources) {
-  localeStore[lng] = resources
-  return localeStore[lng]
+export function changeLocale(lng) {
+  Locales.changeLanguage(lng);
 }
 
-export function getLocale(localeStore, lng) {
-  return localeStore[lng]
+export function getLocale(lng) {
+  return Locales.getResourceBundle(lng, NS);
 }
 
-export function resolveLocaleText(localeStore, locale, key) {
-  const keys = key.split('.')
-  let value = localeStore[locale] || localeStore.zh
-
-  for (const currentKey of keys) {
-    value = value?.[currentKey]
+export function t(key, options = {}) {
+  const result = Locales.t(key, options);
+  if (result === key) {
+    return key.split(".").pop();
   }
-
-  return typeof value === 'string' ? value : keys.at(-1) ?? key
+  return result;
 }
 
-export function createLocales(initialLocale = 'zh') {
-  let currentLocale = initialLocale
-  const localeStore = cloneLocaleStore()
+export const te = Locales.exists.bind(Locales);
 
-  return {
-    addResourceBundle(lng, _ns, resources) {
-      addLocale(localeStore, lng, resources)
-    },
-    changeLanguage(lng) {
-      currentLocale = lng
-    },
-    getResourceBundle(lng) {
-      return getLocale(localeStore, lng)
-    },
-    t(key) {
-      return resolveLocaleText(localeStore, currentLocale, key)
-    },
-    exists(key) {
-      return resolveLocaleText(localeStore, currentLocale, key) !== (key.split('.').at(-1) ?? key)
-    },
-  }
-}
+export default Locales;

@@ -1,7 +1,19 @@
-.isle-editor {
-  position: relative;
-}
+@use "config";
+@use "vars";
 
-.isle-editor-editor-root {
-  min-height: 120px;
-}
+@use "main";
+@use "placeholder";
+@use "indent";
+@use "heading";
+@use "list";
+@use "divider";
+@use "blockquote";
+@use "code";
+@use "link";
+@use "selection";
+@use "code-block";
+@use "table";
+@use "media-block";
+
+@use "menu";
+@use "ui";

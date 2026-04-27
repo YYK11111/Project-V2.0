@@ -2,11 +2,25 @@ import { upload } from '@/api/common'
 
 export type IsleUploadAssetType = 'image' | 'attachment' | 'video'
 
-export interface IsleUploadAsset {
+export interface IsleImageUploadAsset {
+  src: string
+  name: string
+  type: 'image'
+}
+
+export interface IsleAttachmentUploadAsset {
   url: string
   name: string
-  type: IsleUploadAssetType
+  type: 'attachment'
 }
+
+export interface IsleVideoUploadAsset {
+  src: string
+  name: string
+  type: 'video'
+}
+
+export type IsleUploadAsset = IsleImageUploadAsset | IsleAttachmentUploadAsset | IsleVideoUploadAsset
 
 interface UploadResponseData {
   url?: string
@@ -41,12 +55,26 @@ async function uploadFile(file: File, type: IsleUploadAssetType): Promise<IsleUp
 
   const response = await upload(formData as unknown as { new (): FormData }) as UploadResponse
 
-  if (response.code !== 200 || !response.data?.url) {
+  if (response.code !== 200) {
     throw new Error(response.msg || '上传失败')
   }
 
+  if (!response.data?.url) {
+    throw new Error('上传缺少文件地址')
+  }
+
+  const normalizedUrl = normalizeUploadUrl(response.data.url)
+
+  if (type === 'attachment') {
+    return {
+      url: normalizedUrl,
+      name: file.name,
+      type,
+    }
+  }
+
   return {
-    url: normalizeUploadUrl(response.data.url),
+    src: normalizedUrl,
     name: file.name,
     type,
   }

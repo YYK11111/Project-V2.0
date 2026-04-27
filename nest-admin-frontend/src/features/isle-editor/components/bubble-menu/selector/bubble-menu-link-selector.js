@@ -1,0 +1,114 @@
+import { defineComponent, ref, watchEffect, h } from "vue";
+import { prefixClass, t } from '../../../core/index.js'
+import ButtonLink from '../../special-button/button-link.js'
+import { ITooltip, IDivider, IButton, IIcon } from '../../ui/index.js'
+
+export default defineComponent({
+  name: "BubbleLinkSelector",
+  props: {
+    editor: {
+      type: Object,
+      required: true,
+    },
+    menu: {
+      type: Object,
+      required: true,
+    },
+  },
+  setup(props) {
+    const href = ref(null);
+    const target = ref("_blank");
+
+    watchEffect(() => {
+      const linkData = props.editor.getAttributes("link");
+      href.value = linkData.href;
+      target.value = linkData.target || "";
+    });
+
+    const copyOk = ref(false);
+    function clipboardLink() {
+      props.editor.chain().focus().run();
+      navigator.clipboard.writeText(href.value);
+      copyOk.value = true;
+      setTimeout(() => {
+        copyOk.value = false;
+      }, 500);
+    }
+
+    function unLink() {
+      if (!props.editor) return;
+      props.editor.chain().focus().unsetLink().run();
+    }
+
+    function openLink() {
+      window.open(href.value, target.value);
+    }
+
+    return () =>
+      h("div", { class: `${prefixClass}-bubble-menu` }, [
+        h(
+          ITooltip,
+          { text: t("openInNewTab") },
+          {
+            default: () =>
+              h(
+                IButton,
+                {
+                  onClick: openLink,
+                },
+                {
+                  icon: () => h(IIcon, { name: "openRight", size: 14 }),
+                  default: () =>
+                    h(
+                      "span",
+                      { class: `${prefixClass}-bubble-menu__btn-text` },
+                      href.value,
+                    ),
+                },
+              ),
+          },
+        ),
+        h(IDivider, { type: "vertical", style: { height: "1.5rem" } }),
+        h(ButtonLink, { editor: props.editor, menu: props.menu, isEdit: true }),
+        h(
+          ITooltip,
+          { text: t("copy") },
+          {
+            default: () =>
+              h(
+                IButton,
+                {
+                  success: copyOk.value,
+                  onClick: clipboardLink,
+                },
+                {
+                  icon: () =>
+                    h(IIcon, {
+                      name: copyOk.value ? "check" : "copy",
+                      size: 13.5,
+                    }),
+                },
+              ),
+          },
+        ),
+        h(IDivider, { type: "vertical", style: { height: "1.5rem" } }),
+        h(
+          ITooltip,
+          { text: t("unlink") },
+          {
+            default: () =>
+              h(
+                IButton,
+                {
+                  danger: true,
+                  onClick: unLink,
+                },
+                {
+                  icon: () => h(IIcon, { name: "unlink", size: 14 }),
+                },
+              ),
+          },
+        ),
+      ]);
+  },
+});

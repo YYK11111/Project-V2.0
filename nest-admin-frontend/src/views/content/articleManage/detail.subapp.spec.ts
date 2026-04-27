@@ -12,6 +12,8 @@ describe('knowledge detail subapp replacement', () => {
 
     expect(source).toContain('IsleArticleViewer')
     expect(source).toContain(':content="documentState.document"')
+    expect(source).toContain('ref="contentRef"')
+    expect(source).toContain('extractTocItems(contentRef.value)')
     expect(source).not.toContain('KnowledgeViewerHost')
     expect(source).not.toContain('useEditor(')
     expect(source).not.toContain('EditorContent')

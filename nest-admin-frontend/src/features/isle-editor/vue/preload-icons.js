@@ -1,1 +1,1 @@
-export {}
+import '../utils/preload-icons.js'

@@ -27,7 +27,7 @@ describe('useIsleUpload adapter', () => {
     const result = await adapter.uploadImage(new File(['img'], 'demo.png', { type: 'image/png' }))
 
     expect(result).toEqual({
-      url: '/upload/article/demo.png',
+      src: '/upload/article/demo.png',
       name: 'demo.png',
       type: 'image',
     })
@@ -77,18 +77,31 @@ describe('useIsleUpload adapter', () => {
       type: 'attachment',
     })
     expect(staticImage).toEqual({
-      url: '/static/covers/book.png',
+      src: '/static/covers/book.png',
       name: 'book.png',
       type: 'image',
     })
     expect(video).toEqual({
-      url: 'https://cdn.example.com/video.mp4',
+      src: 'https://cdn.example.com/video.mp4',
       name: 'demo.mp4',
       type: 'video',
     })
   })
 
-  it('上传返回缺少 URL 时抛错', async () => {
+  it('上传失败时优先抛出后端错误信息', async () => {
+    uploadMock.mockResolvedValue({
+      code: 500,
+      msg: '文件类型不支持',
+      data: {},
+    })
+
+    const adapter = useIsleUpload()
+
+    await expect(adapter.uploadImage(new File(['img'], 'broken.png', { type: 'image/png' })))
+      .rejects.toThrow('文件类型不支持')
+  })
+
+  it('上传成功但缺少 URL 时抛错', async () => {
     uploadMock.mockResolvedValue({
       code: 200,
       data: {},
@@ -97,6 +110,6 @@ describe('useIsleUpload adapter', () => {
     const adapter = useIsleUpload()
 
     await expect(adapter.uploadImage(new File(['img'], 'broken.png', { type: 'image/png' })))
-      .rejects.toThrow('上传失败')
+      .rejects.toThrow('上传缺少文件地址')
   })
 })
