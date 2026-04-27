@@ -152,4 +152,74 @@ describe('media node schemas', () => {
 
     editor.destroy()
   })
+
+  it('slash commands insert empty media blocks with idle default attrs', () => {
+    const editor = new Editor({
+      extensions: [DocumentExtension, ParagraphExtension, Text, ImageExtension, VideoExtension, AttachmentExtension],
+      content: '<p>before</p>'
+    })
+
+    ImageExtension.options.command({
+      editor,
+      params: null
+    })
+
+    VideoExtension.options.command({
+      editor,
+      params: null
+    })
+
+    AttachmentExtension.options.command({
+      editor,
+      params: null
+    })
+
+    const mediaNodes = editor.getJSON().content?.filter(node => ['image', 'video', 'attachment'].includes(node.type))
+
+    expect(mediaNodes).toEqual([
+      {
+        type: 'image',
+        attrs: {
+          src: '',
+          alt: '',
+          title: '',
+          name: '',
+          size: 0,
+          mime: '',
+          width: '',
+          status: 'idle',
+          error: ''
+        }
+      },
+      {
+        type: 'video',
+        attrs: {
+          src: '',
+          poster: '',
+          title: '',
+          name: '',
+          size: 0,
+          mime: '',
+          width: '',
+          status: 'idle',
+          error: ''
+        }
+      },
+      {
+        type: 'attachment',
+        attrs: {
+          url: '',
+          title: '',
+          name: '',
+          size: 0,
+          mime: '',
+          ext: '',
+          status: 'idle',
+          error: ''
+        }
+      }
+    ])
+
+    editor.destroy()
+  })
 })

@@ -6,15 +6,16 @@ const source = {
   name: 'attachment',
   desc: '插入附件',
   command: ({ editor, range, params = {} }) => {
+    const normalizedParams = params || {}
     const attrs = {
-      url: params.url || '',
-      title: params.title || '',
-      name: params.name || '',
-      size: params.size || 0,
-      mime: params.mime || '',
-      ext: params.ext || '',
-      status: params.status || 'idle',
-      error: params.error || ''
+      url: normalizedParams.url || '',
+      title: normalizedParams.title || '',
+      name: normalizedParams.name || '',
+      size: normalizedParams.size || 0,
+      mime: normalizedParams.mime || '',
+      ext: normalizedParams.ext || '',
+      status: normalizedParams.status || 'idle',
+      error: normalizedParams.error || ''
     }
 
     const chain = editor.chain().focus()

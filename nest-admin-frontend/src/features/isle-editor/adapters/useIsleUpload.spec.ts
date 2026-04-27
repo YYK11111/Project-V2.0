@@ -15,7 +15,7 @@ describe('useIsleUpload adapter', () => {
     uploadMock.mockReset()
   })
 
-  it('将图片上传结果转换为编辑器资源结构', async () => {
+  it('将 bare path 图片上传结果规范化为 src', async () => {
     uploadMock.mockResolvedValue({
       code: 200,
       data: {
@@ -33,24 +33,84 @@ describe('useIsleUpload adapter', () => {
     })
   })
 
-  it('保留已完整的上传路径并支持附件与视频', async () => {
+  it('将附件上传结果保持为 url、name、type 并规范化 bare path', async () => {
+    uploadMock.mockResolvedValue({
+      code: 200,
+      data: {
+        url: 'docs/spec.pdf',
+      },
+    })
+
+    const adapter = useIsleUpload()
+    const result = await adapter.uploadAttachment(new File(['pdf'], 'spec.pdf', { type: 'application/pdf' }))
+
+    expect(result).toEqual({
+      url: '/upload/docs/spec.pdf',
+      name: 'spec.pdf',
+      type: 'attachment',
+    })
+  })
+
+  it('保留 /static/ 图片路径并返回 src', async () => {
+    uploadMock.mockResolvedValue({
+      code: 200,
+      data: {
+        url: '/static/covers/book.png',
+      },
+    })
+
+    const adapter = useIsleUpload()
+    const result = await adapter.uploadImage(new File(['img'], 'book.png', { type: 'image/png' }))
+
+    expect(result).toEqual({
+      src: '/static/covers/book.png',
+      name: 'book.png',
+      type: 'image',
+    })
+  })
+
+  it('保留 /upload/ 视频路径并返回 src', async () => {
+    uploadMock.mockResolvedValue({
+      code: 200,
+      data: {
+        url: '/upload/videos/demo.mp4',
+      },
+    })
+
+    const adapter = useIsleUpload()
+    const result = await adapter.uploadVideo(new File(['video'], 'demo.mp4', { type: 'video/mp4' }))
+
+    expect(result).toEqual({
+      src: '/upload/videos/demo.mp4',
+      name: 'demo.mp4',
+      type: 'video',
+    })
+  })
+
+  it('将 static bare path 规范化为 /static/ 路径', async () => {
+    uploadMock.mockResolvedValue({
+      code: 200,
+      data: {
+        url: 'static/docs/manual.pdf',
+      },
+    })
+
+    const adapter = useIsleUpload()
+    const result = await adapter.uploadAttachment(new File(['pdf'], 'manual.pdf', { type: 'application/pdf' }))
+
+    expect(result).toEqual({
+      url: '/static/docs/manual.pdf',
+      name: 'manual.pdf',
+      type: 'attachment',
+    })
+  })
+
+  it('保留完整的绝对地址', async () => {
     uploadMock
       .mockResolvedValueOnce({
         code: 200,
         data: {
-          url: '/upload/docs/spec.pdf',
-        },
-      })
-      .mockResolvedValueOnce({
-        code: 200,
-        data: {
-          url: '/static/docs/manual.pdf',
-        },
-      })
-      .mockResolvedValueOnce({
-        code: 200,
-        data: {
-          url: 'static/covers/book.png',
+          url: 'https://cdn.example.com/book.png',
         },
       })
       .mockResolvedValueOnce({
@@ -61,23 +121,11 @@ describe('useIsleUpload adapter', () => {
       })
 
     const adapter = useIsleUpload()
-    const attachment = await adapter.uploadAttachment(new File(['pdf'], 'spec.pdf', { type: 'application/pdf' }))
-    const staticAttachment = await adapter.uploadAttachment(new File(['pdf'], 'manual.pdf', { type: 'application/pdf' }))
-    const staticImage = await adapter.uploadImage(new File(['img'], 'book.png', { type: 'image/png' }))
+    const image = await adapter.uploadImage(new File(['img'], 'book.png', { type: 'image/png' }))
     const video = await adapter.uploadVideo(new File(['video'], 'demo.mp4', { type: 'video/mp4' }))
 
-    expect(attachment).toEqual({
-      url: '/upload/docs/spec.pdf',
-      name: 'spec.pdf',
-      type: 'attachment',
-    })
-    expect(staticAttachment).toEqual({
-      url: '/static/docs/manual.pdf',
-      name: 'manual.pdf',
-      type: 'attachment',
-    })
-    expect(staticImage).toEqual({
-      src: '/static/covers/book.png',
+    expect(image).toEqual({
+      src: 'https://cdn.example.com/book.png',
       name: 'book.png',
       type: 'image',
     })

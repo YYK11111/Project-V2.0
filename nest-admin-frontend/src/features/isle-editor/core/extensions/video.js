@@ -6,16 +6,17 @@ const source = {
   name: 'video',
   desc: '插入视频',
   command: ({ editor, range, params = {} }) => {
+    const normalizedParams = params || {}
     const attrs = {
-      src: params.src || '',
-      poster: params.poster || '',
-      title: params.title || '',
-      name: params.name || '',
-      size: params.size || 0,
-      mime: params.mime || '',
-      width: params.width || '',
-      status: params.status || 'idle',
-      error: params.error || ''
+      src: normalizedParams.src || '',
+      poster: normalizedParams.poster || '',
+      title: normalizedParams.title || '',
+      name: normalizedParams.name || '',
+      size: normalizedParams.size || 0,
+      mime: normalizedParams.mime || '',
+      width: normalizedParams.width || '',
+      status: normalizedParams.status || 'idle',
+      error: normalizedParams.error || ''
     }
 
     const chain = editor.chain().focus()

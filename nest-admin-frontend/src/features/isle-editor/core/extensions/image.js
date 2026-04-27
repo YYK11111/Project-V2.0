@@ -6,16 +6,17 @@ const source = {
   name: 'image',
   desc: '插入图片',
   command: ({ editor, range, params = {} }) => {
+    const normalizedParams = params || {}
     const attrs = {
-      src: params.src || '',
-      alt: params.alt || '',
-      title: params.title || '',
-      name: params.name || '',
-      size: params.size || 0,
-      mime: params.mime || '',
-      width: params.width || '',
-      status: params.status || 'idle',
-      error: params.error || ''
+      src: normalizedParams.src || '',
+      alt: normalizedParams.alt || '',
+      title: normalizedParams.title || '',
+      name: normalizedParams.name || '',
+      size: normalizedParams.size || 0,
+      mime: normalizedParams.mime || '',
+      width: normalizedParams.width || '',
+      status: normalizedParams.status || 'idle',
+      error: normalizedParams.error || ''
     }
 
     const chain = editor.chain().focus()

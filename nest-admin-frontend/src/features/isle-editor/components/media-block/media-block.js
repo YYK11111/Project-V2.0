@@ -138,6 +138,28 @@ function createUrlReplaceAttrs(type, value, attrs) {
   return nextAttrs
 }
 
+function getBaseUploadAttrs(type, file, attrs) {
+  const urlKey = mediaTypeMap[type].urlKey
+  const nextAttrs = {
+    name: file.name,
+    title: file.name,
+    size: file.size,
+    mime: file.type,
+    status: 'uploading',
+    error: ''
+  }
+
+  if (attrs[urlKey]) {
+    nextAttrs[urlKey] = attrs[urlKey]
+  }
+
+  if (type === 'attachment') {
+    nextAttrs.ext = getFileExtension(file.name)
+  }
+
+  return nextAttrs
+}
+
 export default defineComponent({
   name: 'MediaBlock',
   props: {
@@ -166,6 +188,7 @@ export default defineComponent({
     const urlInput = ref('')
     const inputRef = ref(null)
     const isSubmittingUrl = ref(false)
+    const isUrlMode = ref(false)
 
     const type = computed(() => props.node.type.name)
     const typeConfig = computed(() => mediaTypeMap[type.value])
@@ -202,6 +225,8 @@ export default defineComponent({
       return parts.join(' · ')
     })
     const placeholderText = computed(() => t(typeConfig.value.placeholderKey))
+    const isEmpty = computed(() => !urlValue.value)
+    const isPristineEmpty = computed(() => isEmpty.value && status.value === 'idle')
 
     function openPicker() {
       if (isUploading.value) {
@@ -217,17 +242,7 @@ export default defineComponent({
       }
 
       const uploadHandler = props.editor.mediaHandlers?.[typeConfig.value.uploadHandlerKey]
-      const baseAttrs = {
-        name: file.name,
-        size: file.size,
-        mime: file.type,
-        status: 'uploading',
-        error: ''
-      }
-
-      if (type.value === 'attachment') {
-        baseAttrs.ext = getFileExtension(file.name)
-      }
+      const baseAttrs = getBaseUploadAttrs(type.value, file, props.node.attrs)
 
       props.updateAttributes(baseAttrs)
 
@@ -281,7 +296,16 @@ export default defineComponent({
       })
 
       urlInput.value = ''
+      isUrlMode.value = false
       isSubmittingUrl.value = false
+    }
+
+    function openUrlMode() {
+      if (isUploading.value) {
+        return
+      }
+
+      isUrlMode.value = true
     }
 
     function removeBlock() {
@@ -293,6 +317,18 @@ export default defineComponent({
 
       if (canOpenSource.value) {
         window.open(value, '_blank', 'noopener,noreferrer')
+      }
+    }
+
+    function copySource() {
+      if (!urlValue.value) {
+        return
+      }
+
+      const writeTask = navigator.clipboard?.writeText(urlValue.value)
+
+      if (writeTask && typeof writeTask.catch === 'function') {
+        writeTask.catch(() => {})
       }
     }
 
@@ -387,11 +423,34 @@ export default defineComponent({
       return h('div', { class: `${prefixClass}-media-block__actions` }, [
         h(IButton, { onClick: openPicker, semiActive: isUploading.value, disabled: isUploading.value }, {
           icon: () => h(IIcon, { name: status.value === 'error' ? 'refreshCw' : 'upload', size: 13 }),
-          default: () => h('span', status.value === 'error' ? t('retryUpload') : t('upload'))
+          default: () => h('span', status.value === 'error' ? t('retryUpload') : status.value === 'done' ? '替换' : t('upload'))
         }),
         h(IButton, { onClick: openSource, disabled: !canOpenSource.value }, {
           icon: () => h(IIcon, { name: 'openRight', size: 13 }),
           default: () => h('span', t('open'))
+        }),
+        type.value !== 'video'
+          ? h(IButton, { onClick: copySource, disabled: !canOpenSource.value }, {
+              icon: () => h(IIcon, { name: 'copy', size: 13 }),
+              default: () => h('span', '复制链接')
+            })
+          : null,
+        h(IButton, { onClick: removeBlock, danger: true }, {
+          icon: () => h(IIcon, { name: 'trash', size: 13 }),
+          default: () => h('span', t('delete'))
+        })
+      ])
+    }
+
+    function renderEmptyActions() {
+      return h('div', { class: `${prefixClass}-media-block__actions` }, [
+        h(IButton, { onClick: openPicker, disabled: isUploading.value }, {
+          icon: () => h(IIcon, { name: 'upload', size: 13 }),
+          default: () => h('span', '上传本地文件')
+        }),
+        h(IButton, { onClick: openUrlMode, disabled: isUploading.value }, {
+          icon: () => h(IIcon, { name: 'link', size: 13 }),
+          default: () => h('span', '通过链接插入')
         }),
         h(IButton, { onClick: removeBlock, danger: true }, {
           icon: () => h(IIcon, { name: 'trash', size: 13 }),
@@ -448,25 +507,27 @@ export default defineComponent({
                     : null
                 ]),
                 renderDetails(),
-                h('div', { class: `${prefixClass}-media-block__url-box` }, [
-                  h('input', {
-                    value: urlInput.value,
-                    placeholder: placeholderText.value,
-                    class: `${prefixClass}-media-block__url-input`,
-                    onInput: event => {
-                      urlInput.value = event.target.value
-                    },
-                    onKeydown: event => {
-                      if (event.key === 'Enter') {
-                        submitUrl()
-                      }
-                    }
-                  }),
-                  h(IButton, { onClick: submitUrl, success: true, disabled: isSubmittingUrl.value || isUploading.value }, {
-                    default: () => h('span', t('confirm'))
-                  })
-                ]),
-                renderActions()
+                isUrlMode.value
+                  ? h('div', { class: `${prefixClass}-media-block__url-box` }, [
+                      h('input', {
+                        value: urlInput.value,
+                        placeholder: placeholderText.value,
+                        class: `${prefixClass}-media-block__url-input`,
+                        onInput: event => {
+                          urlInput.value = event.target.value
+                        },
+                        onKeydown: event => {
+                          if (event.key === 'Enter') {
+                            submitUrl()
+                          }
+                        }
+                      }),
+                      h(IButton, { onClick: submitUrl, success: true, disabled: isSubmittingUrl.value || isUploading.value }, {
+                        default: () => h('span', t('confirm'))
+                      })
+                    ])
+                  : null,
+                isPristineEmpty.value ? renderEmptyActions() : renderActions()
               ])
             ])
           ]

@@ -135,4 +135,18 @@ watch(documentValue, async () => {
   width: 100%;
   min-height: 24px;
 }
+
+.isle-article-viewer :deep([data-type='attachment']) {
+  display: block;
+  border: 1px solid var(--el-border-color);
+  border-radius: 12px;
+  background: var(--el-bg-color-page);
+  padding: 12px 14px;
+}
+
+.isle-article-viewer :deep([data-type='attachment'] > a) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+}
 </style>
