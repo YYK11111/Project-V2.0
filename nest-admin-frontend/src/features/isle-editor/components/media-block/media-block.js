@@ -1,4 +1,4 @@
-import { computed, defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
 import { prefixClass, t } from '../../core/index.js'
 import { NodeViewWrapper } from '../node-view/index.js'
 import { IButton, IIcon } from '../ui/index.js'
@@ -189,6 +189,7 @@ export default defineComponent({
     const inputRef = ref(null)
     const isSubmittingUrl = ref(false)
     const isUrlMode = ref(false)
+    const ownedObjectUrls = new Set()
 
     const type = computed(() => props.node.type.name)
     const typeConfig = computed(() => mediaTypeMap[type.value])
@@ -227,6 +228,27 @@ export default defineComponent({
     const placeholderText = computed(() => t(typeConfig.value.placeholderKey))
     const isEmpty = computed(() => !urlValue.value)
     const isPristineEmpty = computed(() => isEmpty.value && status.value === 'idle')
+    const showCompletedPopover = computed(() => !isPristineEmpty.value && props.selected)
+    const showEmptyPopover = computed(() => isPristineEmpty.value && props.selected)
+
+    function isBlobUrl(value) {
+      return typeof value === 'string' && value.startsWith('blob:')
+    }
+
+    function rememberObjectUrl(value) {
+      if (isBlobUrl(value)) {
+        ownedObjectUrls.add(value)
+      }
+    }
+
+    function revokeObjectUrl(value) {
+      if (!ownedObjectUrls.has(value)) {
+        return
+      }
+
+      URL.revokeObjectURL(value)
+      ownedObjectUrls.delete(value)
+    }
 
     function openPicker() {
       if (isUploading.value) {
@@ -261,6 +283,8 @@ export default defineComponent({
           throw new Error(t('uploadResultInvalid'))
         }
 
+        rememberObjectUrl(normalized[typeConfig.value.urlKey])
+
         props.updateAttributes(normalized)
       } catch (uploadError) {
         props.updateAttributes({
@@ -290,14 +314,17 @@ export default defineComponent({
 
       isSubmittingUrl.value = true
 
-      props.updateAttributes({
-        [typeConfig.value.urlKey]: value,
-        ...createUrlReplaceAttrs(type.value, value, props.node.attrs)
-      })
+      try {
+        props.updateAttributes({
+          [typeConfig.value.urlKey]: value,
+          ...createUrlReplaceAttrs(type.value, value, props.node.attrs)
+        })
 
-      urlInput.value = ''
-      isUrlMode.value = false
-      isSubmittingUrl.value = false
+        urlInput.value = ''
+        isUrlMode.value = false
+      } finally {
+        isSubmittingUrl.value = false
+      }
     }
 
     function openUrlMode() {
@@ -309,8 +336,23 @@ export default defineComponent({
     }
 
     function removeBlock() {
+      revokeObjectUrl(urlValue.value)
       props.deleteNode()
     }
+
+    watch(urlValue, (nextValue, previousValue) => {
+      if (previousValue && previousValue !== nextValue) {
+        revokeObjectUrl(previousValue)
+      }
+    })
+
+    onBeforeUnmount(() => {
+      revokeObjectUrl(urlValue.value)
+      ownedObjectUrls.forEach(value => {
+        URL.revokeObjectURL(value)
+      })
+      ownedObjectUrls.clear()
+    })
 
     function openSource() {
       const value = urlValue.value
@@ -442,6 +484,19 @@ export default defineComponent({
       ])
     }
 
+    function renderErrorActions() {
+      return h('div', { class: `${prefixClass}-media-block__actions` }, [
+        h(IButton, { onClick: openPicker, semiActive: isUploading.value, disabled: isUploading.value }, {
+          icon: () => h(IIcon, { name: 'refreshCw', size: 13 }),
+          default: () => h('span', t('retryUpload'))
+        }),
+        h(IButton, { onClick: removeBlock, danger: true }, {
+          icon: () => h(IIcon, { name: 'trash', size: 13 }),
+          default: () => h('span', t('delete'))
+        })
+      ])
+    }
+
     function renderEmptyActions() {
       return h('div', { class: `${prefixClass}-media-block__actions` }, [
         h(IButton, { onClick: openPicker, disabled: isUploading.value }, {
@@ -456,6 +511,45 @@ export default defineComponent({
           icon: () => h(IIcon, { name: 'trash', size: 13 }),
           default: () => h('span', t('delete'))
         })
+      ])
+    }
+
+    function renderEmptyPopover() {
+      if (!showEmptyPopover.value) {
+        return null
+      }
+
+      return h('div', { class: `${prefixClass}-media-block__popover` }, [
+        isUrlMode.value
+          ? h('div', { class: `${prefixClass}-media-block__url-box` }, [
+              h('input', {
+                value: urlInput.value,
+                placeholder: placeholderText.value,
+                class: `${prefixClass}-media-block__url-input`,
+                onInput: event => {
+                  urlInput.value = event.target.value
+                },
+                onKeydown: event => {
+                  if (event.key === 'Enter') {
+                    submitUrl()
+                  }
+                }
+              }),
+              h(IButton, { onClick: submitUrl, success: true, disabled: isSubmittingUrl.value || isUploading.value }, {
+                default: () => h('span', t('confirm'))
+              })
+            ])
+          : renderEmptyActions()
+      ])
+    }
+
+    function renderSelectedPopover() {
+      if (!showCompletedPopover.value) {
+        return null
+      }
+
+      return h('div', { class: `${prefixClass}-media-block__popover` }, [
+        status.value === 'error' ? renderErrorActions() : renderActions()
       ])
     }
 
@@ -495,40 +589,23 @@ export default defineComponent({
                     h('span', { class: `${prefixClass}-media-block__empty-text` }, t(`${type.value}Empty`))
                   ])
               ]),
-              h('div', { class: `${prefixClass}-media-block__content` }, [
-                h('div', { class: `${prefixClass}-media-block__header` }, [
-                  h('div', { class: `${prefixClass}-media-block__title` }, title.value || t(type.value)),
-                  metaText.value
-                    ? h('div', { class: `${prefixClass}-media-block__meta` }, metaText.value)
-                    : null,
-                  renderStatus(),
-                  status.value === 'error' && error.value
-                    ? h('div', { class: `${prefixClass}-media-block__error` }, error.value)
-                    : null
-                ]),
-                renderDetails(),
-                isUrlMode.value
-                  ? h('div', { class: `${prefixClass}-media-block__url-box` }, [
-                      h('input', {
-                        value: urlInput.value,
-                        placeholder: placeholderText.value,
-                        class: `${prefixClass}-media-block__url-input`,
-                        onInput: event => {
-                          urlInput.value = event.target.value
-                        },
-                        onKeydown: event => {
-                          if (event.key === 'Enter') {
-                            submitUrl()
-                          }
-                        }
-                      }),
-                      h(IButton, { onClick: submitUrl, success: true, disabled: isSubmittingUrl.value || isUploading.value }, {
-                        default: () => h('span', t('confirm'))
-                      })
-                    ])
-                  : null,
-                isPristineEmpty.value ? renderEmptyActions() : renderActions()
-              ])
+              !isPristineEmpty.value
+                ? h('div', { class: `${prefixClass}-media-block__content` }, [
+                    h('div', { class: `${prefixClass}-media-block__header` }, [
+                      h('div', { class: `${prefixClass}-media-block__title` }, title.value || t(type.value)),
+                      metaText.value
+                        ? h('div', { class: `${prefixClass}-media-block__meta` }, metaText.value)
+                        : null,
+                      renderStatus(),
+                      status.value === 'error' && error.value
+                        ? h('div', { class: `${prefixClass}-media-block__error` }, error.value)
+                        : null
+                    ]),
+                    renderDetails()
+                  ])
+                : null,
+              renderSelectedPopover(),
+              renderEmptyPopover()
             ])
           ]
         }

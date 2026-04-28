@@ -10,14 +10,18 @@ function createNode(type, attrs = {}) {
   }
 }
 
-function createWrapper(type, attrs = {}, handlers = {}) {
+type MediaBlockTestOptions = {
+  selected?: boolean
+}
+
+function createWrapper(type, attrs = {}, handlers = {}, options: MediaBlockTestOptions = {}) {
   return mount(MediaBlock, {
     props: {
       editor: {
         mediaHandlers: handlers,
       },
       node: createNode(type, attrs),
-      selected: false,
+      selected: options.selected ?? false,
       updateAttributes: vi.fn(),
       deleteNode: vi.fn(),
     },
@@ -41,8 +45,12 @@ async function triggerFileSelect(wrapper, file) {
   await input.trigger('change')
 }
 
+function findPopover(wrapper) {
+  return wrapper.find('.isle-editor-media-block__popover')
+}
+
 describe('MediaBlock', () => {
-  it('图片块完成态展示替换、打开、复制链接、删除动作', () => {
+  it('图片块完成态默认不常驻展示动作面板', () => {
     const wrapper = createWrapper('image', {
       src: '/upload/demo.png',
       name: 'demo.png',
@@ -51,10 +59,26 @@ describe('MediaBlock', () => {
 
     expect(wrapper.find('img').attributes('src')).toBe('/upload/demo.png')
     expect(wrapper.text()).toContain('demo.png')
-    expect(wrapper.text()).toContain('替换')
-    expect(wrapper.text()).toContain('打开')
-    expect(wrapper.text()).toContain('复制链接')
-    expect(wrapper.text()).toContain('删除')
+    expect(wrapper.find('.isle-editor-media-block__actions').exists()).toBe(false)
+    expect(findPopover(wrapper).exists()).toBe(false)
+  })
+
+  it('图片块完成态选中后通过 popover 展示动作面板', () => {
+    const wrapper = createWrapper('image', {
+      src: '/upload/demo.png',
+      name: 'demo.png',
+      status: 'done',
+    }, {}, {
+      selected: true,
+    })
+
+    const popover = findPopover(wrapper)
+
+    expect(popover.exists()).toBe(true)
+    expect(popover.text()).toContain('替换')
+    expect(popover.text()).toContain('打开')
+    expect(popover.text()).toContain('复制链接')
+    expect(popover.text()).toContain('删除')
   })
 
   it('附件块保持文件卡片并显示元信息', () => {
@@ -88,26 +112,52 @@ describe('MediaBlock', () => {
     expect(uploadImage).toHaveBeenCalled()
   })
 
-  it('空媒体块优先展示本地上传和链接插入入口，初始不展示 URL 输入区', () => {
+  it('空媒体块默认不常驻展示上传本地和通过链接按钮', () => {
     const wrapper = createWrapper('image', {
       status: 'idle',
     })
 
-    expect(wrapper.text()).toContain('上传本地文件')
-    expect(wrapper.text()).toContain('通过链接插入')
+    const popover = findPopover(wrapper)
+
+    expect(popover.exists()).toBe(false)
     expect(wrapper.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+    expect(wrapper.find('.isle-editor-media-block__content').exists()).toBe(false)
   })
 
-  it('点击通过链接插入后才展开 URL 输入区', async () => {
+  it('空媒体块被选中时显示贴块动作面板', () => {
     const wrapper = createWrapper('attachment', {
       status: 'idle',
+    }, {}, {
+      selected: true,
     })
 
-    expect(wrapper.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+    const popover = findPopover(wrapper)
 
-    await wrapper.findAll('button').find(button => button.text().includes('通过链接插入'))?.trigger('click')
+    expect(popover.exists()).toBe(true)
+    expect(popover.text()).toContain('上传本地文件')
+    expect(popover.text()).toContain('通过链接插入')
+    expect(popover.text()).toContain('删除')
+    expect(wrapper.classes()).toContain('is-selected')
+  })
 
-    expect(wrapper.find('.isle-editor-media-block__url-input').exists()).toBe(true)
+  it('点击通过链接后在浮层中切换到链接输入态', async () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    const initialPopover = findPopover(wrapper)
+
+    expect(initialPopover.exists()).toBe(true)
+    expect(initialPopover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+
+    await wrapper.findAll('button').find(button => button.text().includes('通过链接'))?.trigger('click')
+
+    const popover = findPopover(wrapper)
+
+    expect(popover.exists()).toBe(true)
+    expect(popover.find('.isle-editor-media-block__url-input').exists()).toBe(true)
   })
 
   it('uploading 且无 URL 时不显示纯空块 CTA', () => {
@@ -131,8 +181,27 @@ describe('MediaBlock', () => {
 
     expect(wrapper.text()).not.toContain('上传本地文件')
     expect(wrapper.text()).not.toContain('通过链接插入')
-    expect(wrapper.text()).toContain('重试上传')
     expect(wrapper.text()).toContain('上传失败')
+    expect(wrapper.find('.isle-editor-media-block__actions').exists()).toBe(false)
+    expect(findPopover(wrapper).exists()).toBe(false)
+  })
+
+  it('错误态块选中后通过 popover 提供重试和删除', () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'error',
+      error: '上传失败',
+      name: 'broken.pdf',
+    }, {}, {
+      selected: true,
+    })
+
+    const popover = findPopover(wrapper)
+
+    expect(popover.exists()).toBe(true)
+    expect(popover.text()).toContain('重试上传')
+    expect(popover.text()).toContain('删除')
+    expect(popover.text()).not.toContain('打开')
+    expect(popover.text()).not.toContain('复制链接')
   })
 
   it('URL 确认在原块上更新而不重建块', async () => {
@@ -144,6 +213,8 @@ describe('MediaBlock', () => {
       ext: 'MP4',
       poster: '/upload/poster.png',
       status: 'idle',
+    }, {}, {
+      selected: true,
     })
 
     const beforeId = wrapper.findComponent(MediaBlock).vm.$.uid
@@ -167,6 +238,29 @@ describe('MediaBlock', () => {
       poster: '',
     })
     expect(wrapper.findComponent(MediaBlock).vm.$.uid).toBe(beforeId)
+  })
+
+  it('URL 确认成功后关闭浮层内链接输入态', async () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    await wrapper.findAll('button').find(button => button.text().includes('通过链接插入'))?.trigger('click')
+    await wrapper.find('.isle-editor-media-block__url-input').setValue('https://cdn.test/file.pdf')
+    await wrapper.findAll('button').find(button => button.text().includes('确认'))?.trigger('click')
+
+    const popover = findPopover(wrapper)
+
+    expect(wrapper.props('updateAttributes')).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://cdn.test/file.pdf',
+      status: 'done',
+    }))
+    expect(popover.exists()).toBe(true)
+    expect(popover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+    expect(popover.text()).toContain('上传本地文件')
+    expect(popover.text()).toContain('通过链接插入')
   })
 
   it('无 source 的空块不显示打开操作', () => {
@@ -249,6 +343,109 @@ describe('MediaBlock', () => {
     })
 
     URL.createObjectURL = originalCreateObjectURL
+  })
+
+  it('本地 blob 资源改为链接时会释放 object URL', async () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    })
+    const file = new File(['pdf'], 'local.pdf', { type: 'application/pdf' })
+    const revokeObjectURL = vi.fn()
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+
+    URL.createObjectURL = vi.fn(() => 'blob:local.pdf')
+    URL.revokeObjectURL = revokeObjectURL
+
+    await triggerFileSelect(wrapper, file)
+    await wrapper.setProps({
+      node: createNode('attachment', {
+        url: 'blob:local.pdf',
+        name: 'local.pdf',
+        ext: 'PDF',
+        mime: 'application/pdf',
+        size: file.size,
+        status: 'done',
+      }),
+    })
+    await wrapper.setProps({
+      node: createNode('attachment', {
+        url: 'https://cdn.test/next.pdf',
+        name: 'next.pdf',
+        ext: 'PDF',
+        mime: '',
+        size: 0,
+        status: 'done',
+      }),
+    })
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:local.pdf')
+
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
+  })
+
+  it('组件卸载时会释放本地 blob 资源', async () => {
+    const wrapper = createWrapper('image', {
+      status: 'idle',
+    })
+    const file = new File(['img'], 'local.png', { type: 'image/png' })
+    const revokeObjectURL = vi.fn()
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+
+    URL.createObjectURL = vi.fn(() => 'blob:local.png')
+    URL.revokeObjectURL = revokeObjectURL
+
+    await triggerFileSelect(wrapper, file)
+    await wrapper.setProps({
+      node: createNode('image', {
+      src: 'blob:local.png',
+      name: 'local.png',
+      status: 'done',
+      }),
+    })
+
+    wrapper.unmount()
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:local.png')
+
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
+  })
+
+  it('删除节点时会释放本地 blob 资源', async () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+    const file = new File(['pdf'], 'local.pdf', { type: 'application/pdf' })
+    const revokeObjectURL = vi.fn()
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+
+    URL.createObjectURL = vi.fn(() => 'blob:delete.pdf')
+    URL.revokeObjectURL = revokeObjectURL
+
+    await triggerFileSelect(wrapper, file)
+    await wrapper.setProps({
+      node: createNode('attachment', {
+        url: 'blob:delete.pdf',
+        name: 'local.pdf',
+        ext: 'PDF',
+        mime: 'application/pdf',
+        size: file.size,
+        status: 'done',
+      }),
+    })
+    await wrapper.findAll('button').find(button => button.text().includes('删除'))?.trigger('click')
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:delete.pdf')
+    expect(wrapper.props('deleteNode')).toHaveBeenCalled()
+
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
   })
 
   it('失败后再次上传会在原块重试成功并保留已有 source', async () => {
