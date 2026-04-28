@@ -225,10 +225,10 @@ export default defineComponent({
       editor.value.getCharacters = getCharacters
       editor.value.mediaHandlers = props.mediaHandlers || {}
 
-      editor.contentComponent = instance?.ctx._
+      editor.value.contentComponent = props.editable ? instance?.ctx._ : null
 
       if (instance) {
-        editor.appContext = {
+        editor.value.appContext = {
           ...instance.appContext,
           provides: instance.provides,
         }
