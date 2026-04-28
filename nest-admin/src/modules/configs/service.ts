@@ -5,6 +5,8 @@ import { FindManyOptions, Like, Repository, UpdateResult } from "typeorm";
 import { SystenConfig } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
+import { SysFileService } from "src/modules/sys/file/service";
+import { BusinessType } from "src/modules/sys/file/entity";
 
 @Injectable()
 export class SystenConfigsService extends BaseService<
@@ -13,8 +15,16 @@ export class SystenConfigsService extends BaseService<
 > {
   constructor(
     @InjectRepository(SystenConfig) repository: Repository<SystenConfig>,
+    protected readonly sysFileService: SysFileService,
   ) {
     super(SystenConfig, repository);
+  }
+
+  async save(createDto: SystenConfigDto) {
+    const previousConfig = await this.getLatestConfig();
+    const savedConfig = await super.save(createDto);
+    await this.syncBrandingFiles(previousConfig, savedConfig);
+    return savedConfig;
   }
 
   async getSessionExpireMinutes() {
@@ -145,6 +155,59 @@ export class SystenConfigsService extends BaseService<
       where: { isDelete: null as any } as any,
       order: { createTime: "DESC" as any },
     });
+  }
+
+  private async syncBrandingFiles(
+    previousConfig?: Pick<SystenConfig, "systemLogo" | "browserIcon"> | null,
+    savedConfig?: Pick<
+      SystenConfig,
+      "id" | "systemLogo" | "browserIcon"
+    > | null,
+  ) {
+    if (!savedConfig?.id) return;
+
+    const nextPaths = this.normalizeBrandingPaths(
+      this.getBrandingPaths(savedConfig),
+    );
+    const previousPaths = this.normalizeBrandingPaths(
+      this.getBrandingPaths(previousConfig),
+    );
+
+    for (const path of nextPaths) {
+      const file = await this.sysFileService.findByPath(path);
+      if (!file?.id) continue;
+      await this.sysFileService.associateFiles({
+        businessType: BusinessType.SystemConfig,
+        businessId: savedConfig.id,
+        fileIds: [file.id],
+      });
+    }
+
+    for (const path of previousPaths) {
+      if (nextPaths.includes(path)) continue;
+      await this.sysFileService.softDeleteByPath(path);
+    }
+  }
+
+  private getBrandingPaths(
+    config?: Pick<SystenConfig, "systemLogo" | "browserIcon"> | null,
+  ) {
+    return [config?.systemLogo, config?.browserIcon];
+  }
+
+  private normalizeBrandingPaths(paths: Array<string | null | undefined>) {
+    return Array.from(
+      new Set(
+        paths
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+          .filter((item) => !this.isExternalPath(item)),
+      ),
+    );
+  }
+
+  private isExternalPath(value: string) {
+    return /^https?:\/\//i.test(value);
   }
 
   async getProjectReminderStrategy() {

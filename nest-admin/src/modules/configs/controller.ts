@@ -3,10 +3,7 @@ import {
   Get,
   Post,
   Body,
-  Patch,
-  Param,
   Delete,
-  Put,
   Query,
   Req,
   HttpCode,
@@ -25,6 +22,21 @@ export class SystenConfigsController extends BaseController<
 > {
   constructor(readonly service: SystenConfigsService) {
     super(service);
+  }
+
+  @Post("save")
+  async save(@Body() body, @Req() req) {
+    if (body.id) {
+      delete body.createUser;
+      body.updateUser = req.user.id;
+    } else {
+      delete body.updateUser;
+      body.createUser = req.user.name;
+    }
+    body._operatorPermissions = req.user.permissions || [];
+    body._operatorName = req.user.name;
+    body._operatorId = req.user.id;
+    return this.service.save(body);
   }
 
   @Get("list")

@@ -26,6 +26,7 @@ export enum BusinessType {
   Task = "task",
   Ticket = "ticket",
   Change = "change",
+  SystemConfig = "system_config",
 }
 
 export const businessTypeMap = {
@@ -34,6 +35,7 @@ export const businessTypeMap = {
   [BusinessType.Task]: "任务附件",
   [BusinessType.Ticket]: "工单附件",
   [BusinessType.Change]: "变更附件",
+  [BusinessType.SystemConfig]: "系统配置附件",
 };
 
 @MyEntity("sys_file")
