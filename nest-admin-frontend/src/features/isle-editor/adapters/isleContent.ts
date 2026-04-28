@@ -11,9 +11,13 @@ export interface IsleContentNode {
   content?: IsleContentNode[]
 }
 
+export interface IsleContentDocumentNode extends IsleContentNode {
+  content?: IsleContentDocumentNode[]
+}
+
 export interface IsleContentDocument {
   type: 'doc'
-  content: IsleContentNode[]
+  content: IsleContentDocumentNode[]
 }
 
 export function createEmptyIsleContent(): IsleContentDocument {

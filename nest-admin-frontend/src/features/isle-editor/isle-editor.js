@@ -2,6 +2,7 @@ import { changeLocale, prefixClass } from './core/index.js'
 import { defineComponent, getCurrentInstance, h, onMounted, ref, shallowRef, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 
+import { buildDocumentFromPaste } from './input'
 import { changeTheme } from './utils/index.js'
 import { Editor } from './editor.js'
 import './styles/index.scss'
@@ -131,8 +132,31 @@ export default defineComponent({
       return ['extension', 'node', 'mark'].includes(ext?.type)
     })
 
+    const handlePaste = (view, event, slice) => {
+      const clipboardData = event?.clipboardData
+      const document = buildDocumentFromPaste({
+        html: clipboardData?.getData('text/html') || '',
+        text: clipboardData?.getData('text/plain') || '',
+      })
+
+      if (document) {
+        event.preventDefault()
+        editor.value?.commands.insertContent(document.content)
+        return true
+      }
+
+      const nextHandlePaste = props.editorProps?.handlePaste
+
+      if (typeof nextHandlePaste === 'function') {
+        return nextHandlePaste(view, event, slice)
+      }
+
+      return false
+    }
+
     const editorProps = {
       ...props.editorProps,
+      handlePaste,
       attributes: {
         ...(props.editorProps?.attributes || {}),
         class: [prefixClass, props.editorProps?.attributes?.class].filter(Boolean).join(' '),
