@@ -137,7 +137,7 @@ defineExpose({
 
 .isle-article-editor__layout {
   display: flex;
-  min-height: 640px;
+  height: clamp(640px, 72vh, 980px);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
   overflow: hidden;
@@ -153,6 +153,7 @@ defineExpose({
 
 .isle-article-editor__main {
   display: flex;
+  min-height: 0;
   min-width: 0;
   flex: 1;
   flex-direction: column;
@@ -172,12 +173,28 @@ defineExpose({
 
 .isle-article-editor__scroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
 .isle-article-editor__content {
+  box-sizing: border-box;
   max-width: 860px;
   margin: 0 auto;
   padding: 20px 28px 40px;
+}
+
+@media (max-width: 1024px) {
+  .isle-article-editor__layout {
+    height: min(70vh, 760px);
+  }
+
+  .isle-article-editor__toc {
+    display: none;
+  }
+
+  .isle-article-editor__toc-toggle {
+    display: none;
+  }
 }
 </style>
