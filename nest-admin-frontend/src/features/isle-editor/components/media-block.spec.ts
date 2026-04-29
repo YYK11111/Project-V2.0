@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import MediaBlock from './media-block/media-block.js'
@@ -49,7 +51,35 @@ function findPopover(wrapper) {
   return wrapper.find('.isle-editor-media-block__popover')
 }
 
+function findBottomPopover(wrapper) {
+  return wrapper.find('.isle-editor-media-block__bottom-popover')
+}
+
+const mediaBlockSource = readFileSync(
+  `${process.cwd()}/src/features/isle-editor/components/media-block/media-block.js`,
+  'utf-8'
+)
+
+const mediaBlockStyleSource = readFileSync(
+  resolve(process.cwd(), 'src/features/isle-editor/styles/media-block.scss'),
+  'utf-8'
+)
+
+function readMediaBlockRootStyleBlock() {
+  const start = mediaBlockStyleSource.indexOf('.#{$prefix}-media-block {')
+  const end = mediaBlockStyleSource.indexOf('&.is-selected {')
+
+  return mediaBlockStyleSource.slice(start, end)
+}
+
 describe('MediaBlock', () => {
+  it('底部浮层样式允许浮层越过块体边界并相对块本体定位', () => {
+    const source = readMediaBlockRootStyleBlock()
+
+    expect(source).toContain('position: relative;')
+    expect(source).not.toContain('overflow: hidden;')
+  })
+
   it('图片块完成态默认不常驻展示动作面板', () => {
     const wrapper = createWrapper('image', {
       src: '/upload/demo.png',
@@ -131,13 +161,79 @@ describe('MediaBlock', () => {
       selected: true,
     })
 
+    const bottomPopover = findBottomPopover(wrapper)
+
+    expect(bottomPopover.exists()).toBe(true)
+    expect(bottomPopover.text()).toContain('上传本地文件')
+    expect(bottomPopover.text()).toContain('通过链接插入')
+    expect(bottomPopover.text()).toContain('删除')
+    expect(wrapper.classes()).toContain('is-selected')
+  })
+
+  it('选中空块时渲染底部悬浮浮层容器', () => {
+    const wrapper = createWrapper('image', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    const bottomPopover = findBottomPopover(wrapper)
+
+    expect(bottomPopover.exists()).toBe(true)
+    expect(bottomPopover.text()).toContain('上传本地文件')
+    expect(bottomPopover.text()).toContain('通过链接插入')
+    expect(bottomPopover.text()).toContain('删除')
+  })
+
+  it('底部浮层容器使用块下方绝对定位合同', () => {
+    expect(mediaBlockSource).toContain("position: 'absolute'")
+    expect(mediaBlockSource).toContain("top: 'calc(100% + 8px)'")
+    expect(mediaBlockSource).toContain("left: '0'")
+  })
+
+  it('底部浮层收敛为单一渲染入口', () => {
+    expect(mediaBlockSource).toContain('function renderBottomPopover()')
+    expect(mediaBlockSource).not.toContain('function renderEmptyPopover()')
+    expect(mediaBlockSource).not.toContain('function renderSelectedPopover()')
+    expect(mediaBlockSource).toContain('renderBottomPopover()')
+  })
+
+  it('空块本体不再包含块内 footer 或 popover 入口', () => {
+    const wrapper = createWrapper('image', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    expect(wrapper.find('.isle-editor-media-block__footer').exists()).toBe(false)
+    expect(wrapper.find('.isle-editor-media-block__body .isle-editor-media-block__popover').exists()).toBe(false)
+  })
+
+  it('媒体块根节点包含底部浮层定位锚点 class', () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    expect(wrapper.classes()).toContain('isle-editor-media-block--bottom-popover-anchor')
+  })
+
+  it('选中完成态时 popover 渲染为 body 的兄弟节点', () => {
+    const wrapper = createWrapper('image', {
+      src: '/upload/demo.png',
+      name: 'demo.png',
+      status: 'done',
+    }, {}, {
+      selected: true,
+    })
+
+    const body = wrapper.find('.isle-editor-media-block__body')
     const popover = findPopover(wrapper)
 
     expect(popover.exists()).toBe(true)
-    expect(popover.text()).toContain('上传本地文件')
-    expect(popover.text()).toContain('通过链接插入')
-    expect(popover.text()).toContain('删除')
-    expect(wrapper.classes()).toContain('is-selected')
+    expect(body.element.contains(popover.element)).toBe(false)
+    expect(popover.element.parentElement).toBe(wrapper.element)
   })
 
   it('点击通过链接后在浮层中切换到链接输入态', async () => {
@@ -147,17 +243,17 @@ describe('MediaBlock', () => {
       selected: true,
     })
 
-    const initialPopover = findPopover(wrapper)
+    const initialBottomPopover = findBottomPopover(wrapper)
 
-    expect(initialPopover.exists()).toBe(true)
-    expect(initialPopover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+    expect(initialBottomPopover.exists()).toBe(true)
+    expect(initialBottomPopover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
 
     await wrapper.findAll('button').find(button => button.text().includes('通过链接'))?.trigger('click')
 
-    const popover = findPopover(wrapper)
+    const bottomPopover = findBottomPopover(wrapper)
 
-    expect(popover.exists()).toBe(true)
-    expect(popover.find('.isle-editor-media-block__url-input').exists()).toBe(true)
+    expect(bottomPopover.exists()).toBe(true)
+    expect(bottomPopover.find('.isle-editor-media-block__url-input').exists()).toBe(true)
   })
 
   it('uploading 且无 URL 时不显示纯空块 CTA', () => {
@@ -186,7 +282,7 @@ describe('MediaBlock', () => {
     expect(findPopover(wrapper).exists()).toBe(false)
   })
 
-  it('错误态块选中后通过 popover 提供重试和删除', () => {
+  it('错误态块选中后底部浮层只显示重试上传和删除', () => {
     const wrapper = createWrapper('attachment', {
       status: 'error',
       error: '上传失败',
@@ -196,12 +292,17 @@ describe('MediaBlock', () => {
     })
 
     const popover = findPopover(wrapper)
+    const bottomPopover = findBottomPopover(wrapper)
 
     expect(popover.exists()).toBe(true)
+    expect(bottomPopover.exists()).toBe(true)
+    expect(popover.classes()).toContain('isle-editor-media-block__bottom-popover')
     expect(popover.text()).toContain('重试上传')
     expect(popover.text()).toContain('删除')
     expect(popover.text()).not.toContain('打开')
     expect(popover.text()).not.toContain('复制链接')
+    expect(popover.text()).not.toContain('上传本地文件')
+    expect(popover.text()).not.toContain('通过链接插入')
   })
 
   it('URL 确认在原块上更新而不重建块', async () => {
@@ -251,16 +352,54 @@ describe('MediaBlock', () => {
     await wrapper.find('.isle-editor-media-block__url-input').setValue('https://cdn.test/file.pdf')
     await wrapper.findAll('button').find(button => button.text().includes('确认'))?.trigger('click')
 
-    const popover = findPopover(wrapper)
+    const bottomPopover = findBottomPopover(wrapper)
 
     expect(wrapper.props('updateAttributes')).toHaveBeenCalledWith(expect.objectContaining({
       url: 'https://cdn.test/file.pdf',
       status: 'done',
     }))
-    expect(popover.exists()).toBe(true)
-    expect(popover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
-    expect(popover.text()).toContain('上传本地文件')
-    expect(popover.text()).toContain('通过链接插入')
+    expect(bottomPopover.exists()).toBe(true)
+    expect(bottomPopover.find('.isle-editor-media-block__url-input').exists()).toBe(false)
+    expect(bottomPopover.text()).toContain('上传本地文件')
+    expect(bottomPopover.text()).toContain('通过链接插入')
+    expect(findPopover(wrapper).classes()).toContain('isle-editor-media-block__bottom-popover')
+  })
+
+  it('通过链接后仍然使用同一个底部浮层容器', async () => {
+    const wrapper = createWrapper('attachment', {
+      status: 'idle',
+    }, {}, {
+      selected: true,
+    })
+
+    const initialBottomPopover = findBottomPopover(wrapper)
+    const initialElement = initialBottomPopover.element
+
+    await wrapper.findAll('button').find(button => button.text().includes('通过链接插入'))?.trigger('click')
+    await wrapper.find('.isle-editor-media-block__url-input').setValue('https://cdn.test/file.pdf')
+    await wrapper.findAll('button').find(button => button.text().includes('确认'))?.trigger('click')
+    await wrapper.setProps({
+      node: createNode('attachment', {
+        url: 'https://cdn.test/file.pdf',
+        name: 'file.pdf',
+        title: 'file.pdf',
+        status: 'done',
+        error: '',
+        size: 0,
+        mime: '',
+        ext: 'PDF',
+        poster: '',
+      }),
+    })
+
+    const nextBottomPopover = findBottomPopover(wrapper)
+
+    expect(initialBottomPopover.exists()).toBe(true)
+    expect(nextBottomPopover.exists()).toBe(true)
+    expect(nextBottomPopover.element).toBe(initialElement)
+    expect(nextBottomPopover.element.parentElement).toBe(wrapper.element)
+    expect(findPopover(wrapper).classes()).toContain('isle-editor-media-block__bottom-popover')
+    expect(wrapper.find('.isle-editor-media-block__body .isle-editor-media-block__popover').exists()).toBe(false)
   })
 
   it('无 source 的空块不显示打开操作', () => {

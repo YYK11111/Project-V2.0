@@ -2,10 +2,10 @@
 
 .#{$prefix}-media-block {
   margin-top: var(--#{$prefix}-margin);
+  position: relative;
   border: 1px solid var(--#{$prefix}-border-color);
   border-radius: 0.75rem;
   background-color: var(--#{$prefix}-bg-color);
-  overflow: hidden;
 
   &.is-selected {
     border-color: rgba(var(--#{$prefix}-theme-primary-val), 0.65);

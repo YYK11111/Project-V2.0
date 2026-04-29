@@ -228,8 +228,12 @@ export default defineComponent({
     const placeholderText = computed(() => t(typeConfig.value.placeholderKey))
     const isEmpty = computed(() => !urlValue.value)
     const isPristineEmpty = computed(() => isEmpty.value && status.value === 'idle')
-    const showCompletedPopover = computed(() => !isPristineEmpty.value && props.selected)
-    const showEmptyPopover = computed(() => isPristineEmpty.value && props.selected)
+    const showBottomPopover = computed(() => props.selected)
+    const popoverStyle = {
+      position: 'absolute',
+      top: 'calc(100% + 8px)',
+      left: '0'
+    }
 
     function isBlobUrl(value) {
       return typeof value === 'string' && value.startsWith('blob:')
@@ -514,13 +518,9 @@ export default defineComponent({
       ])
     }
 
-    function renderEmptyPopover() {
-      if (!showEmptyPopover.value) {
-        return null
-      }
-
-      return h('div', { class: `${prefixClass}-media-block__popover` }, [
-        isUrlMode.value
+    function renderBottomPopoverContent() {
+      if (isPristineEmpty.value) {
+        return isUrlMode.value
           ? h('div', { class: `${prefixClass}-media-block__url-box` }, [
               h('input', {
                 value: urlInput.value,
@@ -540,16 +540,21 @@ export default defineComponent({
               })
             ])
           : renderEmptyActions()
-      ])
+      }
+
+      return status.value === 'error' ? renderErrorActions() : renderActions()
     }
 
-    function renderSelectedPopover() {
-      if (!showCompletedPopover.value) {
+    function renderBottomPopover() {
+      if (!showBottomPopover.value) {
         return null
       }
 
-      return h('div', { class: `${prefixClass}-media-block__popover` }, [
-        status.value === 'error' ? renderErrorActions() : renderActions()
+      return h('div', {
+        class: [`${prefixClass}-media-block__popover`, `${prefixClass}-media-block__bottom-popover`],
+        style: popoverStyle
+      }, [
+        renderBottomPopoverContent()
       ])
     }
 
@@ -560,6 +565,7 @@ export default defineComponent({
           class: [
             `${prefixClass}-media-block`,
             `${prefixClass}-media-block--${type.value}`,
+            `${prefixClass}-media-block--bottom-popover-anchor`,
             {
               'is-selected': props.selected,
               'is-uploading': status.value === 'uploading',
@@ -604,9 +610,8 @@ export default defineComponent({
                     renderDetails()
                   ])
                 : null,
-              renderSelectedPopover(),
-              renderEmptyPopover()
-            ])
+            ]),
+            renderBottomPopover()
           ]
         }
       )
