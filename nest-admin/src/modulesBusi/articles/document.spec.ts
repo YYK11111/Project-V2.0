@@ -244,6 +244,12 @@ describe("ArticlesService document guards", () => {
       createQueryBuilder: jest.fn(),
       update: jest.fn(),
     };
+    const embeddingService = {
+      rebuildArticleChunkEmbeddings: jest.fn().mockResolvedValue({
+        status: "ready",
+        count: 1,
+      }),
+    };
 
     const service = new ArticlesService(
       repository as never,
@@ -255,6 +261,7 @@ describe("ArticlesService document guards", () => {
       { getOne: jest.fn() } as never,
       { recordKeyword: jest.fn(), getHotKeywords: jest.fn() } as never,
       { deleteTimeout: jest.fn(), addTimeout: jest.fn() } as never,
+      embeddingService as never,
     );
 
     jest
@@ -264,7 +271,7 @@ describe("ArticlesService document guards", () => {
       )
       .mockResolvedValue(undefined);
 
-    return { service, repository };
+    return { service, repository, embeddingService };
   };
 
   it("提取 Isle JSON 嵌套节点纯文本并按块分隔", () => {
@@ -406,10 +413,7 @@ describe("ArticlesService document guards", () => {
           },
           {
             type: "paragraph",
-            content: [
-              { type: "text", text: "保留正文" },
-              { type: "divider" },
-            ],
+            content: [{ type: "text", text: "保留正文" }, { type: "divider" }],
           },
           {
             type: "taskList",
@@ -465,6 +469,155 @@ describe("ArticlesService document guards", () => {
           text: expect.stringContaining("新的知识正文"),
         }),
       ]),
+    );
+  });
+
+  it("基于 contentJson 生成带标题路径和长度估算的结构化切片", async () => {
+    const { service, repository } = createService();
+
+    const result = await service.save({
+      id: "article-1",
+      title: "项目复盘知识",
+      contentJson: {
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "项目复盘" }],
+          },
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "风险总结" }],
+          },
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "这里是风险内容，需要沉淀到知识库。" },
+            ],
+          },
+          {
+            type: "taskList",
+            content: [
+              {
+                type: "taskItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "记录阻塞项" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      contentVersion: 1,
+    });
+
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contentChunks: expect.arrayContaining([
+          expect.objectContaining({
+            id: "article-1:1:1",
+            order: 1,
+            title: "风险总结",
+            headingPath: ["项目复盘", "风险总结"],
+            text: expect.stringContaining("这里是风险内容"),
+            tokenEstimate: expect.any(Number),
+          }),
+        ]),
+      }),
+    );
+    expect(result.contentChunks[0].headingPath).toEqual([
+      "项目复盘",
+      "风险总结",
+    ]);
+  });
+
+  it("保存知识后同步重建 mock embedding 并更新 ready 状态", async () => {
+    const { service, repository, embeddingService } = createService();
+
+    const result = await service.save({
+      id: "article-embed-1",
+      title: "向量知识",
+      contentJson: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "需要生成 mock 向量" }],
+          },
+        ],
+      },
+      contentVersion: 1,
+    });
+
+    expect(embeddingService.rebuildArticleChunkEmbeddings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        articleId: "article-embed-1",
+        embeddingVersion: 1,
+        chunks: expect.any(Array),
+      }),
+    );
+    expect(result.embeddingStatus).toBe("ready");
+    expect(repository.update).toHaveBeenCalledWith("article-embed-1", {
+      embeddingStatus: "ready",
+    });
+  });
+
+  it("手动重建向量失败时记录 failed 状态和错误原因", async () => {
+    const { service, repository, embeddingService } = createService();
+    jest.spyOn(service as never, "getOne" as never).mockResolvedValue({
+      id: "article-embed-2",
+      contentChunks: [{ id: "c1", order: 1, title: "片段", text: "正文" }],
+      embeddingVersion: 1,
+    });
+    embeddingService.rebuildArticleChunkEmbeddings.mockRejectedValueOnce(
+      new Error("mock failed"),
+    );
+
+    await expect(service.rebuildEmbeddings("article-embed-2")).rejects.toThrow(
+      "mock failed",
+    );
+    expect(repository.update).toHaveBeenCalledWith("article-embed-2", {
+      embeddingStatus: "failed",
+    });
+  });
+
+  it("结构化切片会限制过长内容长度", () => {
+    const { service } = createService();
+    const longText = Array.from(
+      { length: 120 },
+      () => "这是一段很长的项目复盘风险内容",
+    ).join("。");
+
+    const chunks = (service as never).buildStructuredContentChunks(
+      {
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "长文档" }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: longText }],
+          },
+        ],
+      },
+      "article-2",
+      3,
+    );
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(
+      Math.max(...chunks.map((chunk) => chunk.text.length)),
+    ).toBeLessThanOrEqual(900);
+    expect(chunks.every((chunk) => chunk.headingPath.includes("长文档"))).toBe(
+      true,
     );
   });
 
@@ -539,6 +692,50 @@ describe("ArticlesService document guards", () => {
       }),
     );
     expect(result.contentText).toBe("从 JSON 重建切片");
+  });
+
+  it("AI 检索评分返回字段命中和运营加权明细", () => {
+    const { service } = createService();
+
+    const detail = (service as never).calculateAiRetrieveScore(
+      {
+        title: "项目复盘风险总结",
+        keywords: "复盘,风险",
+        summary: "沉淀项目风险复盘经验",
+        aiPreferred: "1",
+        authorityLevel: "1",
+        retrievalWeight: 6,
+        updateTime: new Date().toISOString(),
+      },
+      {
+        title: "风险处理",
+        text: "项目复盘时需要记录阻塞和风险处理过程",
+        summary: "风险处理过程",
+      },
+      "项目复盘风险",
+    );
+
+    expect(detail.finalScore).toBeGreaterThan(detail.keywordScore);
+    expect(detail.keywordScore).toBeGreaterThan(0);
+    expect(detail.aiPreferredBonus).toBe(5);
+    expect(detail.authorityBonus).toBe(4);
+    expect(detail.retrievalWeightBonus).toBe(3);
+    expect(detail.matchedTerms).toEqual(
+      expect.arrayContaining(["项目", "复盘", "风险"]),
+    );
+    expect(detail.matchedFields).toEqual(
+      expect.arrayContaining(["title", "keywords", "summary", "chunkText"]),
+    );
+  });
+
+  it("AI 检索按中文短语生成可命中的检索词", () => {
+    const { service } = createService();
+
+    const terms = (service as never).getAiRetrieveTerms("项目复盘风险");
+
+    expect(terms).toEqual(
+      expect.arrayContaining(["项目", "复盘", "风险", "项目复盘", "复盘风险"]),
+    );
   });
 
   it("无查看权限时列表脱敏应清空 contentJson 和切片", async () => {

@@ -86,10 +86,13 @@ export class Article extends BaseEntity {
 
   @Column({ type: "json", nullable: true, comment: "内容切片" })
   contentChunks: Array<{
+    id?: string;
     order: number;
     title: string;
+    headingPath?: string[];
     text: string;
     summary: string;
+    tokenEstimate?: number;
   }>;
 
   @Column({ type: "json", nullable: true, comment: "结构化正文协议" })

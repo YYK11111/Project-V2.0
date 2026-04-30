@@ -26,6 +26,7 @@ import {
   validateDocumentJson,
   validateDocumentSchemaVersion,
 } from "./document.validator";
+import { ArticleChunkEmbeddingsService } from "../articleChunkEmbeddings/service";
 
 @Injectable()
 export class ArticlesService extends BaseService<Article, ArticleDto> {
@@ -42,6 +43,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     private usersService: UsersService,
     private articleSearchRecordsService: ArticleSearchRecordsService,
     private tasksService: TasksService,
+    private articleChunkEmbeddingsService: ArticleChunkEmbeddingsService,
   ) {
     super(Article, repository);
   }
@@ -70,9 +72,14 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     dto.contentText =
       this.extractPlainTextFromDocument(dto.contentJson) ||
       this.extractPlainTextFromHtml(dto.content);
-    dto.contentChunks = this.buildContentChunks(dto.contentText);
     dto.contentVersion = DOCUMENT_SCHEMA_VERSION;
     dto.contentStatus = DOCUMENT_READY_STATUS;
+    dto.contentChunks = this.buildContentChunks(
+      dto.contentText,
+      dto.contentJson,
+      dto.id,
+      dto.contentVersion,
+    );
     const operatorId = dto._operatorId ? String(dto._operatorId) : "";
     if (!dto.authorId && operatorId) {
       dto.authorId = operatorId;
@@ -135,7 +142,11 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
 
     dto.id && this.tasksService.deleteTimeout("Timeout:articles:" + dto.id);
 
-    let res = await super.save(dto);
+    const res = await super.save(dto);
+    await this.syncArticleEmbeddings(res);
+    await this.repository.update(res.id, {
+      embeddingStatus: res.embeddingStatus,
+    });
 
     if (dto.status !== Status.draft && dto.publishTime) {
       let task = (id) => {
@@ -149,6 +160,24 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     }
 
     return res;
+  }
+
+  async rebuildEmbeddings(id: string) {
+    const article = await this.getOne({ where: { id } });
+    try {
+      const result =
+        await this.articleChunkEmbeddingsService.rebuildArticleChunkEmbeddings({
+          articleId: article.id,
+          embeddingVersion: Number(article.embeddingVersion || 1),
+          chunks: article.contentChunks || [],
+        });
+      await this.repository.update(id, { embeddingStatus: result.status });
+      article.embeddingStatus = result.status;
+      return { ...result, articleId: id };
+    } catch (error) {
+      await this.repository.update(id, { embeddingStatus: "failed" });
+      throw error;
+    }
   }
 
   async list(
@@ -331,6 +360,11 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
   ) {
     const keyword = String(query.keyword || "").trim();
     const limit = Math.min(Number(query.limit || 10), 20);
+    const catalogIds = query.catalogId
+      ? (await this.articleCatalogsService.getChildren({ id: query.catalogId }))
+          ?.map((item) => item.id)
+          .filter(Boolean)
+      : [];
     const currentUserId = currentUser?.id ? String(currentUser.id) : "";
     const roleIds = currentUserId
       ? await this.getCurrentUserRoleIds(currentUserId)
@@ -349,10 +383,8 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
         knowledgeType: query.knowledgeType,
       });
     }
-    if (query.catalogId) {
-      qb.andWhere("article.catalogId = :catalogId", {
-        catalogId: query.catalogId,
-      });
+    if (catalogIds?.length) {
+      qb.andWhere("article.catalogId IN (:...catalogIds)", { catalogIds });
     }
     if (keyword) {
       qb.andWhere(
@@ -562,10 +594,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       const documentNode = node as Record<string, unknown>;
       let text = "";
 
-      if (
-        typeof documentNode.text === "string" &&
-        documentNode.text.length
-      ) {
+      if (typeof documentNode.text === "string" && documentNode.text.length) {
         text += normalizeInlineText(documentNode.text);
       }
 
@@ -606,18 +635,199 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       .trim();
   }
 
-  private buildContentChunks(contentText = "") {
+  private buildContentChunks(
+    contentText = "",
+    contentJson?: DocumentNode | Record<string, unknown> | null,
+    articleId = "",
+    contentVersion = DOCUMENT_SCHEMA_VERSION,
+  ) {
+    const structuredChunks = this.buildStructuredContentChunks(
+      contentJson,
+      articleId,
+      contentVersion,
+    );
+    if (structuredChunks.length) {
+      return structuredChunks;
+    }
+
     const paragraphs = String(contentText || "")
       .split(/(?<=[。！？\.!?])\s+/)
       .map((item) => item.trim())
       .filter(Boolean);
 
     return paragraphs.slice(0, 50).map((text, index) => ({
+      id: this.createChunkId(articleId, contentVersion, index + 1),
       order: index + 1,
       title: `片段 ${index + 1}`,
+      headingPath: [],
       text,
       summary: text.slice(0, 120),
+      tokenEstimate: this.estimateTokenCount(text),
     }));
+  }
+
+  private buildStructuredContentChunks(
+    contentJson?: DocumentNode | Record<string, unknown> | null,
+    articleId = "",
+    contentVersion = DOCUMENT_SCHEMA_VERSION,
+  ) {
+    if (!contentJson || typeof contentJson !== "object") {
+      return [];
+    }
+
+    const chunks: Array<{
+      id: string;
+      order: number;
+      title: string;
+      headingPath: string[];
+      text: string;
+      summary: string;
+      tokenEstimate: number;
+    }> = [];
+    const headingPath: string[] = [];
+    const maxChunkLength = 900;
+    const targetChunkLength = 500;
+    let pendingTexts: string[] = [];
+    let pendingHeadingPath: string[] = [];
+    let order = 1;
+
+    const flushPending = () => {
+      const text = pendingTexts.join(" ").replace(/\s+/g, " ").trim();
+      if (!text) return;
+      this.splitChunkText(text, maxChunkLength).forEach((chunkText) => {
+        const title =
+          pendingHeadingPath[pendingHeadingPath.length - 1] || `片段 ${order}`;
+        chunks.push({
+          id: this.createChunkId(articleId, contentVersion, order),
+          order,
+          title,
+          headingPath: [...pendingHeadingPath],
+          text: chunkText,
+          summary: chunkText.slice(0, 120),
+          tokenEstimate: this.estimateTokenCount(chunkText),
+        });
+        order += 1;
+      });
+      pendingTexts = [];
+    };
+
+    const appendBlockText = (text: string) => {
+      const normalizedText = String(text || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!normalizedText) return;
+      if (
+        pendingTexts.length &&
+        pendingTexts.join(" ").length + normalizedText.length >
+          targetChunkLength
+      ) {
+        flushPending();
+      }
+      pendingHeadingPath = [...headingPath];
+      pendingTexts.push(normalizedText);
+      if (pendingTexts.join(" ").length >= targetChunkLength) {
+        flushPending();
+      }
+    };
+
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== "object") return;
+      const documentNode = node as Record<string, any>;
+      const nodeType =
+        typeof documentNode.type === "string" ? documentNode.type : "";
+
+      if (nodeType === "heading") {
+        flushPending();
+        const level = Math.max(
+          1,
+          Math.min(Number(documentNode.attrs?.level || 1), 6),
+        );
+        const headingText = this.collectInlineText(documentNode).trim();
+        if (headingText) {
+          headingPath.splice(level - 1);
+          headingPath[level - 1] = headingText;
+        }
+        return;
+      }
+
+      if (
+        [
+          "paragraph",
+          "taskItem",
+          "blockquote",
+          "codeBlock",
+          "tableCell",
+          "tableHeader",
+        ].includes(nodeType)
+      ) {
+        appendBlockText(this.collectInlineText(documentNode));
+        return;
+      }
+
+      if (Array.isArray(documentNode.content)) {
+        documentNode.content.forEach((child) => walk(child));
+      }
+    };
+
+    walk(contentJson);
+    flushPending();
+    return chunks.slice(0, 50);
+  }
+
+  private collectInlineText(node: unknown): string {
+    if (!node || typeof node !== "object") return "";
+    const documentNode = node as Record<string, unknown>;
+    const currentText =
+      typeof documentNode.text === "string" ? documentNode.text : "";
+    const childText = Array.isArray(documentNode.content)
+      ? documentNode.content
+          .map((child) => this.collectInlineText(child))
+          .join("")
+      : "";
+    return `${currentText}${childText}`;
+  }
+
+  private splitChunkText(text: string, maxLength: number) {
+    if (text.length <= maxLength) return [text];
+    const sentences = text
+      .split(/(?<=[。！？\.!?])\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const result: string[] = [];
+    let current = "";
+    sentences.forEach((sentence) => {
+      if (!current) {
+        current = sentence;
+        return;
+      }
+      if (current.length + sentence.length > maxLength) {
+        result.push(current.slice(0, maxLength));
+        current = sentence;
+        return;
+      }
+      current = `${current} ${sentence}`;
+    });
+    if (current) result.push(current.slice(0, maxLength));
+    return result.flatMap((item) => {
+      if (item.length <= maxLength) return [item];
+      const chunks: string[] = [];
+      for (let index = 0; index < item.length; index += maxLength) {
+        chunks.push(item.slice(index, index + maxLength));
+      }
+      return chunks;
+    });
+  }
+
+  private estimateTokenCount(text: string) {
+    return Math.ceil(String(text || "").length / 2);
+  }
+
+  private createChunkId(
+    articleId: string,
+    contentVersion: number,
+    order: number,
+  ) {
+    return `${articleId || "article"}:${contentVersion || DOCUMENT_SCHEMA_VERSION}:${order}`;
   }
 
   private buildAiRetrieveItems(article: any, keyword: string) {
@@ -625,6 +835,17 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       ? article.contentChunks
       : [];
     if (!chunks.length) {
+      const chunk = {
+        order: 0,
+        title: "全文",
+        text: article.contentText || "",
+        summary: (article.contentText || "").slice(0, 120),
+      };
+      const scoreBreakdown = this.calculateAiRetrieveScore(
+        article,
+        chunk,
+        keyword,
+      );
       return [
         {
           articleId: article.id,
@@ -638,19 +859,19 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
             id: tag.id,
             name: tag.name,
           })),
-          chunkOrder: 0,
-          chunkTitle: "全文",
-          chunkText: article.contentText || "",
-          chunkSummary: (article.contentText || "").slice(0, 120),
-          score: this.calculateChunkScore(
-            article.title +
-              " " +
-              (article.summary || "") +
-              " " +
-              (article.contentText || ""),
-            keyword,
-          ),
+          chunkOrder: chunk.order,
+          chunkTitle: chunk.title,
+          headingPath: chunk.headingPath || [],
+          chunkText: chunk.text,
+          chunkSummary: chunk.summary,
+          tokenEstimate: chunk.tokenEstimate,
+          score: scoreBreakdown.finalScore,
+          scoreBreakdown,
+          matchedTerms: scoreBreakdown.matchedTerms,
+          matchedFields: scoreBreakdown.matchedFields,
           retrievalWeight: article.retrievalWeight,
+          aiPreferred: article.aiPreferred,
+          authorityLevel: article.authorityLevel,
           embeddingStatus: article.embeddingStatus,
           embeddingVersion: article.embeddingVersion,
           visibilityType: article.visibilityType,
@@ -659,31 +880,43 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       ];
     }
 
-    return chunks.map((chunk) => ({
-      articleId: article.id,
-      articleTitle: article.title,
-      articleSummary: article.summary || article.desc || "",
-      catalog: article.catalog
-        ? { id: article.catalog.id, name: article.catalog.name }
-        : null,
-      knowledgeType: article.knowledgeType,
-      tags: (article.tags || []).map((tag) => ({ id: tag.id, name: tag.name })),
-      chunkOrder: chunk.order,
-      chunkTitle: chunk.title,
-      chunkText: chunk.text,
-      chunkSummary: chunk.summary,
-      score: this.calculateChunkScore(
-        `${article.title} ${article.summary || ""} ${chunk.title || ""} ${chunk.text || ""}`,
+    return chunks.map((chunk) => {
+      const scoreBreakdown = this.calculateAiRetrieveScore(
+        article,
+        chunk,
         keyword,
-      ),
-      retrievalWeight: article.retrievalWeight,
-      aiPreferred: article.aiPreferred,
-      authorityLevel: article.authorityLevel,
-      embeddingStatus: article.embeddingStatus,
-      embeddingVersion: article.embeddingVersion,
-      visibilityType: article.visibilityType,
-      updateTime: article.updateTime,
-    }));
+      );
+      return {
+        articleId: article.id,
+        articleTitle: article.title,
+        articleSummary: article.summary || article.desc || "",
+        catalog: article.catalog
+          ? { id: article.catalog.id, name: article.catalog.name }
+          : null,
+        knowledgeType: article.knowledgeType,
+        tags: (article.tags || []).map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+        })),
+        chunkOrder: chunk.order,
+        chunkTitle: chunk.title,
+        headingPath: chunk.headingPath || [],
+        chunkText: chunk.text,
+        chunkSummary: chunk.summary,
+        tokenEstimate: chunk.tokenEstimate,
+        score: scoreBreakdown.finalScore,
+        scoreBreakdown,
+        matchedTerms: scoreBreakdown.matchedTerms,
+        matchedFields: scoreBreakdown.matchedFields,
+        retrievalWeight: article.retrievalWeight,
+        aiPreferred: article.aiPreferred,
+        authorityLevel: article.authorityLevel,
+        embeddingStatus: article.embeddingStatus,
+        embeddingVersion: article.embeddingVersion,
+        visibilityType: article.visibilityType,
+        updateTime: article.updateTime,
+      };
+    });
   }
 
   async rebuildChunks(id: string, currentUser?: Record<string, any>) {
@@ -707,11 +940,33 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     article.contentText =
       this.extractPlainTextFromDocument(article.contentJson) ||
       this.extractPlainTextFromHtml(article.content);
-    article.contentChunks = this.buildContentChunks(article.contentText);
+    article.contentChunks = this.buildContentChunks(
+      article.contentText,
+      article.contentJson,
+      article.id,
+      Number(article.contentVersion || DOCUMENT_SCHEMA_VERSION),
+    );
     article.embeddingStatus = "pending";
     article.embeddingVersion = Number(article.embeddingVersion || 1) + 1;
+    await this.syncArticleEmbeddings(article);
     article.updateUser = currentUser?.name || article.updateUser;
     return this.repository.save(article);
+  }
+
+  private async syncArticleEmbeddings(article: Article) {
+    try {
+      const result =
+        await this.articleChunkEmbeddingsService.rebuildArticleChunkEmbeddings({
+          articleId: article.id,
+          embeddingVersion: Number(article.embeddingVersion || 1),
+          chunks: article.contentChunks || [],
+        });
+      article.embeddingStatus = result.status;
+      return result;
+    } catch (error) {
+      article.embeddingStatus = "failed";
+      throw error;
+    }
   }
 
   async del(
@@ -792,15 +1047,90 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       return 1;
     }
     const normalizedText = String(text || "").toLowerCase();
-    const terms = keyword
-      .toLowerCase()
-      .split(/\s+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const terms = this.getAiRetrieveTerms(keyword);
     return terms.reduce(
       (score, term) => (normalizedText.includes(term) ? score + 1 : score),
       0,
     );
+  }
+
+  private getAiRetrieveTerms(keyword: string) {
+    const normalizedKeyword = String(keyword || "")
+      .toLowerCase()
+      .trim();
+    const baseTerms = normalizedKeyword
+      .split(/[\s,，、;；]+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 1);
+    const compactKeyword = normalizedKeyword.replace(/[\s,，、;；]+/g, "");
+    const chineseTerms = compactKeyword.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+    const slidingTerms = chineseTerms.flatMap((text) => {
+      const result: string[] = [];
+      for (let size = 2; size <= Math.min(4, text.length); size += 1) {
+        for (let index = 0; index <= text.length - size; index += 1) {
+          result.push(text.slice(index, index + size));
+        }
+      }
+      return result;
+    });
+    return [...new Set([...baseTerms, ...slidingTerms])];
+  }
+
+  private calculateAiRetrieveScore(article: any, chunk: any, keyword: string) {
+    const terms = this.getAiRetrieveTerms(keyword);
+    const fieldWeights = [
+      { field: "title", text: article.title, weight: 8 },
+      { field: "keywords", text: article.keywords, weight: 6 },
+      { field: "summary", text: article.summary || article.desc, weight: 4 },
+      { field: "chunkTitle", text: chunk.title, weight: 3 },
+      {
+        field: "chunkText",
+        text: `${chunk.text || ""} ${chunk.summary || ""}`,
+        weight: 1,
+      },
+    ];
+    const matchedTerms = new Set<string>();
+    const matchedFields = new Set<string>();
+    let keywordScore = keyword ? 0 : 1;
+
+    fieldWeights.forEach(({ field, text, weight }) => {
+      const normalizedText = String(text || "").toLowerCase();
+      terms.forEach((term) => {
+        if (!term || !normalizedText.includes(term)) return;
+        matchedTerms.add(term);
+        matchedFields.add(field);
+        keywordScore += weight;
+      });
+    });
+
+    const aiPreferredBonus = String(article.aiPreferred || "0") === "1" ? 5 : 0;
+    const authorityBonus =
+      String(article.authorityLevel || "0") === "1" ? 4 : 0;
+    const retrievalWeightBonus = Number(article.retrievalWeight || 0) * 0.5;
+    const freshnessBonus =
+      article.updateTime && dayjs().diff(dayjs(article.updateTime), "day") <= 30
+        ? 1
+        : 0;
+    const finalScore = Number(
+      (
+        keywordScore +
+        aiPreferredBonus +
+        authorityBonus +
+        retrievalWeightBonus +
+        freshnessBonus
+      ).toFixed(2),
+    );
+
+    return {
+      finalScore,
+      keywordScore,
+      aiPreferredBonus,
+      authorityBonus,
+      retrievalWeightBonus,
+      freshnessBonus,
+      matchedTerms: [...matchedTerms],
+      matchedFields: [...matchedFields],
+    };
   }
 
   private normalizeIdList(value: string[] | string) {

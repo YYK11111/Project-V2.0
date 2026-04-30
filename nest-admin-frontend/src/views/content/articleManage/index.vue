@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { articleTagApi, getKnowledgeTypes, getList, getStatus, getVisibilityTypes, del, rebuildArticleChunks } from './api'
+import { articleTagApi, getKnowledgeTypes, getList, getStatus, getVisibilityTypes, del, rebuildArticleChunks, rebuildArticleEmbeddings } from './api'
 import { listRole } from '@/api/system/role'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
@@ -60,6 +60,13 @@ function removeTag(item: any) {
 function rebuildChunks(row: any) {
   rebuildArticleChunks(row.id).then(() => {
     $sdk.msgSuccess('切片重建成功')
+    rctRef.value?.getList?.()
+  })
+}
+
+function rebuildEmbeddings(row: any) {
+  rebuildArticleEmbeddings(row.id).then(() => {
+    $sdk.msgSuccess('向量重建成功')
     rctRef.value?.getList?.()
   })
 }
@@ -168,29 +175,33 @@ catalog.getTrees()
       <el-tab-pane label="知识列表" name="articles">
         <RequestChartTable ref="rctRef" class="knowledge-article-table-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
-          <div class="query-grid">
-            <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
-            <BaSelect v-model="query.status" filterable label="状态" prop="status">
-              <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-            </BaSelect>
-            <BaSelect v-model="query.knowledgeType" filterable label="知识类型" prop="knowledgeType">
-              <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key"></el-option>
-            </BaSelect>
-            <BaSelect v-model="query.visibilityType" filterable label="可见范围" prop="visibilityType">
-              <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
-            </BaSelect>
-            <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
-              <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
-            </BaSelect>
-            <BaInput v-model="query.sourceProjectId" label="来源项目ID" prop="sourceProjectId"></BaInput>
-            <BaSelect v-model="query.templateType" filterable label="模板类型" prop="templateType">
-              <el-option v-for="(label, key) in templateTypeMap" :key="key" :label="label" :value="key"></el-option>
-            </BaSelect>
-            <BaFormItem label="标签" prop="tagIds">
-              <el-select v-model="query.tagIds" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="选择标签">
-                <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id"></el-option>
-              </el-select>
-            </BaFormItem>
+          <div class="query-sections">
+            <div class="query-section query-section--primary">
+              <div class="query-grid">
+                <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
+                <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                  <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+                </BaSelect>
+                <BaSelect v-model="query.knowledgeType" filterable label="知识类型" prop="knowledgeType">
+                  <el-option v-for="(value, key) of knowledgeTypes" :key="key" :label="value" :value="key"></el-option>
+                </BaSelect>
+                <BaSelect v-model="query.visibilityType" filterable label="可见范围" prop="visibilityType">
+                  <el-option v-for="(value, key) of visibilityTypes" :key="key" :label="value" :value="key"></el-option>
+                </BaSelect>
+                <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+                  <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
+                </BaSelect>
+                <BaInput v-model="query.sourceProjectId" label="来源项目ID" prop="sourceProjectId"></BaInput>
+                <BaSelect v-model="query.templateType" filterable label="模板类型" prop="templateType">
+                  <el-option v-for="(label, key) in templateTypeMap" :key="key" :label="label" :value="key"></el-option>
+                </BaSelect>
+                <BaFormItem label="标签" prop="tagIds">
+                  <el-select v-model="query.tagIds" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="选择标签">
+                    <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id"></el-option>
+                  </el-select>
+                </BaFormItem>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -303,6 +314,7 @@ catalog.getTrees()
           <TbOpBtn icon="view" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.id } })">详情</TbOpBtn>
           <TbOpBtn v-if="checkPermi(['business/articles/update']) && row.canEdit !== false" icon="edit" @click="rctRef.goRoute(row.id, '/content/aev')">修改</TbOpBtn>
           <TbOpBtn v-if="canAiOperate" icon="refresh" @click="rebuildChunks(row)">重建切片</TbOpBtn>
+          <TbOpBtn v-if="canAiOperate" icon="refresh" @click="rebuildEmbeddings(row)">重建向量</TbOpBtn>
           <TbOpBtn v-if="checkPermi(['business/articles/delete']) && row.canDelete !== false" icon="delete" @click="rctRef.del(del, row.id)">删除</TbOpBtn>
         </template>
         </RequestChartTable>

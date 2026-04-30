@@ -13,6 +13,7 @@ import { ArticleSearchRecordsModule } from "../articleSearchRecords/module";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { Project } from "../projects/entity";
 import { ProjectMember } from "../project-members/entity";
+import { ArticleChunkEmbeddingsModule } from "../articleChunkEmbeddings/module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ProjectMember } from "../project-members/entity";
     ArticleSearchRecordsModule,
     UsersModule,
     TasksModule,
+    ArticleChunkEmbeddingsModule,
   ],
   controllers: [ArticlesController],
   providers: [ArticlesService],

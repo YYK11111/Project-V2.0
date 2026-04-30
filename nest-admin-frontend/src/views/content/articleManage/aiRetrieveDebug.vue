@@ -125,6 +125,8 @@ onMounted(() => {
               <span>分类：{{ item.catalog?.name || '-' }}</span>
               <span>类型：{{ knowledgeTypes[item.knowledgeType] || '-' }}</span>
               <span>切片：{{ item.chunkTitle }}（#{{ item.chunkOrder }}）</span>
+              <span>标题路径：{{ item.headingPath?.join(' / ') || '-' }}</span>
+              <span>长度估算：{{ item.tokenEstimate || '-' }}</span>
             </div>
           </div>
           <div class="result-card__scores">
@@ -139,6 +141,21 @@ onMounted(() => {
           </div>
         </div>
         <div class="result-card__summary">{{ item.chunkSummary || item.articleSummary || '-' }}</div>
+        <div class="score-breakdown">
+          <div class="score-breakdown__title">评分明细</div>
+          <div class="score-breakdown__grid">
+            <span>关键词分：{{ item.scoreBreakdown?.keywordScore ?? '-' }}</span>
+            <span>AI优先：{{ item.scoreBreakdown?.aiPreferredBonus ?? '-' }}</span>
+            <span>权威加权：{{ item.scoreBreakdown?.authorityBonus ?? '-' }}</span>
+            <span>权重加成：{{ item.scoreBreakdown?.retrievalWeightBonus ?? '-' }}</span>
+          </div>
+          <div class="score-breakdown__tags">
+            <span>命中词：</span>
+            <el-tag v-for="term in item.matchedTerms || item.scoreBreakdown?.matchedTerms || []" :key="term" size="small" effect="plain">{{ term }}</el-tag>
+            <span class="score-breakdown__field-label">命中字段：</span>
+            <el-tag v-for="field in item.matchedFields || item.scoreBreakdown?.matchedFields || []" :key="field" size="small" type="info" effect="plain">{{ field }}</el-tag>
+          </div>
+        </div>
         <pre class="result-card__text">{{ item.chunkText || '-' }}</pre>
         <div class="result-card__footer">
           <span>向量状态：{{ item.embeddingStatus }}</span>
@@ -290,6 +307,43 @@ onMounted(() => {
   color: var(--el-text-color-regular);
   line-height: 1.7;
   margin-bottom: 12px;
+}
+
+.score-breakdown {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-bg-color) 80%, var(--el-fill-color-extra-light));
+}
+
+.score-breakdown__title {
+  margin-bottom: 8px;
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score-breakdown__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.score-breakdown__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.score-breakdown__field-label {
+  margin-left: 8px;
 }
 
 .result-card__text {

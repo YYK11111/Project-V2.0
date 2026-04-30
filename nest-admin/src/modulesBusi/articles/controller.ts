@@ -47,6 +47,11 @@ export class ArticlesController extends BaseController<
     return this.service.rebuildChunks(id, req.user);
   }
 
+  @Post("rebuildEmbeddings/:id")
+  rebuildEmbeddings(@Param("id") id: string) {
+    return this.service.rebuildEmbeddings(id);
+  }
+
   @Get("retrieveForAi")
   async retrieveForAi(@Query() query: any, @Req() req) {
     return this.service.retrieveForAi(query, req.user);

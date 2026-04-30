@@ -16,4 +16,13 @@ describe('articleManage 后台管理列表治理守卫', () => {
     expect(source).toContain('AI检索调试')
     expect(source).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)
   })
+
+  it('提供重建向量操作入口', () => {
+    const source = readArticleManageView()
+
+    expect(source).toContain('rebuildArticleEmbeddings')
+    expect(source).toContain('function rebuildEmbeddings')
+    expect(source).toContain('向量重建成功')
+    expect(source).toContain('重建向量')
+  })
 })
