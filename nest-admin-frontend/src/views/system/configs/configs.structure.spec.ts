@@ -23,9 +23,10 @@ describe('system configs structure', () => {
     const source = readSource()
 
     expect(source).toContain("defaultUserPassword: ''")
+    expect(source).toContain('<el-form-item label="默认用户密码" prop="defaultUserPassword">')
     expect(source).toContain('v-model="form.defaultUserPassword"')
-    expect(source).toContain('label="默认用户密码"')
     expect(source).toContain('show-password')
+    expect(source).toContain("defaultUserPassword: data?.defaultUserPassword || ''")
   })
 
   it('加载系统配置后写入全局系统版本', () => {

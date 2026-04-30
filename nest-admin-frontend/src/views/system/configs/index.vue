@@ -183,6 +183,7 @@ function getListFun() {
     const data = res?.list?.[0] || {}
     form.value = {
       ...(data || {}),
+      defaultUserPassword: data?.defaultUserPassword || '',
       projectReminderStrategy: mergeReminderStrategy(data?.projectReminderStrategy),
       projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(data?.projectFieldPermissionMatrix),
     }
@@ -216,7 +217,9 @@ function submit() {
           <BaInput v-model="form.systemName" label="系统名称" prop="systemName"></BaInput>
           <BaInput v-model="form.browserTitle" label="标签页名称" prop="browserTitle"></BaInput>
           <BaInput v-model="form.systemVersion" label="系统版本" prop="systemVersion"></BaInput>
-          <BaInput v-model="form.defaultUserPassword" label="默认用户密码" prop="defaultUserPassword" show-password maxlength="30"></BaInput>
+          <el-form-item label="默认用户密码" prop="defaultUserPassword">
+            <el-input v-model="form.defaultUserPassword" clearable show-password maxlength="30" placeholder="请输入默认用户密码" />
+          </el-form-item>
           <BaInput v-model="form.sessionExpireMinutes" label="有效时间" prop="sessionExpireMinutes" type="number">
             <template #append>分钟</template>
           </BaInput>
