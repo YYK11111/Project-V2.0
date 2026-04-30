@@ -34,6 +34,30 @@ export const constantRoutes = [
     children: [],
   },
   {
+    path: '/index',
+    component: Layout,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/index/index.vue'),
+        name: 'UserHome',
+        meta: { title: '首页', icon: 'home' },
+      },
+    ],
+  },
+  {
+    path: '/adminindex',
+    component: Layout,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/index/adminindex.vue'),
+        name: 'AdminHome',
+        meta: { title: '系统首页', icon: 'dashboard', permissionKey: 'dashboard/adminIndex' },
+      },
+    ],
+  },
+  {
     path: '/login',
     component: () => import('@/layout/visitor'),
     isHidden: true,

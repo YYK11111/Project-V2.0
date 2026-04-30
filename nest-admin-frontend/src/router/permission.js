@@ -11,6 +11,13 @@ NProgress.configure({ showSpinner: true })
 const whiteList = ['/bind', '/test', '/404', '/401'] // 不管有没有token都可直接进入的页面路径
 const noLoginList = ['/authRedirect', '/login', '/register'] // 没有token才能进入的页面
 
+function hasRoutePermission(to, permissions) {
+  const permissionKeys = to.matched.map((route) => route.meta?.permissionKey).filter(Boolean)
+  if (!permissionKeys.length) return true
+  if (permissions?.includes('*')) return true
+  return permissionKeys.every((permissionKey) => permissions?.includes(permissionKey))
+}
+
 function buildRestoreTarget(fullPath) {
   const browserUrl = new URL(fullPath, window.location.origin)
   return {
@@ -93,6 +100,11 @@ export default function permission(router) {
           }
           return { path: '/', replace: true }
         }
+        if (!hasRoutePermission(to, userStore.permissions || [])) {
+          clearInitialBrowserPath()
+          Message.warning('当前页面没有访问权限')
+          return { path: '/401', replace: true }
+        }
         if (to.path === '/' && firstVisibleRoute?.path) {
           clearInitialBrowserPath()
           return { path: firstVisibleRoute.path, replace: true }
@@ -114,6 +126,11 @@ export default function permission(router) {
           if (shouldAttemptRestore) {
             const restored = await tryRestoreInitialPath(router, 'recovered-user')
             if (restored) return restored
+          }
+          if (!hasRoutePermission(to, userStore.permissions || [])) {
+            clearInitialBrowserPath()
+            Message.warning('当前页面没有访问权限')
+            return { path: '/401', replace: true }
           }
           if (to.path === '/') {
             if (firstVisibleRoute?.path) {
