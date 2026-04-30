@@ -232,4 +232,55 @@ describe("ProjectsService closure guards", () => {
       ]),
     ).toThrow(ForbiddenException);
   });
+
+  it("驾驶舱应使用项目列表返回的 list 字段生成项目选项", async () => {
+    const { service } = createService();
+    jest.spyOn(service, "list").mockResolvedValue({
+      list: [
+        {
+          id: "p1",
+          name: "项目A",
+          leader: { id: "u1", name: "NestAdmin" },
+          status: "2",
+          priority: "1",
+          progress: 60,
+          category: "交付",
+          riskLevel: "low",
+          qualityLevel: "high",
+          currency: "CNY",
+          spentHours: 12,
+          budget: 100,
+          actualCost: 80,
+        },
+      ],
+      total: 1,
+    } as any);
+    jest.spyOn(service, "getDashboard").mockResolvedValue({
+      summary: {
+        healthSummary: { totalScore: 88, level: "healthy", levelLabel: "健康" },
+        knowledgeSummary: { recentUpdatedCount: 1 },
+      },
+      focus: { alerts: [] },
+    } as any);
+    jest.spyOn(service as any, "getProjectTrend").mockResolvedValue({
+      dates: [],
+      healthScores: [],
+      riskCounts: [],
+      knowledgeUpdateCounts: [],
+      costVariances: [],
+    });
+
+    const result = await service.getCockpit({
+      pageNum: 1,
+      pageSize: 20,
+    } as any);
+
+    expect(result.projectOptions).toEqual([
+      expect.objectContaining({
+        id: "p1",
+        name: "项目A",
+      }),
+    ]);
+    expect(result.selectedProjectId).toBe("p1");
+  });
 });

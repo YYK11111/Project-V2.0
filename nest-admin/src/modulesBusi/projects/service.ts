@@ -2411,7 +2411,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
   async getCockpit(query: QueryListDto): Promise<any> {
     const projectListRes = await this.list(query);
-    const rawProjects = projectListRes?.data || [];
+    const rawProjects = projectListRes?.list || [];
     const cockpitSampleProjects = rawProjects.slice(0, 20);
     const cockpitSampleMetrics = await Promise.all(
       cockpitSampleProjects.map(async (item) => {
