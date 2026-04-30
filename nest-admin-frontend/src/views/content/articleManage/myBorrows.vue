@@ -52,10 +52,16 @@ const statusTypeMap = {
 
       <RequestChartTable ref="rctRef" :params="params" :request="getMyArticleBorrows">
         <template #query="{ query }">
-          <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
-          <BaSelect v-model="query.status" label="状态" prop="status">
-            <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
+          <div class="query-sections">
+            <div class="query-section query-section--primary">
+              <div class="query-grid">
+                <BaInput v-model="query.keyword" label="关键词" prop="keyword"></BaInput>
+                <BaSelect v-model="query.status" label="状态" prop="status">
+                  <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key"></el-option>
+                </BaSelect>
+              </div>
+            </div>
+          </div>
         </template>
         <template #table>
           <el-table-column label="知识标题" min-width="220">

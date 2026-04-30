@@ -74,12 +74,18 @@ function submitDialog() {
 
       <RequestChartTable ref="rctRef" :params="params" :request="getPendingArticleBorrows">
         <template #query="{ query }">
-          <BaInput v-model="query.keyword" label="关键词" prop="keyword" />
-          <BaSelect v-model="query.status" label="状态" prop="status">
-            <el-option label="待审批" value="pending" />
-            <el-option label="已通过" value="approved" />
-            <el-option label="已拒绝" value="rejected" />
-          </BaSelect>
+          <div class="query-sections">
+            <div class="query-section query-section--primary">
+              <div class="query-grid">
+                <BaInput v-model="query.keyword" label="关键词" prop="keyword" />
+                <BaSelect v-model="query.status" label="状态" prop="status">
+                  <el-option label="待审批" value="pending" />
+                  <el-option label="已通过" value="approved" />
+                  <el-option label="已拒绝" value="rejected" />
+                </BaSelect>
+              </div>
+            </div>
+          </div>
         </template>
         <template #table>
           <el-table-column label="知识标题" min-width="220">

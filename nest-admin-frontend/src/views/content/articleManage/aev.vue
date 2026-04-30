@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { yesOrNO, KEY_NO, KEY_YES } from '@/utils/dictionary'
 import { listRole } from '@/api/system/role'
-import { htmlToMarkdown } from '@/components/Editor/markdownInterop'
 import IsleArticleEditor from '@/features/isle-editor/components/IsleArticleEditor.vue'
 import { type IsleContentDocument } from '@/features/isle-editor/adapters/isleContent'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
@@ -350,26 +349,6 @@ function cancel() {
     : router.back()
 }
 
-async function handleCopyMarkdown() {
-  if (!navigator.clipboard?.writeText) {
-    $sdk.msgError('当前环境不支持复制 Markdown')
-    return
-  }
-
-  if (isKnowledgeDocumentBlocked(documentState.value.kind)) {
-    showEditBlockedMessage()
-    return
-  }
-
-  const markdown = htmlToMarkdown(form.value.contentText || '')
-  try {
-    await navigator.clipboard.writeText(markdown)
-    $sdk.msgSuccess('已复制 Markdown')
-  } catch {
-    $sdk.msgError('复制 Markdown 失败，请重试')
-  }
-}
-
 function submitBorrow() {
   borrowLoading.value = true
   applyArticleBorrow(borrowForm.value)
@@ -569,7 +548,6 @@ function submitBorrow() {
     </BaForm>
       <OperateBar v-if="!accessDeniedInfo && canEditCurrentArticle" class="knowledge-editor-operate-bar">
         <ElButton type="primary" @click="cancel">取消</ElButton>
-        <ElButton @click="handleCopyMarkdown">复制 Markdown</ElButton>
         <ElButton type="primary" @click="submit('draft')">保存草稿</ElButton>
         <ElButton type="primary" @click="submit()">发布</ElButton>
       </OperateBar>

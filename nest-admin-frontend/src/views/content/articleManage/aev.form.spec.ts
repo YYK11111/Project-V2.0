@@ -28,25 +28,21 @@ describe('知识编辑页结构治理守卫', () => {
     expect(contentSection).toBeGreaterThan(governanceSection)
   })
 
-  it('提供复制 Markdown 入口并声明复制处理函数', () => {
+  it('操作栏不再提供复制 Markdown 入口', () => {
     const source = readAev()
     const operateBarStart = source.indexOf('<OperateBar v-if="!accessDeniedInfo && canEditCurrentArticle" class="knowledge-editor-operate-bar">')
-    const copyButton = source.indexOf('<ElButton @click="handleCopyMarkdown">复制 Markdown</ElButton>')
     const cancelButton = source.indexOf('<ElButton type="primary" @click="cancel">取消</ElButton>')
     const draftButton = source.indexOf('<ElButton type="primary" @click="submit(\'draft\')">保存草稿</ElButton>')
     const publishButton = source.indexOf('<ElButton type="primary" @click="submit()">发布</ElButton>')
 
-    expect(source).toMatch(/function handleCopyMarkdown\(\)/)
-    expect(source).toContain("if (!navigator.clipboard?.writeText)")
-    expect(source).toContain("$sdk.msgError('当前环境不支持复制 Markdown')")
-    expect(source).toContain("$sdk.msgError('复制 Markdown 失败，请重试')")
+    expect(source).not.toMatch(/function handleCopyMarkdown\(\)/)
+    expect(source).not.toContain('复制 Markdown')
+    expect(source).not.toContain('htmlToMarkdown')
     expect(operateBarStart).toBeGreaterThan(-1)
-    expect(copyButton).toBeGreaterThan(operateBarStart)
     expect(cancelButton).toBeGreaterThan(operateBarStart)
     expect(draftButton).toBeGreaterThan(operateBarStart)
     expect(publishButton).toBeGreaterThan(operateBarStart)
-    expect(cancelButton).toBeLessThan(copyButton)
-    expect(copyButton).toBeLessThan(draftButton)
+    expect(cancelButton).toBeLessThan(draftButton)
     expect(draftButton).toBeLessThan(publishButton)
   })
 
