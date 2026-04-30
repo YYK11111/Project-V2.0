@@ -96,7 +96,7 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="Gcard">
+  <div class="Gcard go-live-form-shell">
     <el-page-header class="mb20" @back="$router.back()" :title="isReadonly ? '上线单详情' : isEdit ? '编辑上线单' : '新增上线单'">
       <template #extra>
         <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
@@ -152,6 +152,13 @@ function scrollToWorkflowPanel() {
 </template>
 
 <style scoped>
+.go-live-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .workflow-panel-section {
   margin: 24px 0;
 }

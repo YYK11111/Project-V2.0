@@ -211,13 +211,19 @@ getTreesFun()
       <el-tab-pane label="列表审计" name="table">
         <RequestChartTable ref="rctRef" class="menu-index-panel" :request="getTrees">
           <template #query="{ query }">
-            <BaInput v-model="query.name" label="菜单名称" prop="name"></BaInput>
-            <BaSelect v-model="query.type" label="菜单类型" prop="type" isAll>
-              <el-option v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
-            </BaSelect>
-            <BaSelect v-model="query.isActive" label="是否启用" prop="isActive" isAll>
-              <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
-            </BaSelect>
+            <div class="query-sections">
+              <div class="query-section query-section--primary">
+                <div class="query-grid">
+                  <BaInput v-model="query.name" label="菜单名称" prop="name"></BaInput>
+                  <BaSelect v-model="query.type" label="菜单类型" prop="type" isAll>
+                    <el-option v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
+                  </BaSelect>
+                  <BaSelect v-model="query.isActive" label="是否启用" prop="isActive" isAll>
+                    <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
+                  </BaSelect>
+                </div>
+              </div>
+            </div>
           </template>
 
           <template #operation>

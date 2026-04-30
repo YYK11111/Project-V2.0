@@ -6,6 +6,21 @@ function readBusinessView(relativePath: string) {
   return readFileSync(resolve(__dirname, '..', relativePath), 'utf-8')
 }
 
+function getStyleBlock(source: string, selector: string) {
+  const styleSource = Array.from(source.matchAll(/<style[^>]*>(?<content>[\s\S]*?)<\/style>/g))
+    .map((match) => match.groups?.content || '')
+    .join('\n')
+  const sourceWithoutMedia = styleSource.replace(/@media[\s\S]*?\n\}/g, '')
+  const rules = sourceWithoutMedia.matchAll(/(?<selectors>[^{}]+)\{(?<styles>[^{}]*)\}/g)
+
+  for (const rule of rules) {
+    const selectors = (rule.groups?.selectors || '').split(',').map((item) => item.trim())
+    if (selectors.includes(selector)) return rule.groups?.styles || ''
+  }
+
+  return ''
+}
+
 describe('项目链路表单结构整改守卫', () => {
   it('目标表单页不再保留 Hero 结构', () => {
     const files = [
@@ -58,6 +73,88 @@ describe('项目链路表单结构整改守卫', () => {
       const source = readBusinessView(file)
       expect(source).toContain('useCurrentRouteGuard')
       expect(source).toContain(`'${routePath}'`)
+    })
+  })
+
+  it('新增项目页表格容器承接横向溢出，避免固定列宽撑大页面', () => {
+    const source = readBusinessView('projectManage/form.vue')
+    const tableWrapperBlock = source.match(/^\.table-wrapper\s*\{(?<styles>[^}]*)\}/m)?.groups?.styles || ''
+
+    expect(tableWrapperBlock).toContain('overflow-x: auto;')
+  })
+
+  it('新增项目页外层卡片不承接横向滚动，避免左侧字段被挤出可视区', () => {
+    const source = readBusinessView('projectManage/form.vue')
+    const shellBlock = source.match(/^\.project-form-shell\s*\{(?<styles>[^}]*)\}/m)?.groups?.styles || ''
+
+    expect(shellBlock).toContain('overflow-x: hidden;')
+  })
+
+  it('新增项目页基础信息行抵消 Element Plus gutter 负边距，避免字段区横向溢出', () => {
+    const source = readBusinessView('projectManage/form.vue')
+    const basicInfoRowBlock = source.match(/^\.basic-info-row\s*\{(?<styles>[^}]*)\}/m)?.groups?.styles || ''
+
+    expect(basicInfoRowBlock).toContain('margin-left: 0 !important;')
+    expect(basicInfoRowBlock).toContain('margin-right: 0 !important;')
+  })
+
+  it('新增项目页里程碑表不默认写死宽度，避免新建态少列表格撑大表单', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain("'table-wrapper--milestones-wide': !isCreate")
+    expect(source).not.toMatch(/\.table-wrapper--milestones\s+:deep\(\.el-table\)\s*\{[\s\S]*width:\s*1280px;/)
+  })
+
+  it('高频业务表单外层卡片不承接横向滚动', () => {
+    const shellGuards = [
+      { file: 'taskManage/form.vue', selector: '.task-form-shell' },
+      { file: 'userStoryManage/form.vue', selector: '.story-form-shell' },
+      { file: 'ticketManage/form.vue', selector: '.ticket-form-shell' },
+      { file: 'crm/customerManage/form.vue', selector: '.customer-form-shell' },
+      { file: 'crm/opportunityManage/form.vue', selector: '.opportunity-form-shell' },
+      { file: 'crm/interactionManage/form.vue', selector: '.interaction-form-shell' },
+      { file: 'crm/contractManage/form.vue', selector: '.contract-form-shell' },
+      { file: 'riskManage/form.vue', selector: '.risk-form-shell' },
+      { file: 'changeManage/form.vue', selector: '.change-form-shell' },
+      { file: 'sprintManage/form.vue', selector: '.sprint-form-shell' },
+      { file: 'milestoneManage/form.vue', selector: '.milestone-form-shell' },
+      { file: 'goLiveManage/form.vue', selector: '.go-live-form-shell' },
+      { file: 'acceptanceManage/form.vue', selector: '.acceptance-form-shell' },
+      { file: 'handoverManage/form.vue', selector: '.handover-form-shell' },
+    ]
+
+    shellGuards.forEach(({ file, selector }) => {
+      const source = readBusinessView(file)
+      const shellBlock = getStyleBlock(source, selector)
+
+      expect(shellBlock).toContain('width: 100%;')
+      expect(shellBlock).toContain('max-width: 100%;')
+      expect(shellBlock).toContain('min-width: 0;')
+      expect(shellBlock).toContain('overflow-x: hidden;')
+    })
+  })
+
+  it('高频业务表单行抵消 Element Plus gutter 负边距', () => {
+    const rowGuards = [
+      { file: 'taskManage/form.vue', selector: '.task-info-row' },
+      { file: 'userStoryManage/form.vue', selector: '.story-info-row' },
+      { file: 'ticketManage/form.vue', selector: '.ticket-form-page :deep(.el-row)' },
+      { file: 'crm/customerManage/form.vue', selector: '.customer-form-page :deep(.el-row)' },
+      { file: 'crm/opportunityManage/form.vue', selector: '.opportunity-form-page :deep(.el-row)' },
+      { file: 'crm/interactionManage/form.vue', selector: '.interaction-form-page :deep(.el-row)' },
+      { file: 'crm/contractManage/form.vue', selector: '.contract-form-page :deep(.el-row)' },
+      { file: 'changeManage/form.vue', selector: '.change-form-page :deep(.el-row)' },
+      { file: 'sprintManage/form.vue', selector: '.sprint-form-page :deep(.el-row)' },
+      { file: 'projectManage/approval.vue', selector: '.summary-row' },
+      { file: 'projectManage/approval.vue', selector: '.basic-info-row' },
+    ]
+
+    rowGuards.forEach(({ file, selector }) => {
+      const source = readBusinessView(file)
+      const rowBlock = getStyleBlock(source, selector)
+
+      expect(rowBlock).toContain('margin-left: 0 !important;')
+      expect(rowBlock).toContain('margin-right: 0 !important;')
     })
   })
 })

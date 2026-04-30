@@ -600,6 +600,8 @@ watch(
 .summary-row,
 .basic-info-row {
   margin-bottom: 8px;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .summary-row--last,

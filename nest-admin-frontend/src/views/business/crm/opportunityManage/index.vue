@@ -32,14 +32,18 @@ const getButtons = (row) => [
   <div class="opportunity-index-page">
     <RequestChartTable ref="rctRef" class="opportunity-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.name" label="机会名称" prop="name"></BaInput>
-          <BaSelect v-model="query.customerId" filterable label="客户" prop="customerId">
-            <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.stage" filterable label="销售阶段" prop="stage">
-            <el-option v-for="(value, key) of stages" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.name" label="机会名称" prop="name"></BaInput>
+              <BaSelect v-model="query.customerId" filterable label="客户" prop="customerId">
+                <el-option v-for="customer in customerList" :key="customer.id" :label="customer.name" :value="customer.id"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.stage" filterable label="销售阶段" prop="stage">
+                <el-option v-for="(value, key) of stages" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -122,6 +126,42 @@ const getButtons = (row) => [
   font-weight: 500;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -160,6 +200,10 @@ const getButtons = (row) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .opportunity-index-operation,

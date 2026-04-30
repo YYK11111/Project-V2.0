@@ -595,6 +595,18 @@ function scrollToWorkflowPanel() {
   min-height: 100%;
 }
 
+.change-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.change-form-page :deep(.el-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 .change-form-shell__top {
   margin-bottom: 20px;
 }

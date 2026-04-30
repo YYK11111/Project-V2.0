@@ -170,31 +170,35 @@ const getButtons = (row) => [
   <div class="risk-index-page">
     <RequestChartTable ref="rctRef" class="risk-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="native-query-grid">
-          <div class="native-query-item">
-            <div class="native-query-label">所属项目</div>
-            <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
-              <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-            </el-select>
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">状态</div>
-            <el-select v-model="query.status" placeholder="请选择状态" clearable>
-              <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
-            </el-select>
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">风险等级</div>
-            <el-select v-model="query.level" placeholder="请选择风险等级" clearable>
-              <el-option v-for="(v, k) in levelMap" :key="k" :label="v" :value="k" />
-            </el-select>
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">知识回流</div>
-            <el-select v-model="query.knowledgeLinked" placeholder="请选择知识回流" clearable>
-              <el-option label="已关联" value="1" />
-              <el-option label="未关联" value="0" />
-            </el-select>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <div class="query-select-item">
+                <div class="query-select-label">所属项目</div>
+                <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
+                  <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">状态</div>
+                <el-select v-model="query.status" placeholder="请选择状态" clearable>
+                  <el-option v-for="(v, k) in statusMap" :key="k" :label="v" :value="k" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">风险等级</div>
+                <el-select v-model="query.level" placeholder="请选择风险等级" clearable>
+                  <el-option v-for="(v, k) in levelMap" :key="k" :label="v" :value="k" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">知识回流</div>
+                <el-select v-model="query.knowledgeLinked" placeholder="请选择知识回流" clearable>
+                  <el-option label="已关联" value="1" />
+                  <el-option label="未关联" value="0" />
+                </el-select>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -272,7 +276,19 @@ const getButtons = (row) => [
   color: var(--el-text-color-primary);
 }
 
-.native-query-grid {
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 20px;
@@ -280,7 +296,7 @@ const getButtons = (row) => [
   width: 100%;
 }
 
-.native-query-item {
+.query-select-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -288,23 +304,24 @@ const getButtons = (row) => [
   width: 100%;
 }
 
-.native-query-label {
+.query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  width: 80px;
+  width: auto;
+  min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.native-query-grid :deep(.el-select),
-.native-query-grid :deep(.el-input) {
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input) {
   flex: 1;
   min-width: 0;
   width: 100%;
 }
 
 @media (max-width: 1200px) {
-  .native-query-grid {
+  .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -314,7 +331,7 @@ const getButtons = (row) => [
     padding-top: 18px;
   }
 
-  .native-query-grid {
+  .query-grid {
     grid-template-columns: 1fr;
   }
 

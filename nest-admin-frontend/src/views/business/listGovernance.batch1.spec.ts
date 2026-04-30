@@ -26,6 +26,15 @@ describe('第一批列表页治理守卫', () => {
     })
   })
 
+  it('筛选项超过 4 个的目标页面提供高级筛选区与展开收起入口', () => {
+    const source = readBusinessView('taskManage/index.vue')
+
+    expect(source).toMatch(/const showAdvanced = ref\(false\)/)
+    expect(source).toMatch(/class=\"query-section query-section--advanced\"/)
+    expect(source).toContain('展开高级筛选')
+    expect(source).toContain('收起高级筛选')
+  })
+
   it('原生查询控件页使用 4 列 native-query-grid 并保留原生控件', () => {
     const files = [
       'riskManage/index.vue',
@@ -38,6 +47,8 @@ describe('第一批列表页治理守卫', () => {
       const source = readBusinessView(file)
       expect(source).toMatch(/:is-selection=/)
       expect(source).toContain('<el-table-column type="index" label="序号" width="70" />')
+      expect(source).toMatch(/class=\"query-sections\"/)
+      expect(source).toMatch(/class=\"query-section query-section--primary\"/)
       expect(source).toMatch(/class=\"native-query-grid\"/)
       expect(source).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)
       expect(source).toMatch(/@media \(max-width:\s*1200px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/)

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { CaretBottom } from '@element-plus/icons-vue'
 import { getList, getRoles, getStats, getProjectOverview, addMember, updateMember, removeMember } from './api'
 import { getStatus as getProjectStatus } from '../projectManage/api'
 import TableOperation from '@/components/TableOperation.vue'
@@ -26,6 +27,7 @@ const stats = ref({
   missingCoreProjects: 0,
 })
 const viewMode = ref<'member' | 'project'>('member')
+const showAdvanced = ref(false)
 
 const rctRef = ref()
 const addDialogVisible = ref(false)
@@ -262,35 +264,55 @@ onMounted(() => {
 
     <RequestChartTable ref="rctRef" class="project-member-index-panel" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview" :is-selection="viewMode === 'member'">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.keyword" label="关键词" prop="keyword" placeholder="项目名/姓名/昵称" />
-          <div class="query-select-item">
-            <div class="query-select-label">所属项目</div>
-            <ProjectSelect v-model="query.projectId" placeholder="请选择项目" clearable />
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.keyword" label="关键词" prop="keyword" placeholder="项目名/姓名/昵称" />
+              <div class="query-select-item">
+                <div class="query-select-label">所属项目</div>
+                <ProjectSelect v-model="query.projectId" placeholder="请选择项目" clearable />
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">项目成员</div>
+                <UserSelect v-model="query.userId" placeholder="请选择成员" filter-dept clearable />
+              </div>
+            </div>
           </div>
-          <div class="query-select-item">
-            <div class="query-select-label">项目成员</div>
-            <UserSelect v-model="query.userId" placeholder="请选择成员" filter-dept clearable />
+
+          <div v-if="showAdvanced" class="query-section query-section--advanced">
+            <div class="query-section__header">
+              <div class="query-section__title">高级筛选</div>
+              <div class="query-section__desc">按角色、成员状态、项目状态和配置异常进一步定位成员数据</div>
+            </div>
+            <div class="query-grid">
+              <BaSelect v-if="viewMode === 'member'" v-model="query.role" filterable label="角色" prop="role">
+                <el-option v-for="(value, key) of roles" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-if="viewMode === 'member'" v-model="query.isCore" filterable label="核心成员" prop="isCore">
+                <el-option label="是" value="1"></el-option>
+                <el-option label="否" value="0"></el-option>
+              </BaSelect>
+              <BaSelect v-if="viewMode === 'member'" v-model="query.isActive" filterable label="状态" prop="isActive">
+                <el-option label="激活" value="1"></el-option>
+                <el-option label="禁用" value="0"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.projectStatus" filterable label="项目状态" prop="projectStatus">
+                <el-option v-for="(label, key) of projectStatusMap" :key="key" :label="label" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.issueType" filterable label="异常筛选" prop="issueType">
+                <el-option label="缺少项目经理" value="missingManager"></el-option>
+                <el-option label="缺少核心成员" value="missingCore"></el-option>
+              </BaSelect>
+            </div>
           </div>
-          <BaSelect v-if="viewMode === 'member'" v-model="query.role" filterable label="角色" prop="role">
-            <el-option v-for="(value, key) of roles" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-if="viewMode === 'member'" v-model="query.isCore" filterable label="核心成员" prop="isCore">
-            <el-option label="是" value="1"></el-option>
-            <el-option label="否" value="0"></el-option>
-          </BaSelect>
-          <BaSelect v-if="viewMode === 'member'" v-model="query.isActive" filterable label="状态" prop="isActive">
-            <el-option label="激活" value="1"></el-option>
-            <el-option label="禁用" value="0"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.projectStatus" filterable label="项目状态" prop="projectStatus">
-            <el-option v-for="(label, key) of projectStatusMap" :key="key" :label="label" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.issueType" filterable label="异常筛选" prop="issueType">
-            <el-option label="缺少项目经理" value="missingManager"></el-option>
-            <el-option label="缺少核心成员" value="missingCore"></el-option>
-          </BaSelect>
         </div>
+      </template>
+
+      <template #extraButtons>
+        <el-button class="advanced-filter-toggle" plain type="primary" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '收起高级筛选' : '展开高级筛选' }}
+          <el-icon :class="{ 'rotate-180': showAdvanced }"><CaretBottom /></el-icon>
+        </el-button>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -552,6 +574,51 @@ onMounted(() => {
   width: 100%;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
+.advanced-filter-toggle :deep(.el-icon) {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
 .query-grid :deep(.el-form-item) {
   display: flex;
   width: 100%;
@@ -584,7 +651,8 @@ onMounted(() => {
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1;
-  width: 80px;
+  width: auto;
+  min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -671,6 +739,10 @@ onMounted(() => {
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .project-member-index-operation,

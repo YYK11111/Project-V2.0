@@ -282,6 +282,13 @@ async function handleConvertToTask() {
   min-height: 100%;
 }
 
+.risk-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .risk-form-shell__top {
   margin-bottom: 20px;
 }

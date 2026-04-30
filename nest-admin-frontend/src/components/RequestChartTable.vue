@@ -458,6 +458,32 @@ export default defineComponent({
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px 20px;
+
+  .el-form-item {
+    display: inline-flex;
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .el-form-item--label-top {
+    display: inline-flex;
+  }
+
+  .el-form-item__label {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0;
+    padding-right: 0;
+    line-height: var(--heightInput);
+  }
+
+  .el-form-item--label-top .el-form-item__label {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    margin-bottom: 0;
+    line-height: var(--heightInput);
+  }
 }
 ::v-deep.queryFormMiddle {
   display: inline-flex;

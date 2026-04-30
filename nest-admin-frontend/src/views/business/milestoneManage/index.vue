@@ -15,6 +15,7 @@ const loading = ref(false)
 const statusMap = ref({})
 const projectList = ref([])
 const projectMap = ref({})
+const showAdvancedFilters = ref(false)
 const params = ref({
   projectId: route.query.projectId || '',
   status: '',
@@ -119,40 +120,57 @@ const getButtons = (row) => [
   <div class="milestone-index-page">
     <RequestChartTable ref="rctRef" class="milestone-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="native-query-grid">
-          <div class="native-query-item">
-            <div class="native-query-label">所属项目</div>
-            <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
-              <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <div class="query-select-item">
+                <div class="query-select-label">所属项目</div>
+                <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
+                  <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">责任人</div>
+                <UserSelect v-model="query.ownerId" placeholder="请选择责任人" clearable @change="handleQueryChange" />
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">里程碑阶段</div>
+                <el-input v-model="query.phase" placeholder="请输入里程碑阶段" clearable @change="handleQueryChange" />
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">状态</div>
+                <el-select v-model="query.status" placeholder="请选择状态" clearable @change="handleQueryChange">
+                  <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
+                </el-select>
+              </div>
+            </div>
           </div>
-          <div class="native-query-item">
-            <div class="native-query-label">责任人</div>
-            <UserSelect v-model="query.ownerId" placeholder="请选择责任人" clearable @change="handleQueryChange" />
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">里程碑阶段</div>
-            <el-input v-model="query.phase" placeholder="请输入里程碑阶段" clearable @change="handleQueryChange" />
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">变更影响</div>
-            <el-select v-model="query.changeImpactFlag" placeholder="请选择变更影响" clearable @change="handleQueryChange">
-              <el-option label="是" value="1" />
-              <el-option label="否" value="0" />
-            </el-select>
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">风险影响</div>
-            <el-select v-model="query.riskImpactFlag" placeholder="请选择风险影响" clearable @change="handleQueryChange">
-              <el-option label="是" value="1" />
-              <el-option label="否" value="0" />
-            </el-select>
-          </div>
-          <div class="native-query-item">
-            <div class="native-query-label">状态</div>
-            <el-select v-model="query.status" placeholder="请选择状态" clearable @change="handleQueryChange">
-              <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
-            </el-select>
+          <div class="query-section query-section--advanced">
+            <div class="query-section__header">
+              <div>
+                <div class="query-section__title">高级筛选</div>
+                <div class="query-section__desc">按影响来源进一步定位里程碑偏差信息</div>
+              </div>
+              <el-button class="advanced-filter-toggle" link type="primary" @click="showAdvancedFilters = !showAdvancedFilters">
+                {{ showAdvancedFilters ? '收起筛选' : '展开筛选' }}
+              </el-button>
+            </div>
+            <div v-if="showAdvancedFilters" class="query-grid">
+              <div class="query-select-item">
+                <div class="query-select-label">变更影响</div>
+                <el-select v-model="query.changeImpactFlag" placeholder="请选择变更影响" clearable @change="handleQueryChange">
+                  <el-option label="是" value="1" />
+                  <el-option label="否" value="0" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">风险影响</div>
+                <el-select v-model="query.riskImpactFlag" placeholder="请选择风险影响" clearable @change="handleQueryChange">
+                  <el-option label="是" value="1" />
+                  <el-option label="否" value="0" />
+                </el-select>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -222,7 +240,51 @@ const getButtons = (row) => [
   flex-wrap: wrap;
 }
 
-.native-query-grid {
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
+.advanced-filter-toggle {
+  flex-shrink: 0;
+}
+
+.query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 20px;
@@ -230,7 +292,7 @@ const getButtons = (row) => [
   width: 100%;
 }
 
-.native-query-item {
+.query-select-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -238,24 +300,25 @@ const getButtons = (row) => [
   width: 100%;
 }
 
-.native-query-label {
+.query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  width: 80px;
+  width: auto;
+  min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.native-query-grid :deep(.el-select),
-.native-query-grid :deep(.el-input),
-.native-query-grid :deep(.user-select) {
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input),
+.query-grid :deep(.user-select) {
   flex: 1;
   min-width: 0;
   width: 100%;
 }
 
 @media (max-width: 1200px) {
-  .native-query-grid {
+  .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -270,8 +333,12 @@ const getButtons = (row) => [
     padding-top: 18px;
   }
 
-  .native-query-grid {
+  .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .milestone-index-operation,

@@ -43,17 +43,21 @@ const getButtons = (row) => [
   <div class="customer-index-page">
     <RequestChartTable ref="rctRef" class="customer-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.name" label="客户名称" prop="name"></BaInput>
-          <BaSelect v-model="query.type" filterable label="客户类型" prop="type">
-            <el-option v-for="(value, key) of customerTypes" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.level" filterable label="客户等级" prop="level">
-            <el-option v-for="(value, key) of customerLevels" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.status" filterable label="客户状态" prop="status">
-            <el-option v-for="(value, key) of customerStatuses" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.name" label="客户名称" prop="name"></BaInput>
+              <BaSelect v-model="query.type" filterable label="客户类型" prop="type">
+                <el-option v-for="(value, key) of customerTypes" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.level" filterable label="客户等级" prop="level">
+                <el-option v-for="(value, key) of customerLevels" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.status" filterable label="客户状态" prop="status">
+                <el-option v-for="(value, key) of customerStatuses" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -154,6 +158,42 @@ const getButtons = (row) => [
   font-weight: 500;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -192,6 +232,10 @@ const getButtons = (row) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .customer-index-operation,

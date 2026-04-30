@@ -139,13 +139,17 @@ function getTypeTag(type) {
       @selection-change="handleSelectionChange"
     >
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaSelect v-model="query.type" filterable label="类型" prop="type">
-            <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
-          </BaSelect>
-          <BaSelect v-model="query.status" filterable label="状态" prop="status">
-            <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaSelect v-model="query.type" filterable label="类型" prop="type">
+                <el-option v-for="(value, key) in typeMap" :key="key" :label="value" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                <el-option v-for="(value, key) in statusMap" :key="key" :label="value" :value="key" />
+              </BaSelect>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -214,6 +218,18 @@ function getTypeTag(type) {
 
 .filter-container {
   margin-bottom: 16px;
+}
+
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
 }
 
 .query-grid {

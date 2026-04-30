@@ -85,18 +85,22 @@ const getButtons = (row) => [
   <div class="ticket-index-page">
     <RequestChartTable ref="rctRef" class="ticket-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.title" label="工单标题" prop="title" />
-          <BaSelect v-model="query.type" filterable label="类型" prop="type">
-            <el-option v-for="(value, key) of type" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.status" filterable label="状态" prop="status">
-            <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.knowledgeLinked" filterable label="知识回流" prop="knowledgeLinked">
-            <el-option label="已关联" value="1"></el-option>
-            <el-option label="未关联" value="0"></el-option>
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.title" label="工单标题" prop="title" />
+              <BaSelect v-model="query.type" filterable label="类型" prop="type">
+                <el-option v-for="(value, key) of type" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.knowledgeLinked" filterable label="知识回流" prop="knowledgeLinked">
+                <el-option label="已关联" value="1"></el-option>
+                <el-option label="未关联" value="0"></el-option>
+              </BaSelect>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -182,6 +186,42 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -207,6 +247,10 @@ const getButtons = (row) => [
   flex: 1;
 }
 
+.advanced-filter-toggle {
+  flex-shrink: 0;
+}
+
 @media (max-width: 1200px) {
   .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -220,6 +264,10 @@ const getButtons = (row) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .ticket-index-operation,

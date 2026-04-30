@@ -16,5 +16,7 @@ describe('workflow 列表治理守卫', () => {
     expect(source).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)
     expect(source).toMatch(/@media \(max-width:\s*1200px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/)
     expect(source).toMatch(/@media \(max-width:\s*768px\)[\s\S]*grid-template-columns:\s*1fr/)
+    expect(source).toContain('class="query-sections"')
+    expect(source).toContain('class="query-section query-section--primary"')
   })
 })

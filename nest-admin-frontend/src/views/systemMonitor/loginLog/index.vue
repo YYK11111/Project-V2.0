@@ -8,13 +8,19 @@ const yesOrNOStatus = { [KEY_YES]: '成功', [KEY_NO]: '失败' }
   <div class="login-log-index-page">
     <RequestChartTable ref="rctRef" class="login-log-index-panel" :request="getList">
       <template #query="{ query }">
-        <BaInput v-model="query.account" label="登录账号" prop="account"></BaInput>
-        <BaInput v-model="query.address" label="登录地点" prop="ip"></BaInput>
-        <BaInput v-model="query.ip" label="ip地址" prop="ip"></BaInput>
-        <BaSelect v-model="query.isSuccess" filterable label="登录状态" prop="isSuccess">
-          <el-option v-for="(value, key) of yesOrNOStatus" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
-        <BaDatePicker v-model="query.createTimeRange" label="登录时间" prop="createTimeRange"></BaDatePicker>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.account" label="登录账号" prop="account"></BaInput>
+              <BaInput v-model="query.address" label="登录地点" prop="ip"></BaInput>
+              <BaInput v-model="query.ip" label="ip地址" prop="ip"></BaInput>
+              <BaSelect v-model="query.isSuccess" filterable label="登录状态" prop="isSuccess">
+                <el-option v-for="(value, key) of yesOrNOStatus" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaDatePicker v-model="query.createTimeRange" label="登录时间" prop="createTimeRange"></BaDatePicker>
+            </div>
+          </div>
+        </div>
       </template>
 
       <template #tableView>

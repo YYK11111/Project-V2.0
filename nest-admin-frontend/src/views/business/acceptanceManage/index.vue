@@ -19,14 +19,18 @@ const getButtons = (row) => [
 
 <template>
   <div class="Gcard">
-    <RequestChartTable ref="rctRef" :params="params" :request="getList" :is-selection="true" label-position="left" label-width="80px">
+    <RequestChartTable ref="rctRef" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.title" label="验收标题" prop="title" />
-          <BaInput v-model="query.projectId" label="项目ID" prop="projectId" />
-          <BaSelect v-model="query.result" label="结果" prop="result">
-            <el-option v-for="(label, key) in resultMap" :key="key" :label="label" :value="key" />
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.title" label="验收标题" prop="title" />
+              <BaInput v-model="query.projectId" label="项目ID" prop="projectId" />
+              <BaSelect v-model="query.result" label="结果" prop="result">
+                <el-option v-for="(label, key) in resultMap" :key="key" :label="label" :value="key" />
+              </BaSelect>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -58,6 +62,42 @@ const getButtons = (row) => [
 </template>
 
 <style scoped>
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -112,6 +152,10 @@ const getButtons = (row) => [
 @media (max-width: 768px) {
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .closure-index-operation,

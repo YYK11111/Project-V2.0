@@ -10,6 +10,8 @@ describe('sprintManage 列表局部治理守卫', () => {
   it('Sprint 列表筛选区使用带标签的原生查询项', () => {
     const source = readSprintManageView()
 
+    expect(source).toContain('class="query-sections"')
+    expect(source).toContain('class="query-section query-section--primary"')
     expect(source).toContain('class="native-query-grid"')
     expect(source).toContain('class="native-query-item"')
     expect(source).toContain('class="native-query-label"')

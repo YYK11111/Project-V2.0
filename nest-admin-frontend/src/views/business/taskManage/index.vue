@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import dayjs from 'dayjs'
+import { CaretBottom } from '@element-plus/icons-vue'
 import { getList, getStatus, getPriority, del, updateProgress, submitApproval } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
@@ -16,6 +17,7 @@ getPriority().then(({ data }) => (priority.value = data))
 
 
 const rctRef = ref()
+const showAdvanced = ref(false)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
 const canTaskDelete = computed(() => checkPermi(['business/tasks/delete']))
@@ -66,29 +68,49 @@ const getButtons = (row) => [
   <div class="task-index-page">
     <RequestChartTable ref="rctRef" class="task-index-panel" :params="params" :request="getList" :key="$route.fullPath" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.name" label="任务名称" prop="name" />
-          <BaSelect v-model="query.status" filterable label="状态" prop="status">
-            <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
-            <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
-            <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
-            <el-option label="有评论" value="1"></el-option>
-            <el-option label="无评论" value="0"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.hasReport" filterable label="汇报情况" prop="hasReport" isAll>
-            <el-option label="有汇报" value="1"></el-option>
-            <el-option label="无汇报" value="0"></el-option>
-          </BaSelect>
-          <BaSelect v-model="query.reportFreshness" filterable label="汇报时效" prop="reportFreshness" isAll>
-            <el-option label="最近7天未汇报" value="stale7d"></el-option>
-          </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.name" label="任务名称" prop="name" />
+              <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
+                <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.sourceType" filterable label="来源类型" prop="sourceType">
+                <el-option v-for="(label, key) in sourceTypeMap" :key="key" :label="label" :value="key"></el-option>
+              </BaSelect>
+            </div>
+          </div>
+
+          <div v-if="showAdvanced" class="query-section query-section--advanced">
+            <div class="query-section__header">
+              <div class="query-section__title">高级筛选</div>
+              <div class="query-section__desc">按评论、汇报情况进一步筛选需要协作跟进的任务</div>
+            </div>
+            <div class="query-grid">
+              <BaSelect v-model="query.hasComment" filterable label="评论情况" prop="hasComment" isAll>
+                <el-option label="有评论" value="1"></el-option>
+                <el-option label="无评论" value="0"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.hasReport" filterable label="汇报情况" prop="hasReport" isAll>
+                <el-option label="有汇报" value="1"></el-option>
+                <el-option label="无汇报" value="0"></el-option>
+              </BaSelect>
+              <BaSelect v-model="query.reportFreshness" filterable label="汇报时效" prop="reportFreshness" isAll>
+                <el-option label="最近7天未汇报" value="stale7d"></el-option>
+              </BaSelect>
+            </div>
+          </div>
         </div>
+      </template>
+
+      <template #extraButtons>
+        <el-button class="advanced-filter-toggle" plain type="primary" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '收起高级筛选' : '展开高级筛选' }}
+          <el-icon :class="{ 'rotate-180': showAdvanced }"><CaretBottom /></el-icon>
+        </el-button>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -219,6 +241,42 @@ const getButtons = (row) => [
   scroll-behavior: auto;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -244,6 +302,19 @@ const getButtons = (row) => [
   flex: 1;
 }
 
+.advanced-filter-toggle {
+  flex-shrink: 0;
+}
+
+.advanced-filter-toggle :deep(.el-icon) {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
 @media (max-width: 1200px) {
   .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -257,6 +328,10 @@ const getButtons = (row) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .task-index-operation,

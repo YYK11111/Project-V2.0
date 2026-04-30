@@ -331,6 +331,9 @@ async function handleCreateTaskFromStory() {
 
 .story-form-shell {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .story-form-shell__top {
@@ -377,6 +380,8 @@ async function handleCreateTaskFromStory() {
 
 .story-info-row {
   margin-bottom: 0;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .story-info-row--last {

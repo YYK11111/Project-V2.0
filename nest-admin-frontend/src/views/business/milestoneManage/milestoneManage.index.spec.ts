@@ -10,6 +10,10 @@ describe('milestoneManage 列表局部治理守卫', () => {
   it('里程碑列表筛选区使用带标签的原生查询项', () => {
     const source = readMilestoneManageView()
 
+    expect(source).toContain('class="query-sections"')
+    expect(source).toContain('class="query-section query-section--primary"')
+    expect(source).toContain('class="query-section query-section--advanced"')
+    expect(source).toContain('class="advanced-filter-toggle"')
     expect(source).toContain('class="native-query-grid"')
     expect(source).toContain('class="native-query-item"')
     expect(source).toContain('class="native-query-label"')

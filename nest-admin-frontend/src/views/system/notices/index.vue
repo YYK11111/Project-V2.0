@@ -23,10 +23,16 @@ const getButtons = (row: any) => [
   <div class="notice-index-page">
     <RequestChartTable ref="rctRef" class="notice-index-panel" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.title" label="公告标题" prop="title"></BaInput>
-        <BaSelect v-model="query.isActive" filterable label="是否激活" prop="isActive">
-          <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
-        </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.title" label="公告标题" prop="title"></BaInput>
+              <BaSelect v-model="query.isActive" filterable label="是否激活" prop="isActive">
+                <el-option v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-option>
+              </BaSelect>
+            </div>
+          </div>
+        </div>
       </template>
 
         <template #operation="{ selectedIds }">

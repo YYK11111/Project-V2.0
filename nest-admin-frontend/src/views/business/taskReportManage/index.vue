@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import { CaretBottom } from '@element-plus/icons-vue'
 import { getList, addReport, updateReport, deleteReport } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import Editor from '@/components/Editor/index.vue'
@@ -16,6 +17,7 @@ const formRef = ref()
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增任务汇报')
 const submitLoading = ref(false)
+const showAdvanced = ref(false)
 const defaultReportTemplate = '<p>今日完成：</p><p><br></p><p>遇到问题：</p><p><br></p><p>下一步计划：</p><p><br></p>'
 const currentUserId = computed(() => String(userStore.id || ''))
 const canTaskReportAdd = computed(() => checkPermi(['business/tasks/timelog/add']))
@@ -135,12 +137,32 @@ const getButtons = (row: any) => [
   <div class="task-report-index-page">
     <RequestChartTable ref="rctRef" class="task-report-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
-          <BaInput v-model="query.userId" label="用户ID" prop="userId" />
-          <BaDatePicker v-model="query.beginDate" label="开始日期" prop="beginDate" value-format="YYYY-MM-DD" />
-          <BaDatePicker v-model="query.endDate" label="结束日期" prop="endDate" value-format="YYYY-MM-DD" />
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.taskId" label="任务ID" prop="taskId" />
+              <BaInput v-model="query.userId" label="用户ID" prop="userId" />
+            </div>
+          </div>
+
+          <div v-if="showAdvanced" class="query-section query-section--advanced">
+            <div class="query-section__header">
+              <div class="query-section__title">高级筛选</div>
+              <div class="query-section__desc">按工作日期范围进一步定位任务汇报记录</div>
+            </div>
+            <div class="query-grid">
+              <BaDatePicker v-model="query.beginDate" label="开始日期" prop="beginDate" value-format="YYYY-MM-DD" />
+              <BaDatePicker v-model="query.endDate" label="结束日期" prop="endDate" value-format="YYYY-MM-DD" />
+            </div>
+          </div>
         </div>
+      </template>
+
+      <template #extraButtons>
+        <el-button class="advanced-filter-toggle" plain type="primary" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '收起高级筛选' : '展开高级筛选' }}
+          <el-icon :class="{ 'rotate-180': showAdvanced }"><CaretBottom /></el-icon>
+        </el-button>
       </template>
 
       <template #operation="{ selectedIds }">
@@ -245,6 +267,42 @@ const getButtons = (row: any) => [
   scroll-behavior: auto;
 }
 
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -271,6 +329,19 @@ const getButtons = (row: any) => [
   flex: 1;
 }
 
+.advanced-filter-toggle {
+  flex-shrink: 0;
+}
+
+.advanced-filter-toggle :deep(.el-icon) {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
 @media (max-width: 1200px) {
   .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -291,6 +362,10 @@ const getButtons = (row: any) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .task-report-index-operation,

@@ -1096,6 +1096,9 @@ watch(hasTaskId, (value) => {
 
 .task-form-shell {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .task-form-shell__top {
@@ -1155,6 +1158,8 @@ watch(hasTaskId, (value) => {
 
 .task-info-row {
   margin-bottom: 0;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .task-info-row--last {

@@ -91,54 +91,65 @@ const getButtons = (row) => [
 
 <template>
   <div class="project-index-page">
-    <RequestChartTable ref="rctRef" class="project-index-panel" :params="params" :request="getList" :is-selection="true" label-position="left" label-width="80px">
+    <RequestChartTable ref="rctRef" class="project-index-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <div class="query-grid">
-          <BaInput v-model="query.name" label="项目名称" prop="name" />
-          <BaSelect v-model="query.status" filterable label="状态" prop="status">
-            <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
-          </BaSelect>
-          <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
-            <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
-          </BaSelect>
-          <BaSelect v-model="query.projectType" filterable label="项目类型" prop="projectType">
-            <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
-          </BaSelect>
-          <BaSelect v-model="query.phase" filterable label="项目阶段" prop="phase">
-            <el-option v-for="(label, key) in phaseMap" :key="key" :label="label" :value="key" />
-          </BaSelect>
-          <template v-if="showAdvanced">
-            <div class="query-select-item">
-              <div class="query-select-label">所属部门</div>
-              <el-select v-model="query.departmentId" placeholder="请选择所属部门" clearable filterable>
-                <el-option v-for="(label, key) in deptMap" :key="key" :label="label" :value="key" />
-              </el-select>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.name" label="项目名称" prop="name" />
+              <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
+                <el-option v-for="(value, key) in priority" :key="key" :label="value" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.projectType" filterable label="项目类型" prop="projectType">
+                <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.phase" filterable label="项目阶段" prop="phase">
+                <el-option v-for="(label, key) in phaseMap" :key="key" :label="label" :value="key" />
+              </BaSelect>
             </div>
-            <div class="query-select-item">
-              <div class="query-select-label">项目发起人</div>
-              <UserSelect v-model="query.creatorId" placeholder="请选择项目发起人" clearable />
+          </div>
+
+          <div v-if="showAdvanced" class="query-section query-section--advanced">
+            <div class="query-section__header">
+              <div class="query-section__title">高级筛选</div>
+              <div class="query-section__desc">按组织、质量、归档和业务属性进一步缩小范围</div>
             </div>
-            <BaSelect v-model="query.riskLevel" filterable label="风险等级" prop="riskLevel">
-              <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
-            </BaSelect>
-            <BaSelect v-model="query.qualityLevel" filterable label="质量等级" prop="qualityLevel">
-              <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
-            </BaSelect>
-            <BaSelect v-model="query.isArchived" filterable label="是否归档" prop="isArchived">
-              <el-option label="未归档" value="0" />
-              <el-option label="已归档" value="1" />
-            </BaSelect>
-            <BaInput v-model="query.category" label="项目分类" prop="category" />
-            <BaInput v-model="query.businessLine" label="业务线" prop="businessLine" />
-            <BaInput v-model="query.industry" label="行业" prop="industry" />
-            <BaInput v-model="query.projectSource" label="项目来源" prop="projectSource" />
-          </template>
+            <div class="query-grid">
+              <div class="query-select-item">
+                <div class="query-select-label">所属部门</div>
+                <el-select v-model="query.departmentId" placeholder="请选择所属部门" clearable filterable>
+                  <el-option v-for="(label, key) in deptMap" :key="key" :label="label" :value="key" />
+                </el-select>
+              </div>
+              <div class="query-select-item">
+                <div class="query-select-label">项目发起人</div>
+                <UserSelect v-model="query.creatorId" placeholder="请选择项目发起人" clearable />
+              </div>
+              <BaSelect v-model="query.riskLevel" filterable label="风险等级" prop="riskLevel">
+                <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.qualityLevel" filterable label="质量等级" prop="qualityLevel">
+                <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
+              </BaSelect>
+              <BaSelect v-model="query.isArchived" filterable label="是否归档" prop="isArchived">
+                <el-option label="未归档" value="0" />
+                <el-option label="已归档" value="1" />
+              </BaSelect>
+              <BaInput v-model="query.category" label="项目分类" prop="category" />
+              <BaInput v-model="query.businessLine" label="业务线" prop="businessLine" />
+              <BaInput v-model="query.industry" label="行业" prop="industry" />
+              <BaInput v-model="query.projectSource" label="项目来源" prop="projectSource" />
+            </div>
+          </div>
         </div>
       </template>
 
       <template #extraButtons>
-        <el-button link type="primary" @click="showAdvanced = !showAdvanced">
-          {{ showAdvanced ? '收起更多' : '更多筛选' }}
+        <el-button class="advanced-filter-toggle" plain type="primary" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '收起高级筛选' : '展开高级筛选' }}
           <el-icon :class="{ 'rotate-180': showAdvanced }"><CaretBottom /></el-icon>
         </el-button>
       </template>
@@ -283,7 +294,8 @@ const getButtons = (row) => [
 .query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  width: 80px;
+  width: auto;
+  min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -308,6 +320,42 @@ const getButtons = (row) => [
 .project-index-panel :deep(.el-table__header-wrapper),
 .project-index-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
+}
+
+.query-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.query-section {
+  min-width: 0;
+}
+
+.query-section--advanced {
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+}
+
+.query-section__header {
+  margin-bottom: 14px;
+}
+
+.query-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.query-section__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
 }
 
 .query-grid {
@@ -351,6 +399,11 @@ const getButtons = (row) => [
   min-width: 0;
 }
 
+.advanced-filter-toggle :deep(.el-icon) {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
 @media (max-width: 1200px) {
   .query-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -364,6 +417,10 @@ const getButtons = (row) => [
 
   .query-grid {
     grid-template-columns: 1fr;
+  }
+
+  .query-section--advanced {
+    padding: 14px;
   }
 
   .project-index-operation,

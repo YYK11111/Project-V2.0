@@ -195,9 +195,15 @@ const getButtons = (row: any) => [
   <div class="workflow-config-index-page">
     <RequestChartTable ref="rctRef" class="workflow-config-index-panel" :params="params" :request="getBusinessConfigs" :is-selection="true">
       <template #query="{ query }">
-        <BaSelect v-model="query.businessType" label="业务对象" prop="businessType" isAll>
-          <el-option v-for="item in businessTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaSelect v-model="query.businessType" label="业务对象" prop="businessType" isAll>
+                <el-option v-for="item in businessTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </BaSelect>
+            </div>
+          </div>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">

@@ -505,6 +505,18 @@ function scrollToWorkflowPanel() {
   min-height: 100%;
 }
 
+.ticket-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.ticket-form-page :deep(.el-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 .ticket-form-shell__top {
   margin-bottom: 20px;
 }

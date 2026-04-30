@@ -956,7 +956,7 @@ function cancel() {
             </div>
           </div>
 
-          <div class="table-wrapper table-wrapper--milestones">
+          <div class="table-wrapper table-wrapper--milestones" :class="{ 'table-wrapper--milestones-wide': !isCreate }">
             <el-table :data="form.milestones" border class="edit-table milestones-table" @cell-click="milestonesManuallyEdited = true">
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="里程碑名称" width="180">
@@ -1136,6 +1136,7 @@ function cancel() {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .project-form-shell__top {
@@ -1250,6 +1251,8 @@ function cancel() {
 
 .basic-info-row {
   margin-bottom: 10px;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .basic-info-progress-item {
@@ -1302,6 +1305,8 @@ function cancel() {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .table-wrapper--milestones {
@@ -1314,16 +1319,16 @@ function cancel() {
   border-radius: 10px;
 }
 
-.table-wrapper--milestones :deep(.el-table) {
+.table-wrapper--milestones-wide :deep(.el-table) {
   min-width: 1280px;
   width: 1280px;
   max-width: none;
 }
 
-.table-wrapper--milestones :deep(.el-table__inner-wrapper),
-.table-wrapper--milestones :deep(.el-table__header-wrapper),
-.table-wrapper--milestones :deep(.el-table__body-wrapper),
-.table-wrapper--milestones :deep(table) {
+.table-wrapper--milestones-wide :deep(.el-table__inner-wrapper),
+.table-wrapper--milestones-wide :deep(.el-table__header-wrapper),
+.table-wrapper--milestones-wide :deep(.el-table__body-wrapper),
+.table-wrapper--milestones-wide :deep(table) {
   min-width: 1280px;
 }
 
@@ -1402,11 +1407,11 @@ function cancel() {
     grid-template-columns: 1fr;
   }
 
-  .table-wrapper--milestones :deep(.el-table),
-  .table-wrapper--milestones :deep(.el-table__inner-wrapper),
-  .table-wrapper--milestones :deep(.el-table__header-wrapper),
-  .table-wrapper--milestones :deep(.el-table__body-wrapper),
-  .table-wrapper--milestones :deep(table) {
+  .table-wrapper--milestones-wide :deep(.el-table),
+  .table-wrapper--milestones-wide :deep(.el-table__inner-wrapper),
+  .table-wrapper--milestones-wide :deep(.el-table__header-wrapper),
+  .table-wrapper--milestones-wide :deep(.el-table__body-wrapper),
+  .table-wrapper--milestones-wide :deep(table) {
     min-width: 1120px;
     width: 1120px;
   }
@@ -1426,11 +1431,11 @@ function cancel() {
     padding-inline: 6px;
   }
 
-  .table-wrapper--milestones :deep(.el-table),
-  .table-wrapper--milestones :deep(.el-table__inner-wrapper),
-  .table-wrapper--milestones :deep(.el-table__header-wrapper),
-  .table-wrapper--milestones :deep(.el-table__body-wrapper),
-  .table-wrapper--milestones :deep(table) {
+  .table-wrapper--milestones-wide :deep(.el-table),
+  .table-wrapper--milestones-wide :deep(.el-table__inner-wrapper),
+  .table-wrapper--milestones-wide :deep(.el-table__header-wrapper),
+  .table-wrapper--milestones-wide :deep(.el-table__body-wrapper),
+  .table-wrapper--milestones-wide :deep(table) {
     min-width: 980px;
     width: 980px;
   }

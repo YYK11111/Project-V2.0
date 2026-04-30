@@ -181,12 +181,18 @@ function submit({ form, visible, loading }: any) {
   <div class="role-index-page">
     <RequestChartTable ref="rctRef" class="role-index-panel" :request="getList" :is-selection="true">
       <template #query="{ query }">
-        <BaInput v-model="query.name" label="角色名称" prop="name"></BaInput>
-        <BaInput v-model="query.permissionKey" label="权限字符" prop="permissionKey"></BaInput>
-        <BaSelect v-model="query.isActive" isAll label="状态" prop="isActive">
-          <el-option label="正常" value="1"></el-option>
-          <el-option label="停用" value="0"></el-option>
-        </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaInput v-model="query.name" label="角色名称" prop="name"></BaInput>
+              <BaInput v-model="query.permissionKey" label="权限字符" prop="permissionKey"></BaInput>
+              <BaSelect v-model="query.isActive" isAll label="状态" prop="isActive">
+                <el-option label="正常" value="1"></el-option>
+                <el-option label="停用" value="0"></el-option>
+              </BaSelect>
+            </div>
+          </div>
+        </div>
       </template>
 
       <template #operation="{ selectedIds }">
