@@ -48,12 +48,16 @@ describe("SystenConfigsService", () => {
       repository as never,
       createSysFileService() as never,
     );
-    repository.findAndCount = jest.fn().mockResolvedValue([
-      [{ id: "config-new", defaultUserPassword: "new-password" }],
-      1,
-    ]);
+    repository.findAndCount = jest
+      .fn()
+      .mockResolvedValue([
+        [{ id: "config-new", defaultUserPassword: "new-password" }],
+        1,
+      ]);
 
-    await expect(service.list({ pageNum: 1, pageSize: 10 } as any)).resolves.toEqual({
+    await expect(
+      service.list({ pageNum: 1, pageSize: 10 } as any),
+    ).resolves.toEqual({
       total: 1,
       data: [{ id: "config-new", defaultUserPassword: "new-password" }],
       _flag: true,
