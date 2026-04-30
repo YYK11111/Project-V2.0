@@ -38,6 +38,11 @@ const workSummaryCards = computed<SummaryCardItem[]>(() => [
   { title: '当前待办', value: unread.value.todo || 0, path: '/user/messages' },
   { title: '当前待阅', value: unread.value.cc || 0, path: '/user/messages' },
   { title: '参与项目', value: projectList.value.length || 0, path: '/business/projectManage/index' },
+  {
+    title: '我负责项目',
+    value: projectList.value.filter((item) => getProjectOwner(item) === userStore.name).length,
+    path: '/business/projectManage/index',
+  },
 ])
 
 function greetingFun() {
@@ -266,7 +271,7 @@ onMounted(() => {
 }
 
 .summary-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: var(--Margin);
 }
 

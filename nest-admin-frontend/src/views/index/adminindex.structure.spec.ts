@@ -16,4 +16,14 @@ describe('admin home structure', () => {
     expect(source).toContain('访问趋势')
     expect(source).toContain('用户地区分布')
   })
+
+  it('系统首页具备更强的驾驶舱导语和管理导向', () => {
+    const source = readSource()
+
+    expect(source).toContain('集中查看系统状态、访问趋势和后台管理入口。')
+    expect(source).toContain('当前在线人数')
+    expect(source).toContain('未读系统消息')
+    expect(source).toContain('系统日志')
+    expect(source).toContain('system-console')
+  })
 })

@@ -112,6 +112,7 @@ onMounted(() => {
   <div class="admin-home-page">
     <div class="grid grid-cols-[3fr_1fr] --Gap hero-grid">
       <div class="flexBetween --Gap hero-card Gcard">
+        <div class="system-console">管理驾驶舱</div>
         <div class="hero-copy">
           <div class="wel --Color">系统首页</div>
           <div class="hero-desc">集中查看系统状态、访问趋势和后台管理入口。</div>
@@ -199,6 +200,21 @@ onMounted(() => {
 .hero-card {
   display: flex;
   align-items: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), #fff 58%);
+}
+
+.system-console {
+  position: absolute;
+  right: 24px;
+  top: 20px;
+  padding: 5px 12px;
+  border: 1px solid rgba(64, 158, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(64, 158, 255, 0.08);
+  color: var(--Color);
+  font-size: 12px;
 }
 
 .hero-meta {
@@ -236,7 +252,7 @@ onMounted(() => {
   width: 100%;
   border: 1px solid var(--BorderBlack10);
   border-radius: var(--Radius);
-  background: var(--Bg);
+  background: linear-gradient(180deg, #fff, rgba(64, 158, 255, 0.04));
   padding: 18px 20px;
   text-align: left;
   transition: border-color 0.2s ease, transform 0.2s ease;

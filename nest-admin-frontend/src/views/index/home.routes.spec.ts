@@ -6,6 +6,10 @@ function readRoutesSource() {
   return readFileSync(resolve(__dirname, '..', '..', 'router', 'routes.js'), 'utf-8')
 }
 
+function readPermissionSource() {
+  return readFileSync(resolve(__dirname, '..', '..', 'router', 'permission.js'), 'utf-8')
+}
+
 function getConstantRoutesBlock() {
   const source = readRoutesSource()
   const match = source.match(/export const constantRoutes = \[(.*?)\n\]/s)
@@ -53,5 +57,13 @@ describe('home routes', () => {
 
     expect(source).toContain("path: '/adminindex'")
     expect(source).toContain('dashboard/adminIndex')
+  })
+
+  it('根路径默认落点按 dashboard/adminIndex 权限显式分流', () => {
+    const permissionSource = readPermissionSource()
+
+    expect(permissionSource).toContain("permissions?.includes('dashboard/adminIndex')")
+    expect(permissionSource).toContain("return { path: '/adminindex', replace: true }")
+    expect(permissionSource).toContain("return { path: '/index', replace: true }")
   })
 })

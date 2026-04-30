@@ -21,6 +21,17 @@ describe('user home structure', () => {
     expect(source).toContain('快捷入口')
   })
 
+  it('用户首页保留欢迎区并强化工作台层级', () => {
+    const source = readSource()
+
+    expect(source).toContain('围绕消息、项目和知识入口开始今天的工作。')
+    expect(source).toContain('当前待办')
+    expect(source).toContain('当前待阅')
+    expect(source).toContain('参与项目')
+    expect(source).toContain('我负责项目')
+    expect(source).toContain('负责人：')
+  })
+
   it('移除了首页文件中的 ts-nocheck 和未使用旧接口', () => {
     const source = readSource()
     const apiSource = readApiSource()

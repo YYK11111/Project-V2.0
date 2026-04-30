@@ -18,6 +18,13 @@ function hasRoutePermission(to, permissions) {
   return permissionKeys.every((permissionKey) => permissions?.includes(permissionKey))
 }
 
+function getDefaultHomeTarget(permissions = []) {
+  if (permissions?.includes('*') || permissions?.includes('dashboard/adminIndex')) {
+    return { path: '/adminindex', replace: true }
+  }
+  return { path: '/index', replace: true }
+}
+
 function buildRestoreTarget(fullPath) {
   const browserUrl = new URL(fullPath, window.location.origin)
   return {
@@ -79,11 +86,8 @@ export default function permission(router) {
             if (restored) return restored
           }
           if (to.path === '/') {
-            const firstRoute = appStore.permission.sidebarRouters.find((route) => !route.isHidden)
-            if (firstRoute?.path) {
-              clearInitialBrowserPath()
-              return { path: firstRoute.path, replace: true }
-            }
+            clearInitialBrowserPath()
+            return getDefaultHomeTarget(userStore.permissions || [])
           }
           clearInitialBrowserPath()
           return {
@@ -107,7 +111,7 @@ export default function permission(router) {
         }
         if (to.path === '/' && firstVisibleRoute?.path) {
           clearInitialBrowserPath()
-          return { path: firstVisibleRoute.path, replace: true }
+          return getDefaultHomeTarget(userStore.permissions || [])
         }
         return
       } else {
@@ -133,10 +137,8 @@ export default function permission(router) {
             return { path: '/401', replace: true }
           }
           if (to.path === '/') {
-            if (firstVisibleRoute?.path) {
-              clearInitialBrowserPath()
-              return { path: firstVisibleRoute.path, replace: true }
-            }
+            clearInitialBrowserPath()
+            return getDefaultHomeTarget(userStore.permissions || [])
           }
           clearInitialBrowserPath()
           return {
