@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { CountTo } from 'vue3-count-to'
 import RequestChartTable from '@/components/RequestChartTable.vue'
+import ChartChinaMap from './components/ChartChinaMap.vue'
 import * as api from './api'
 import type { AdminChartPoint, AdminIndexCountPayload, HomeUnreadStats } from './api'
-import RELEASE from '../../../RELEASE.md?raw'
 
 const router = useRouter()
 const sysConfig = window.sysConfig
@@ -11,6 +11,7 @@ const sysConfig = window.sysConfig
 const loading = ref(false)
 const indexCounts = ref<AdminIndexCountPayload>({})
 const unread = ref<HomeUnreadStats>({ total: 0, todo: 0, cc: 0 })
+const provinceDistribution = ref<AdminChartPoint[]>([])
 
 interface QuickLinkItem {
   title: string
@@ -69,9 +70,14 @@ function goTo(path: string) {
 async function loadHomeData() {
   loading.value = true
   try {
-    const [countRes, unreadRes] = await Promise.all([api.getAdminIndexSummary(), api.getHomeUnreadCount()])
+    const [countRes, unreadRes, provinceRes] = await Promise.all([
+      api.getAdminIndexSummary(),
+      api.getHomeUnreadCount(),
+      api.getAdminUserLoginProvinceList(),
+    ])
     indexCounts.value = countRes
     unread.value = unreadRes
+    provinceDistribution.value = provinceRes
   } finally {
     loading.value = false
   }
@@ -87,19 +93,6 @@ function dealVisitedTrend(data: AdminChartPoint[], seriesData: number[][], xData
   })
 
   xData.splice(0, xData.length, ...dates)
-  seriesData.splice(0, seriesData.length, values)
-}
-
-function dealAreaDistribution(data: AdminChartPoint[], seriesData: number[][], xData: string[]) {
-  const areas: string[] = []
-  const values: number[] = []
-
-  data.forEach((item, index) => {
-    areas.push(String(item.area || item.name || item.label || `地区${index + 1}`))
-    values.push(Number(item.value ?? item.num ?? item.count ?? 0) || 0)
-  })
-
-  xData.splice(0, xData.length, ...areas)
   seriesData.splice(0, seriesData.length, values)
 }
 
@@ -126,7 +119,7 @@ onMounted(() => {
         </div>
         <div>
           <span class="--FontBlack5">系统版本：</span>
-          <span class="--FontBlack2 blod">{{ RELEASE.match('## (.*)')?.[1] }}</span>
+          <span class="--FontBlack2 blod">{{ sysConfig.SYSTEM_VERSION }}</span>
         </div>
       </div>
     </div>
@@ -170,14 +163,9 @@ onMounted(() => {
         legend="访问量"
         :deal-data-fun="dealVisitedTrend"
       />
-      <RequestChartTable
-        title="用户地区分布"
-        type="barChart"
-        :is-page-query="false"
-        :request="api.getAdminUserAreaList"
-        :legend="['用户数']"
-        :deal-data-fun="dealAreaDistribution"
-      />
+      <div class="chart-map-loading" v-loading="loading">
+        <ChartChinaMap title="最近成功登录用户省份分布" :data="provinceDistribution" />
+      </div>
     </div>
   </div>
 </template>
@@ -317,6 +305,7 @@ onMounted(() => {
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 16px;
 }
 

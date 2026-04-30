@@ -36,6 +36,21 @@ export class SystenConfigsService extends BaseService<
     return Number.isFinite(value) && value > 0 ? value : 30;
   }
 
+  async list(query: QueryListDto): Promise<ResponseListDto<SystenConfig>> {
+    return this.listBy(
+      {
+        where: { isDelete: null as any } as any,
+        order: { createTime: "DESC" as any },
+      },
+      query,
+    );
+  }
+
+  async getDefaultUserPassword() {
+    const config = await this.getLatestConfig();
+    return String(config?.defaultUserPassword || "").trim();
+  }
+
   getDefaultProjectReminderStrategy() {
     return {
       enabled: true,

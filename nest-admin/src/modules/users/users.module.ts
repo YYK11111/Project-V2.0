@@ -6,6 +6,7 @@ import { User } from "./entities/user.entity";
 import { CommonModule } from "../common/common.module";
 import { DepstModule } from "../depts/depts.module";
 import { SysFileModule } from "../sys/file/module";
+import { SystenConfigsModule } from "../configs/module";
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { SysFileModule } from "../sys/file/module";
     CommonModule,
     DepstModule,
     SysFileModule,
+    SystenConfigsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

@@ -42,6 +42,7 @@ export const useAppStore = defineStore('app', {
           data.systemName && (window.sysConfig.SYSTEM_NAME = data.systemName)
           data.systemLogo && (window.sysConfig.LOGO = data.systemLogo)
           data.browserTitle && (window.sysConfig.SYSTEM_NAME_ALL = data.browserTitle)
+          window.sysConfig.SYSTEM_VERSION = data.systemVersion || ''
           data.browserIcon && (window.sysConfig.BROWSER_ICON = data.browserIcon)
           applyBrowserBranding(data)
         })

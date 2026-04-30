@@ -7,7 +7,7 @@ import { checkPermi } from '@/utils/permission'
 const params = ref({
   includeNoDept: true,
 })
-const rules = { name: [$sdk.ruleRequiredBlur], phone: [$sdk.ruleRequiredBlur], deptId: [$sdk.ruleRequiredChange] }
+const rules = { name: [$sdk.ruleRequiredBlur], nickname: [$sdk.ruleRequiredBlur], phone: [$sdk.ruleRequiredBlur], deptId: [$sdk.ruleRequiredChange] }
 
 const canUserAdd = computed(() => checkPermi(['system/users/add']))
 const canUserUpdate = computed(() => checkPermi(['system/users/update']))
@@ -90,7 +90,7 @@ function filterUser(keyword) {
     filteredUserList.value = userList.value
   } else {
     filteredUserList.value = userList.value.filter(u =>
-      u.name.includes(keyword) || u.phone?.includes(keyword)
+      u.name.includes(keyword) || u.nickname?.includes(keyword) || u.phone?.includes(keyword)
     )
   }
 }
@@ -314,12 +314,19 @@ const getButtons = (row: any) => {
     <div class="GleftRightR">
       <RequestChartTable ref="rctRef" class="user-index-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
-          <BaInput v-model="query.name" label="姓名" prop="name"></BaInput>
-          <!-- <BaInput v-model="query.nickname" label="昵称" prop="nickname"></BaInput> -->
-          <BaSelect v-model="query.roleId" isAll filterable label="角色" prop="roleId">
-            <el-option v-for="(data, key) in roleList" :key="data.id" :label="data.name" :value="data.id"></el-option>
-          </BaSelect>
-          <el-checkbox v-model="params.includeNoDept" class="ml-10">显示无部门人员</el-checkbox>
+          <div class="query-sections">
+            <div class="query-section query-section--primary">
+              <div class="query-grid">
+                <BaInput v-model="query.name" label="登录名" prop="name"></BaInput>
+                <BaInput v-model="query.nickname" label="姓名" prop="nickname"></BaInput>
+                <BaInput v-model="query.email" label="邮箱" prop="email"></BaInput>
+                <BaSelect v-model="query.roleId" isAll filterable label="角色" prop="roleId">
+                  <el-option v-for="(data, key) in roleList" :key="data.id" :label="data.name" :value="data.id"></el-option>
+                </BaSelect>
+                <el-checkbox v-model="params.includeNoDept" class="ml-10">显示无部门人员</el-checkbox>
+              </div>
+            </div>
+          </div>
         </template>
 
         <template #operation="{ selectedIds }">
@@ -343,7 +350,8 @@ const getButtons = (row: any) => {
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="姓名" prop="name" :show-overflow-tooltip="true" />
+          <el-table-column label="登录名" prop="name" :show-overflow-tooltip="true" />
+          <el-table-column label="姓名" prop="nickname" :show-overflow-tooltip="true" />
           <el-table-column label="部门" prop="dept" width="150">
             <template #default="{ row }">
               <MultiTags v-if="row.dept?.name" :list="row.dept?.name" />
@@ -351,6 +359,12 @@ const getButtons = (row: any) => {
           </el-table-column>
           <!-- <el-table-column label="职务" prop="position" /> -->
           <el-table-column label="手机" prop="phone" />
+          <el-table-column label="邮箱" prop="email" :show-overflow-tooltip="true" />
+          <el-table-column label="性别" prop="gender">
+            <template #default="{ row }">
+              {{ row.gender === 'man' ? '男' : row.gender === 'woamn' ? '女' : '-' }}
+            </template>
+          </el-table-column>
           <el-table-column label="角色" prop="role" width="250">
             <template #default="{ row }">
               <MultiTags :list="row.roles" />
@@ -371,9 +385,15 @@ const getButtons = (row: any) => {
         width="500"
         @confirm="$refs.userDialogRef.confirm(add, () => $refs.rctRef.getList(), update)">
         <template #form="{ form }">
-          <BaInput v-model="form.name" prop="name" label="名称" maxlength="30"></BaInput>
-          <!-- show-password -->
+          <BaInput v-model="form.name" prop="name" label="登录名" maxlength="30"></BaInput>
+          <BaInput v-model="form.nickname" prop="nickname" label="姓名" maxlength="30"></BaInput>
+          <BaInput v-if="!form.id" v-model="form.password" prop="password" label="密码" maxlength="30" show-password></BaInput>
           <BaInput v-model="form.phone" prop="phone" label="手机" maxlength="11"></BaInput>
+          <BaInput v-model="form.email" prop="email" label="邮箱" maxlength="255"></BaInput>
+          <BaSelect v-model="form.gender" prop="gender" label="性别">
+            <el-option label="男" value="man"></el-option>
+            <el-option label="女" value="woamn"></el-option>
+          </BaSelect>
           <el-form-item prop="avatar" label="头像">
             <Upload v-model:fileUrl="form.avatar" :params="{ module: 'avatar' }"></Upload>
           </el-form-item>

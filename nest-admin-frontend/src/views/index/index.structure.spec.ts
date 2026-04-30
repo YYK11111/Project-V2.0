@@ -41,4 +41,12 @@ describe('user home structure', () => {
     expect(apiSource).not.toContain('getIndexCountData')
     expect(apiSource).not.toContain('const serve')
   })
+
+  it('系统版本只读取系统配置项', () => {
+    const source = readSource()
+
+    expect(source).toContain('sysConfig.SYSTEM_VERSION')
+    expect(source).not.toContain('RELEASE.md?raw')
+    expect(source).not.toContain('RELEASE.match')
+  })
 })

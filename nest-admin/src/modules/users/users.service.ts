@@ -25,6 +25,7 @@ import {
   isPasswordHashed,
   verifyPassword,
 } from "src/common/utils/password";
+import { SystenConfigsService } from "../configs/service";
 
 @Injectable()
 export class UsersService extends BaseService<User, CreateUserDto> {
@@ -33,6 +34,7 @@ export class UsersService extends BaseService<User, CreateUserDto> {
     private usersRepository: Repository<User>,
     private deptService: DeptService,
     private sysFileService: SysFileService,
+    private configService: SystenConfigsService,
   ) {
     super(User, usersRepository);
   }
@@ -47,6 +49,13 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       operatorPermissions,
       "system/users/manageAdmin",
     );
+
+    if (!createDto.id && !createDto.password) {
+      createDto.password = await this.configService.getDefaultUserPassword();
+      if (!createDto.password) {
+        throw new Error("请先在系统配置中设置默认用户密码");
+      }
+    }
 
     if (createDto.password && !isPasswordHashed(createDto.password)) {
       createDto.password = await hashPassword(createDto.password);

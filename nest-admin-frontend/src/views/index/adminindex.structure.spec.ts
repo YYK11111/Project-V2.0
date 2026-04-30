@@ -14,7 +14,13 @@ describe('admin home structure', () => {
     expect(source).toContain('管理工作摘要')
     expect(source).toContain('系统管理快捷入口')
     expect(source).toContain('访问趋势')
-    expect(source).toContain('用户地区分布')
+    expect(source).toContain('最近成功登录用户省份分布')
+    expect(source).toContain('ChartChinaMap')
+    expect(source).toContain(':data="provinceDistribution"')
+    expect(source).not.toContain('getAdminUserAreaList')
+    expect(source).not.toContain('getUserAreaList')
+    expect(source).not.toContain('用户地区分布')
+    expect(source).toMatch(/<div\b(?=[^>]*\bclass="chart-map-loading")(?=[^>]*\bv-loading="loading")[^>]*>/)
   })
 
   it('系统首页具备更强的驾驶舱导语和管理导向', () => {
@@ -25,5 +31,14 @@ describe('admin home structure', () => {
     expect(source).toContain('未读系统消息')
     expect(source).toContain('系统日志')
     expect(source).toContain('system-console')
+    expect(source).toContain('align-items: start')
+  })
+
+  it('系统版本只读取系统配置项', () => {
+    const source = readSource()
+
+    expect(source).toContain('sysConfig.SYSTEM_VERSION')
+    expect(source).not.toContain('RELEASE.md?raw')
+    expect(source).not.toContain('RELEASE.match')
   })
 })

@@ -1,24 +1,77 @@
 import { HttpException } from "@nestjs/common";
 import { UsersService } from "./users.service";
+import { verifyPassword } from "src/common/utils/password";
 
 describe("UsersService", () => {
   const usersRepository = {
+    findOne: jest.fn(),
+    save: jest.fn(),
     manager: {
       getRepository: jest.fn(),
     },
   };
   const deptService = {};
   const sysFileService = {};
+  const configService = {
+    getDefaultUserPassword: jest.fn(),
+  };
 
   const createService = () =>
     new UsersService(
       usersRepository as any,
       deptService as any,
       sysFileService as any,
+      configService as any,
     );
 
   beforeEach(() => {
     jest.clearAllMocks();
+    usersRepository.manager.getRepository.mockReturnValue({
+      findOne: jest.fn().mockResolvedValue(null),
+    });
+    usersRepository.findOne.mockResolvedValue(null);
+    usersRepository.save.mockImplementation(async (data) => ({ ...data }));
+    sysFileService.findByPath = jest.fn().mockResolvedValue(null);
+    sysFileService.softDeleteByPath = jest.fn();
+    sysFileService.associateFiles = jest.fn();
+  });
+
+  it("新增用户未填写密码时使用系统配置默认密码", async () => {
+    const service = createService();
+    configService.getDefaultUserPassword.mockResolvedValue("Init@123456");
+    usersRepository.save = jest.fn(async (data) => ({ ...data, id: "user-1" }));
+
+    const result = await service.save({ name: "zhangsan" } as any);
+
+    await expect(verifyPassword("Init@123456", result.password)).resolves.toBe(
+      true,
+    );
+    expect(result.password).not.toBe("Init@123456");
+    expect(result.passwordVersion).toBe(2);
+  });
+
+  it("新增用户未填写密码且系统未配置默认密码时应拒绝新增", async () => {
+    const service = createService();
+    configService.getDefaultUserPassword.mockResolvedValue("");
+
+    await expect(service.save({ name: "zhangsan" } as any)).rejects.toThrow(
+      "请先在系统配置中设置默认用户密码",
+    );
+  });
+
+  it("编辑用户未填写密码时不应套用默认密码", async () => {
+    const service = createService();
+    configService.getDefaultUserPassword.mockResolvedValue("Init@123456");
+    jest.spyOn(service, "getOne").mockResolvedValue({ id: "user-1" } as any);
+    usersRepository.save = jest.fn(async (data) => ({ ...data }));
+
+    const result = await service.save({
+      id: "user-1",
+      nickname: "张三",
+    } as any);
+
+    expect(configService.getDefaultUserPassword).not.toHaveBeenCalled();
+    expect(result.password).toBeUndefined();
   });
 
   it("管理员用户更新自己的主题或提醒偏好时不应因 manageAdmin 权限被拒绝", async () => {

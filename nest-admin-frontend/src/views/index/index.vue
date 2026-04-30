@@ -2,7 +2,6 @@
 import * as api from './api'
 import type { HomeMessageItem, HomeProjectItem, HomeUnreadStats } from './api'
 import { useUserStore } from '@/stores/user'
-import RELEASE from '../../../RELEASE.md?raw'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -138,7 +137,7 @@ onMounted(() => {
         </div>
         <div>
           <span class="--FontBlack5">系统版本：</span>
-          <span class="--FontBlack2 blod">{{ RELEASE.match('## (.*)')?.[1] }}</span>
+          <span class="--FontBlack2 blod">{{ sysConfig.SYSTEM_VERSION }}</span>
         </div>
       </div>
     </div>

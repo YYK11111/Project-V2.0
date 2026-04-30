@@ -27,11 +27,18 @@ export class SystenConfig extends BaseEntity {
   @MaxLength(100)
   browserTitle: string;
 
+  @BaseColumn({ name: "system_version", nullable: true })
+  @MaxLength(100)
+  systemVersion: string;
+
   @BaseColumn({ name: "browser_icon", nullable: true })
   browserIcon: string;
 
   @BaseColumn({ name: "session_expire_minutes", nullable: true })
   sessionExpireMinutes: string;
+
+  @BaseColumn({ name: "default_user_password", nullable: true })
+  defaultUserPassword: string;
 
   @BaseColumn({
     type: "json",

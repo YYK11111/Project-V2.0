@@ -26,6 +26,7 @@ dist/
 # Local tool state
 .opencode/
 .lingma/
+.superpowers/
 .worktrees/
 
 # Runtime uploads

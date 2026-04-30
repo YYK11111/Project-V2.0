@@ -74,6 +74,7 @@ export default {
   // background: var(--MainBg);
   .main-container {
     min-height: 100%;
+    min-width: 0;
     transition: all 0.28s;
     position: relative;
     flex: auto;

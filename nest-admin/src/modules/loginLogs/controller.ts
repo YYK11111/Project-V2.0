@@ -1,21 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Put,
-  Query,
-  Req,
-  HttpCode,
-} from "@nestjs/common";
+import { Controller, Get, Post, Query, HttpCode } from "@nestjs/common";
 import { LoginLogsService } from "./service";
-import { QueryListDto, ResponseListDto } from "src/common/dto";
-import { UpdateResult } from "typeorm";
 import { LoginLog } from "./entity";
 import { BaseController } from "src/common/BaseController";
+
+interface ProvinceStatItem {
+  name: string;
+  value: number;
+}
 
 @Controller("system/loginLogs")
 export class LoginLogsController extends BaseController<
@@ -49,5 +40,14 @@ export class LoginLogsController extends BaseController<
   @Get("getUserAreaList")
   async getUserAreaList(@Query() query: { beginTime; endTime }) {
     return await this.service.getUserAreaList(query);
+  }
+
+  /**
+   * 最近成功登录用户省份分布
+   * @returns
+   */
+  @Get("getUserLoginProvinceList")
+  async getUserLoginProvinceList(): Promise<ProvinceStatItem[]> {
+    return await this.service.getUserLoginProvinceList();
   }
 }

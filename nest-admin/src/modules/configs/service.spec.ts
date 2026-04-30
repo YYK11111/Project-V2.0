@@ -1,6 +1,8 @@
 import { SystenConfigsService } from "./service";
 import { BusinessType } from "src/modules/sys/file/entity";
 import { SystenConfigsController } from "./controller";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 describe("SystenConfigsService", () => {
   function createRepository() {
@@ -38,6 +40,29 @@ describe("SystenConfigsService", () => {
     );
 
     await expect(service.getSessionExpireMinutes()).resolves.toBe(30);
+  });
+
+  it("配置列表应按创建时间倒序返回最新配置", async () => {
+    const repository = createRepository();
+    const service = new SystenConfigsService(
+      repository as never,
+      createSysFileService() as never,
+    );
+    repository.findAndCount = jest.fn().mockResolvedValue([
+      [{ id: "config-new", defaultUserPassword: "new-password" }],
+      1,
+    ]);
+
+    await expect(service.list({ pageNum: 1, pageSize: 10 } as any)).resolves.toEqual({
+      total: 1,
+      data: [{ id: "config-new", defaultUserPassword: "new-password" }],
+      _flag: true,
+    });
+    expect(repository.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order: { createTime: "DESC" },
+      }),
+    );
   });
 
   it("保存配置后应关联新的品牌附件并软删除被替换的旧附件", async () => {
@@ -210,6 +235,15 @@ describe("SystenConfigsService", () => {
     expect(sysFileService.softDeleteByPath).not.toHaveBeenCalledWith(
       "branding/legacy.ico",
     );
+  });
+});
+
+describe("SystenConfig entity", () => {
+  it("支持手动配置系统版本字段", () => {
+    const source = readFileSync(resolve(__dirname, "entity.ts"), "utf-8");
+
+    expect(source).toContain('name: "system_version"');
+    expect(source).toContain("systemVersion: string");
   });
 });
 

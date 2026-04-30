@@ -3,8 +3,10 @@
 import { computed, ref } from 'vue'
 import { getList, save } from './api'
 import { checkPermi } from '@/utils/permission'
+import { useAppStore } from '@/stores/app'
 
 const activeTab = ref('basic')
+const appStore = useAppStore()
 const fieldGroups = [
   { code: 'projectBasic', label: '基础组', desc: '项目名称、类型、优先级、负责人、发起人、描述等基础字段' },
   { code: 'projectMember', label: '成员组', desc: '项目成员集合权限，控制成员表格的显示与编辑' },
@@ -23,7 +25,9 @@ const matrixRows = [
 const form = ref<any>({
   systemName: '',
   browserTitle: '',
+  systemVersion: '',
   sessionExpireMinutes: '',
+  defaultUserPassword: '',
   systemLogo: '',
   browserIcon: '',
   projectReminderStrategy: getDefaultReminderStrategy(),
@@ -195,6 +199,8 @@ function submit() {
     projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(form.value?.projectFieldPermissionMatrix),
   }).then(() => {
     $sdk.msgSuccess()
+    appStore.sysConfig = null
+    appStore.getConfig()
     getListFun()
   })
 }
@@ -209,6 +215,8 @@ function submit() {
         <el-form ref="formRef" label-position="right" :model="form" :rules="rules" label-width="100px" class="system-config-form">
           <BaInput v-model="form.systemName" label="系统名称" prop="systemName"></BaInput>
           <BaInput v-model="form.browserTitle" label="标签页名称" prop="browserTitle"></BaInput>
+          <BaInput v-model="form.systemVersion" label="系统版本" prop="systemVersion"></BaInput>
+          <BaInput v-model="form.defaultUserPassword" label="默认用户密码" prop="defaultUserPassword" show-password maxlength="30"></BaInput>
           <BaInput v-model="form.sessionExpireMinutes" label="有效时间" prop="sessionExpireMinutes" type="number">
             <template #append>分钟</template>
           </BaInput>

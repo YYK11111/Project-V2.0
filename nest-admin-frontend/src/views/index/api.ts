@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import { getMessageList, getUnreadCount } from '@/api/system/message'
-import { getUserAreaList, getVisitedNumChart } from '@/views/systemMonitor/loginLog/api'
+import { getUserLoginProvinceList, getVisitedNumChart } from '@/views/systemMonitor/loginLog/api'
 import { getList as getProjectList } from '@/views/business/projectManage/api'
 
 const { get } = request
@@ -138,6 +138,7 @@ export async function getAdminVisitedNumChart(): Promise<{ data: AdminChartPoint
   return { data: normalizeChartList(await getVisitedNumChart({})) }
 }
 
-export async function getAdminUserAreaList(): Promise<{ data: AdminChartPoint[] }> {
-  return { data: normalizeChartList(await getUserAreaList({})) }
+// 地图组件直接消费纯数组数据，不包裹为 RequestChartTable 的 { data } 形状。
+export async function getAdminUserLoginProvinceList(): Promise<AdminChartPoint[]> {
+  return normalizeChartList(await getUserLoginProvinceList())
 }
