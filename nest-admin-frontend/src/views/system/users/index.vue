@@ -422,7 +422,6 @@ const getButtons = (row: any) => {
         width="500"
         @confirm="$refs.resetPasswordDialogRef.confirm(resetPassword)">
         <template #form="{ form }">
-          <BaInput v-model="form.passwordOld" prop="password" label="旧密码" maxlength="30"></BaInput>
           <BaInput v-model="form.passwordNew" prop="password" label="新密码" maxlength="30"></BaInput>
           <BaInput
             v-model="form.passwordNewConfirm"

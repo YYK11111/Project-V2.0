@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { SystenConfigsService } from "./service";
 import { SystenConfigsController } from "./controller";
 import { SystenConfig } from "./entity";
@@ -6,7 +6,10 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { SysFileModule } from "src/modules/sys/file/module";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SystenConfig]), SysFileModule],
+  imports: [
+    TypeOrmModule.forFeature([SystenConfig]),
+    forwardRef(() => SysFileModule),
+  ],
   controllers: [SystenConfigsController],
   providers: [SystenConfigsService],
   exports: [SystenConfigsService],

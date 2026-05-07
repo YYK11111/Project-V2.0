@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 import { Task, TaskStatus } from "./entity";
@@ -11,6 +12,7 @@ import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { TaskDto } from "./dto";
 import { TaskDependency } from "./entities/task-dependency.entity";
+import { TaskDelayRecord } from "./entities/task-delay-record.entity";
 import { TaskTimeLog } from "./entities/task-time-log.entity";
 import { SysFileService } from "src/modules/sys/file/service";
 import { SaveDto } from "src/common/dto";
@@ -22,6 +24,9 @@ import { Milestone } from "../milestones/entity";
 import { UserStory } from "../projects/entities/user-story.entity";
 import { Risk } from "../risks/entity";
 import { Ticket } from "../tickets/entity";
+import { MessageType } from "src/modules/messages/entity";
+import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
+import { MessagesService } from "src/modules/messages/service";
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -29,6 +34,8 @@ export class TasksService extends BaseService<Task, TaskDto> {
     @InjectRepository(Task) repository: Repository<Task>,
     @InjectRepository(TaskDependency)
     private dependencyRepository: Repository<TaskDependency>,
+    @InjectRepository(TaskDelayRecord)
+    private delayRecordRepository: Repository<TaskDelayRecord>,
     @InjectRepository(TaskTimeLog)
     private timeLogRepository: Repository<TaskTimeLog>,
     @InjectRepository(TaskComment)
@@ -44,6 +51,8 @@ export class TasksService extends BaseService<Task, TaskDto> {
     private ticketRepository: Repository<Ticket>,
     private readonly sysFileService: SysFileService,
     private readonly projectsService: ProjectsService,
+    private readonly messagesService: MessagesService,
+    private readonly systemScheduledJobsService: SystemScheduledJobsService,
   ) {
     super(Task, repository);
   }
@@ -105,26 +114,704 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
   }
 
-  private async getTaskPermissions(task: Task, operatorId: string) {
-    if (!operatorId) return { canEdit: false, canDelete: false };
-    const context = await this.projectsService.getProjectPermissionContext(
-      task.projectId,
-      operatorId,
-    );
-    const canEdit =
+  private getTodayDate() {
+    return new Date().toISOString().split("T")[0];
+  }
+
+  private async getTaskById(taskId: string, isError = true) {
+    const task = await this.repository.findOne({
+      where: { id: taskId, isDelete: null as any } as any,
+    });
+    if (!task && isError) {
+      throw new NotFoundException("任务不存在");
+    }
+    return task;
+  }
+
+  private async getTaskPermissionContext(task: Task, operatorId: string) {
+    const context = operatorId
+      ? await this.projectsService.getProjectPermissionContext(
+          task.projectId,
+          operatorId,
+        )
+      : null;
+    const canManage =
       Boolean(context?.isManager) ||
       Boolean(context?.isDeliveryManager) ||
       Boolean(context?.isFunctionalLead) ||
-      String(task.leaderId || "") === String(operatorId) ||
-      String(task.createUser || "") === String(operatorId);
+      String(task.leaderId || "") === String(operatorId || "") ||
+      String(task.createUser || "") === String(operatorId || "");
+    const canExecute =
+      canManage ||
+      (task.executorIds || []).some(
+        (executorId) => String(executorId) === String(operatorId || ""),
+      );
     return {
-      canEdit,
+      context,
+      canManage,
+      canExecute,
+    };
+  }
+
+  private async ensureTaskCanManage(task: Task, operatorId: string) {
+    const permissionContext = await this.getTaskPermissionContext(
+      task,
+      operatorId,
+    );
+    if (!permissionContext.canManage) {
+      throw new ForbiddenException("当前无管理该任务的权限");
+    }
+    return permissionContext;
+  }
+
+  private async ensureTaskCanExecute(task: Task, operatorId: string) {
+    const permissionContext = await this.getTaskPermissionContext(
+      task,
+      operatorId,
+    );
+    if (!permissionContext.canExecute) {
+      throw new ForbiddenException("当前无执行该任务的权限");
+    }
+    return permissionContext;
+  }
+
+  private async ensureTaskCanStart(task: Task) {
+    const dependencies = await this.dependencyRepository.find({
+      where: { taskId: Number(task.id) } as any,
+      relations: ["dependency"],
+    });
+    const blockedDependency = dependencies.find((item) => {
+      const dependencyStatus = String(item.dependency?.status || "");
+      return dependencyStatus && dependencyStatus !== TaskStatus.completed;
+    });
+    if (blockedDependency) {
+      throw new BadRequestException("存在未完成的前置任务，当前任务不可开始");
+    }
+  }
+
+  private getTaskReminderRecipients(task: {
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }) {
+    return Array.from(
+      new Set(
+        [task?.leaderId, ...(task?.executorIds || [])]
+          .filter(Boolean)
+          .map((id) => String(id)),
+      ),
+    );
+  }
+
+  private async getTaskReminderContext(taskId: string) {
+    return this.repository.findOne({
+      where: { id: taskId, isDelete: null as any } as any,
+      select: [
+        "id",
+        "name",
+        "projectId",
+        "leaderId",
+        "executorIds",
+        "status",
+        "approvalStatus",
+      ] as any,
+    });
+  }
+
+  private getTaskReminderMeta(reminderType: string) {
+    const configs = {
+      taskAssigned: {
+        messageType: MessageType.todo,
+        titlePrefix: "任务分配提醒",
+        content: "您有一个新的任务待处理，请及时查看。",
+      },
+      taskStarted: {
+        messageType: MessageType.cc,
+        titlePrefix: "任务开始通知",
+        content: "任务已开始执行，请关注最新进展。",
+      },
+      taskDelayed: {
+        messageType: MessageType.cc,
+        titlePrefix: "任务延期通知",
+        content: "任务截止时间已延期，请关注最新安排。",
+      },
+      taskCompletionApproved: {
+        messageType: MessageType.cc,
+        titlePrefix: "任务完成审批通过",
+        content: "任务完成审批已通过，请查看处理结果。",
+      },
+      taskCompletionRejected: {
+        messageType: MessageType.todo,
+        titlePrefix: "任务完成审批驳回",
+        content: "任务完成审批已驳回，请根据意见继续处理。",
+      },
+    } as const;
+    return configs[reminderType as keyof typeof configs] || null;
+  }
+
+  private async hasRecentReminder(input: {
+    taskId: string;
+    receiverId: string;
+    reminderType: string;
+    windowHours: number;
+  }) {
+    const thresholdDate = new Date(
+      Date.now() - input.windowHours * 60 * 60 * 1000,
+    ).toISOString();
+    const count = await this.messagesService.repository
+      .createQueryBuilder("message")
+      .where("message.sourceType = :sourceType", {
+        sourceType: "task_reminder",
+      })
+      .andWhere("message.sourceId = :sourceId", { sourceId: input.taskId })
+      .andWhere("message.receiverId = :receiverId", {
+        receiverId: input.receiverId,
+      })
+      .andWhere("message.createTime >= :thresholdDate", {
+        thresholdDate,
+      })
+      .andWhere(
+        "JSON_EXTRACT(message.extraData, '$.reminderType') = :reminderType",
+        {
+          reminderType: JSON.stringify(input.reminderType),
+        },
+      )
+      .getCount();
+    return count > 0;
+  }
+
+  async scanDueSoonTaskReminders() {
+    const tasks = await this.repository.find({
+      where: [
+        { status: TaskStatus.pending, isDelete: null as any } as any,
+        { status: TaskStatus.inProgress, isDelete: null as any } as any,
+        {
+          status: TaskStatus.deferred,
+          isDelete: null as any,
+        } as any,
+        {
+          status: TaskStatus.pendingCompletionApproval,
+          isDelete: null as any,
+        } as any,
+      ],
+    });
+    const today = this.getTodayDate();
+    const todayTime = new Date(today).getTime();
+
+    for (const task of tasks) {
+      if (!task.endDate) continue;
+
+      const endDateTime = new Date(task.endDate).getTime();
+      const diffDays = Math.ceil(
+        (endDateTime - todayTime) / (24 * 60 * 60 * 1000),
+      );
+      if (diffDays < 0 || diffDays > 3) continue;
+
+      for (const receiverId of this.getTaskReminderRecipients(task)) {
+        const hasRecent = await this.hasRecentReminder({
+          taskId: String(task.id),
+          receiverId,
+          reminderType: "taskDueSoon",
+          windowHours: 24,
+        });
+        if (hasRecent) continue;
+
+        await this.messagesService.sendMessage({
+          title: `任务即将到期：${task.name || task.id}`,
+          content: "任务截止时间临近，请及时处理。",
+          messageType: MessageType.cc,
+          sourceType: "task_reminder",
+          sourceId: String(task.id),
+          receiverId,
+          senderId: "system",
+          linkUrl: `/taskManage/form?id=${task.id}&action=view`,
+          extraData: {
+            businessType: "task",
+            taskId: String(task.id),
+            projectId: String(task.projectId || ""),
+            reminderType: "taskDueSoon",
+            status: String(task.status || ""),
+            approvalStatus: String(task.approvalStatus || "0"),
+            channels: ["messageCenter"],
+          },
+        });
+      }
+    }
+  }
+
+  async scanOverdueTaskReminders() {
+    const tasks = await this.repository.find({
+      where: [
+        { status: TaskStatus.pending, isDelete: null as any } as any,
+        { status: TaskStatus.inProgress, isDelete: null as any } as any,
+        {
+          status: TaskStatus.deferred,
+          isDelete: null as any,
+        } as any,
+        {
+          status: TaskStatus.pendingCompletionApproval,
+          isDelete: null as any,
+        } as any,
+      ],
+    });
+    const today = this.getTodayDate();
+
+    for (const task of tasks) {
+      if (!task.endDate || task.endDate >= today) continue;
+
+      for (const receiverId of this.getTaskReminderRecipients(task)) {
+        const hasRecent = await this.hasRecentReminder({
+          taskId: String(task.id),
+          receiverId,
+          reminderType: "taskOverdue",
+          windowHours: 24,
+        });
+        if (hasRecent) continue;
+
+        await this.messagesService.sendMessage({
+          title: `任务已逾期：${task.name || task.id}`,
+          content: "任务已超过截止时间，请尽快处理。",
+          messageType: MessageType.todo,
+          sourceType: "task_reminder",
+          sourceId: String(task.id),
+          receiverId,
+          senderId: "system",
+          linkUrl: `/taskManage/form?id=${task.id}&action=view`,
+          extraData: {
+            businessType: "task",
+            taskId: String(task.id),
+            projectId: String(task.projectId || ""),
+            reminderType: "taskOverdue",
+            status: String(task.status || ""),
+            approvalStatus: String(task.approvalStatus || "0"),
+            channels: ["messageCenter"],
+          },
+        });
+      }
+    }
+  }
+
+  async scanStaleReportTaskReminders() {
+    const tasks = await this.repository.find({
+      where: [
+        { status: TaskStatus.inProgress, isDelete: null as any } as any,
+        {
+          status: TaskStatus.deferred,
+          isDelete: null as any,
+        } as any,
+        {
+          status: TaskStatus.pendingCompletionApproval,
+          isDelete: null as any,
+        } as any,
+      ],
+    });
+    const taskIds = tasks.map((task) => String(task.id || "")).filter(Boolean);
+    const latestReportSummary = taskIds.length
+      ? await this.timeLogRepository.query(
+          `SELECT task_id AS taskId, MAX(create_time) AS latestReportTime
+         FROM task_time_log
+         WHERE task_id IN (?)
+           AND is_delete IS NULL
+         GROUP BY task_id`,
+          [taskIds],
+        )
+      : [];
+    const staleThreshold = Date.now() - 48 * 60 * 60 * 1000;
+    const latestReportMap = new Map<string, number>(
+      latestReportSummary.map((item) => [
+        String(item.taskId),
+        item.latestReportTime ? new Date(item.latestReportTime).getTime() : 0,
+      ]),
+    );
+
+    for (const task of tasks) {
+      const latestReportTime: number =
+        latestReportMap.get(String(task.id)) || 0;
+      if (latestReportTime && latestReportTime >= staleThreshold) continue;
+
+      for (const receiverId of this.getTaskReminderRecipients(task)) {
+        const hasRecent = await this.hasRecentReminder({
+          taskId: String(task.id),
+          receiverId,
+          reminderType: "taskReportStale",
+          windowHours: 48,
+        });
+        if (hasRecent) continue;
+
+        await this.messagesService.sendMessage({
+          title: `任务汇报提醒：${task.name || task.id}`,
+          content: "该任务最近 2 天未提交汇报，请及时更新进展。",
+          messageType: MessageType.todo,
+          sourceType: "task_reminder",
+          sourceId: String(task.id),
+          receiverId,
+          senderId: "system",
+          linkUrl: `/taskManage/form?id=${task.id}&action=view`,
+          extraData: {
+            businessType: "task",
+            taskId: String(task.id),
+            projectId: String(task.projectId || ""),
+            reminderType: "taskReportStale",
+            status: String(task.status || ""),
+            approvalStatus: String(task.approvalStatus || "0"),
+            channels: ["messageCenter"],
+          },
+        });
+      }
+    }
+  }
+
+  async runScheduledTaskReminders() {
+    await this.scanDueSoonTaskReminders();
+    await this.scanOverdueTaskReminders();
+    await this.scanStaleReportTaskReminders();
+  }
+
+  @Cron("0 0 9 * * *")
+  async scheduledTaskDueSoonReminder() {
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "tasks.dueSoonReminder",
+      ))
+    ) {
+      return;
+    }
+    await this.systemScheduledJobsService.runJob(
+      "tasks.dueSoonReminder",
+      "scheduled",
+      async () => {
+        await this.scanDueSoonTaskReminders();
+        return {};
+      },
+    );
+  }
+
+  @Cron("0 5 9 * * *")
+  async scheduledTaskOverdueReminder() {
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "tasks.overdueReminder",
+      ))
+    ) {
+      return;
+    }
+    await this.systemScheduledJobsService.runJob(
+      "tasks.overdueReminder",
+      "scheduled",
+      async () => {
+        await this.scanOverdueTaskReminders();
+        return {};
+      },
+    );
+  }
+
+  @Cron("0 10 9 * * *")
+  async scheduledTaskReportReminder() {
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "tasks.reportStaleReminder",
+      ))
+    ) {
+      return;
+    }
+    await this.systemScheduledJobsService.runJob(
+      "tasks.reportStaleReminder",
+      "scheduled",
+      async () => {
+        await this.scanStaleReportTaskReminders();
+        return {};
+      },
+    );
+  }
+
+  async queueTaskReminder(payload: {
+    taskId: string;
+    recipientId: string;
+    reminderType: string;
+    messageType: MessageType;
+  }): Promise<void> {
+    const taskId = String(payload.taskId || "");
+    const recipientId = String(payload.recipientId || "");
+    if (!taskId || !recipientId) return;
+
+    const task = await this.getTaskReminderContext(taskId);
+    if (!task) return;
+
+    await this.messagesService.sendMessage({
+      title: `${this.getTaskReminderMeta(payload.reminderType)?.titlePrefix || "任务通知"}：${task.name || taskId}`,
+      content:
+        this.getTaskReminderMeta(payload.reminderType)?.content ||
+        "您有一条新的任务通知，请及时查看。",
+      messageType: payload.messageType,
+      sourceType: "task",
+      sourceId: taskId,
+      receiverId: recipientId,
+      senderId: "system",
+      linkUrl: `/taskManage/form?id=${taskId}&action=view`,
+      extraData: {
+        businessType: "task",
+        taskId,
+        projectId: String(task.projectId || ""),
+        reminderType: payload.reminderType,
+        status: String(task.status || ""),
+        approvalStatus: String(task.approvalStatus || "0"),
+        channels: ["messageCenter"],
+      },
+    });
+  }
+
+  async queueAssignmentReminders(task: {
+    id?: string | number;
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }): Promise<void> {
+    const taskId = String(task?.id || "");
+    if (!taskId) return;
+    const recipientIds = this.getTaskReminderRecipients(task);
+    for (const recipientId of recipientIds) {
+      await this.queueTaskReminder({
+        taskId,
+        recipientId,
+        reminderType: "taskAssigned",
+        messageType: MessageType.todo,
+      });
+    }
+  }
+
+  async queueStartedReminders(task: {
+    id?: string | number;
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }): Promise<void> {
+    const taskId = String(task?.id || "");
+    if (!taskId) return;
+    for (const recipientId of this.getTaskReminderRecipients(task)) {
+      await this.queueTaskReminder({
+        taskId,
+        recipientId,
+        reminderType: "taskStarted",
+        messageType: MessageType.cc,
+      });
+    }
+  }
+
+  async queueDelayReminders(task: {
+    id?: string | number;
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }): Promise<void> {
+    const taskId = String(task?.id || "");
+    if (!taskId) return;
+    for (const recipientId of this.getTaskReminderRecipients(task)) {
+      await this.queueTaskReminder({
+        taskId,
+        recipientId,
+        reminderType: "taskDelayed",
+        messageType: MessageType.cc,
+      });
+    }
+  }
+
+  async queueCompletionApprovedReminders(task: {
+    id?: string | number;
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }): Promise<void> {
+    const taskId = String(task?.id || "");
+    if (!taskId) return;
+    for (const recipientId of this.getTaskReminderRecipients(task)) {
+      await this.queueTaskReminder({
+        taskId,
+        recipientId,
+        reminderType: "taskCompletionApproved",
+        messageType: MessageType.cc,
+      });
+    }
+  }
+
+  async queueCompletionRejectedReminders(task: {
+    id?: string | number;
+    leaderId?: string | number | null;
+    executorIds?: Array<string | number | null | undefined>;
+  }): Promise<void> {
+    const taskId = String(task?.id || "");
+    if (!taskId) return;
+    for (const recipientId of this.getTaskReminderRecipients(task)) {
+      await this.queueTaskReminder({
+        taskId,
+        recipientId,
+        reminderType: "taskCompletionRejected",
+        messageType: MessageType.todo,
+      });
+    }
+  }
+
+  private async getTaskPermissions(task: Task, operatorId: string) {
+    if (!operatorId)
+      return {
+        canEdit: false,
+        canDelete: false,
+        canManage: false,
+        canExecute: false,
+      };
+    const { context, canManage, canExecute } =
+      await this.getTaskPermissionContext(task, operatorId);
+    return {
+      canEdit: canManage,
       canDelete:
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(task.leaderId || "") === String(operatorId) ||
         String(task.createUser || "") === String(operatorId),
+      canManage,
+      canExecute,
     };
+  }
+
+  async startTask(id: string, operatorId: string) {
+    const task = await this.getTaskById(String(id));
+    await this.ensureTaskCanExecute(task, operatorId);
+    await this.ensureTaskCanStart(task);
+    const payload: Partial<Task> = {
+      status: TaskStatus.inProgress,
+    };
+    if (!task.actualStartDate) {
+      payload.actualStartDate = this.getTodayDate();
+    }
+    await this.repository.update(task.id, payload as any);
+    await this.queueStartedReminders(task);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async pauseTask(id: string, operatorId: string) {
+    const task = await this.getTaskById(String(id));
+    await this.ensureTaskCanManage(task, operatorId);
+    await this.repository.update(task.id, {
+      status: TaskStatus.deferred,
+    } as any);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async resumeTask(id: string, operatorId: string) {
+    const task = await this.getTaskById(String(id));
+    await this.ensureTaskCanExecute(task, operatorId);
+    await this.ensureTaskCanStart(task);
+    await this.repository.update(task.id, {
+      status: TaskStatus.inProgress,
+    } as any);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async submitCompletionApproval(id: string, operatorId: string) {
+    const task = await this.getTaskById(String(id));
+    await this.ensureTaskCanExecute(task, operatorId);
+    await this.repository.update(task.id, {
+      status: TaskStatus.pendingCompletionApproval,
+      approvalStatus: "1",
+      currentNodeName: "待完成审批",
+    } as any);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async handleCompletionApprovalApproved(id: string) {
+    const task = await this.getTaskById(String(id));
+    const isPendingCompletionApproval =
+      task.status === TaskStatus.pendingCompletionApproval &&
+      String(task.approvalStatus || "") === "1";
+    if (!isPendingCompletionApproval) {
+      return task;
+    }
+    const payload: Partial<Task> = {
+      status: TaskStatus.completed,
+      approvalStatus: "2",
+      currentNodeName: "完成审批已通过",
+    };
+    if (!task.actualEndDate) {
+      payload.actualEndDate = this.getTodayDate();
+    }
+    await this.repository.update(task.id, payload as any);
+    await this.queueCompletionApprovedReminders(task);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async handleCompletionApprovalRejected(id: string) {
+    const task = await this.getTaskById(String(id));
+    const isPendingCompletionApproval =
+      task.status === TaskStatus.pendingCompletionApproval &&
+      String(task.approvalStatus || "") === "1";
+    if (!isPendingCompletionApproval) {
+      return task;
+    }
+    await this.repository.update(task.id, {
+      status: TaskStatus.inProgress,
+      approvalStatus: "3",
+      currentNodeName: "完成审批已驳回",
+    } as any);
+    await this.queueCompletionRejectedReminders(task);
+    await this.recalculateProjectProgressByIds([task.projectId]);
+    return this.getTaskById(task.id);
+  }
+
+  async delayTask(
+    id: string,
+    body: { afterEndDate?: string; reason?: string },
+    operator: { id?: string; name?: string },
+  ) {
+    const task = await this.getTaskById(String(id));
+    await this.ensureTaskCanManage(task, String(operator?.id || ""));
+
+    const allowedStatuses = [
+      TaskStatus.pending,
+      TaskStatus.inProgress,
+      TaskStatus.deferred,
+      TaskStatus.pendingCompletionApproval,
+    ];
+    if (!allowedStatuses.includes(task.status)) {
+      throw new BadRequestException("当前任务状态不允许延期");
+    }
+    if (!task.endDate) {
+      throw new BadRequestException("当前任务缺少截止日期，无法延期");
+    }
+    const afterEndDate = String(body?.afterEndDate || "");
+    if (!afterEndDate) {
+      throw new BadRequestException("延期后截止日期不能为空");
+    }
+    if (afterEndDate <= String(task.endDate)) {
+      throw new BadRequestException("延期后截止日期必须晚于当前截止日期");
+    }
+
+    const payload: Partial<Task> = {
+      endDate: afterEndDate,
+    };
+    if (!task.actualStartDate) {
+      payload.plannedEndDate = afterEndDate;
+    }
+
+    await this.repository.update(task.id, payload as any);
+    const delayRecord = this.delayRecordRepository.create({
+      taskId: String(task.id),
+      beforeEndDate: task.endDate,
+      afterEndDate,
+      reason: String(body?.reason || ""),
+      operatorId: String(operator?.id || ""),
+      operatorName: String(operator?.name || ""),
+    });
+    await this.delayRecordRepository.save(delayRecord);
+    await this.queueDelayReminders(task);
+
+    return this.getTaskById(task.id);
+  }
+
+  async getDelayRecords(taskId: string) {
+    await this.getTaskById(String(taskId));
+    return this.delayRecordRepository.find({
+      where: { taskId: String(taskId) } as any,
+      order: { createTime: "DESC" },
+    });
   }
 
   private normalizeTaskPayload(
@@ -164,6 +851,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   async save(dto: SaveDto<TaskDto> & { attachments?: string[] }) {
+    const isCreate = !dto.id;
     await this.projectsService.assertProjectNotArchived(
       String(dto.projectId || ""),
     );
@@ -207,6 +895,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
 
     const saved = Array.isArray(result) ? result[0] : result;
+    if (isCreate) {
+      await this.queueAssignmentReminders(saved);
+    }
     await this.recalculateProjectProgressByIds([
       originalTask?.projectId,
       saved?.projectId,
@@ -241,6 +932,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
 
     const saved = Array.isArray(result) ? result[0] : result;
+    await this.queueAssignmentReminders(saved);
     await this.recalculateProjectProgressByIds([saved?.projectId]);
 
     return result;
@@ -468,7 +1160,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
         String((query as any)._operatorId),
       );
     }
-    const detail = this.buildTaskDetail(task) as any;
+    const detail = (await this.buildTaskDetail(task)) as any;
     if ((query as any)._operatorId) {
       Object.assign(
         detail,

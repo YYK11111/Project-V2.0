@@ -23,6 +23,7 @@ export enum TaskStatus {
   completed = "3",
   rejected = "4",
   deferred = "5",
+  pendingCompletionApproval = "6",
 }
 
 export const taskStatusMap = {
@@ -31,6 +32,7 @@ export const taskStatusMap = {
   [TaskStatus.completed]: "已完成",
   [TaskStatus.rejected]: "已驳回",
   [TaskStatus.deferred]: "暂缓",
+  [TaskStatus.pendingCompletionApproval]: "待完成审批",
 };
 
 // 优先级枚举

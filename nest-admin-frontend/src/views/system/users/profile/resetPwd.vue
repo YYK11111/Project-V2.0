@@ -17,7 +17,7 @@
 </template>
 
 <script>
-import { resetPassword } from '../api'
+import { updatePassword } from '../api'
 
 export default {
 	props: {
@@ -52,7 +52,7 @@ export default {
 		submit() {
 			this.$refs['form'].validate((valid) => {
 				if (valid) {
-					resetPassword(this.user).then((response) => {
+					updatePassword(this.user).then((response) => {
 						$sdk.msgSuccess('修改成功')
 					})
 				}

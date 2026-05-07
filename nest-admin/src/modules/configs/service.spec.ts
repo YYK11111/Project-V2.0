@@ -122,6 +122,54 @@ describe("SystenConfigsService", () => {
     );
   });
 
+  it("默认用户密码作为普通配置项留空保存时应清空", async () => {
+    const repository = createRepository();
+    const service = new SystenConfigsService(
+      repository as never,
+      createSysFileService() as never,
+    );
+
+    repository.findOne.mockResolvedValueOnce({
+      id: "config-1",
+      defaultUserPassword: "old-password",
+    });
+    repository.save.mockImplementation(async (data) => data);
+
+    await expect(
+      service.save({
+        id: "config-1",
+        systemName: "项目系统",
+        defaultUserPassword: "",
+      } as never),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        defaultUserPassword: "",
+      }),
+    );
+  });
+
+  it("配置列表返回默认用户密码明文配置值", async () => {
+    const repository = createRepository();
+    const service = new SystenConfigsService(
+      repository as never,
+      createSysFileService() as never,
+    );
+    repository.findAndCount = jest
+      .fn()
+      .mockResolvedValue([
+        [{ id: "config-1", defaultUserPassword: "secret-password" }],
+        1,
+      ]);
+
+    await expect(
+      service.list({ pageNum: 1, pageSize: 10 } as any),
+    ).resolves.toEqual({
+      total: 1,
+      data: [{ id: "config-1", defaultUserPassword: "secret-password" }],
+      _flag: true,
+    });
+  });
+
   it("外链图片不应触发附件关联，且找不到记录时不阻塞保存", async () => {
     const repository = createRepository();
     const sysFileService = createSysFileService();

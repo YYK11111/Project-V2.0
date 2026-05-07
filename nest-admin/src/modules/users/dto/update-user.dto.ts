@@ -5,4 +5,5 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   passwordOld: string;
   passwordNew: string;
   passwordNewConfirm: string;
+  permissions?: string[];
 }

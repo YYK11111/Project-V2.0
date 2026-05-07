@@ -233,6 +233,24 @@ describe("ProjectsService closure guards", () => {
     ).toThrow(ForbiddenException);
   });
 
+  it("立项后不允许通过项目编辑维护结项字段", () => {
+    const { service } = createService();
+    expect(() =>
+      (service as any).assertProjectLifecycleEditable({ status: "3" }, [
+        "closeSummary",
+      ]),
+    ).toThrow(ForbiddenException);
+  });
+
+  it("草稿项目仍允许通过项目编辑维护字段", () => {
+    const { service } = createService();
+    expect(() =>
+      (service as any).assertProjectLifecycleEditable({ status: "1" }, [
+        "name",
+      ]),
+    ).not.toThrow();
+  });
+
   it("驾驶舱应使用项目列表返回的 list 字段生成项目选项", async () => {
     const { service } = createService();
     jest.spyOn(service, "list").mockResolvedValue({

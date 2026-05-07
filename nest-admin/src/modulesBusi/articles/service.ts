@@ -838,8 +838,10 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       const chunk = {
         order: 0,
         title: "全文",
+        headingPath: [],
         text: article.contentText || "",
         summary: (article.contentText || "").slice(0, 120),
+        tokenEstimate: this.estimateTokenCount(article.contentText || ""),
       };
       const scoreBreakdown = this.calculateAiRetrieveScore(
         article,

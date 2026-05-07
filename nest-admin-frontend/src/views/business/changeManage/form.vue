@@ -105,6 +105,7 @@ async function loadChange() {
     form.value = {
       ...defaultForm(),
       projectId: String(route.query.projectId || ''),
+      type: String(route.query.type || '6'),
     }
     return
   }

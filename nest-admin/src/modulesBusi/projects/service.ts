@@ -50,6 +50,7 @@ import { ProjectCockpitSnapshot } from "./entities/project-cockpit-snapshot.enti
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { ChangeImpactConfirmHistory } from "../changes/entities/change-impact-confirm-history.entity";
 import { ProjectFieldPermissionService } from "./project-field-permission.service";
+import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 
 @Injectable()
 export class ProjectsService extends BaseService<Project, ProjectDto> {
@@ -88,6 +89,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private opportunityRepository: Repository<SalesOpportunity>,
     private readonly sysFileService: SysFileService,
     private readonly dataSource: DataSource,
+    private readonly systemScheduledJobsService: SystemScheduledJobsService,
   ) {
     super(Project, repository);
   }
@@ -203,34 +205,15 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return String(project.status || "") !== ProjectStatus.draft;
   }
 
-  private getLockedGroupsAfterApproval() {
-    return ["projectBasic", "projectPlan", "projectBusiness", "projectMember"];
-  }
-
   private assertProjectLifecycleEditable(
     originalProject: Project,
     changedFields: string[],
   ) {
     if (!this.isProjectLifecycleLocked(originalProject)) return;
     if (!changedFields.length) return;
-    const changedGroups = this.resolveChangedGroupCodes(changedFields);
-    const blockedGroups = changedGroups.filter((groupCode) =>
-      this.getLockedGroupsAfterApproval().includes(groupCode),
+    throw new ForbiddenException(
+      "项目立项后不允许直接编辑，请通过项目变更发起调整",
     );
-    if (!blockedGroups.length) return;
-    throw new ForbiddenException({
-      message: `项目立项后不允许编辑字段组：${blockedGroups.join(", ")}`,
-      details: {
-        groups: blockedGroups,
-        fields: changedFields.filter((field) =>
-          blockedGroups.some((groupCode) =>
-            this.projectFieldPermissionService
-              .getGroupFieldMap()
-              [groupCode]?.includes(field),
-          ),
-        ),
-      },
-    });
   }
 
   private async assertProjectFieldEditPermission(
@@ -2916,7 +2899,26 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async generateDailyCockpitSnapshots() {
-    await this.generateCockpitSnapshots();
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "projects.dailyCockpitSnapshots",
+      ))
+    ) {
+      return;
+    }
+    await this.systemScheduledJobsService.runJob(
+      "projects.dailyCockpitSnapshots",
+      "scheduled",
+      async () => {
+        const result = await this.generateCockpitSnapshots();
+        return {
+          summary: `生成 ${Number(result?.total || 0)} 个项目快照`,
+          processedCount: Number(result?.total || 0),
+          successCount: Number(result?.total || 0),
+          failedCount: 0,
+        };
+      },
+    );
   }
 
   async generateCockpitSnapshots(projectIds?: string[]) {

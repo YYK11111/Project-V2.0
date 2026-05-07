@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { UsersService } from "./users.service";
 import { UsersController } from "./users.controller";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -11,9 +11,9 @@ import { SystenConfigsModule } from "../configs/module";
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-    CommonModule,
+    forwardRef(() => CommonModule),
     DepstModule,
-    SysFileModule,
+    forwardRef(() => SysFileModule),
     SystenConfigsModule,
   ],
   controllers: [UsersController],

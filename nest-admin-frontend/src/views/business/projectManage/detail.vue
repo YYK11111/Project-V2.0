@@ -52,7 +52,7 @@ const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canKnowledgeAdd = computed(() => checkPermi(['business/articles/add']))
-const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false)
+const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false && String(project.value?.status || '') === '1')
 const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false)
 const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
 const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
@@ -555,6 +555,11 @@ function goToEdit() {
   router.push({ path: '/projectManage/form', query: { id: projectId.value } })
 }
 
+function goToProjectChange(type = '6') {
+  if (!projectId.value) return
+  router.push({ path: '/changeManage/form', query: { projectId: projectId.value, type } })
+}
+
 function goToCockpit() {
   router.push({ path: '/projectManage/cockpit', query: { projectId: projectId.value } })
 }
@@ -763,7 +768,7 @@ function getProjectApprovalText(project) {
     <el-page-header @back="$router.back()" title="项目详情">
       <template #extra>
         <el-button @click="goToCockpit">进入驾驶舱</el-button>
-        <el-button type="primary" :disabled="!canEditCurrentProject" @click="canEditCurrentProject ? goToEdit() : $sdk.msgWarning('当前无编辑该项目的权限')">编辑项目</el-button>
+        <el-button v-if="canEditCurrentProject" type="primary" @click="goToEdit">编辑项目</el-button>
         <el-button type="warning" :disabled="!canSubmitCloseCurrentProject" @click="handleSubmitClose" v-if="project.status === '3'">提交结项申请</el-button>
       </template>
     </el-page-header>
@@ -1410,7 +1415,7 @@ function getProjectApprovalText(project) {
             <div class="plan-action-card__actions">
               <el-button v-if="canSprintAdd" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
               <el-button v-if="canTaskAdd" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
-              <el-button type="primary" @click="goToEdit">调整基线计划</el-button>
+              <el-button type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
             </div>
           </div>
         </el-card>
@@ -1419,7 +1424,7 @@ function getProjectApprovalText(project) {
           <template #header>
             <div class="focus-card__header">
               <span>执行计划说明</span>
-              <el-button link type="primary" @click="goToEdit">调整基线计划</el-button>
+              <el-button link type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
             </div>
           </template>
           <div class="plan-intro-card">
@@ -2001,7 +2006,7 @@ function getProjectApprovalText(project) {
               <div class="plan-action-card__desc">在资料与佐证齐备后，从这里继续发起结项审批、维护执行凭证和沉淀知识。</div>
             </div>
             <div class="plan-action-card__actions">
-              <el-button @click="goToEdit">去完善结项资料</el-button>
+              <el-button @click="goToProjectChange('6')">去完善结项资料</el-button>
               <el-button @click="createProjectScopedRecord('/goLiveManage/form')">新增上线单</el-button>
               <el-button @click="createProjectScopedRecord('/acceptanceManage/form')">新增验收单</el-button>
               <el-button @click="createProjectScopedRecord('/handoverManage/form')">新增运维交接单</el-button>

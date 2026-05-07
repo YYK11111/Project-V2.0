@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { SysFile, FileStatus } from "./entity";
 import { CreateFileDto, AssociateFileDto } from "./dto";
 import { Cron, CronExpression } from "@nestjs/schedule";
+import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 
 export type CleanupResult = {
   deletedCount: number;
@@ -17,6 +18,7 @@ export type CleanupResult = {
 export class SysFileService {
   constructor(
     @InjectRepository(SysFile) private readonly repository: Repository<SysFile>,
+    private readonly systemScheduledJobsService: SystemScheduledJobsService,
   ) {}
 
   async create(dto: CreateFileDto): Promise<SysFile> {
@@ -172,10 +174,28 @@ export class SysFileService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async scheduledCleanup(): Promise<void> {
-    console.log("Running scheduled file cleanup...");
-    const result = await this.cleanupOrphanFiles(24);
-    console.log(
-      `Cleanup completed: ${result.deletedCount} files deleted, ${result.totalSize} bytes freed`,
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "sysFile.orphanCleanup",
+      ))
+    ) {
+      return;
+    }
+    await this.systemScheduledJobsService.runJob(
+      "sysFile.orphanCleanup",
+      "scheduled",
+      async () => {
+        const result = await this.cleanupOrphanFiles(24);
+        return {
+          summary: `清理 ${result.deletedCount} 个文件`,
+          processedCount: result.deletedCount,
+          successCount: result.deletedCount,
+          payload: {
+            totalSize: result.totalSize,
+            details: result.details,
+          },
+        };
+      },
     );
   }
 }

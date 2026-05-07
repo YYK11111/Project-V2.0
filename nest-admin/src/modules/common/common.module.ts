@@ -1,4 +1,4 @@
-import { Module, NestMiddleware } from "@nestjs/common";
+import { Module, NestMiddleware, forwardRef } from "@nestjs/common";
 import { CommonService } from "./common.service";
 import { CommonController } from "./common.controller";
 import { MulterModule } from "@nestjs/platform-express";
@@ -66,7 +66,7 @@ export class StaticFileMiddleware implements NestMiddleware {
 @Module({
   imports: [
     LoginLogsModule,
-    SysFileModule,
+    forwardRef(() => SysFileModule),
     // 注释掉静态文件服务，因为它与新版 path-to-regexp 不兼容
     // ServeStaticModule.forRoot({
     //   rootPath: join(process.cwd(), 'upload'),

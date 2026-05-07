@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { ProjectsService } from "./service";
 import { ProjectsController } from "./controller";
 import { Project } from "./entity";
@@ -29,6 +29,7 @@ import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
 import { Contract } from "../crm/contracts/entity";
 import { SalesOpportunity } from "../crm/opportunities/entity";
+import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
 
 @Module({
   imports: [
@@ -52,11 +53,12 @@ import { SalesOpportunity } from "../crm/opportunities/entity";
       Contract,
       SalesOpportunity,
     ]),
-    UsersModule,
+    forwardRef(() => UsersModule),
     CrmModule,
-    SysFileModule,
+    forwardRef(() => SysFileModule),
     MessagesModule,
     SystenConfigsModule,
+    forwardRef(() => SystemScheduledJobsModule),
   ],
   controllers: [ProjectsController, UserStoryController],
   providers: [

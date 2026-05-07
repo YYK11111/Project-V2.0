@@ -46,7 +46,7 @@ function getProjectApprovalText(row) {
 }
 
 function canEditProject(row) {
-  return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') !== '3'
+  return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') === '1'
 }
 
 function canEnterApprovalPage(row) {
@@ -294,7 +294,7 @@ const getButtons = (row) => [
 .query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  width: auto;
+  width: 80px;
   min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;

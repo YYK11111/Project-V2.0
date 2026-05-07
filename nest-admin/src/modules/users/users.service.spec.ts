@@ -74,6 +74,86 @@ describe("UsersService", () => {
     expect(result.password).toBeUndefined();
   });
 
+  it("有用户管理重置密码权限时无需旧密码即可重置", async () => {
+    const service = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({ id: "user-1" } as any);
+    usersRepository.save = jest.fn(async (data) => ({ ...data }));
+
+    const result = await service.resetPassword({
+      id: "user-1",
+      passwordNew: "New@123456",
+      passwordNewConfirm: "New@123456",
+      permissions: ["system/users/resetPassword"],
+    } as any);
+
+    await expect(verifyPassword("New@123456", result.password)).resolves.toBe(
+      true,
+    );
+    expect(result.passwordVersion).toBe(2);
+  });
+
+  it("没有用户管理重置密码权限时不能调用管理员重置密码", async () => {
+    const service = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({
+      id: "user-1",
+      password: await (
+        await import("src/common/utils/password")
+      ).hashPassword("Old@123456"),
+    } as any);
+
+    await expect(
+      service.resetPassword({
+        id: "user-1",
+        passwordOld: "Wrong@123456",
+        passwordNew: "New@123456",
+        passwordNewConfirm: "New@123456",
+        permissions: [],
+      } as any),
+    ).rejects.toThrow("接口无权限");
+  });
+
+  it("个人中心修改密码必须校验旧密码", async () => {
+    const service = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({
+      id: "user-1",
+      password: await (
+        await import("src/common/utils/password")
+      ).hashPassword("Old@123456"),
+    } as any);
+
+    await expect(
+      service.updatePassword({
+        id: "user-1",
+        passwordOld: "Wrong@123456",
+        passwordNew: "New@123456",
+        passwordNewConfirm: "New@123456",
+      } as any),
+    ).rejects.toThrow("旧密码不正确");
+  });
+
+  it("个人中心修改密码成功后应加密保存新密码", async () => {
+    const service = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({
+      id: "user-1",
+      password: await (
+        await import("src/common/utils/password")
+      ).hashPassword("Old@123456"),
+    } as any);
+    usersRepository.save = jest.fn(async (data) => ({ ...data }));
+
+    const result = await service.updatePassword({
+      id: "user-1",
+      passwordOld: "Old@123456",
+      passwordNew: "New@123456",
+      passwordNewConfirm: "New@123456",
+    } as any);
+
+    await expect(verifyPassword("New@123456", result.password)).resolves.toBe(
+      true,
+    );
+    expect(result.passwordVersion).toBe(2);
+  });
+
   it("管理员用户更新自己的主题或提醒偏好时不应因 manageAdmin 权限被拒绝", async () => {
     const service = createService();
     jest.spyOn(service, "getOne").mockResolvedValue({

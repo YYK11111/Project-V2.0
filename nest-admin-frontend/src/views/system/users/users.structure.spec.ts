@@ -30,4 +30,13 @@ describe('system users structure', () => {
     expect(source).toContain('v-model="form.password" prop="password" label="密码"')
     expect(source).toContain('show-password')
   })
+
+  it('用户管理重置密码不要求填写旧密码', () => {
+    const source = readSource()
+
+    expect(source).not.toContain('v-model="form.passwordOld"')
+    expect(source).not.toContain('label="旧密码"')
+    expect(source).toContain('v-model="form.passwordNew" prop="password" label="新密码"')
+    expect(source).toContain('v-model="form.passwordNewConfirm"')
+  })
 })

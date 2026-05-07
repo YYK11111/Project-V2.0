@@ -1,11 +1,10 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TasksService } from "./service";
 import { TasksController } from "./controller";
 import { Task } from "./entity";
 import { TaskDependency } from "./entities/task-dependency.entity";
 import { TaskTimeLog } from "./entities/task-time-log.entity";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { UsersModule } from "src/modules/users/users.module";
 import { ProjectsModule } from "../projects/module";
 import { SysFileModule } from "src/modules/sys/file/module";
 import { User } from "src/modules/users/entities/user.entity";
@@ -14,6 +13,9 @@ import { Milestone } from "../milestones/entity";
 import { UserStory } from "../projects/entities/user-story.entity";
 import { Risk } from "../risks/entity";
 import { Ticket } from "../tickets/entity";
+import { TaskDelayRecord } from "./entities/task-delay-record.entity";
+import { MessagesModule } from "src/modules/messages/module";
+import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
 
 @Module({
   imports: [
@@ -27,10 +29,12 @@ import { Ticket } from "../tickets/entity";
       UserStory,
       Risk,
       Ticket,
+      TaskDelayRecord,
     ]),
-    UsersModule,
-    ProjectsModule,
-    SysFileModule,
+    forwardRef(() => ProjectsModule),
+    forwardRef(() => SysFileModule),
+    MessagesModule,
+    forwardRef(() => SystemScheduledJobsModule),
   ],
   controllers: [TasksController],
   providers: [TasksService],

@@ -198,22 +198,27 @@ export class UsersService extends BaseService<User, CreateUserDto> {
   }
 
   async resetPassword(updateDto: UpdateUserDto): Promise<UpdateResult> {
+    let { id, passwordNew, passwordNewConfirm, permissions } = updateDto;
+    if (!this.hasPermission(permissions || [], "system/users/resetPassword")) {
+      throw new HttpException("接口无权限", 403);
+    }
+    if (passwordNew !== passwordNewConfirm) {
+      throw new Error("两次输入的密码不一致");
+    }
+    return this.updateUserPassword(id, passwordNew);
+  }
+
+  async updatePassword(updateDto: UpdateUserDto): Promise<UpdateResult> {
     let { id, passwordOld, passwordNew, passwordNewConfirm } = updateDto;
     if (passwordNew !== passwordNewConfirm) {
       throw new Error("两次输入的密码不一致");
-    } else {
-      let user = await this.getOne({ id });
-      const isMatch = await verifyPassword(passwordOld, user.password);
-      if (!isMatch) {
-        throw new Error("旧密码不正确 ");
-      }
-      let data = Object.assign(new User(), {
-        id,
-        password: await hashPassword(passwordNew),
-        passwordVersion: 2,
-      });
-      return super.update(data);
     }
+    let user = await this.getOne({ id });
+    const isMatch = await verifyPassword(passwordOld, user.password);
+    if (!isMatch) {
+      throw new Error("旧密码不正确 ");
+    }
+    return this.updateUserPassword(id, passwordNew);
   }
 
   async dataValidate(data: { id; updateUser; permissions?: string[] }) {
@@ -237,6 +242,15 @@ export class UsersService extends BaseService<User, CreateUserDto> {
 
   private hasPermission(permissions: string[], key: string) {
     return permissions?.includes("*") || permissions?.includes(key);
+  }
+
+  private async updateUserPassword(id: string, password: string) {
+    let data = Object.assign(new User(), {
+      id,
+      password: await hashPassword(password),
+      passwordVersion: 2,
+    });
+    return super.update(data);
   }
 
   private normalizeStoredPath(path?: string) {

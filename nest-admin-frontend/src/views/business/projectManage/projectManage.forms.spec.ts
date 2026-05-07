@@ -105,6 +105,14 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).not.toMatch(/\.table-wrapper--milestones\s+:deep\(\.el-table\)\s*\{[\s\S]*width:\s*1280px;/)
   })
 
+  it('立项后项目编辑页应跳转详情并提示走项目变更', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain("isEdit.value && String(data?.status || '') !== '1'")
+    expect(source).toContain("项目立项后不允许直接编辑，请通过项目变更发起调整")
+    expect(source).toContain("router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })")
+  })
+
   it('高频业务表单外层卡片不承接横向滚动', () => {
     const shellGuards = [
       { file: 'taskManage/form.vue', selector: '.task-form-shell' },

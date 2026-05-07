@@ -42,6 +42,47 @@ export class TasksController extends BaseController<Task, TasksService> {
     return { success: true, instanceId };
   }
 
+  @Post(":id/start")
+  startTask(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.startTask(id, userId);
+  }
+
+  @Post(":id/pause")
+  pauseTask(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.pauseTask(id, userId);
+  }
+
+  @Post(":id/resume")
+  resumeTask(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.resumeTask(id, userId);
+  }
+
+  @Post(":id/delay")
+  delayTask(
+    @Param("id") id: string,
+    @Body() body: { afterEndDate?: string; reason?: string },
+    @Req() req: any,
+  ) {
+    return this.service.delayTask(id, body, {
+      id: req.user?.id || req.user?.name,
+      name: req.user?.name,
+    });
+  }
+
+  @Get(":id/delay-records")
+  getDelayRecords(@Param("id") id: string) {
+    return this.service.getDelayRecords(id);
+  }
+
+  @Post(":id/submit-completion-approval")
+  submitCompletionApproval(@Param("id") id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.submitCompletionApproval(id, userId);
+  }
+
   @Post("progress/:id")
   updateProgress(@Param("id") id: string, @Body("progress") progress: number) {
     return this.service.updateProgress(id, progress);

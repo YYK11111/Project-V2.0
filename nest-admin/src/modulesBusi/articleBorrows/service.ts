@@ -9,6 +9,7 @@ import { Article } from "../articles/entity";
 import { TasksService } from "src/common/tasks/tasks.service";
 import { UsersService } from "src/modules/users/users.service";
 import { Cron } from "@nestjs/schedule";
+import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 
 @Injectable()
 export class ArticleBorrowsService {
@@ -18,6 +19,7 @@ export class ArticleBorrowsService {
     @InjectRepository(Article) private articleRepo: Repository<Article>,
     private tasksService: TasksService,
     private usersService: UsersService,
+    private readonly systemScheduledJobsService: SystemScheduledJobsService,
   ) {}
 
   async hasActiveBorrow(articleId: string, userId: string) {
@@ -252,20 +254,39 @@ export class ArticleBorrowsService {
 
   @Cron("0 */5 * * * *")
   async syncExpiredBorrows() {
-    const now = dayjs().format("YYYY-MM-DD HH:mm:ss");
-    const rows = await this.borrowRepo
-      .createQueryBuilder("borrow")
-      .where("borrow.status = :status", {
-        status: KnowledgeBorrowStatus.approved,
-      })
-      .andWhere("borrow.borrowEndTime IS NOT NULL")
-      .andWhere("borrow.borrowEndTime < :now", { now })
-      .getMany();
-
-    for (const row of rows) {
-      row.status = KnowledgeBorrowStatus.expired;
-      await this.borrowRepo.save(row);
+    if (
+      !(await this.systemScheduledJobsService.isJobEnabled(
+        "articleBorrows.syncExpired",
+      ))
+    ) {
+      return;
     }
+    await this.systemScheduledJobsService.runJob(
+      "articleBorrows.syncExpired",
+      "scheduled",
+      async () => {
+        const now = dayjs().format("YYYY-MM-DD HH:mm:ss");
+        const rows = await this.borrowRepo
+          .createQueryBuilder("borrow")
+          .where("borrow.status = :status", {
+            status: KnowledgeBorrowStatus.approved,
+          })
+          .andWhere("borrow.borrowEndTime IS NOT NULL")
+          .andWhere("borrow.borrowEndTime < :now", { now })
+          .getMany();
+
+        for (const row of rows) {
+          row.status = KnowledgeBorrowStatus.expired;
+          await this.borrowRepo.save(row);
+        }
+
+        return {
+          summary: `同步 ${rows.length} 条借阅记录`,
+          processedCount: rows.length,
+          successCount: rows.length,
+        };
+      },
+    );
   }
 
   private applyCommonFilters(qb, query: QueryListDto) {

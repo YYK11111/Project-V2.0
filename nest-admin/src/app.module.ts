@@ -40,6 +40,7 @@ import { MessagesModule } from "./modules/messages/module";
 import { GoLiveRecordsModule } from "./modulesBusi/go-live-records/module";
 import { AcceptanceRecordsModule } from "./modulesBusi/acceptance-records/module";
 import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
+import { SystemScheduledJobsModule } from "./modules/systemScheduledJobs/module";
 
 @Dependencies(DataSource)
 @Module({
@@ -78,6 +79,7 @@ import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
     SysFileModule,
     WorkflowTriggerModule,
     MessagesModule,
+    SystemScheduledJobsModule,
     GoLiveRecordsModule,
     AcceptanceRecordsModule,
     HandoverRecordsModule,

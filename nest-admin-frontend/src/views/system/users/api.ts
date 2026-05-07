@@ -18,6 +18,9 @@ export const register = (data) => post(`${auth}/register`, data)
 // 重置密码
 export const resetPassword = (data) => put(`${serve}/resetPassword`, data)
 
+// 个人中心修改密码
+export const updatePassword = (data) => put(`${serve}/updatePassword`, data)
+
 // 获取路由
 export const getRouters = () => get(`${serve}/getRouters`)
 

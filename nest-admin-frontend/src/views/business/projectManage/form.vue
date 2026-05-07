@@ -334,8 +334,8 @@ async function loadProject() {
     return
   }
   const { data } = await getOne(route.query.id)
-  if (isEdit.value && String(data?.status || '') === '3') {
-    $sdk.msgWarning('执行中的项目不允许编辑')
+  if (isEdit.value && String(data?.status || '') !== '1') {
+    $sdk.msgWarning('项目立项后不允许直接编辑，请通过项目变更发起调整')
     router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })
     return
   }

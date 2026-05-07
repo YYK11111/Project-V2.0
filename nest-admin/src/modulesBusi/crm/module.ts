@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CustomersService } from "./customers/service";
 import { CustomersController } from "./customers/controller";
@@ -24,7 +24,7 @@ import { Project } from "../projects/entity";
       Contract,
       Project,
     ]),
-    UsersModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [
     CustomersController,

@@ -20,7 +20,6 @@ import { QueryListDto, ResponseListDto } from "../../common/dto/index";
 import { BaseController } from "src/common/BaseController";
 import { MulterFileInterceptor } from "src/common/interceptor/file.interceptor";
 import { CaptchaService } from "../common/captcha.service";
-import { Public } from "../auth/auth.service";
 import { SysFileService } from "../sys/file/service";
 import { BusinessType, FileStatus } from "../sys/file/entity";
 
@@ -36,14 +35,16 @@ export class UsersController extends BaseController<User, UsersService> {
   }
 
   // 重置密码
-  @Public()
   @Put("resetPassword")
-  async resetPassword(@Body() body) {
-    let result = this.captchaService.validateCaptcha(body.uuid, body.code);
-    if (result !== "true") {
-      throw new Error(result);
-    }
+  async resetPassword(@Body() body, @Req() req) {
+    body.permissions = req.user?.permissions || [];
     return this.usersService.resetPassword(body);
+  }
+
+  // 个人中心修改密码
+  @Put("updatePassword")
+  async updatePassword(@Body() body, @Req() req) {
+    return this.usersService.updatePassword({ ...body, id: req.user.id });
   }
 
   @Post("uploadAvatar")
