@@ -131,6 +131,34 @@ describe("AuthGuard", () => {
     );
   });
 
+  it("角色菜单解析出的星号权限可以访问用户管理重置密码接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/users/resetPassword",
+      method: "PUT",
+      body: {},
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([{ permissionKey: "*" }]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/users/resetPassword",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("个人提醒偏好接口未出现在菜单权限清单时不应被拒绝", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -161,5 +189,119 @@ describe("AuthGuard", () => {
     redisService.getPermissions.mockResolvedValue(["system/users/update"]);
 
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("缺少定时任务列表权限时拒绝访问列表接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/scheduled-jobs/list",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/scheduledJobs/list",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("具备定时任务立即执行权限时放行运行接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/scheduled-jobs/run/demo-job",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "system/scheduledJobs/run" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["system/scheduledJobs/run"]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("具备日志权限时放行定时任务日志详情接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/scheduled-jobs/logs/log-1",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "system/scheduledJobs/logs" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/scheduledJobs/logs",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("缺少日志权限时拒绝访问定时任务日志详情接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/scheduled-jobs/logs/log-1",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/scheduledJobs/logs",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
   });
 });

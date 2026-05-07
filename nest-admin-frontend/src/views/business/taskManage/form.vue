@@ -4,7 +4,7 @@ import { ref, computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { ChatDotRound, DocumentAdd } from '@element-plus/icons-vue'
-import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
+import { getOne, save, update, getStatus, getPriority, getProjectList, getList, getDependencies, getDependents, addDependency, removeDependency, submitApproval, startTask, pauseTask, resumeTask, submitCompletionApproval, delayTask, getDelayRecords, getTaskComments, addComment, updateComment, deleteComment, getTimeLogs, addTimeLog, updateTimeLog, deleteTimeLog } from './api'
 import { getOne as getStoryOne } from '@/views/business/userStoryManage/api'
 import { getOne as getRiskOne } from '@/views/business/riskManage/api'
 import { getOne as getTicketOne } from '@/views/business/ticketManage/api'
@@ -62,8 +62,32 @@ const rules = {
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
   leaderId: [{ required: true, message: '请选择负责人', trigger: 'change' }],
-  startDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  endDate: [{ required: true, message: '请选择截止时间', trigger: 'change' }],
+  startDate: [
+    { required: true, message: '请选择开始时间', trigger: 'change' },
+    {
+      trigger: 'change',
+      validator: (_rule, _value, callback) => {
+        if (!form.value.startDate || !form.value.endDate) return callback()
+        if (form.value.startDate >= form.value.endDate) {
+          return callback(new Error('开始时间必须早于结束时间'))
+        }
+        callback()
+      },
+    },
+  ],
+  endDate: [
+    { required: true, message: '请选择截止时间', trigger: 'change' },
+    {
+      trigger: 'change',
+      validator: (_rule, _value, callback) => {
+        if (!form.value.startDate || !form.value.endDate) return callback()
+        if (form.value.startDate >= form.value.endDate) {
+          return callback(new Error('开始时间必须早于结束时间'))
+        }
+        callback()
+      },
+    },
+  ],
 }
 
 const status = ref({})
@@ -83,6 +107,14 @@ const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
 const canEditCurrentTask = computed(() => !hasTaskId.value || form.value?.canEdit !== false)
+const canExecuteCurrentTask = computed(() => hasTaskId.value && form.value?.canExecute !== false)
+const canStartTask = computed(() => hasTaskId.value && canExecuteCurrentTask.value && String(form.value.status || '') === '1')
+const canPauseTask = computed(() => hasTaskId.value && form.value?.canManage !== false && String(form.value.status || '') === '2')
+const canResumeTask = computed(() => hasTaskId.value && canExecuteCurrentTask.value && String(form.value.status || '') === '5')
+const canDelayTask = computed(() => hasTaskId.value && form.value?.canManage !== false && ['1', '2', '5', '6'].includes(String(form.value.status || '')))
+const canCreateComment = computed(() => hasTaskId.value && canExecuteCurrentTask.value && ['2', '3', '5', '6'].includes(String(form.value.status || '')))
+const canCreateTimeLog = computed(() => hasTaskId.value && canExecuteCurrentTask.value && ['2', '5', '6'].includes(String(form.value.status || '')))
+const canSubmitCompletion = computed(() => hasTaskId.value && canExecuteCurrentTask.value && String(form.value.status || '') === '2' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
@@ -92,6 +124,7 @@ const commentSectionRef = ref()
 const isTaskFormRoute = useCurrentRouteGuard(route, '/taskManage/form')
 
 const dependencies = ref([])
+const pendingDependencies = ref([])
 const dependents = ref([])
 const availableTasks = ref([])
 const sprintList = ref([])
@@ -129,8 +162,9 @@ const timeLogRules = {
   progress: [{ required: true, message: '请输入当前进度', trigger: 'blur' }],
 }
 const currentUserId = computed(() => String(userStore.id || ''))
-const canCommentOnTask = computed(() => !!hasTaskId.value)
-const canAddTimeLog = computed(() => !!hasTaskId.value)
+const canCommentOnTask = computed(() => canCreateComment.value)
+const canAddTimeLog = computed(() => canCreateTimeLog.value)
+const currentDependencies = computed(() => hasTaskId.value ? dependencies.value : pendingDependencies.value)
 const sourceStoryTitle = computed(() => String(route.query.sourceStoryTitle || form.value.sourceEntity?.title || form.value.sourceEntity?.name || ''))
 const sourceEntity = ref(null)
 
@@ -350,28 +384,80 @@ watch(() => form.value.projectId, () => {
 })
 
 async function handleAddDependency() {
-  if (isReadonly.value || !canTaskUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  const hasPermission = hasTaskId.value ? canTaskUpdate.value : canTaskAdd.value
+  if (isReadonly.value || !hasPermission) return $sdk.msgWarning('当前操作没有权限')
   if (!newDependencyId.value) return
   try {
-    await addDependency(route.query.id, newDependencyId.value)
+    if (hasTaskId.value) {
+      await addDependency(route.query.id, newDependencyId.value)
+      await loadDependencies()
+    } else if (!pendingDependencies.value.includes(newDependencyId.value)) {
+      pendingDependencies.value.push(newDependencyId.value)
+    }
     $sdk.msgSuccess('添加成功')
     showDependencyDialog.value = false
     newDependencyId.value = ''
-    await loadDependencies()
   } catch (e) {
     $sdk.msgError(e.message || '添加失败')
   }
 }
 
 async function handleRemoveDependency(depId) {
-  if (isReadonly.value || !canTaskUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  const hasPermission = hasTaskId.value ? canTaskUpdate.value : canTaskAdd.value
+  if (isReadonly.value || !hasPermission) return $sdk.msgWarning('当前操作没有权限')
   try {
-    await removeDependency(route.query.id, depId)
+    if (hasTaskId.value) {
+      await removeDependency(route.query.id, depId)
+      await loadDependencies()
+    } else {
+      pendingDependencies.value = pendingDependencies.value.filter((id) => id !== depId)
+    }
     $sdk.msgSuccess('移除成功')
-    await loadDependencies()
   } catch (e) {
     $sdk.msgError(e.message || '移除失败')
   }
+}
+
+async function handleStartTask() {
+  if (!canStartTask.value) return $sdk.msgWarning('当前操作没有权限')
+  await startTask(route.query.id)
+  $sdk.msgSuccess('任务已开始')
+  await reloadCurrent()
+}
+
+async function handlePauseTask() {
+  if (!canPauseTask.value) return $sdk.msgWarning('当前操作没有权限')
+  await pauseTask(route.query.id)
+  $sdk.msgSuccess('任务已暂停')
+  await reloadCurrent()
+}
+
+async function handleResumeTask() {
+  if (!canResumeTask.value) return $sdk.msgWarning('当前操作没有权限')
+  await resumeTask(route.query.id)
+  $sdk.msgSuccess('任务已恢复')
+  await reloadCurrent()
+}
+
+async function handleDelayTask() {
+  if (!canDelayTask.value) return $sdk.msgWarning('当前操作没有权限')
+  const { value } = await ElMessageBox.prompt('请输入新的截止日期，格式为 YYYY-MM-DD', '任务延期', {
+    confirmButtonText: '确认延期',
+    cancelButtonText: '取消',
+    inputPlaceholder: '例如 2026-05-31',
+  })
+  const afterEndDate = String(value || '').trim()
+  if (!afterEndDate) return $sdk.msgWarning('请输入新的截止日期')
+  await delayTask(route.query.id, { afterEndDate })
+  $sdk.msgSuccess('任务已延期')
+  await reloadCurrent()
+}
+
+async function handleSubmitCompletionApproval() {
+  if (!canSubmitCompletion.value) return $sdk.msgWarning('当前操作没有权限')
+  await submitCompletionApproval(route.query.id)
+  $sdk.msgSuccess('完成审批已提交')
+  await reloadCurrent()
 }
 
 const defaultForm = () => ({
@@ -407,7 +493,7 @@ async function loadTask() {
       ...defaultForm(),
       projectId: String(route.query.projectId || ''),
       sprintId: String(route.query.sprintId || ''),
-      leaderId: String(route.query.leaderId || ''),
+      leaderId: String(route.query.leaderId || currentUserId.value || ''),
       name: String(route.query.name || ''),
       description: String(route.query.description || ''),
       acceptanceCriteria: String(route.query.acceptanceCriteria || ''),
@@ -416,6 +502,7 @@ async function loadTask() {
       storyPoints: Number(route.query.storyPoints || 0),
     }
     dependencies.value = []
+    pendingDependencies.value = []
     dependents.value = []
     taskComments.value = []
     timeLogs.value = []
@@ -433,10 +520,11 @@ async function loadTask() {
     storyPoints: data.storyPoints || 0,
   }
   await loadDependencies()
-  loadTaskComments()
-  loadTimeLogs()
-  loadSprintOptions()
-  await loadSourceEntity()
+      loadTaskComments()
+      loadTimeLogs()
+      loadSprintOptions()
+      getDelayRecords(route.query.id).catch(() => null)
+      await loadSourceEntity()
 }
 
 async function loadSourceEntity() {
@@ -485,7 +573,12 @@ function submit() {
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
-      api(form.value).then(() => {
+      api(form.value).then(async (res) => {
+        const createdTaskId = String(res?.id || '')
+        if (!isEdit.value && pendingDependencies.value.length && createdTaskId) {
+          await Promise.all(pendingDependencies.value.map((dependencyId) => addDependency(createdTaskId, dependencyId)))
+        }
+        pendingDependencies.value = []
         $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
         if (isEdit.value) {
           router.back()
@@ -604,8 +697,13 @@ watch(hasTaskId, (value) => {
       <div class="task-form-shell__top">
         <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
           <template #extra>
-            <el-button v-if="hasTaskId && canEditCurrentTask" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
-            <el-button v-if="hasTaskId && canEditCurrentTask" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
+            <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
+            <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>
+            <el-button v-if="canResumeTask" type="success" plain @click="handleResumeTask">恢复任务</el-button>
+            <el-button v-if="canDelayTask" type="danger" plain @click="handleDelayTask">任务延期</el-button>
+            <el-button v-if="canSubmitCompletion" type="warning" plain @click="handleSubmitCompletionApproval">提交完成审批</el-button>
+            <el-button v-if="canCreateTimeLog" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
+            <el-button v-if="canCreateComment" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
             <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
             <el-button v-if="canCloseReturnedInstance && canEditCurrentTask" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
           </template>
@@ -753,13 +851,13 @@ watch(hasTaskId, (value) => {
 
         <el-row :gutter="20" class="task-info-row">
           <el-col :xs="24" :sm="12">
-            <el-form-item label="计划开始">
+            <el-form-item v-if="hasTaskId" label="计划开始">
               <ViewField v-if="isReadonly" :value="form.plannedStartDate" />
               <el-date-picker v-else v-model="form.plannedStartDate" type="date" placeholder="选择计划开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="计划结束">
+            <el-form-item v-if="hasTaskId" label="计划结束">
               <ViewField v-if="isReadonly" :value="form.plannedEndDate" />
               <el-date-picker v-else v-model="form.plannedEndDate" type="date" placeholder="选择计划结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
@@ -768,13 +866,13 @@ watch(hasTaskId, (value) => {
 
         <el-row :gutter="20" class="task-info-row">
           <el-col :xs="24" :sm="12">
-            <el-form-item label="实际开始">
+            <el-form-item v-if="hasTaskId" label="实际开始">
               <ViewField v-if="isReadonly" :value="form.actualStartDate" />
               <el-date-picker v-else v-model="form.actualStartDate" type="date" placeholder="选择实际开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="实际结束">
+            <el-form-item v-if="hasTaskId" label="实际结束">
               <ViewField v-if="isReadonly" :value="form.actualEndDate" />
               <el-date-picker v-else v-model="form.actualEndDate" type="date" placeholder="选择实际结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
@@ -844,7 +942,7 @@ watch(hasTaskId, (value) => {
 
         <div class="task-execution-fields">
         <div class="metric-grid">
-          <div class="metric-card">
+          <div v-if="hasTaskId" class="metric-card metric-card--progress">
             <div class="metric-card__title">进度</div>
             <div class="metric-card__desc">用于表达任务当前完成百分比。</div>
               <div v-if="isReadonly" class="progress-compact">
@@ -962,23 +1060,23 @@ watch(hasTaskId, (value) => {
         <el-empty v-else description="暂无任务评论" />
       </section>
 
-      <section v-if="isEdit" class="task-section section-card section-card--approval">
+      <section v-if="!hasTaskId || isEdit" class="task-section section-card section-card--approval">
         <div class="task-section__header">
-          <div class="task-section__title">审批信息</div>
-          <div class="task-section__desc">查看当前审批状态、节点信息以及任务依赖关系。</div>
+          <div class="task-section__title">{{ hasTaskId ? '审批信息' : '任务依赖' }}</div>
+          <div class="task-section__desc">{{ hasTaskId ? '查看当前审批状态、节点信息以及任务依赖关系。' : '维护前置任务关系，帮助新建任务时同步规划依赖。' }}</div>
         </div>
 
         <div class="task-approval-fields">
-        <el-form-item label="审批状态">
+        <el-form-item v-if="hasTaskId" label="审批状态">
           <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
         </el-form-item>
 
-        <el-form-item label="当前审批节点" v-if="form.currentNodeName">
+        <el-form-item label="当前审批节点" v-if="hasTaskId && form.currentNodeName">
           <el-tag type="warning">{{ form.currentNodeName }}</el-tag>
         </el-form-item>
 
         <el-alert
-          v-if="form.approvalStatus === '2'"
+          v-if="hasTaskId && form.approvalStatus === '2'"
           title="该任务审批已通过，当前业务状态应进入处理中。"
           type="success"
           :closable="false"
@@ -990,17 +1088,17 @@ watch(hasTaskId, (value) => {
           <div class="dependency-group">
             <div class="dependency-header">
               <span class="dependency-title">前置任务（依赖于此任务无法开始）</span>
-              <el-button type="primary" size="small" @click="showDependencyDialog = true" :disabled="!isEdit || isReadonly">添加依赖</el-button>
+              <el-button type="primary" size="small" @click="showDependencyDialog = true" :disabled="isReadonly">添加依赖</el-button>
             </div>
-            <div class="dependency-list" v-if="dependencies.length > 0">
-              <el-tag v-for="dep in dependencies" :key="dep.id" :closable="!isReadonly" @close="handleRemoveDependency(dep.id)" class="dep-tag">
-                {{ dep.name }}
+            <div class="dependency-list" v-if="currentDependencies.length > 0">
+              <el-tag v-for="dep in currentDependencies" :key="hasTaskId ? dep.id : dep" :closable="!isReadonly" @close="handleRemoveDependency(hasTaskId ? dep.id : dep)" class="dep-tag">
+                {{ hasTaskId ? dep.name : availableTasks.find((task) => String(task.id) === String(dep))?.name || dep }}
               </el-tag>
             </div>
             <div v-else class="no-data">暂无前置任务</div>
           </div>
 
-          <div class="dependency-group">
+          <div v-if="hasTaskId" class="dependency-group">
             <div class="dependency-header">
               <span class="dependency-title">后置任务（依赖此任务的任务）</span>
             </div>
@@ -1019,7 +1117,7 @@ watch(hasTaskId, (value) => {
           </el-select>
           <template #footer>
             <el-button @click="showDependencyDialog = false">取消</el-button>
-            <el-button v-if="canTaskUpdate && !isReadonly" type="primary" @click="handleAddDependency">确定</el-button>
+            <el-button v-if="(hasTaskId ? canTaskUpdate : canTaskAdd) && !isReadonly" type="primary" @click="handleAddDependency">确定</el-button>
           </template>
         </el-dialog>
         </div>
@@ -1031,6 +1129,11 @@ watch(hasTaskId, (value) => {
           <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">提交</el-button>
           <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
           <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+          <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
+          <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>
+          <el-button v-if="canResumeTask" type="success" plain @click="handleResumeTask">恢复任务</el-button>
+          <el-button v-if="canDelayTask" type="danger" plain @click="handleDelayTask">任务延期</el-button>
+          <el-button v-if="canSubmitCompletion" type="warning" plain @click="handleSubmitCompletionApproval">提交完成审批</el-button>
         </el-form-item>
       </el-form>
 

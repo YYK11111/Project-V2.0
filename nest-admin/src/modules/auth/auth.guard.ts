@@ -67,7 +67,7 @@ export class AuthGuard implements CanActivate {
     if (
       requiredPermission &&
       permissions.includes(requiredPermission) &&
-      !payload.permissions?.includes(requiredPermission)
+      !this.hasPermission(payload.permissions || [], requiredPermission)
     ) {
       throw new HttpException("接口无权限", 403);
     }
@@ -75,7 +75,7 @@ export class AuthGuard implements CanActivate {
     if (
       !requiredPermission &&
       permissions.includes(api) &&
-      !payload.permissions?.includes(api)
+      !this.hasPermission(payload.permissions || [], api)
     ) {
       throw new HttpException("接口无权限", 403);
     }
@@ -132,6 +132,7 @@ export class AuthGuard implements CanActivate {
       ["PUT", /^system\/users\/update$/, "system/users/update"],
       ["DELETE", /^system\/users\/del\/[^/]+$/, "system/users/delete"],
       ["PUT", /^system\/users\/resetPassword$/, "system/users/resetPassword"],
+      ["PUT", /^system\/users\/updatePassword$/, "system/users/update"],
       ["GET", /^system\/users\/getTheme$/, "system/users/getOne"],
       ["PUT", /^system\/users\/updateTheme$/, "system/users/update"],
       [
@@ -228,6 +229,29 @@ export class AuthGuard implements CanActivate {
       ["GET", /^system\/messages\/recent$/, "system/messages/list"],
       ["GET", /^system\/messages\/list$/, "system/messages/list"],
       ["POST", /^system\/messages\/read\/[^/]+$/, "system/messages/list"],
+
+      ["GET", /^system\/scheduled-jobs\/list$/, "system/scheduledJobs/list"],
+      ["GET", /^system\/scheduled-jobs\/logs$/, "system/scheduledJobs/logs"],
+      [
+        "GET",
+        /^system\/scheduled-jobs\/logs\/[^/]+$/,
+        "system/scheduledJobs/logs",
+      ],
+      [
+        "POST",
+        /^system\/scheduled-jobs\/run\/[^/]+$/,
+        "system/scheduledJobs/run",
+      ],
+      [
+        "POST",
+        /^system\/scheduled-jobs\/enable\/[^/]+$/,
+        "system/scheduledJobs/enable",
+      ],
+      [
+        "POST",
+        /^system\/scheduled-jobs\/disable\/[^/]+$/,
+        "system/scheduledJobs/disable",
+      ],
 
       ["GET", /^business\/projects\/list$/, "business/projects/list"],
       [
@@ -851,6 +875,10 @@ export class AuthGuard implements CanActivate {
         menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean),
       ),
     ];
+  }
+
+  private hasPermission(permissions: string[], key: string) {
+    return permissions.includes("*") || permissions.includes(key);
   }
 
   private isPublicRoute(request: Request): boolean {

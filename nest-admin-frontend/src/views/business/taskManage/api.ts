@@ -17,20 +17,24 @@ function normalizePageData(res) {
   }
 }
 
+function normalizeEntityData(res) {
+  return res?.data?.data || res?.data || res || {}
+}
+
 export function getList(params) {
   return request({ url: `${baseUrl}/list`, method: 'get', params }).then(normalizePageData)
 }
 
 export function getOne(id) {
-  return request({ url: `${baseUrl}/getOne/${id}`, method: 'get' })
+  return request({ url: `${baseUrl}/getOne/${id}`, method: 'get' }).then((data) => ({ data: normalizeEntityData(data) }))
 }
 
 export function save(data) {
-  return request({ url: `${baseUrl}/save`, method: 'post', data })
+  return request({ url: `${baseUrl}/save`, method: 'post', data }).then(normalizeEntityData)
 }
 
 export function update(data) {
-  return request({ url: `${baseUrl}/update`, method: 'put', data })
+  return request({ url: `${baseUrl}/update`, method: 'put', data }).then(normalizeEntityData)
 }
 
 export function del(ids) {
@@ -85,6 +89,30 @@ export function checkCircularDependency(taskId, dependencyId) {
 
 export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}
+
+export function startTask(id) {
+  return request({ url: `${baseUrl}/${id}/start`, method: 'post' })
+}
+
+export function pauseTask(id) {
+  return request({ url: `${baseUrl}/${id}/pause`, method: 'post' })
+}
+
+export function resumeTask(id) {
+  return request({ url: `${baseUrl}/${id}/resume`, method: 'post' })
+}
+
+export function submitCompletionApproval(id) {
+  return request({ url: `${baseUrl}/${id}/submit-completion-approval`, method: 'post' })
+}
+
+export function delayTask(id, data) {
+  return request({ url: `${baseUrl}/${id}/delay`, method: 'post', data })
+}
+
+export function getDelayRecords(id) {
+  return request({ url: `${baseUrl}/${id}/delay-records`, method: 'get' })
 }
 
 export { addComment, updateComment, deleteComment, getTaskComments }
