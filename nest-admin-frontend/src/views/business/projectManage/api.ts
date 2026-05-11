@@ -32,6 +32,10 @@ export function getFieldPermissions(id) {
   return request({ url: `${baseUrl}/field-permissions/${id}`, method: 'get' })
 }
 
+export function getPermissionContext(id) {
+  return request({ url: `${baseUrl}/permission-context/${id}`, method: 'get' })
+}
+
 export function getCockpit(params) {
   return request({ url: `${baseUrl}/cockpit`, method: 'get', params })
 }

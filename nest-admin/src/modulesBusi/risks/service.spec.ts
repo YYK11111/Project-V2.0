@@ -40,4 +40,42 @@ describe("RisksService convert to task", () => {
     );
     expect(result.taskId).toBe("t1");
   });
+
+  it("返回风险对象权限上下文", async () => {
+    const repository = { findOne: jest.fn(), update: jest.fn() };
+    const projectsService = {
+      getProjectPermissionContext: jest.fn().mockResolvedValue({
+        isManager: false,
+        isDeliveryManager: true,
+        isFunctionalLead: false,
+      }),
+    };
+    const service = new RisksService(
+      repository as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+      { add: jest.fn() } as any,
+    );
+
+    const result = await (service as any).getRiskPermissions(
+      {
+        projectId: "p1",
+        riskOwnerId: "u2",
+        createUser: "creator-1",
+      },
+      "u1",
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+        permissionContext: expect.objectContaining({
+          canEdit: true,
+          canDelete: true,
+        }),
+      }),
+    );
+  });
 });

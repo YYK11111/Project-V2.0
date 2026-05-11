@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ProjectsService } from "./service";
+import { ProjectStatus } from "./entity";
 
 describe("ProjectsService closure guards", () => {
   const createService = () => {
@@ -251,6 +252,97 @@ describe("ProjectsService closure guards", () => {
     ).not.toThrow();
   });
 
+  it("为草稿项目构建可提交立项审批的动作上下文", () => {
+    const { service } = createService();
+
+    const result = (service as any).buildProjectLifecycleContext(
+      {
+        id: "p1",
+        status: ProjectStatus.draft,
+        isArchived: "0",
+      },
+      {
+        role: "1",
+        canEdit: true,
+        canSubmitApproval: true,
+        canSubmitClose: true,
+        canArchive: true,
+        canDelete: true,
+      },
+    );
+
+    expect(result.lifecycleContext).toEqual({
+      status: ProjectStatus.draft,
+      isArchived: false,
+      isLifecycleLocked: false,
+    });
+    expect(result.actions).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canSubmitApproval: true,
+        canSubmitClose: false,
+        canArchive: false,
+        canDelete: true,
+      }),
+    );
+    expect(result.actions.reasons.submitClose).toBe("草稿项目未进入结项阶段");
+    expect(result.actions.reasons.archive).toBe("项目未结项，不允许归档");
+  });
+
+  it("为已归档项目构建只读动作上下文", () => {
+    const { service } = createService();
+
+    const result = (service as any).buildProjectLifecycleContext(
+      {
+        id: "p1",
+        status: ProjectStatus.completed,
+        isArchived: "1",
+      },
+      {
+        role: "1",
+        canEdit: true,
+        canSubmitApproval: true,
+        canSubmitClose: true,
+        canArchive: true,
+        canDelete: true,
+      },
+    );
+
+    expect(result.lifecycleContext).toEqual({
+      status: ProjectStatus.completed,
+      isArchived: true,
+      isLifecycleLocked: true,
+    });
+    expect(result.actions).toEqual(
+      expect.objectContaining({
+        canEdit: false,
+        canSubmitApproval: false,
+        canSubmitClose: false,
+        canArchive: false,
+        canDelete: false,
+      }),
+    );
+    expect(result.actions.reasons.edit).toBe("项目已归档，仅允许查看");
+    expect(result.actions.reasons.archive).toBe("项目已归档，无需重复归档");
+  });
+
+  it("将项目审批状态映射为统一审批视图", () => {
+    const { service } = createService();
+
+    const result = (service as any).buildApprovalViewModel({
+      approvalStatus: "3",
+      currentNodeName: "退回发起人-补充资料",
+    });
+
+    expect(result).toEqual({
+      status: "returned",
+      label: "已退回发起人",
+      currentNodeName: "退回发起人-补充资料",
+      canSubmit: false,
+      canResubmit: true,
+    });
+  });
+
   it("驾驶舱应使用项目列表返回的 list 字段生成项目选项", async () => {
     const { service } = createService();
     jest.spyOn(service, "list").mockResolvedValue({
@@ -300,5 +392,170 @@ describe("ProjectsService closure guards", () => {
       }),
     ]);
     expect(result.selectedProjectId).toBe("p1");
+  });
+
+  it("项目列表结果应携带生命周期动作与审批视图", async () => {
+    const { service } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p1",
+            leaderId: "u1",
+            status: ProjectStatus.draft,
+            approvalStatus: "0",
+            currentNodeName: "",
+            isArchived: "0",
+          },
+        ],
+        1,
+      ]),
+    };
+    (service as any).repository.createQueryBuilder.mockReturnValue(
+      queryBuilder,
+    );
+    (service as any).projectMemberRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "u1",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result.list[0]).toEqual(
+      expect.objectContaining({
+        actions: expect.objectContaining({
+          canEdit: true,
+          canSubmitApproval: true,
+        }),
+        lifecycleContext: expect.objectContaining({
+          status: ProjectStatus.draft,
+          isArchived: false,
+        }),
+        approvalView: expect.objectContaining({
+          status: "none",
+          label: "无需审批",
+        }),
+      }),
+    );
+  });
+
+  it("项目详情结果应携带审批视图", async () => {
+    const { service } = createService();
+    jest
+      .spyOn(service as any, "calculateProjectProgress")
+      .mockResolvedValue(30);
+    (service as any).repository.findOne.mockResolvedValue({
+      id: "p1",
+      name: "项目A",
+      status: ProjectStatus.executing,
+      approvalStatus: "1",
+      currentNodeName: "立项审批中",
+      progress: 0,
+      contractId: null,
+      opportunityId: null,
+    });
+    (service as any).projectMemberRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+    (service as any).milestoneRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    const result = await service.getOne({ id: "p1" });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        approvalView: expect.objectContaining({
+          status: "pending",
+          label: "审批中",
+        }),
+      }),
+    );
+  });
+
+  it("项目驾驶舱结果应返回统一权限上下文", async () => {
+    const { service } = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({
+      id: "p1",
+      name: "项目A",
+      status: ProjectStatus.executing,
+      approvalStatus: "1",
+      currentNodeName: "立项审批中",
+      isArchived: "0",
+      progress: 30,
+    } as any);
+    jest.spyOn(service, "getProjectPermissionContext").mockResolvedValue({
+      role: "1",
+      isManager: true,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+      isVisitor: false,
+      canView: true,
+      canEdit: true,
+      canSubmitApproval: true,
+      canSubmitClose: true,
+      canArchive: true,
+      canDelete: true,
+    } as any);
+    (
+      service as any
+    ).projectFieldPermissionService.getProjectFieldPermissions.mockResolvedValue(
+      {
+        groups: {
+          projectBasic: "readonly",
+        },
+        fields: {
+          name: "readonly",
+        },
+        contextRules: {
+          lifecycleLocked: true,
+        },
+      },
+    );
+    jest.spyOn(service, "getStatistics").mockResolvedValue({});
+    jest
+      .spyOn(service, "getDashboard")
+      .mockResolvedValue({ project: { id: "p1" } } as any);
+
+    const permissionContext = await service.getProjectPermissionContext(
+      "p1",
+      "u1",
+    );
+    const fieldPermissions = await (
+      service as any
+    ).projectFieldPermissionService.getProjectFieldPermissions({
+      project: await service.getOne({ id: "p1" }),
+      rawRole: permissionContext.role,
+      canVisit: true,
+    });
+
+    expect({
+      ...permissionContext,
+      fieldPermissions,
+    }).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canSubmitClose: true,
+        fieldPermissions: expect.objectContaining({
+          groups: expect.objectContaining({
+            projectBasic: "readonly",
+          }),
+          contextRules: expect.objectContaining({
+            lifecycleLocked: true,
+          }),
+        }),
+      }),
+    );
   });
 });

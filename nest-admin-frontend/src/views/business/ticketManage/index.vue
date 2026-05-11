@@ -23,6 +23,13 @@ const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
 const canTicketSubmitApproval = computed(() => checkPermi(['business/tickets/update']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
+function getApprovalTagType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
+}
+
 async function handleSubmitApproval(row) {
   if (!canTicketSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定提交该工单审批吗？')
@@ -54,7 +61,7 @@ function exportTicketList() {
       row.handler?.nickname || row.handler?.name || '-',
       row.project?.name || '-',
       status.value[row.status] || '-',
-      ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批'),
+      row.approvalView?.label || '无需审批',
       row.knowledgeLinked === '1' ? '已关联' : '未关联',
       row.knowledgeArticleId || '-',
       row.createTime || '-',
@@ -63,11 +70,11 @@ function exportTicketList() {
   downloadCsv('工单列表导出.csv', rows)
 }
 
-const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canSubmitTicketApproval = (row) => row.status === '1' && row.approvalView?.canSubmit === true
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
-  canTicketUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
+  canTicketUpdate.value && row.permissionContext?.canEdit !== false && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
     : canArticleAdd.value
@@ -77,7 +84,7 @@ const getButtons = (row) => [
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
   canTicketSubmitApproval.value && canSubmitTicketApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canTicketDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  canTicketDelete.value && row.permissionContext?.canDelete !== false && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
@@ -138,8 +145,8 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            <el-tag :type="getApprovalTagType(row.approvalView?.status)" size="small">
+              {{ row.approvalView?.label || '无需审批' }}
             </el-tag>
           </template>
         </el-table-column>

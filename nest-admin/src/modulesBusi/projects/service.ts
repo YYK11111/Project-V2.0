@@ -205,6 +205,142 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return String(project.status || "") !== ProjectStatus.draft;
   }
 
+  buildApprovalViewModel(entity?: {
+    approvalStatus?: string | null;
+    currentNodeName?: string | null;
+  }) {
+    const approvalStatus = String(entity?.approvalStatus || "0");
+    const currentNodeName = String(entity?.currentNodeName || "");
+    const isReturned =
+      approvalStatus === "3" && currentNodeName.includes("退回发起人");
+
+    if (isReturned) {
+      return {
+        status: "returned",
+        label: "已退回发起人",
+        currentNodeName,
+        canSubmit: false,
+        canResubmit: true,
+      };
+    }
+
+    const statusMap = {
+      "0": {
+        status: "none",
+        label: "无需审批",
+        canSubmit: true,
+        canResubmit: false,
+      },
+      "1": {
+        status: "pending",
+        label: "审批中",
+        canSubmit: false,
+        canResubmit: false,
+      },
+      "2": {
+        status: "approved",
+        label: "已通过",
+        canSubmit: false,
+        canResubmit: false,
+      },
+      "3": {
+        status: "rejected",
+        label: "已驳回",
+        canSubmit: false,
+        canResubmit: true,
+      },
+    } as const;
+
+    const mapped = statusMap[approvalStatus as keyof typeof statusMap] || {
+      status: "none",
+      label: "无需审批",
+      canSubmit: true,
+      canResubmit: false,
+    };
+
+    return {
+      ...mapped,
+      currentNodeName,
+    };
+  }
+
+  private buildProjectLifecycleContext(
+    project: Partial<Project> | null | undefined,
+    permissionContext?: {
+      canEdit?: boolean;
+      canSubmitApproval?: boolean;
+      canSubmitClose?: boolean;
+      canArchive?: boolean;
+      canDelete?: boolean;
+    } | null,
+  ) {
+    const status = String(project?.status || ProjectStatus.draft);
+    const isArchived = String(project?.isArchived || "0") === "1";
+    const isLifecycleLocked = status !== ProjectStatus.draft || isArchived;
+    const reasons: Record<string, string> = {};
+
+    let canEdit = Boolean(permissionContext?.canEdit);
+    let canSubmitApproval = Boolean(permissionContext?.canSubmitApproval);
+    let canSubmitClose = Boolean(permissionContext?.canSubmitClose);
+    let canArchive = Boolean(permissionContext?.canArchive);
+    let canDelete = Boolean(permissionContext?.canDelete);
+
+    if (isArchived) {
+      canEdit = false;
+      canSubmitApproval = false;
+      canSubmitClose = false;
+      canArchive = false;
+      canDelete = false;
+      reasons.edit = "项目已归档，仅允许查看";
+      reasons.submitApproval = "项目已归档，不允许发起立项审批";
+      reasons.submitClose = "项目已归档，不允许发起结项审批";
+      reasons.archive = "项目已归档，无需重复归档";
+      reasons.delete = "项目已归档，不允许删除";
+    } else {
+      if (status !== ProjectStatus.draft) {
+        canEdit = false;
+        canDelete = false;
+        reasons.edit = "项目立项后不允许直接编辑，请通过项目变更发起调整";
+        reasons.delete = "项目进入流程后不允许删除";
+      }
+      if (status !== ProjectStatus.draft) {
+        canSubmitApproval = false;
+        reasons.submitApproval = "当前项目不在草稿阶段，不能重复发起立项审批";
+      }
+      if (
+        ![
+          ProjectStatus.executing,
+          ProjectStatus.paused,
+          ProjectStatus.closeApprovalPending,
+          ProjectStatus.completed,
+        ].includes(status as ProjectStatus)
+      ) {
+        canSubmitClose = false;
+        reasons.submitClose = "草稿项目未进入结项阶段";
+      }
+      if (status !== ProjectStatus.completed) {
+        canArchive = false;
+        reasons.archive = "项目未结项，不允许归档";
+      }
+    }
+
+    return {
+      lifecycleContext: {
+        status,
+        isArchived,
+        isLifecycleLocked,
+      },
+      actions: {
+        canEdit,
+        canSubmitApproval,
+        canSubmitClose,
+        canArchive,
+        canDelete,
+        reasons,
+      },
+    };
+  }
+
   private assertProjectLifecycleEditable(
     originalProject: Project,
     changedFields: string[],
@@ -1164,20 +1300,23 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
           ProjectMemberRole.testLead,
         ].includes(role as any);
         const isVisitor = role === ProjectMemberRole.visitor;
+        const permissionContext = {
+          role,
+          isManager,
+          isDeliveryManager,
+          isFunctionalLead,
+          isVisitor,
+          canView: !isVisitor || Boolean(member) || isLeader,
+          canEdit: isManager,
+          canSubmitApproval: isManager,
+          canSubmitClose: isManager,
+          canArchive: isManager,
+          canDelete: isManager,
+        };
         Object.assign(project, {
-          permissionContext: {
-            role,
-            isManager,
-            isDeliveryManager,
-            isFunctionalLead,
-            isVisitor,
-            canView: !isVisitor || Boolean(member) || isLeader,
-            canEdit: isManager,
-            canSubmitApproval: isManager,
-            canSubmitClose: isManager,
-            canArchive: isManager,
-            canDelete: isManager,
-          },
+          permissionContext,
+          approvalView: this.buildApprovalViewModel(project),
+          ...this.buildProjectLifecycleContext(project, permissionContext),
         });
       }
     }
@@ -1233,6 +1372,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
     return {
       ...project,
+      approvalView: this.buildApprovalViewModel(project),
       contract: this.mapContractSummary(contract),
       opportunity: this.mapOpportunitySummary(opportunity),
       members: members.map((member) => ({

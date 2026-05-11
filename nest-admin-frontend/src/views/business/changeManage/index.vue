@@ -28,6 +28,13 @@ const canChangeDelete = computed(() => checkPermi(['business/changes/delete']))
 const canChangeSubmitApproval = computed(() => checkPermi(['business/changes/approve']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
+function getApprovalTagType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
+}
+
 const columns = [
   { prop: 'title', label: '变更标题', minWidth: 150 },
   { prop: 'projectId', label: '所属项目', width: 150, formatter: (row) => projectMap.value[row.projectId] || '-' },
@@ -94,7 +101,7 @@ function exportChangeList() {
       typeMap.value[row.type] || row.type || '-',
       { '1': '低', '2': '中', '3': '高' }[row.impact] || '-',
       statusMap.value[row.status] || '-',
-      ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批'),
+      row.approvalView?.label || '无需审批',
       row.costImpact || 0,
       row.scheduleImpact || 0,
       row.knowledgeLinked === '1' ? '已关联' : '未关联',
@@ -104,7 +111,7 @@ function exportChangeList() {
   downloadCsv('变更列表导出.csv', rows)
 }
 
-const canSubmitChangeApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canSubmitChangeApproval = (row) => row.status === '1' && row.approvalView?.canSubmit === true
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
@@ -117,8 +124,8 @@ const getButtons = (row) => [
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
   canChangeSubmitApproval.value && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canChangeUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
-  canChangeDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  canChangeUpdate.value && row.permissionContext?.canEdit !== false && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canChangeDelete.value && row.permissionContext?.canDelete !== false && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 
 const getStatusType = (status) => {
@@ -209,8 +216,8 @@ watch(
         </el-table-column>
         <el-table-column prop="approvalStatus" label="审批状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            <el-tag :type="getApprovalTagType(row.approvalView?.status)">
+              {{ row.approvalView?.label || '无需审批' }}
             </el-tag>
           </template>
         </el-table-column>

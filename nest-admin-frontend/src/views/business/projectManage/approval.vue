@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getStatus, getPriority, getProjectType, submitApproval, getFieldPermissions } from './api'
+import { getOne, getStatus, getPriority, getProjectType, submitApproval, getPermissionContext } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
@@ -58,28 +58,25 @@ const customerList = ref([])
 const deptMap = ref({})
 const workflowPanelRef = ref()
 const workflowInstance = ref(null)
-const fieldPermissionResult = ref(null)
+const projectPermissionContext = ref(null)
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
-const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
-const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
-const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
-const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
-const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
-const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
+const groupPermissions = computed(() => projectPermissionContext.value?.fieldPermissions?.groups || {})
+const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalView?.status === 'returned')
+const canEditProject = computed(() => canProjectUpdate.value && project.value?.actions?.canEdit === true)
+const isApprovalRejected = computed(() => ['rejected', 'returned'].includes(project.value?.approvalView?.status))
+const isApprovalPassed = computed(() => project.value?.approvalView?.status === 'approved')
+const isApprovalRunning = computed(() => project.value?.approvalView?.status === 'pending')
 
 function getProjectApprovalText(project) {
-  const hasApprovalStarted = Boolean(project?.workflowInstanceId) || !['', '0', undefined, null].includes(project?.approvalStatus)
-  if (!hasApprovalStarted) return '-'
-  if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
-  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
+  return project?.approvalView?.label || '-'
 }
 
 function getApprovalType(status) {
-  if (status === '2') return 'success'
-  if (status === '1') return 'warning'
-  if (status === '3') return 'danger'
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
   return 'info'
 }
 
@@ -89,7 +86,7 @@ function canViewGroup(groupCode) {
 
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes, permissionRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes, permissionContextRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
@@ -97,7 +94,7 @@ async function reloadCurrent() {
     getDeptTrees({}),
     getOne(projectId.value),
     workflowInstanceId.value ? getWorkflowInstance(workflowInstanceId.value) : Promise.resolve({ data: null }),
-    getFieldPermissions(projectId.value),
+    getPermissionContext(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -121,7 +118,7 @@ async function reloadCurrent() {
     milestones: projectRes.data?.milestones || [],
   }
   workflowInstance.value = workflowRes.data || null
-  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
+  projectPermissionContext.value = permissionContextRes?.data || permissionContextRes || null
 
   if (!workflowInstance.value && project.value?.workflowInstanceId) {
     const fallbackWorkflowRes = await getWorkflowInstance(project.value.workflowInstanceId)
@@ -217,7 +214,7 @@ watch(
     >
       <template #default>
         <div class="top-alert-actions">
-          <el-button v-if="canProjectSubmitApproval && project.status === '1'" type="warning" size="small" :loading="retryApprovalLoading" @click="handleRetryApproval">重试发起立项审批</el-button>
+          <el-button v-if="canProjectSubmitApproval && project.actions?.canSubmitApproval" type="warning" size="small" :loading="retryApprovalLoading" @click="handleRetryApproval">重试发起立项审批</el-button>
         </div>
       </template>
     </el-alert>
@@ -279,7 +276,7 @@ watch(
           </el-col>
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="审批状态">
-              <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalStatus)" />
+              <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalView?.status)" />
             </el-form-item>
           </el-col>
         </el-row>

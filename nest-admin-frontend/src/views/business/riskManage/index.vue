@@ -152,7 +152,7 @@ watch(
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canRiskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canRiskUpdate.value && row.permissionContext?.canEdit !== false && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
     : canArticleAdd.value
@@ -162,7 +162,7 @@ const getButtons = (row) => [
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
   canRiskUpdate.value && row.status !== '4' && row.status !== '5' ? { key: 'resolve', label: '解决', type: 'primary', onClick: () => handleResolve(row) } : null,
-  canRiskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  canRiskDelete.value && row.permissionContext?.canDelete !== false && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>
 

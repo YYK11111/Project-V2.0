@@ -54,7 +54,7 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
-const canEditCurrentRisk = computed(() => !hasRiskId.value || form.value?.canEdit !== false)
+const canEditCurrentRisk = computed(() => !hasRiskId.value || (form.value?.permissionContext?.canEdit ?? form.value?.canEdit) !== false)
 
 const isRiskFormRoute = useCurrentRouteGuard(route, '/riskManage/form')
 

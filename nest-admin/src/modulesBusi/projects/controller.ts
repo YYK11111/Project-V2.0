@@ -70,8 +70,28 @@ export class ProjectsController extends BaseController<
       "view",
     );
     const dashboard = await this.service.getDashboard(id);
+    const fieldPermissions =
+      await this.projectFieldPermissionService.getProjectFieldPermissions({
+        project: dashboard?.project,
+        rawRole: permissionContext.role,
+        canVisit: true,
+      });
     return {
       ...dashboard,
+      projectPermissionContext: {
+        role: permissionContext.role,
+        isManager: permissionContext.isManager,
+        isDeliveryManager: permissionContext.isDeliveryManager,
+        isFunctionalLead: permissionContext.isFunctionalLead,
+        isVisitor: permissionContext.isVisitor,
+        canView: permissionContext.canView,
+        canEdit: permissionContext.canEdit,
+        canSubmitApproval: permissionContext.canSubmitApproval,
+        canSubmitClose: permissionContext.canSubmitClose,
+        canArchive: permissionContext.canArchive,
+        canDelete: permissionContext.canDelete,
+        fieldPermissions,
+      },
       permissionContext: {
         role: permissionContext.role,
         isManager: permissionContext.isManager,
@@ -97,6 +117,36 @@ export class ProjectsController extends BaseController<
       rawRole: permissionContext.role,
       canVisit: true,
     });
+  }
+
+  @Get("permission-context/:id")
+  async getPermissionContext(@Param("id") id: string, @Req() req: any) {
+    const permissionContext = await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "view",
+    );
+    const project = await this.service.getOne({ id });
+    const fieldPermissions =
+      await this.projectFieldPermissionService.getProjectFieldPermissions({
+        project,
+        rawRole: permissionContext.role,
+        canVisit: true,
+      });
+    return {
+      role: permissionContext.role,
+      isManager: permissionContext.isManager,
+      isDeliveryManager: permissionContext.isDeliveryManager,
+      isFunctionalLead: permissionContext.isFunctionalLead,
+      isVisitor: permissionContext.isVisitor,
+      canView: permissionContext.canView,
+      canEdit: permissionContext.canEdit,
+      canSubmitApproval: permissionContext.canSubmitApproval,
+      canSubmitClose: permissionContext.canSubmitClose,
+      canArchive: permissionContext.canArchive,
+      canDelete: permissionContext.canDelete,
+      fieldPermissions,
+    };
   }
 
   @Post(":id/sync-alerts")

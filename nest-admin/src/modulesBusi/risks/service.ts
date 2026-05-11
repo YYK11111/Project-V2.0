@@ -50,7 +50,13 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
   }
 
   private async getRiskPermissions(risk: Risk, operatorId: string) {
-    if (!operatorId) return { canEdit: false, canDelete: false };
+    if (!operatorId) {
+      const permissionContext = { canEdit: false, canDelete: false };
+      return {
+        ...permissionContext,
+        permissionContext,
+      };
+    }
     const context = await this.projectsService.getProjectPermissionContext(
       risk.projectId,
       operatorId,
@@ -61,13 +67,17 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       Boolean(context?.isFunctionalLead) ||
       String(risk.riskOwnerId || "") === String(operatorId) ||
       String(risk.createUser || "") === String(operatorId);
-    return {
+    const permissionContext = {
       canEdit,
       canDelete:
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(risk.riskOwnerId || "") === String(operatorId) ||
         String(risk.createUser || "") === String(operatorId),
+    };
+    return {
+      ...permissionContext,
+      permissionContext,
     };
   }
 

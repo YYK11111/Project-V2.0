@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getDashboard, getStatus, getPriority, getProjectType, publishCloseReview, submitClose, syncProjectAlerts, getFieldPermissions } from './api'
+import { getDashboard, getStatus, getPriority, getProjectType, publishCloseReview, submitClose, syncProjectAlerts } from './api'
 import { confirmPlanImpact, confirmPlanImpactScope, confirmPlanImpactTarget } from '@/views/business/changeManage/api'
 import { getKnowledgeTypes } from '@/views/content/articleManage/api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
@@ -37,7 +37,6 @@ const sprints = ref([])
 const knowledgeSummary = ref({})
 const knowledgeArticles = ref([])
 const projectPermissionContext = ref({})
-const fieldPermissionResult = ref(null)
 const activeTab = ref('overview')
 const taskFilter = ref('all')
 const ticketFilter = ref('all')
@@ -52,10 +51,10 @@ const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canKnowledgeAdd = computed(() => checkPermi(['business/articles/add']))
-const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false && String(project.value?.status || '') === '1')
-const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false)
+const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false && project.value?.actions?.canEdit !== false)
+const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false && project.value?.actions?.canSubmitClose !== false)
 const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
-const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
+const groupPermissions = computed(() => projectPermissionContext.value?.fieldPermissions?.groups || {})
 
 function canViewGroup(groupCode) {
   return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
@@ -132,9 +131,9 @@ function getPriorityType(priority) {
 }
 
 function getApprovalType(status) {
-  if (status === '2') return 'success'
-  if (status === '1') return 'warning'
-  if (status === '3') return 'danger'
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
   return 'info'
 }
 
@@ -455,7 +454,7 @@ watch(
 
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, knowledgeTypeRes, customerRes, deptRes, dashboardRes, fieldPermissionsRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, knowledgeTypeRes, customerRes, deptRes, dashboardRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
@@ -463,7 +462,6 @@ async function reloadCurrent() {
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
     getDeptTrees({}),
     getDashboard(projectId.value),
-    getFieldPermissions(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -480,8 +478,7 @@ async function reloadCurrent() {
   walk(deptRes.data || [])
   deptMap.value = map
   dashboard.value = dashboardRes.data || {}
-  fieldPermissionResult.value = fieldPermissionsRes?.data || fieldPermissionsRes || null
-  projectPermissionContext.value = dashboard.value.permissionContext || {}
+  projectPermissionContext.value = dashboard.value.projectPermissionContext || dashboard.value.permissionContext || {}
   project.value = dashboard.value.project || {}
   tasks.value = dashboard.value.tasks || []
   tickets.value = dashboard.value.tickets || []
@@ -756,10 +753,7 @@ function goToDetail(path, id, query = {}) {
 }
 
 function getProjectApprovalText(project) {
-  const hasApprovalStarted = Boolean(project?.workflowInstanceId) || !['', '0', undefined, null].includes(project?.approvalStatus)
-  if (!hasApprovalStarted) return '-'
-  if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
-  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
+  return project?.approvalView?.label || '-'
 }
 </script>
 
@@ -769,7 +763,7 @@ function getProjectApprovalText(project) {
       <template #extra>
         <el-button @click="goToCockpit">进入驾驶舱</el-button>
         <el-button v-if="canEditCurrentProject" type="primary" @click="goToEdit">编辑项目</el-button>
-        <el-button type="warning" :disabled="!canSubmitCloseCurrentProject" @click="handleSubmitClose" v-if="project.status === '3'">提交结项申请</el-button>
+        <el-button type="warning" :disabled="!canSubmitCloseCurrentProject" @click="handleSubmitClose" v-if="project.actions?.canSubmitClose">提交结项申请</el-button>
       </template>
     </el-page-header>
 
@@ -782,7 +776,7 @@ function getProjectApprovalText(project) {
           </div>
             <div class="project-hero__tags">
               <ViewTagField :text="statusMap[project.status]" :type="getProjectStatusType(project.status)" />
-              <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalStatus)" />
+               <ViewTagField :text="getProjectApprovalText(project)" :type="getApprovalType(project.approvalView?.status)" />
               <ViewTagField :text="priorityMap[project.priority]" :type="getPriorityType(project.priority)" />
             </div>
         </div>
@@ -2012,7 +2006,7 @@ function getProjectApprovalText(project) {
               <el-button @click="createProjectScopedRecord('/handoverManage/form')">新增运维交接单</el-button>
               <el-button :loading="publishReviewLoading" :disabled="!project.closeReview" @click="handlePublishCloseReview">沉淀到知识中心</el-button>
               <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('review')">复盘模板</el-button>
-              <el-button v-if="canProjectSubmitClose && project.status === '3'" type="warning" @click="handleSubmitClose">提交结项审批</el-button>
+              <el-button v-if="canProjectSubmitClose && project.actions?.canSubmitClose" type="warning" @click="handleSubmitClose">提交结项审批</el-button>
             </div>
           </div>
         </el-card>

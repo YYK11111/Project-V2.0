@@ -646,16 +646,21 @@ export class TasksService extends BaseService<Task, TaskDto> {
   }
 
   private async getTaskPermissions(task: Task, operatorId: string) {
-    if (!operatorId)
-      return {
+    if (!operatorId) {
+      const permissionContext = {
         canEdit: false,
         canDelete: false,
         canManage: false,
         canExecute: false,
       };
+      return {
+        ...permissionContext,
+        permissionContext,
+      };
+    }
     const { context, canManage, canExecute } =
       await this.getTaskPermissionContext(task, operatorId);
-    return {
+    const permissionContext = {
       canEdit: canManage,
       canDelete:
         Boolean(context?.isManager) ||
@@ -664,6 +669,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
         String(task.createUser || "") === String(operatorId),
       canManage,
       canExecute,
+    };
+    return {
+      ...permissionContext,
+      permissionContext,
+      approvalView: this.projectsService.buildApprovalViewModel(task),
     };
   }
 
@@ -1352,6 +1362,10 @@ export class TasksService extends BaseService<Task, TaskDto> {
           row,
           await this.getTaskPermissions(row, String(_operatorId)),
         );
+      } else {
+        Object.assign(row, {
+          approvalView: this.projectsService.buildApprovalViewModel(row),
+        });
       }
     }
     return { data: rows, total, _flag: true };

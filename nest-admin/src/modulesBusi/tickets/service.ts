@@ -32,7 +32,13 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   }
 
   private async getTicketPermissions(ticket: Ticket, operatorId: string) {
-    if (!operatorId) return { canEdit: false, canDelete: false };
+    if (!operatorId) {
+      const permissionContext = { canEdit: false, canDelete: false };
+      return {
+        ...permissionContext,
+        permissionContext,
+      };
+    }
     const context = await this.projectsService.getProjectPermissionContext(
       ticket.projectId,
       operatorId,
@@ -44,7 +50,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       String(ticket.handlerId || "") === String(operatorId) ||
       String(ticket.submitterId || "") === String(operatorId) ||
       String(ticket.createUser || "") === String(operatorId);
-    return {
+    const permissionContext = {
       canEdit,
       canDelete:
         Boolean(context?.isManager) ||
@@ -52,6 +58,10 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
         String(ticket.handlerId || "") === String(operatorId) ||
         String(ticket.submitterId || "") === String(operatorId) ||
         String(ticket.createUser || "") === String(operatorId),
+    };
+    return {
+      ...permissionContext,
+      permissionContext,
     };
   }
 
@@ -161,6 +171,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
           await this.getTicketPermissions(row, String(_operatorId)),
         );
       }
+      Object.assign(row, {
+        approvalView: this.projectsService.buildApprovalViewModel(row),
+      });
     }
     return res;
   }
@@ -319,6 +332,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       );
     }
     const detail: any = this.buildTicketDetail(ticket);
+    Object.assign(detail, {
+      approvalView: this.projectsService.buildApprovalViewModel(ticket),
+    });
     if (ticket.linkedTaskId) {
       detail.linkedTask = await this.repository.manager.findOne(Task as any, {
         where: { id: ticket.linkedTaskId } as any,

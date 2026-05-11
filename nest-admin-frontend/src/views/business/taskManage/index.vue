@@ -24,10 +24,13 @@ const canTaskDelete = computed(() => checkPermi(['business/tasks/delete']))
 const canTaskUpdateProgress = computed(() => checkPermi(['business/tasks/updateProgress']))
 const canTaskSubmitApproval = computed(() => checkPermi(['business/tasks/update']))
 const canTaskExecute = computed(() => checkPermi(['business/tasks/update']))
-const statusMap = computed(() => ({
-  ...status.value,
-  6: status.value?.['6'] || '待完成审批',
-}))
+
+function getApprovalTagType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
+}
 
 function handleProgressChange(row) {
   if (!canTaskUpdateProgress.value) return $sdk.msgWarning('当前操作没有权限')
@@ -45,28 +48,28 @@ async function handleSubmitApproval(row) {
 }
 
 async function handleStartTask(row) {
-  if (!canTaskExecute.value || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
+  if (!canTaskExecute.value || row.permissionContext?.canExecute === false || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
   await startTask(row.id)
   $sdk.msgSuccess('任务已开始')
   rctRef.value?.getList()
 }
 
 async function handlePauseTask(row) {
-  if (!canTaskUpdate.value || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
+  if (!canTaskUpdate.value || row.permissionContext?.canManage === false || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
   await pauseTask(row.id)
   $sdk.msgSuccess('任务已暂缓')
   rctRef.value?.getList()
 }
 
 async function handleResumeTask(row) {
-  if (!canTaskUpdate.value || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
+  if (!canTaskUpdate.value || row.permissionContext?.canManage === false || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
   await resumeTask(row.id)
   $sdk.msgSuccess('任务已恢复')
   rctRef.value?.getList()
 }
 
 async function handleSubmitCompletionApproval(row) {
-  if (!canTaskExecute.value || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
+  if (!canTaskExecute.value || row.permissionContext?.canExecute === false || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
   await submitCompletionApproval(row.id)
   $sdk.msgSuccess('完成审批已提交')
   rctRef.value?.getList()
@@ -85,23 +88,23 @@ function isRowAttentionNeeded(row) {
   return !row.commentCount || isReportStale(row)
 }
 
-const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
-const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.canExecute !== false
-const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.canManage !== false
-const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.canManage !== false
-const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.canExecute !== false && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canSubmitTaskApproval = (row) => row.status === '1' && row.approvalView?.canSubmit === true
+const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.permissionContext?.canExecute !== false && row.canExecute !== false
+const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.permissionContext?.canManage !== false && row.canManage !== false
+const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.permissionContext?.canManage !== false && row.canManage !== false
+const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.permissionContext?.canExecute !== false && row.canExecute !== false && row.approvalView?.canSubmit === true
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
   { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
   { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
-  canTaskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
+  canTaskUpdate.value && row.permissionContext?.canEdit !== false && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
   canTaskExecute.value && canStartCurrentTask(row) ? { key: 'startTask', label: '开始任务', type: 'success', onClick: () => handleStartTask(row) } : null,
   canTaskUpdate.value && canPauseCurrentTask(row) ? { key: 'pauseTask', label: '暂缓任务', type: 'warning', onClick: () => handlePauseTask(row) } : null,
   canTaskUpdate.value && canResumeCurrentTask(row) ? { key: 'resumeTask', label: '恢复任务', type: 'success', onClick: () => handleResumeTask(row) } : null,
   canTaskExecute.value && canSubmitCompletionCurrentTask(row) ? { key: 'submitCompletionApproval', label: '提交完成审批', type: 'warning', onClick: () => handleSubmitCompletionApproval(row) } : null,
   canTaskSubmitApproval.value && canSubmitTaskApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canTaskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  canTaskDelete.value && row.permissionContext?.canDelete !== false && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
@@ -112,10 +115,10 @@ const getButtons = (row) => [
         <div class="query-sections">
           <div class="query-section query-section--primary">
             <div class="query-grid">
-              <BaInput v-model="query.name" label="任务名称" prop="name" />
-               <BaSelect v-model="query.status" filterable label="状态" prop="status">
-                 <el-option v-for="(value, key) of statusMap" :key="key" :label="value" :value="key"></el-option>
-               </BaSelect>
+                <BaInput v-model="query.name" label="任务名称" prop="name" />
+                <BaSelect v-model="query.status" filterable label="状态" prop="status">
+                  <el-option v-for="(value, key) of status" :key="key" :label="value" :value="key"></el-option>
+                </BaSelect>
               <BaSelect v-model="query.priority" filterable label="优先级" prop="priority">
                 <el-option v-for="(value, key) of priority" :key="key" :label="value" :value="key"></el-option>
               </BaSelect>
@@ -199,14 +202,14 @@ const getButtons = (row) => [
             <el-tag 
               :type="row.status === '3' ? 'success' : row.status === '2' ? 'primary' : row.status === '6' ? 'warning' : 'info'"
               size="small">
-              {{ statusMap[row.status] || (row.status === '6' ? '待完成审批' : row.status) }}
+              {{ status[row.status] || row.status }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            <el-tag :type="getApprovalTagType(row.approvalView?.status)" size="small">
+              {{ row.approvalView?.label || '无需审批' }}
             </el-tag>
           </template>
         </el-table-column>

@@ -38,22 +38,19 @@ const canProjectArchive = computed(() => checkPermi(['business/projects/archive'
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const recalculatingProgress = ref(false)
 
-function getProjectApprovalText(row) {
-  const hasApprovalStarted = Boolean(row?.workflowInstanceId) || !['', '0', undefined, null].includes(row?.approvalStatus)
-  if (!hasApprovalStarted) return '-'
-  if (row?.approvalStatus === '3' && String(row?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
-  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row?.approvalStatus] || '-')
+function getApprovalTagType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
 }
 
 function canEditProject(row) {
-  return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') === '1'
+  return canProjectUpdate.value && row.actions?.canEdit === true
 }
 
 function canEnterApprovalPage(row) {
-  return canProjectSubmitApproval.value && row.permissionContext?.canSubmitApproval !== false && (
-    String(row.status || '') === '1'
-    || ['1', '3'].includes(String(row.approvalStatus || '0'))
-  )
+  return canProjectSubmitApproval.value && (row.actions?.canSubmitApproval === true || row.approvalView?.canResubmit === true)
 }
 
 function handleArchive(row) {
@@ -84,8 +81,8 @@ const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') },
   canEditProject(row) ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
   canEnterApprovalPage(row) ? { key: 'approval', label: '立项审批', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
-  canProjectArchive.value && row.permissionContext?.canArchive !== false ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
-  canProjectDelete.value && row.permissionContext?.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  canProjectArchive.value && row.actions?.canArchive === true ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
+  canProjectDelete.value && row.actions?.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
@@ -203,8 +200,8 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="审批状态" prop="approvalStatus" width="140">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ getProjectApprovalText(row) }}
+            <el-tag :type="getApprovalTagType(row.approvalView?.status)" size="small">
+              {{ row.approvalView?.label || '-' }}
             </el-tag>
           </template>
         </el-table-column>

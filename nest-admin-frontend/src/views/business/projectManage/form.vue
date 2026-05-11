@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
-import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval, submitClose, getFieldPermissions } from './api'
+import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval, submitClose, getPermissionContext } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { checkPermi } from '@/utils/permission'
@@ -205,10 +205,10 @@ const isClosureMode = computed(() => !isCreate.value && String(form.value.status
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
-const canEditCurrentProject = computed(() => isDraftMode.value)
+const canEditCurrentProject = computed(() => isDraftMode.value || form.value?.actions?.canEdit === true)
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
-const fieldPermissionResult = ref(null)
+const projectPermissionContext = ref(null)
 
 const status = ref({})
 const priority = ref({})
@@ -239,7 +239,7 @@ getDeptTrees({}).then((res) => {
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => form.value.customer || customerMap.value.get(String(form.value.customerId || '')) || null)
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map((item) => [String(item.id), item.name])))
-const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
+const groupPermissions = computed(() => projectPermissionContext.value?.fieldPermissions?.groups || {})
 
 function canViewGroup(groupCode) {
   return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
@@ -330,7 +330,7 @@ async function loadProject() {
       ...createDefaultForm(),
       ...(hydrateFromContractQuery() || {}),
     }
-    fieldPermissionResult.value = null
+    projectPermissionContext.value = null
     return
   }
   const { data } = await getOne(route.query.id)
@@ -352,8 +352,8 @@ async function loadProject() {
     members: (data.members || []).length ? data.members : [defaultMember(1)],
     milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
   }
-  const permissionRes = await getFieldPermissions(route.query.id)
-  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
+  const permissionContextRes = await getPermissionContext(route.query.id)
+  projectPermissionContext.value = permissionContextRes?.data || permissionContextRes || null
 }
 
 watch(
@@ -1113,7 +1113,7 @@ function cancel() {
           暂存
         </el-button>
         <el-button
-          v-if="!isView && canProjectSubmitApproval && form.status === '1'"
+          v-if="!isView && canProjectSubmitApproval && form.actions?.canSubmitApproval"
           type="warning"
           :loading="approvalLoading"
           :disabled="saveLoading"

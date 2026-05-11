@@ -53,7 +53,13 @@ export class ChangesService extends BaseService<
     change: ProjectChange,
     operatorId: string,
   ) {
-    if (!operatorId) return { canEdit: false, canDelete: false };
+    if (!operatorId) {
+      const permissionContext = { canEdit: false, canDelete: false };
+      return {
+        ...permissionContext,
+        permissionContext,
+      };
+    }
     const context = await this.projectsService.getProjectPermissionContext(
       change.projectId,
       operatorId,
@@ -64,13 +70,17 @@ export class ChangesService extends BaseService<
       Boolean(context?.isFunctionalLead) ||
       String(change.requesterId || "") === String(operatorId) ||
       String(change.createUser || "") === String(operatorId);
-    return {
+    const permissionContext = {
       canEdit,
       canDelete:
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(change.requesterId || "") === String(operatorId) ||
         String(change.createUser || "") === String(operatorId),
+    };
+    return {
+      ...permissionContext,
+      permissionContext,
     };
   }
 
@@ -172,6 +182,9 @@ export class ChangesService extends BaseService<
           await this.getChangePermissions(row, String(_operatorId)),
         );
       }
+      Object.assign(row, {
+        approvalView: this.projectsService.buildApprovalViewModel(row),
+      });
     }
     return res;
   }
@@ -528,6 +541,9 @@ export class ChangesService extends BaseService<
       ...this.buildChangeDetail(change),
       confirmHistory: history,
     };
+    Object.assign(detail, {
+      approvalView: this.projectsService.buildApprovalViewModel(change),
+    });
     if ((query as any)._operatorId) {
       Object.assign(
         detail,

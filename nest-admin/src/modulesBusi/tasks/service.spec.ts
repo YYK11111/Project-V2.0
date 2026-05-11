@@ -59,6 +59,33 @@ describe("TasksService lifecycle actions", () => {
       query: jest.fn(),
     };
     const projectsService = {
+      buildApprovalViewModel: jest.fn((entity) => ({
+        status:
+          String(entity?.approvalStatus || "0") === "1"
+            ? "pending"
+            : String(entity?.approvalStatus || "0") === "3" &&
+                String(entity?.currentNodeName || "").includes("退回发起人")
+              ? "returned"
+              : String(entity?.approvalStatus || "0") === "2"
+                ? "approved"
+                : String(entity?.approvalStatus || "0") === "3"
+                  ? "rejected"
+                  : "none",
+        label:
+          String(entity?.approvalStatus || "0") === "1"
+            ? "审批中"
+            : String(entity?.approvalStatus || "0") === "3" &&
+                String(entity?.currentNodeName || "").includes("退回发起人")
+              ? "已退回发起人"
+              : String(entity?.approvalStatus || "0") === "2"
+                ? "已通过"
+                : String(entity?.approvalStatus || "0") === "3"
+                  ? "已驳回"
+                  : "无需审批",
+        currentNodeName: String(entity?.currentNodeName || ""),
+        canSubmit: String(entity?.approvalStatus || "0") === "0",
+        canResubmit: String(entity?.approvalStatus || "0") === "3",
+      })),
       getProjectPermissionContext: jest.fn(),
       assertProjectPermission: jest.fn(),
       assertExecutionObjectPermission: jest.fn(),
@@ -212,6 +239,40 @@ describe("TasksService lifecycle actions", () => {
         approvalStatus: "1",
       }),
     );
+  });
+
+  it("将任务完成审批中的状态映射为统一审批视图", () => {
+    const { service } = createService();
+
+    const result = (service as any).projectsService.buildApprovalViewModel({
+      approvalStatus: "1",
+      currentNodeName: "待完成审批",
+    });
+
+    expect(result).toEqual({
+      status: "pending",
+      label: "审批中",
+      currentNodeName: "待完成审批",
+      canSubmit: false,
+      canResubmit: false,
+    });
+  });
+
+  it("将任务退回发起人的状态映射为统一审批视图", () => {
+    const { service } = createService();
+
+    const result = (service as any).projectsService.buildApprovalViewModel({
+      approvalStatus: "3",
+      currentNodeName: "退回发起人-继续补充",
+    });
+
+    expect(result).toEqual({
+      status: "returned",
+      label: "已退回发起人",
+      currentNodeName: "退回发起人-继续补充",
+      canSubmit: false,
+      canResubmit: true,
+    });
   });
 
   it("处理中任务延期时更新截止日期并保存延期记录", async () => {
@@ -973,6 +1034,11 @@ describe("TasksService lifecycle actions", () => {
         canEdit: false,
         canManage: false,
         canExecute: true,
+        permissionContext: expect.objectContaining({
+          canEdit: false,
+          canManage: false,
+          canExecute: true,
+        }),
       }),
     );
   });
