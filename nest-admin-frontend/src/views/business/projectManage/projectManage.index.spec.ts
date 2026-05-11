@@ -7,6 +7,12 @@ function readProjectManageView(name: string) {
 }
 
 describe('projectManage 列表治理守卫', () => {
+  it('项目列表已移除 ts-nocheck', () => {
+    const source = readProjectManageView('index')
+
+    expect(source).not.toContain('@ts-nocheck')
+  })
+
   it('项目列表筛选区使用 4 列网格并保留选中列与序号列', () => {
     const source = readProjectManageView('index')
 
@@ -28,10 +34,11 @@ describe('projectManage 列表治理守卫', () => {
     expect(source).toContain("showAdvanced ? '收起高级筛选' : '展开高级筛选'")
   })
 
-  it('项目列表仅允许草稿项目进入编辑', () => {
+  it('项目列表编辑和审批入口依赖共享上下文', () => {
     const source = readProjectManageView('index')
 
-    expect(source).toContain("String(row.status || '') === '1'")
-    expect(source).not.toContain("String(row.status || '') !== '3'")
+    expect(source).toContain('row.actions?.canEdit === true')
+    expect(source).toContain('row.approvalView?.canResubmit === true')
+    expect(source).not.toContain("String(row.status || '') === '1'")
   })
 })
