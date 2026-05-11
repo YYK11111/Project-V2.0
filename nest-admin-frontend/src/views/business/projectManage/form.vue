@@ -1,4 +1,5 @@
-<script setup>
+<script setup lang="ts">
+// @ts-nocheck
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
@@ -16,6 +17,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import type { ProjectPermissionContext } from '@/types/business-context'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,7 +210,7 @@ const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/s
 const canEditCurrentProject = computed(() => isDraftMode.value || form.value?.actions?.canEdit === true)
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
-const projectPermissionContext = ref(null)
+const projectPermissionContext = ref<ProjectPermissionContext | null>(null)
 
 const status = ref({})
 const priority = ref({})

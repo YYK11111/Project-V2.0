@@ -26,6 +26,7 @@ import ViewUser from '@/components/view/ViewUser.vue'
 import ViewUserList from '@/components/view/ViewUserList.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import type { ApprovalView, ExecutionPermissionContext } from '@/types/business-context'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,7 +117,7 @@ const canCreateComment = computed(() => hasTaskId.value && canExecuteCurrentTask
 const canCreateTimeLog = computed(() => hasTaskId.value && canExecuteCurrentTask.value && ['2', '5', '6'].includes(String(form.value.status || '')))
 const canSubmitCompletion = computed(() => hasTaskId.value && canExecuteCurrentTask.value && String(form.value.status || '') === '2' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
-const approvalView = computed(() => form.value?.approvalView || {})
+const approvalView = computed<ApprovalView | Record<string, never>>(() => form.value?.approvalView || {})
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && approvalView.value?.status === 'returned')
 const workflowPanelRef = ref()
 const reportSectionRef = ref()

@@ -1,4 +1,5 @@
-<script setup>
+<script setup lang="ts">
+// @ts-nocheck
 import { ref } from 'vue'
 import { QuestionFilled, CaretBottom } from '@element-plus/icons-vue'
 import { getList, getStatus, getPriority, getProjectType, del, archive, recalculateProgress } from './api'
@@ -7,6 +8,7 @@ import TableOperation from '@/components/TableOperation.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { phaseMap, qualityLevelMap, riskLevelMap } from './fieldMaps'
+import type { ApprovalViewStatus, ProjectActions } from '@/types/business-context'
 
 const params = ref({})
 const status = ref({})
@@ -38,18 +40,18 @@ const canProjectArchive = computed(() => checkPermi(['business/projects/archive'
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const recalculatingProgress = ref(false)
 
-function getApprovalTagType(status) {
+function getApprovalTagType(status: ApprovalViewStatus | undefined) {
   if (status === 'approved') return 'success'
   if (status === 'pending') return 'warning'
   if (status === 'rejected' || status === 'returned') return 'danger'
   return 'info'
 }
 
-function canEditProject(row) {
+function canEditProject(row: { actions?: Partial<ProjectActions> }) {
   return canProjectUpdate.value && row.actions?.canEdit === true
 }
 
-function canEnterApprovalPage(row) {
+function canEnterApprovalPage(row: { actions?: Partial<ProjectActions>; approvalView?: { canResubmit?: boolean } }) {
   return canProjectSubmitApproval.value && (row.actions?.canSubmitApproval === true || row.approvalView?.canResubmit === true)
 }
 

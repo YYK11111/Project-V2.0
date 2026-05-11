@@ -1,4 +1,5 @@
-<script setup>
+<script setup lang="ts">
+// @ts-nocheck
 import { computed, ref } from 'vue'
 import dayjs from 'dayjs'
 import { CaretBottom } from '@element-plus/icons-vue'
@@ -6,6 +7,7 @@ import { getList, getStatus, getPriority, del, updateProgress, submitApproval, s
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { sourceTypeMap } from '../projectManage/fieldMaps'
+import type { ApprovalViewStatus, ExecutionPermissionContext } from '@/types/business-context'
 
 const params = ref({})
 
@@ -25,7 +27,7 @@ const canTaskUpdateProgress = computed(() => checkPermi(['business/tasks/updateP
 const canTaskSubmitApproval = computed(() => checkPermi(['business/tasks/update']))
 const canTaskExecute = computed(() => checkPermi(['business/tasks/update']))
 
-function getApprovalTagType(status) {
+function getApprovalTagType(status: ApprovalViewStatus | undefined) {
   if (status === 'approved') return 'success'
   if (status === 'pending') return 'warning'
   if (status === 'rejected' || status === 'returned') return 'danger'
@@ -88,11 +90,11 @@ function isRowAttentionNeeded(row) {
   return !row.commentCount || isReportStale(row)
 }
 
-const canSubmitTaskApproval = (row) => row.status === '1' && row.approvalView?.canSubmit === true
-const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.permissionContext?.canExecute !== false && row.canExecute !== false
-const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.permissionContext?.canManage !== false && row.canManage !== false
-const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.permissionContext?.canManage !== false && row.canManage !== false
-const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.permissionContext?.canExecute !== false && row.canExecute !== false && row.approvalView?.canSubmit === true
+const canSubmitTaskApproval = (row: { status?: string; approvalView?: { canSubmit?: boolean } }) => row.status === '1' && row.approvalView?.canSubmit === true
+const canStartCurrentTask = (row: { status?: string; permissionContext?: ExecutionPermissionContext; canExecute?: boolean }) => String(row.status || '') === '1' && row.permissionContext?.canExecute !== false && row.canExecute !== false
+const canPauseCurrentTask = (row: { status?: string; permissionContext?: ExecutionPermissionContext; canManage?: boolean }) => String(row.status || '') === '2' && row.permissionContext?.canManage !== false && row.canManage !== false
+const canResumeCurrentTask = (row: { status?: string; permissionContext?: ExecutionPermissionContext; canManage?: boolean }) => String(row.status || '') === '5' && row.permissionContext?.canManage !== false && row.canManage !== false
+const canSubmitCompletionCurrentTask = (row: { status?: string; permissionContext?: ExecutionPermissionContext; canExecute?: boolean; approvalView?: { canSubmit?: boolean } }) => String(row.status || '') === '2' && row.permissionContext?.canExecute !== false && row.canExecute !== false && row.approvalView?.canSubmit === true
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
