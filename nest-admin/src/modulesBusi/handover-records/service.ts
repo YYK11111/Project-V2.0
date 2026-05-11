@@ -5,6 +5,7 @@ import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { HandoverRecordDto } from "./dto";
 import { HandoverRecord, handoverRecordStatusMap } from "./entity";
+import { buildApprovalViewModel } from "src/modulesBusi/workflow/approval-view.helper";
 
 @Injectable()
 export class HandoverRecordsService extends BaseService<
@@ -16,63 +17,6 @@ export class HandoverRecordsService extends BaseService<
     repository: Repository<HandoverRecord>,
   ) {
     super(HandoverRecord, repository);
-  }
-
-  buildApprovalViewModel(entity?: {
-    approvalStatus?: string | null;
-    currentNodeName?: string | null;
-  }) {
-    const approvalStatus = String(entity?.approvalStatus || "0");
-    const currentNodeName = String(entity?.currentNodeName || "");
-    const isReturned =
-      approvalStatus === "3" && currentNodeName.includes("退回发起人");
-
-    if (isReturned) {
-      return {
-        status: "returned",
-        label: "已退回发起人",
-        currentNodeName,
-        canSubmit: false,
-        canResubmit: true,
-      };
-    }
-
-    const statusMap = {
-      "0": {
-        status: "none",
-        label: "无需审批",
-        canSubmit: true,
-        canResubmit: false,
-      },
-      "1": {
-        status: "pending",
-        label: "审批中",
-        canSubmit: false,
-        canResubmit: false,
-      },
-      "2": {
-        status: "approved",
-        label: "已通过",
-        canSubmit: false,
-        canResubmit: false,
-      },
-      "3": {
-        status: "rejected",
-        label: "已驳回",
-        canSubmit: false,
-        canResubmit: true,
-      },
-    } as const;
-
-    return {
-      ...(statusMap[approvalStatus as keyof typeof statusMap] || {
-        status: "none",
-        label: "无需审批",
-        canSubmit: true,
-        canResubmit: false,
-      }),
-      currentNodeName,
-    };
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<HandoverRecord>> {
@@ -89,7 +33,7 @@ export class HandoverRecordsService extends BaseService<
     const result = await this.listBy(queryOrm, query);
     for (const row of result.list || []) {
       Object.assign(row, {
-        approvalView: this.buildApprovalViewModel(row),
+        approvalView: buildApprovalViewModel(row),
       });
     }
     return result;
@@ -103,7 +47,7 @@ export class HandoverRecordsService extends BaseService<
     if (!record) return record;
     return {
       ...record,
-      approvalView: this.buildApprovalViewModel(record),
+      approvalView: buildApprovalViewModel(record),
     };
   }
 

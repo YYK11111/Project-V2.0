@@ -1,4 +1,5 @@
 import { CustomersService } from "./service";
+import { buildApprovalViewModel } from "src/modulesBusi/workflow/approval-view.helper";
 
 describe("CustomersService approval view", () => {
   const createService = () => {
@@ -14,7 +15,7 @@ describe("CustomersService approval view", () => {
   it("将客户退回发起人状态映射为统一审批视图", () => {
     const { service } = createService();
 
-    const result = (service as any).buildApprovalViewModel({
+    const result = buildApprovalViewModel({
       approvalStatus: "3",
       currentNodeName: "退回发起人-补充客户资料",
     });

@@ -7,6 +7,7 @@ import { BaseService } from "src/common/BaseService";
 import { CustomerDto } from "./dto";
 import dayjs from "dayjs";
 import { User } from "src/modules/users/entities/user.entity";
+import { buildApprovalViewModel } from "src/modulesBusi/workflow/approval-view.helper";
 
 @Injectable()
 export class CustomersService extends BaseService<Customer, CustomerDto> {
@@ -26,63 +27,6 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       dto.code = await this.generateCustomerCode();
     }
     return super.add(dto);
-  }
-
-  buildApprovalViewModel(entity?: {
-    approvalStatus?: string | null;
-    currentNodeName?: string | null;
-  }) {
-    const approvalStatus = String(entity?.approvalStatus || "0");
-    const currentNodeName = String(entity?.currentNodeName || "");
-    const isReturned =
-      approvalStatus === "3" && currentNodeName.includes("退回发起人");
-
-    if (isReturned) {
-      return {
-        status: "returned",
-        label: "已退回发起人",
-        currentNodeName,
-        canSubmit: false,
-        canResubmit: true,
-      };
-    }
-
-    const statusMap = {
-      "0": {
-        status: "none",
-        label: "无需审批",
-        canSubmit: true,
-        canResubmit: false,
-      },
-      "1": {
-        status: "pending",
-        label: "审批中",
-        canSubmit: false,
-        canResubmit: false,
-      },
-      "2": {
-        status: "approved",
-        label: "已通过",
-        canSubmit: false,
-        canResubmit: false,
-      },
-      "3": {
-        status: "rejected",
-        label: "已驳回",
-        canSubmit: false,
-        canResubmit: true,
-      },
-    } as const;
-
-    return {
-      ...(statusMap[approvalStatus as keyof typeof statusMap] || {
-        status: "none",
-        label: "无需审批",
-        canSubmit: true,
-        canResubmit: false,
-      }),
-      currentNodeName,
-    };
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<Customer>> {
@@ -122,6 +66,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     for (const row of result.list || []) {
       Object.assign(row, {
         approvalView: this.buildApprovalViewModel(row),
+        approvalView: buildApprovalViewModel(row),
       });
     }
     return result;
@@ -190,7 +135,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return {
       ...customer,
       sales: this.mapUserSummary(customer.sales),
-      approvalView: this.buildApprovalViewModel(customer),
+      approvalView: buildApprovalViewModel(customer),
     };
   }
 }

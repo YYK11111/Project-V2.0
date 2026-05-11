@@ -1,4 +1,5 @@
 import { HandoverRecordsService } from "./service";
+import { buildApprovalViewModel } from "src/modulesBusi/workflow/approval-view.helper";
 
 describe("HandoverRecordsService approval view", () => {
   const createService = () => {
@@ -13,7 +14,7 @@ describe("HandoverRecordsService approval view", () => {
   it("将交接单退回发起人状态映射为统一审批视图", () => {
     const { service } = createService();
 
-    const result = (service as any).buildApprovalViewModel({
+    const result = buildApprovalViewModel({
       approvalStatus: "3",
       currentNodeName: "退回发起人-补充交接说明",
     });
