@@ -86,6 +86,28 @@ describe("TasksService lifecycle actions", () => {
         canSubmit: String(entity?.approvalStatus || "0") === "0",
         canResubmit: String(entity?.approvalStatus || "0") === "3",
       })),
+      buildExecutionPermissionContext: jest.fn(
+        ({ context, operatorId, ownerIds, createUser }) => {
+          const normalizedOperatorId = String(operatorId || "");
+          const isOwner = (ownerIds || [])
+            .map((item) => String(item || ""))
+            .includes(normalizedOperatorId);
+          const isCreator = String(createUser || "") === normalizedOperatorId;
+          return {
+            canEdit:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              Boolean(context?.isFunctionalLead) ||
+              isOwner ||
+              isCreator,
+            canDelete:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              isOwner ||
+              isCreator,
+          };
+        },
+      ),
       getProjectPermissionContext: jest.fn(),
       assertProjectPermission: jest.fn(),
       assertExecutionObjectPermission: jest.fn(),

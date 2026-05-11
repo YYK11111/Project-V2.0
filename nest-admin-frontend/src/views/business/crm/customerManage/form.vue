@@ -81,11 +81,19 @@ const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
-const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
+const approvalView = computed(() => form.value?.approvalView || {})
+const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && approvalView.value?.status === 'returned')
 const workflowPanelRef = ref()
 
 const isCustomerFormRoute = useCurrentRouteGuard(route, '/crm/customerManage/form')
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map(dept => [String(dept.id), dept.name])))
+
+function getApprovalType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
+}
 
 const defaultForm = () => ({
   name: '',
@@ -198,8 +206,8 @@ function scrollToWorkflowPanel() {
     </div>
 
     <el-alert
-      v-if="route.query.id && form.approvalStatus === '3'"
-      :title="String(form.currentNodeName || '').includes('退回发起人') ? '该客户审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该客户审批已驳回，请根据意见调整后重新提交。'"
+      v-if="route.query.id && ['rejected', 'returned'].includes(approvalView.status)"
+      :title="approvalView.status === 'returned' ? '该客户审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该客户审批已驳回，请根据意见调整后重新提交。'"
       type="warning"
       :closable="false"
       show-icon
@@ -335,7 +343,7 @@ function scrollToWorkflowPanel() {
       </el-row>
 
       <el-form-item label="审批状态" v-if="isEdit">
-        <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
+        <ViewTagField :text="approvalView.label || '无需审批'" :type="getApprovalType(approvalView.status)" />
       </el-form-item>
 
       <el-form-item label="当前审批节点" v-if="isEdit && form.currentNodeName">

@@ -660,13 +660,16 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
     const { context, canManage, canExecute } =
       await this.getTaskPermissionContext(task, operatorId);
+    const basePermissionContext =
+      this.projectsService.buildExecutionPermissionContext({
+        context,
+        operatorId,
+        ownerIds: [task.leaderId],
+        createUser: task.createUser,
+      });
     const permissionContext = {
+      ...basePermissionContext,
       canEdit: canManage,
-      canDelete:
-        Boolean(context?.isManager) ||
-        Boolean(context?.isDeliveryManager) ||
-        String(task.leaderId || "") === String(operatorId) ||
-        String(task.createUser || "") === String(operatorId),
       canManage,
       canExecute,
     };

@@ -22,6 +22,7 @@ const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId.value)
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const workflowPanelRef = ref()
+const approvalView = computed(() => form.value?.approvalView || {})
 
 const form = ref({
   title: '',
@@ -73,7 +74,7 @@ function submit() {
 
 function handleSubmitApproval() {
   if (!route.query.id) return $sdk.msgWarning('请先保存上线单后再提交审批')
-  const request = String(form.value.currentNodeName || '').includes('退回发起人') && form.value.workflowInstanceId
+  const request = approvalView.value?.status === 'returned' && form.value.workflowInstanceId
     ? resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     : submitApproval(route.query.id)
   request.then(() => {
@@ -100,7 +101,7 @@ function scrollToWorkflowPanel() {
     <el-page-header class="mb20" @back="$router.back()" :title="isReadonly ? '上线单详情' : isEdit ? '编辑上线单' : '新增上线单'">
       <template #extra>
         <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-        <el-button v-if="form.workflowInstanceId && String(form.currentNodeName || '').includes('退回发起人')" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
+        <el-button v-if="form.workflowInstanceId && approvalView.status === 'returned'" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
       </template>
     </el-page-header>
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 840px">

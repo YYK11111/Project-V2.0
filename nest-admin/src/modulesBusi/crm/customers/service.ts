@@ -28,6 +28,63 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return super.add(dto);
   }
 
+  buildApprovalViewModel(entity?: {
+    approvalStatus?: string | null;
+    currentNodeName?: string | null;
+  }) {
+    const approvalStatus = String(entity?.approvalStatus || "0");
+    const currentNodeName = String(entity?.currentNodeName || "");
+    const isReturned =
+      approvalStatus === "3" && currentNodeName.includes("退回发起人");
+
+    if (isReturned) {
+      return {
+        status: "returned",
+        label: "已退回发起人",
+        currentNodeName,
+        canSubmit: false,
+        canResubmit: true,
+      };
+    }
+
+    const statusMap = {
+      "0": {
+        status: "none",
+        label: "无需审批",
+        canSubmit: true,
+        canResubmit: false,
+      },
+      "1": {
+        status: "pending",
+        label: "审批中",
+        canSubmit: false,
+        canResubmit: false,
+      },
+      "2": {
+        status: "approved",
+        label: "已通过",
+        canSubmit: false,
+        canResubmit: false,
+      },
+      "3": {
+        status: "rejected",
+        label: "已驳回",
+        canSubmit: false,
+        canResubmit: true,
+      },
+    } as const;
+
+    return {
+      ...(statusMap[approvalStatus as keyof typeof statusMap] || {
+        status: "none",
+        label: "无需审批",
+        canSubmit: true,
+        canResubmit: false,
+      }),
+      currentNodeName,
+    };
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<Customer>> {
     const { name, code, shortName, level, status, industry, salesId } = query;
 
@@ -61,7 +118,13 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       relations: ["sales"],
     };
 
-    return this.listBy(queryOrm, query);
+    const result = await this.listBy(queryOrm, query);
+    for (const row of result.list || []) {
+      Object.assign(row, {
+        approvalView: this.buildApprovalViewModel(row),
+      });
+    }
+    return result;
   }
 
   async getCustomerDetail(id: string) {
@@ -127,6 +190,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return {
       ...customer,
       sales: this.mapUserSummary(customer.sales),
+      approvalView: this.buildApprovalViewModel(customer),
     };
   }
 }

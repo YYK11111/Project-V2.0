@@ -61,20 +61,13 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       risk.projectId,
       operatorId,
     );
-    const canEdit =
-      Boolean(context?.isManager) ||
-      Boolean(context?.isDeliveryManager) ||
-      Boolean(context?.isFunctionalLead) ||
-      String(risk.riskOwnerId || "") === String(operatorId) ||
-      String(risk.createUser || "") === String(operatorId);
-    const permissionContext = {
-      canEdit,
-      canDelete:
-        Boolean(context?.isManager) ||
-        Boolean(context?.isDeliveryManager) ||
-        String(risk.riskOwnerId || "") === String(operatorId) ||
-        String(risk.createUser || "") === String(operatorId),
-    };
+    const permissionContext =
+      this.projectsService.buildExecutionPermissionContext({
+        context,
+        operatorId,
+        ownerIds: [risk.riskOwnerId],
+        createUser: risk.createUser,
+      });
     return {
       ...permissionContext,
       permissionContext,

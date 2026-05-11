@@ -49,13 +49,55 @@ describe("TicketsService convert to task", () => {
       {} as any,
       {} as any,
       {
+        buildExecutionPermissionContext: jest.fn(
+          ({ context, operatorId, ownerIds, createUser }) => {
+            const normalizedOperatorId = String(operatorId || "");
+            const isOwner = (ownerIds || [])
+              .map((item) => String(item || ""))
+              .includes(normalizedOperatorId);
+            const isCreator = String(createUser || "") === normalizedOperatorId;
+            return {
+              canEdit:
+                Boolean(context?.isManager) ||
+                Boolean(context?.isDeliveryManager) ||
+                Boolean(context?.isFunctionalLead) ||
+                isOwner ||
+                isCreator,
+              canDelete:
+                Boolean(context?.isManager) ||
+                Boolean(context?.isDeliveryManager) ||
+                isOwner ||
+                isCreator,
+            };
+          },
+        ),
         getProjectPermissionContext: jest.fn(),
         buildApprovalViewModel: jest.fn((entity) => ({
-          status: String(entity?.approvalStatus || '0') === '1' ? 'pending' : String(entity?.approvalStatus || '0') === '3' && String(entity?.currentNodeName || '').includes('退回发起人') ? 'returned' : String(entity?.approvalStatus || '0') === '2' ? 'approved' : String(entity?.approvalStatus || '0') === '3' ? 'rejected' : 'none',
-          label: String(entity?.approvalStatus || '0') === '1' ? '审批中' : String(entity?.approvalStatus || '0') === '3' && String(entity?.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : String(entity?.approvalStatus || '0') === '2' ? '已通过' : String(entity?.approvalStatus || '0') === '3' ? '已驳回' : '无需审批',
-          currentNodeName: String(entity?.currentNodeName || ''),
-          canSubmit: String(entity?.approvalStatus || '0') === '0',
-          canResubmit: String(entity?.approvalStatus || '0') === '3',
+          status:
+            String(entity?.approvalStatus || "0") === "1"
+              ? "pending"
+              : String(entity?.approvalStatus || "0") === "3" &&
+                  String(entity?.currentNodeName || "").includes("退回发起人")
+                ? "returned"
+                : String(entity?.approvalStatus || "0") === "2"
+                  ? "approved"
+                  : String(entity?.approvalStatus || "0") === "3"
+                    ? "rejected"
+                    : "none",
+          label:
+            String(entity?.approvalStatus || "0") === "1"
+              ? "审批中"
+              : String(entity?.approvalStatus || "0") === "3" &&
+                  String(entity?.currentNodeName || "").includes("退回发起人")
+                ? "已退回发起人"
+                : String(entity?.approvalStatus || "0") === "2"
+                  ? "已通过"
+                  : String(entity?.approvalStatus || "0") === "3"
+                    ? "已驳回"
+                    : "无需审批",
+          currentNodeName: String(entity?.currentNodeName || ""),
+          canSubmit: String(entity?.approvalStatus || "0") === "0",
+          canResubmit: String(entity?.approvalStatus || "0") === "3",
         })),
       } as any,
       { add: jest.fn() } as any,
@@ -82,13 +124,55 @@ describe("TicketsService convert to task", () => {
       {} as any,
       {} as any,
       {
+        buildExecutionPermissionContext: jest.fn(
+          ({ context, operatorId, ownerIds, createUser }) => {
+            const normalizedOperatorId = String(operatorId || "");
+            const isOwner = (ownerIds || [])
+              .map((item) => String(item || ""))
+              .includes(normalizedOperatorId);
+            const isCreator = String(createUser || "") === normalizedOperatorId;
+            return {
+              canEdit:
+                Boolean(context?.isManager) ||
+                Boolean(context?.isDeliveryManager) ||
+                Boolean(context?.isFunctionalLead) ||
+                isOwner ||
+                isCreator,
+              canDelete:
+                Boolean(context?.isManager) ||
+                Boolean(context?.isDeliveryManager) ||
+                isOwner ||
+                isCreator,
+            };
+          },
+        ),
         getProjectPermissionContext: jest.fn(),
         buildApprovalViewModel: jest.fn((entity) => ({
-          status: String(entity?.approvalStatus || '0') === '1' ? 'pending' : String(entity?.approvalStatus || '0') === '3' && String(entity?.currentNodeName || '').includes('退回发起人') ? 'returned' : String(entity?.approvalStatus || '0') === '2' ? 'approved' : String(entity?.approvalStatus || '0') === '3' ? 'rejected' : 'none',
-          label: String(entity?.approvalStatus || '0') === '1' ? '审批中' : String(entity?.approvalStatus || '0') === '3' && String(entity?.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : String(entity?.approvalStatus || '0') === '2' ? '已通过' : String(entity?.approvalStatus || '0') === '3' ? '已驳回' : '无需审批',
-          currentNodeName: String(entity?.currentNodeName || ''),
-          canSubmit: String(entity?.approvalStatus || '0') === '0',
-          canResubmit: String(entity?.approvalStatus || '0') === '3',
+          status:
+            String(entity?.approvalStatus || "0") === "1"
+              ? "pending"
+              : String(entity?.approvalStatus || "0") === "3" &&
+                  String(entity?.currentNodeName || "").includes("退回发起人")
+                ? "returned"
+                : String(entity?.approvalStatus || "0") === "2"
+                  ? "approved"
+                  : String(entity?.approvalStatus || "0") === "3"
+                    ? "rejected"
+                    : "none",
+          label:
+            String(entity?.approvalStatus || "0") === "1"
+              ? "审批中"
+              : String(entity?.approvalStatus || "0") === "3" &&
+                  String(entity?.currentNodeName || "").includes("退回发起人")
+                ? "已退回发起人"
+                : String(entity?.approvalStatus || "0") === "2"
+                  ? "已通过"
+                  : String(entity?.approvalStatus || "0") === "3"
+                    ? "已驳回"
+                    : "无需审批",
+          currentNodeName: String(entity?.currentNodeName || ""),
+          canSubmit: String(entity?.approvalStatus || "0") === "0",
+          canResubmit: String(entity?.approvalStatus || "0") === "3",
         })),
       } as any,
       { add: jest.fn() } as any,
@@ -111,6 +195,28 @@ describe("TicketsService convert to task", () => {
   it("返回工单对象权限上下文", async () => {
     const repository = { findOne: jest.fn(), update: jest.fn() };
     const projectsService = {
+      buildExecutionPermissionContext: jest.fn(
+        ({ context, operatorId, ownerIds, createUser }) => {
+          const normalizedOperatorId = String(operatorId || "");
+          const isOwner = (ownerIds || [])
+            .map((item) => String(item || ""))
+            .includes(normalizedOperatorId);
+          const isCreator = String(createUser || "") === normalizedOperatorId;
+          return {
+            canEdit:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              Boolean(context?.isFunctionalLead) ||
+              isOwner ||
+              isCreator,
+            canDelete:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              isOwner ||
+              isCreator,
+          };
+        },
+      ),
       getProjectPermissionContext: jest.fn().mockResolvedValue({
         isManager: false,
         isDeliveryManager: true,

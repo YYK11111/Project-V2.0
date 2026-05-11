@@ -43,22 +43,13 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       ticket.projectId,
       operatorId,
     );
-    const canEdit =
-      Boolean(context?.isManager) ||
-      Boolean(context?.isDeliveryManager) ||
-      Boolean(context?.isFunctionalLead) ||
-      String(ticket.handlerId || "") === String(operatorId) ||
-      String(ticket.submitterId || "") === String(operatorId) ||
-      String(ticket.createUser || "") === String(operatorId);
-    const permissionContext = {
-      canEdit,
-      canDelete:
-        Boolean(context?.isManager) ||
-        Boolean(context?.isDeliveryManager) ||
-        String(ticket.handlerId || "") === String(operatorId) ||
-        String(ticket.submitterId || "") === String(operatorId) ||
-        String(ticket.createUser || "") === String(operatorId),
-    };
+    const permissionContext =
+      this.projectsService.buildExecutionPermissionContext({
+        context,
+        operatorId,
+        ownerIds: [ticket.handlerId, ticket.submitterId],
+        createUser: ticket.createUser,
+      });
     return {
       ...permissionContext,
       permissionContext,

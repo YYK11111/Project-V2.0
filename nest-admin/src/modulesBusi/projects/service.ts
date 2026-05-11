@@ -1722,6 +1722,45 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return context;
   }
 
+  buildExecutionPermissionContext(options: {
+    context?: {
+      isManager?: boolean;
+      isDeliveryManager?: boolean;
+      isFunctionalLead?: boolean;
+    } | null;
+    operatorId: string;
+    ownerIds?: Array<string | null | undefined>;
+    createUser?: string | null;
+    editAllowsFunctionalLead?: boolean;
+  }) {
+    const operatorId = String(options.operatorId || "");
+    const ownerIdSet = new Set(
+      (options.ownerIds || [])
+        .map((item) => String(item || ""))
+        .filter(Boolean),
+    );
+    const isOwner = ownerIdSet.has(operatorId);
+    const isCreator =
+      String(options.createUser || "") === String(options.operatorId || "");
+    const canEdit =
+      Boolean(options.context?.isManager) ||
+      Boolean(options.context?.isDeliveryManager) ||
+      (options.editAllowsFunctionalLead !== false &&
+        Boolean(options.context?.isFunctionalLead)) ||
+      isOwner ||
+      isCreator;
+    const canDelete =
+      Boolean(options.context?.isManager) ||
+      Boolean(options.context?.isDeliveryManager) ||
+      isOwner ||
+      isCreator;
+
+    return {
+      canEdit,
+      canDelete,
+    };
+  }
+
   /**
    * 获取项目统计
    */

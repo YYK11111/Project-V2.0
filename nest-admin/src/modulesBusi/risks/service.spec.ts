@@ -44,6 +44,28 @@ describe("RisksService convert to task", () => {
   it("返回风险对象权限上下文", async () => {
     const repository = { findOne: jest.fn(), update: jest.fn() };
     const projectsService = {
+      buildExecutionPermissionContext: jest.fn(
+        ({ context, operatorId, ownerIds, createUser }) => {
+          const normalizedOperatorId = String(operatorId || "");
+          const isOwner = (ownerIds || [])
+            .map((item) => String(item || ""))
+            .includes(normalizedOperatorId);
+          const isCreator = String(createUser || "") === normalizedOperatorId;
+          return {
+            canEdit:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              Boolean(context?.isFunctionalLead) ||
+              isOwner ||
+              isCreator,
+            canDelete:
+              Boolean(context?.isManager) ||
+              Boolean(context?.isDeliveryManager) ||
+              isOwner ||
+              isCreator,
+          };
+        },
+      ),
       getProjectPermissionContext: jest.fn().mockResolvedValue({
         isManager: false,
         isDeliveryManager: true,

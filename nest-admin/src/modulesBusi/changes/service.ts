@@ -64,20 +64,13 @@ export class ChangesService extends BaseService<
       change.projectId,
       operatorId,
     );
-    const canEdit =
-      Boolean(context?.isManager) ||
-      Boolean(context?.isDeliveryManager) ||
-      Boolean(context?.isFunctionalLead) ||
-      String(change.requesterId || "") === String(operatorId) ||
-      String(change.createUser || "") === String(operatorId);
-    const permissionContext = {
-      canEdit,
-      canDelete:
-        Boolean(context?.isManager) ||
-        Boolean(context?.isDeliveryManager) ||
-        String(change.requesterId || "") === String(operatorId) ||
-        String(change.createUser || "") === String(operatorId),
-    };
+    const permissionContext =
+      this.projectsService.buildExecutionPermissionContext({
+        context,
+        operatorId,
+        ownerIds: [change.requesterId],
+        createUser: change.createUser,
+      });
     return {
       ...permissionContext,
       permissionContext,

@@ -21,6 +21,13 @@ const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/upd
 const canCustomerDelete = computed(() => checkPermi(['business/crm/customers/delete']))
 const canCustomerSubmitApproval = computed(() => checkPermi(['business/crm/customers/update']))
 
+function getApprovalType(status) {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'rejected' || status === 'returned') return 'danger'
+  return 'info'
+}
+
 async function handleSubmitApproval(row) {
   if (!canCustomerSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定提交该客户审批吗？')
@@ -29,7 +36,7 @@ async function handleSubmitApproval(row) {
   rctRef.value?.getList()
 }
 
-const canSubmitCustomerApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canSubmitCustomerApproval = (row) => row.status === '1' && row.approvalView?.canSubmit === true
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
@@ -98,8 +105,8 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+            <el-tag :type="getApprovalType(row.approvalView?.status)" size="small">
+              {{ row.approvalView?.label || '无需审批' }}
             </el-tag>
           </template>
         </el-table-column>
