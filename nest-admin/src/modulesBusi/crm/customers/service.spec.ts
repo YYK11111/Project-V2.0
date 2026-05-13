@@ -14,9 +14,21 @@ describe("CustomersService", () => {
     };
   }
 
+  function createViewerRepository() {
+    return {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+    };
+  }
+
   it("新增客户时应把空字符串销售负责人归一化为 null", async () => {
     const repository = createRepository();
-    const service = new CustomersService(repository as never);
+    const service = new CustomersService(
+      repository as never,
+      createViewerRepository() as never,
+    );
 
     await service.save({
       name: "测试客户",
@@ -34,7 +46,10 @@ describe("CustomersService", () => {
 
   it("通过 add 新增客户时也应把空字符串销售负责人归一化为 null", async () => {
     const repository = createRepository();
-    const service = new CustomersService(repository as never);
+    const service = new CustomersService(
+      repository as never,
+      createViewerRepository() as never,
+    );
 
     await service.add({
       name: "测试客户",
@@ -48,5 +63,59 @@ describe("CustomersService", () => {
         salesId: null,
       }),
     );
+  });
+
+  it("客户列表只返回创建人、审批参与人和授权人可见的客户", async () => {
+    const customerRows = [
+      { id: "c1", name: "自己创建", createUser: "u1" },
+      { id: "c2", name: "审批参与", createUser: "u2" },
+      { id: "c3", name: "授权查看", createUser: "u3" },
+      { id: "c4", name: "不可见", createUser: "u4" },
+    ];
+    const repository = createRepository();
+    const queryBuilder: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest
+        .fn()
+        .mockResolvedValue([customerRows.slice(0, 3), 3]),
+    };
+    repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+    const viewerRepository = createViewerRepository();
+    viewerRepository.find.mockResolvedValue([
+      { customerId: "c2", userId: "u1", sourceType: "approval" },
+      { customerId: "c3", userId: "u1", sourceType: "manual" },
+    ]);
+    const service = new CustomersService(
+      repository as never,
+      viewerRepository as never,
+    );
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "u1",
+      _operatorName: "yyk",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(customer.createUser IN (:...creatorKeys) OR customer.id IN (:...visibleCustomerIds))",
+      { creatorKeys: ["u1", "yyk"], visibleCustomerIds: ["c2", "c3"] },
+    );
+    expect(viewerRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: expect.objectContaining({
+            _value: ["u1", "yyk"],
+          }),
+        }),
+      }),
+    );
+    expect(result).toEqual({ list: customerRows.slice(0, 3), total: 3 });
   });
 });

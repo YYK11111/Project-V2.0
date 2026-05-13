@@ -16,6 +16,7 @@ import { GoLiveRecord } from "src/modulesBusi/go-live-records/entity";
 import { AcceptanceRecord } from "src/modulesBusi/acceptance-records/entity";
 import { HandoverRecord } from "src/modulesBusi/handover-records/entity";
 import { SystenConfigsModule } from "../configs/module";
+import { CrmModule } from "src/modulesBusi/crm/module";
 
 @Global()
 @Module({
@@ -35,6 +36,7 @@ import { SystenConfigsModule } from "../configs/module";
     ]),
     WorkflowModule,
     MilestonesModule,
+    CrmModule,
     forwardRef(() => ProjectsModule),
   ],
   controllers: [],

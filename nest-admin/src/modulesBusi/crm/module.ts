@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { CustomersService } from "./customers/service";
 import { CustomersController } from "./customers/controller";
 import { Customer } from "./customers/entity";
+import { CustomerViewer } from "./customers/entities/customer-viewer.entity";
 import { CustomerInteractionService } from "./interactions/service";
 import { CustomerInteractionsController } from "./interactions/controller";
 import { CustomerInteraction } from "./interactions/entity";
@@ -19,6 +20,7 @@ import { Project } from "../projects/entity";
   imports: [
     TypeOrmModule.forFeature([
       Customer,
+      CustomerViewer,
       CustomerInteraction,
       SalesOpportunity,
       Contract,

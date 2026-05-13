@@ -236,3 +236,34 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     expect(repositories.handover.update).not.toHaveBeenCalled();
   });
 });
+
+describe("WorkflowIntegrationService 客户审批参与人可见性", () => {
+  it("客户审批完成后会同步审批参与人到客户可见人列表", async () => {
+    const customerRepository = { findOne: jest.fn(), update: jest.fn() };
+    const customersService = {
+      syncApprovalParticipants: jest.fn(),
+    };
+    const service = new WorkflowIntegrationService(
+      { findOne: jest.fn(), update: jest.fn(), save: jest.fn() } as any,
+      { findOne: jest.fn(), update: jest.fn() } as any,
+      { update: jest.fn() } as any,
+      { update: jest.fn() } as any,
+      customerRepository as any,
+      { findOne: jest.fn(), update: jest.fn() } as any,
+      { findOne: jest.fn(), update: jest.fn() } as any,
+      { findOne: jest.fn(), update: jest.fn() } as any,
+      { startBusinessWorkflow: jest.fn() } as any,
+      { ensureKnowledgeSpaceWhenProjectExecuting: jest.fn() } as any,
+      customersService as any,
+    );
+
+    await service.handleWorkflowCallback("wf-1", "completed", {
+      businessKey: "customer_c1",
+    });
+
+    expect(customersService.syncApprovalParticipants).toHaveBeenCalledWith(
+      "c1",
+      "wf-1",
+    );
+  });
+});

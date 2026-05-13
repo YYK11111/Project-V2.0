@@ -20,6 +20,7 @@ import {
   HandoverRecordStatus,
 } from "src/modulesBusi/handover-records/entity";
 import { WorkflowService } from "src/modulesBusi/workflow/service";
+import { CustomersService } from "src/modulesBusi/crm/customers/service";
 
 @Injectable()
 export class WorkflowIntegrationService {
@@ -42,6 +43,7 @@ export class WorkflowIntegrationService {
     private readonly handoverRecordRepository: Repository<HandoverRecord>,
     private readonly workflowService: WorkflowService,
     private readonly projectsService: ProjectsService,
+    private readonly customersService?: CustomersService,
   ) {}
 
   private getTodayDate() {
@@ -339,6 +341,10 @@ export class WorkflowIntegrationService {
       } as any);
     } else if (businessKey?.startsWith("customer_")) {
       const customerId = businessKey.replace("customer_", "");
+      await this.customersService?.syncApprovalParticipants(
+        customerId,
+        instanceId,
+      );
       await this.customerRepository.update(customerId, {
         status: status === "completed" ? "2" : "4",
         approvalStatus: status === "completed" ? "2" : "3",
