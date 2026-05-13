@@ -26,14 +26,20 @@ describe('projectManage 链路路由一致性', () => {
   it('项目管理页面引用的隐藏表单路由都已在 routes.js 注册', () => {
     const routesSource = readRoutesSource()
     const routePaths = new Set(extractRoutePaths(routesSource))
+    const projectIndexSource = readProjectManageView('index')
     const projectDetailSource = readProjectManageView('detail')
     const taskFormSource = readBusinessView('taskManage/form.vue')
 
     const referencedPaths = [
+      ...Array.from(projectIndexSource.matchAll(/goRoute\([^,]+,\s*['"]([^'"]+)['"]\)/g)).map((match) => match[1]),
       ...extractPushedPaths(projectDetailSource),
       ...extractPushedPaths(taskFormSource),
     ].filter((path) => path.includes('projectManage') || path === '/cockpit' || path === '/riskManage/form')
 
+    expect(referencedPaths).toContain('/projectManage/form')
+    expect(referencedPaths).toContain('/projectManage/detail')
+    expect(routePaths.has('/projectManage/form')).toBe(true)
+    expect(routePaths.has('/projectManage/detail')).toBe(true)
     expect(referencedPaths).not.toContain('/cockpit')
     expect(referencedPaths).toContain('/projectManage/cockpit')
     expect(routePaths.has('/cockpit')).toBe(false)
