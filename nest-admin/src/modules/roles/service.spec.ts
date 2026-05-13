@@ -94,4 +94,35 @@ describe("RolesService", () => {
     expect(getMany).toHaveBeenCalled();
     expect(menus.map((item) => item.id)).toEqual(["206", "207"]);
   });
+
+  it("获取登录用户菜单时应把驾驶舱旧权限键归一为新权限键", async () => {
+    const service = createService();
+    const getMany = jest.fn().mockResolvedValue([
+      {
+        menus: [
+          {
+            id: "204",
+            order: 2,
+            createTime: "2026-04-16 18:57:25",
+            permissionKey: "business/projectManage/cockpit",
+          },
+        ],
+      },
+    ]);
+    repository.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany,
+    });
+
+    const menus = await service.getUserMenus({
+      name: "NestAdmin",
+      roles: [{ permissionKey: "admin", isActive: "1" }],
+    });
+
+    expect(menus).toHaveLength(1);
+    expect(menus[0].permissionKey).toBe("business/projects/dashboard");
+  });
 });

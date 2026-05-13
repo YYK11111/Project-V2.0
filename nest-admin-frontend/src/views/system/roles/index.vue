@@ -10,6 +10,11 @@ import {
   getMenuTree,
   getRoleMenuTree,
 } from './api'
+import {
+  getMenuNodeTooltipLines,
+  getMenuNodeTagType,
+  getMenuNodeTypeLabel,
+} from './menu-tree'
 import { useRouter } from 'vue-router'
 import { checkPermi } from '@/utils/permission'
 
@@ -95,7 +100,7 @@ function filterMenuNode(keyword: string, data: any) {
   if (!keyword) return true
   const normalizedKeyword = String(keyword).trim().toLowerCase()
   if (!normalizedKeyword) return true
-  return [data?.name, data?.permissionKey, data?.path]
+  return [data?.name, data?.permissionKey, data?.path, data?.desc, getMenuNodeTypeLabel(data)]
     .filter(Boolean)
     .some((item) => String(item).toLowerCase().includes(normalizedKeyword))
 }
@@ -247,7 +252,7 @@ function submit({ form, visible, loading }: any) {
               v-model="menuKeyword"
               class="mb10"
               clearable
-              placeholder="搜索名称 / 权限字符 / 路径"
+              placeholder="搜索名称 / 权限字符 / 路径 / 说明"
               @input="handleMenuKeywordChange"
             />
             <el-tree
@@ -260,7 +265,31 @@ function submit({ form, visible, loading }: any) {
               empty-text="加载中，请稍候"
               :filter-node-method="filterMenuNode"
               :props="{ label: 'name', children: 'children' }"
-            />
+            >
+              <template #default="{ data }">
+                <el-tooltip placement="top-start" effect="light" :show-after="300">
+                  <template #content>
+                    <div class="menu-node-tooltip">
+                      <div v-for="(line, index) in getMenuNodeTooltipLines(data)" :key="`${data.id || data.permissionKey || 'menu'}-${index}`">
+                        {{ line }}
+                      </div>
+                    </div>
+                  </template>
+                  <div class="menu-node">
+                    <div class="menu-node__head">
+                      <span class="menu-node__name">{{ data.name }}</span>
+                      <el-tag size="small" :type="getMenuNodeTagType(data)" effect="plain">
+                        {{ getMenuNodeTypeLabel(data) }}
+                      </el-tag>
+                    </div>
+                    <div class="menu-node__meta">
+                      <span class="menu-node__key">{{ data.permissionKey || '无权限字符' }}</span>
+                      <span v-if="data.path" class="menu-node__path">{{ data.path }}</span>
+                    </div>
+                  </div>
+                </el-tooltip>
+              </template>
+            </el-tree>
           </div>
         </el-form-item>
 
@@ -298,6 +327,58 @@ function submit({ form, visible, loading }: any) {
 .role-index-panel :deep(.el-table__header-wrapper),
 .role-index-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
+}
+
+.role-index-page :deep(.el-tree-node__content) {
+  height: auto;
+  min-height: 36px;
+  align-items: flex-start;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.role-index-page :deep(.el-tree-node__label) {
+  width: 100%;
+}
+
+.menu-node {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.menu-node__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.menu-node__name {
+  color: var(--el-text-color-primary);
+  font-weight: 500;
+}
+
+.menu-node__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--el-text-color-secondary);
+}
+
+.menu-node__key,
+.menu-node__path {
+  min-width: 0;
+  word-break: break-all;
+}
+
+.menu-node-tooltip {
+  white-space: pre-line;
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {

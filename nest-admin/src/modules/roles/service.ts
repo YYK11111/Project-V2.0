@@ -16,6 +16,7 @@ import { arrayToTree } from "src/common/utils/common";
 import { BoolNum } from "src/common/type/base";
 import { config } from "config";
 import { BaseService } from "src/common/BaseService";
+import { normalizePermissionKey } from "src/common/utils/permission-key";
 
 @Injectable()
 export class RolesService extends BaseService<Role, SaveRoleDto> {
@@ -120,7 +121,12 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
       });
     });
 
-    const menus = [...menuMap.values()].sort((a, b) => {
+    const menus = [...menuMap.values()];
+    menus.forEach((menu) => {
+      menu.permissionKey = normalizePermissionKey(menu.permissionKey);
+    });
+
+    menus.sort((a, b) => {
       const leftOrder = Number(a.order || 0);
       const rightOrder = Number(b.order || 0);
       if (leftOrder === rightOrder) {

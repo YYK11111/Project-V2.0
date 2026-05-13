@@ -12,6 +12,10 @@ import { RedisService } from "../global/redis.service";
 import { config } from "config";
 import { PERMISSION_KEY } from "./permission.decorator";
 import { RolesService } from "../roles/service";
+import {
+  normalizePermissionKey,
+  normalizePermissionKeys,
+} from "src/common/utils/permission-key";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -62,21 +66,15 @@ export class AuthGuard implements CanActivate {
       ]) || this.resolvePermissionByRequest(request);
 
     // 按钮/接口权限校验
-    let permissions = await this.redisService.getPermissions();
     let api = request.path.replace(config.apiBase, "").replace(/^\//g, "");
     if (!this.isAuthenticatedSelfServiceRoute(request)) {
-      if (
-        requiredPermission &&
-        permissions.includes(requiredPermission) &&
-        !this.hasPermission(payload.permissions || [], requiredPermission)
-      ) {
+      if (!requiredPermission) {
         throw new HttpException("接口无权限", 403);
       }
 
       if (
-        !requiredPermission &&
-        permissions.includes(api) &&
-        !this.hasPermission(payload.permissions || [], api)
+        requiredPermission &&
+        !this.hasPermission(payload.permissions || [], requiredPermission)
       ) {
         throw new HttpException("接口无权限", 403);
       }
@@ -227,10 +225,52 @@ export class AuthGuard implements CanActivate {
       ["POST", /^system\/configs\/save$/, "system/configs/update"],
       ["PUT", /^system\/configs\/update$/, "system/configs/update"],
 
+      ["GET", /^system\/loginLogs\/list$/, "systemMonitor/loginLog/index"],
+      [
+        "GET",
+        /^system\/loginLogs\/getOne\/[^/]+$/,
+        "systemMonitor/loginLog/index",
+      ],
+      [
+        "DELETE",
+        /^system\/loginLogs\/del\/[^/]+$/,
+        "systemMonitor/loginLog/index",
+      ],
+      [
+        "GET",
+        /^system\/loginLogs\/getVisitedNumChart$/,
+        "systemMonitor/loginLog/index",
+      ],
+      [
+        "GET",
+        /^system\/loginLogs\/getUserAreaList$/,
+        "systemMonitor/loginLog/index",
+      ],
+      [
+        "GET",
+        /^system\/loginLogs\/getUserLoginProvinceList$/,
+        "systemMonitor/loginLog/index",
+      ],
+
       ["GET", /^system\/messages\/unread-count$/, "system/messages/list"],
       ["GET", /^system\/messages\/recent$/, "system/messages/list"],
       ["GET", /^system\/messages\/list$/, "system/messages/list"],
-      ["POST", /^system\/messages\/read\/[^/]+$/, "system/messages/list"],
+      ["POST", /^system\/messages\/read\/[^/]+$/, "system/messages/markRead"],
+      [
+        "POST",
+        /^system\/messages\/project-alerts\/read-all$/,
+        "system/messages/markAllRead",
+      ],
+      [
+        "POST",
+        /^system\/messages\/project-alerts\/clear$/,
+        "system/messages/delete",
+      ],
+      [
+        "POST",
+        /^system\/messages\/rebuild-todo$/,
+        "system/messages/rebuildTodo",
+      ],
 
       ["GET", /^system\/scheduled-jobs\/list$/, "system/scheduledJobs/list"],
       ["GET", /^system\/scheduled-jobs\/logs$/, "system/scheduledJobs/logs"],
@@ -299,9 +339,54 @@ export class AuthGuard implements CanActivate {
         /^business\/projects\/dashboard\/[^/]+$/,
         "business/projects/dashboard",
       ],
+      [
+        "GET",
+        /^business\/projects\/field-permissions\/[^/]+$/,
+        "business/projects/getOne",
+      ],
+      ["GET", /^business\/projects\/cockpit$/, "business/projects/dashboard"],
+      [
+        "POST",
+        /^business\/projects\/[^/]+\/sync-alerts$/,
+        "business/projects/update",
+      ],
+      [
+        "POST",
+        /^business\/projects\/recalculate-progress$/,
+        "business/projects/update",
+      ],
+      [
+        "POST",
+        /^business\/projects\/generate-cockpit-snapshots$/,
+        "business/projects/update",
+      ],
+      [
+        "POST",
+        /^business\/projects\/[^/]+\/recalculate-progress$/,
+        "business/projects/update",
+      ],
+      [
+        "POST",
+        /^business\/projects\/[^/]+\/publish-close-review$/,
+        "business/projects/update",
+      ],
 
       ["GET", /^business\/tasks\/list$/, "business/tasks/list"],
       ["GET", /^business\/tasks\/getOne\/[^/]+$/, "business/tasks/getOne"],
+      [
+        "POST",
+        /^business\/tasks\/[^/]+\/submit-approval$/,
+        "business/tasks/update",
+      ],
+      ["POST", /^business\/tasks\/[^/]+\/start$/, "business/tasks/update"],
+      ["POST", /^business\/tasks\/[^/]+\/pause$/, "business/tasks/update"],
+      ["POST", /^business\/tasks\/[^/]+\/resume$/, "business/tasks/update"],
+      ["POST", /^business\/tasks\/[^/]+\/delay$/, "business/tasks/update"],
+      [
+        "POST",
+        /^business\/tasks\/[^/]+\/submit-completion-approval$/,
+        "business/tasks/update",
+      ],
       ["POST", /^business\/tasks\/add$/, "business/tasks/add"],
       [
         "POST",
@@ -319,12 +404,22 @@ export class AuthGuard implements CanActivate {
       ["GET", /^business\/tasks\/kanban\/[^/]+$/, "business/tasks/kanban"],
       [
         "GET",
+        /^business\/tasks\/[^/]+\/delay-records$/,
+        "business/tasks/getOne",
+      ],
+      [
+        "GET",
         /^business\/tasks\/[^/]+\/dependencies$/,
         "business/tasks/dependency/list",
       ],
       [
         "POST",
         /^business\/tasks\/[^/]+\/dependencies$/,
+        "business/tasks/dependency/add",
+      ],
+      [
+        "POST",
+        /^business\/tasks\/[^/]+\/check-circular$/,
         "business/tasks/dependency/add",
       ],
       [
@@ -548,12 +643,139 @@ export class AuthGuard implements CanActivate {
 
       [
         "GET",
+        /^business\/go-live-records\/list$/,
+        "business/go-live-records/list",
+      ],
+      [
+        "GET",
+        /^business\/go-live-records\/getOne\/[^/]+$/,
+        "business/go-live-records/getOne",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/add$/,
+        "business/go-live-records/add",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/save$/,
+        (req) =>
+          req.body?.id
+            ? "business/go-live-records/update"
+            : "business/go-live-records/add",
+      ],
+      [
+        "PUT",
+        /^business\/go-live-records\/update$/,
+        "business/go-live-records/update",
+      ],
+      [
+        "DELETE",
+        /^business\/go-live-records\/del\/[^/]+$/,
+        "business/go-live-records/delete",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/[^/]+\/submit-approval$/,
+        "business/go-live-records/submitApproval",
+      ],
+
+      [
+        "GET",
+        /^business\/acceptance-records\/list$/,
+        "business/acceptance-records/list",
+      ],
+      [
+        "GET",
+        /^business\/acceptance-records\/getOne\/[^/]+$/,
+        "business/acceptance-records/getOne",
+      ],
+      [
+        "POST",
+        /^business\/acceptance-records\/add$/,
+        "business/acceptance-records/add",
+      ],
+      [
+        "POST",
+        /^business\/acceptance-records\/save$/,
+        (req) =>
+          req.body?.id
+            ? "business/acceptance-records/update"
+            : "business/acceptance-records/add",
+      ],
+      [
+        "PUT",
+        /^business\/acceptance-records\/update$/,
+        "business/acceptance-records/update",
+      ],
+      [
+        "DELETE",
+        /^business\/acceptance-records\/del\/[^/]+$/,
+        "business/acceptance-records/delete",
+      ],
+      [
+        "POST",
+        /^business\/acceptance-records\/[^/]+\/submit-approval$/,
+        "business/acceptance-records/submitApproval",
+      ],
+
+      [
+        "GET",
+        /^business\/handover-records\/list$/,
+        "business/handover-records/list",
+      ],
+      [
+        "GET",
+        /^business\/handover-records\/getOne\/[^/]+$/,
+        "business/handover-records/getOne",
+      ],
+      [
+        "POST",
+        /^business\/handover-records\/add$/,
+        "business/handover-records/add",
+      ],
+      [
+        "POST",
+        /^business\/handover-records\/save$/,
+        (req) =>
+          req.body?.id
+            ? "business/handover-records/update"
+            : "business/handover-records/add",
+      ],
+      [
+        "PUT",
+        /^business\/handover-records\/update$/,
+        "business/handover-records/update",
+      ],
+      [
+        "DELETE",
+        /^business\/handover-records\/del\/[^/]+$/,
+        "business/handover-records/delete",
+      ],
+      [
+        "POST",
+        /^business\/handover-records\/[^/]+\/submit-approval$/,
+        "business/handover-records/submitApproval",
+      ],
+
+      [
+        "GET",
         /^business\/project-members\/list$/,
         "business/projectMembers/list",
       ],
       [
         "GET",
         /^business\/project-members\/project\/[^/]+$/,
+        "business/projectMembers/list",
+      ],
+      [
+        "GET",
+        /^business\/project-members\/stats$/,
+        "business/projectMembers/list",
+      ],
+      [
+        "GET",
+        /^business\/project-members\/project-overview$/,
         "business/projectMembers/list",
       ],
       ["POST", /^business\/project-members$/, "business/projectMembers/add"],
@@ -619,6 +841,26 @@ export class AuthGuard implements CanActivate {
         "DELETE",
         /^business\/crm\/customers\/del\/[^/]+$/,
         "business/crm/customers/delete",
+      ],
+      [
+        "GET",
+        /^business\/crm\/customers\/[^/]+\/auth-users$/,
+        "business/crm/customers/getOne",
+      ],
+      [
+        "POST",
+        /^business\/crm\/customers\/[^/]+\/auth$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "DELETE",
+        /^business\/crm\/customers\/[^/]+\/auth\/[^/]+$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "POST",
+        /^business\/crm\/customers\/[^/]+\/submit-approval$/,
+        "business/crm/customers/update",
       ],
 
       [
@@ -872,24 +1114,77 @@ export class AuthGuard implements CanActivate {
       name: payload?.name,
       roles: payload?.roles,
     });
-    return [
-      ...new Set(
-        menus.flatMap((menu) => menu.permissionKey || []).filter(Boolean),
-      ),
-    ];
+    return normalizePermissionKeys(
+      menus.map((menu) => normalizePermissionKey(menu.permissionKey)),
+    );
   }
 
   private hasPermission(permissions: string[], key: string) {
-    return permissions.includes("*") || permissions.includes(key);
+    const normalizedPermissions = normalizePermissionKeys(permissions);
+    const normalizedKey = normalizePermissionKey(key);
+    return (
+      normalizedPermissions.includes("*") ||
+      normalizedPermissions.includes(normalizedKey)
+    );
   }
 
   private isAuthenticatedSelfServiceRoute(request: Request): boolean {
     const method = request.method.toUpperCase();
     const api = request.path.replace(config.apiBase, "").replace(/^\//g, "");
+    if (method === "GET" && this.isDictionaryRoute(api)) {
+      return true;
+    }
+    if (this.isMessageSelfServiceRoute(method, api)) {
+      return true;
+    }
     return [
+      ["GET", "auth/getLoginUser"],
+      ["POST", "auth/logout"],
       ["GET", "system/roles/getLoginUserMenus"],
       ["GET", "system/users/getTheme"],
+      ["PUT", "system/users/updateTheme"],
+      ["PUT", "system/users/updatePassword"],
+      ["POST", "system/users/uploadAvatar"],
+      ["GET", "system/users/getProjectReminderPreference"],
+      ["PUT", "system/users/updateProjectReminderPreference"],
+      ["GET", "system/users/options"],
+      ["GET", "system/dept/options"],
+      ["GET", "system/dept/getTrees"],
+      ["GET", "business/projects/list"],
     ].some(([m, path]) => m === method && path === api);
+  }
+
+  private isMessageSelfServiceRoute(method: string, api: string): boolean {
+    return [
+      ["GET", /^system\/messages\/unread-count$/],
+      ["GET", /^system\/messages\/recent$/],
+      ["GET", /^system\/messages\/list$/],
+      ["POST", /^system\/messages\/read\/[^/]+$/],
+      ["POST", /^system\/messages\/project-alerts\/read-all$/],
+      ["POST", /^system\/messages\/project-alerts\/clear$/],
+    ].some(([m, reg]) => m === method && (reg as RegExp).test(api));
+  }
+
+  private isDictionaryRoute(api: string): boolean {
+    return [
+      /^business\/projects\/get(Status|Priority|ProjectType)$/,
+      /^business\/tasks\/get(Status|Priority|DependencyType)$/,
+      /^business\/tickets\/get(Type|Status|Priority|Severity|RootCauseCategory)$/,
+      /^business\/stories\/get(Status|Type)$/,
+      /^business\/sprints\/getStatus$/,
+      /^business\/milestones\/getStatus$/,
+      /^business\/risks\/get(Status|Level|Category)$/,
+      /^business\/changes\/get(Status|Type|Impact)$/,
+      /^business\/project-members\/getRoles$/,
+      /^business\/acceptance-records\/getResults$/,
+      /^business\/go-live-records\/getStatuses$/,
+      /^business\/handover-records\/getStatuses$/,
+      /^business\/crm\/customers\/get(Types|Levels|Statuses)$/,
+      /^business\/crm\/opportunities\/getStages$/,
+      /^business\/crm\/contracts\/getStatuses$/,
+      /^business\/crm\/interactions\/getTypes$/,
+      /^system\/file\/get(Status|BusinessType)$/,
+    ].some((reg) => reg.test(api));
   }
 
   private isPublicRoute(request: Request): boolean {

@@ -114,7 +114,7 @@ describe("AuthGuard", () => {
       headers: {
         cookie: "admin_session=header.payload.signature",
       },
-      path: "/api/system/users/updateTheme",
+      path: "/api/system/users/update",
       method: "PUT",
       body: {},
     };
@@ -255,6 +255,375 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("登录后获取当前用户项目提醒偏好不要求用户管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/users/getProjectReminderPreference",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问当前用户消息接口不要求消息中心菜单权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const baseUser = {
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    };
+    const requests = [
+      { path: "/api/system/messages/unread-count", method: "GET" },
+      { path: "/api/system/messages/recent", method: "GET" },
+      { path: "/api/system/messages/list", method: "GET" },
+    ];
+
+    for (const requestInfo of requests) {
+      const request: Record<string, any> = {
+        headers: {
+          cookie: "admin_session=header.payload.signature",
+        },
+        ...requestInfo,
+      };
+      jwtService.verifyAsync.mockResolvedValue(baseUser);
+      rolesService.getUserMenus.mockResolvedValue([]);
+
+      await expect(guard.canActivate(createContext(request))).resolves.toBe(
+        true,
+      );
+    }
+  });
+
+  it("登录后访问首页项目列表不应被菜单权限拦截", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/projects/list",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "project_member" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/project/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["business/projects/list"]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问部门树基础选项不要求部门管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/dept/getTrees",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/project/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["system/dept/tree"]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问用户选择选项不要求用户管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/users/options",
+      method: "GET",
+      query: {
+        pageNum: 1,
+        pageSize: 100,
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/projectMembers/add" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["system/users/list"]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问部门选择选项不要求部门管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/dept/options",
+      method: "GET",
+      query: {
+        pageNum: 1,
+        pageSize: 1000,
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/projectMembers/add" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("缺少用户管理列表权限时拒绝访问系统用户列表", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/users/list",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue(["system/users/list"]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("缺少部门管理列表权限时拒绝访问系统部门列表", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/dept/list",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("缺少部门新增权限时仍拒绝访问部门新增接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/dept/add",
+      method: "POST",
+      body: {
+        deptName: "测试部门",
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue(["system/dept/add"]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("项目成员统计接口使用项目成员列表权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/project-members/stats",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/projectMembers/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/projectMembers/list",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("缺少项目成员列表权限时拒绝访问项目成员统计接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/project-members/stats",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/projectMembers/list",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("具备项目驾驶舱旧菜单权限时仍应放行并归一为新权限键", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/projects/cockpit",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "admin_1",
+      name: "NestAdmin",
+      roles: [{ permissionKey: "admin" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/projectManage/cockpit" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/projects/dashboard",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+    expect(request.user.permissions).toEqual(["business/projects/dashboard"]);
+  });
+
   it("缺少定时任务列表权限时拒绝访问列表接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -278,6 +647,220 @@ describe("AuthGuard", () => {
     redisService.getPermissions.mockResolvedValue([
       "system/scheduledJobs/list",
     ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("具备登录日志菜单权限时放行登录日志列表和统计接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const baseUser = {
+      permissions: [],
+      id: "admin_1",
+      name: "NestAdmin",
+      roles: [{ permissionKey: "admin" }],
+    };
+    const requests = [
+      { path: "/api/system/loginLogs/list", method: "GET" },
+      { path: "/api/system/loginLogs/getVisitedNumChart", method: "GET" },
+      { path: "/api/system/loginLogs/getUserAreaList", method: "GET" },
+      {
+        path: "/api/system/loginLogs/getUserLoginProvinceList",
+        method: "GET",
+      },
+    ];
+
+    for (const requestInfo of requests) {
+      const request: Record<string, any> = {
+        headers: {
+          cookie: "admin_session=header.payload.signature",
+        },
+        ...requestInfo,
+      };
+      jwtService.verifyAsync.mockResolvedValue(baseUser);
+      rolesService.getUserMenus.mockResolvedValue([
+        { permissionKey: "systemMonitor/loginLog/index" },
+      ]);
+      redisService.getPermissions.mockResolvedValue([
+        "systemMonitor/loginLog/index",
+      ]);
+
+      await expect(guard.canActivate(createContext(request))).resolves.toBe(
+        true,
+      );
+    }
+  });
+
+  it("缺少登录日志菜单权限时拒绝访问登录日志统计接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/loginLogs/getVisitedNumChart",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+      name: "user",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([
+      "systemMonitor/loginLog/index",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("未声明权限的受保护接口默认拒绝访问", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/internal/unmapped-action",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: ["business/tasks/update"],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/tasks/update" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["business/tasks/update"]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("任务启动接口使用任务更新权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/tasks/task-1/start",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/tasks/update" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["business/tasks/update"]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问业务字典接口不要求菜单按钮权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/projects/getStatus",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("验收单提交审批接口使用验收单提交审批权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/acceptance-records/record-1/submit-approval",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/acceptance-records/submitApproval" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/acceptance-records/submitApproval",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("普通消息列表权限不能触发重建待办维护接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/messages/rebuild-todo",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "system/messages/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue(["system/messages/list"]);
 
     await expect(guard.canActivate(createContext(request))).rejects.toThrow(
       "接口无权限",
@@ -362,6 +945,88 @@ describe("AuthGuard", () => {
     rolesService.getUserMenus.mockResolvedValue([]);
     redisService.getPermissions.mockResolvedValue([
       "system/scheduledJobs/logs",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).rejects.toThrow(
+      "接口无权限",
+    );
+  });
+
+  it("具备客户详情权限时放行客户授权人员列表接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/customer-1/auth-users",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/getOne" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("具备客户更新权限时放行客户查看授权接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/customer-1/auth",
+      method: "POST",
+      body: { userIds: ["user_2"] },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/update" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("缺少客户更新权限时拒绝客户查看授权接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/customer-1/auth",
+      method: "POST",
+      body: { userIds: ["user_2"] },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/getOne" },
     ]);
 
     await expect(guard.canActivate(createContext(request))).rejects.toThrow(
