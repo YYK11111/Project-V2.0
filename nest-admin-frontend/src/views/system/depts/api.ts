@@ -10,3 +10,6 @@ export const { getList, getOne, del, save, add, update } = baseApi(serve)
 
 // 获取部门树
 export const getTrees = (data) => get(`${serve}/getTrees`, data)
+
+// 获取部门选项
+export const getOptions = (data) => get(`${serve}/options`, data)

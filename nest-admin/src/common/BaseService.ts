@@ -89,15 +89,17 @@ export class BaseService<T, K> {
     if (typeof ids == "string") {
       ids = ids.split(",");
     }
-    await this.dataValidate({
-      id: ids?.[0],
-      updateUser,
-      permissions,
-      operatorName,
-    });
     const normalizedIds = (ids || [])
       .map((item) => String(item))
       .filter(Boolean);
+    for (const id of normalizedIds) {
+      await this.dataValidate({
+        id,
+        updateUser,
+        permissions,
+        operatorName,
+      });
+    }
     const result = await this.repository.update(normalizedIds, {
       isDelete: BoolNum.Yes,
       updateUser,

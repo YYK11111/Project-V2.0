@@ -6,11 +6,14 @@ describe("UsersService", () => {
   const usersRepository = {
     findOne: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn(),
     manager: {
       getRepository: jest.fn(),
     },
   };
-  const deptService = {};
+  const deptService = {
+    getChildren: jest.fn(),
+  };
   const sysFileService = {};
   const configService = {
     getDefaultUserPassword: jest.fn(),
@@ -34,6 +37,140 @@ describe("UsersService", () => {
     sysFileService.findByPath = jest.fn().mockResolvedValue(null);
     sysFileService.softDeleteByPath = jest.fn();
     sysFileService.associateFiles = jest.fn();
+    deptService.getChildren.mockResolvedValue([]);
+  });
+
+  it("人员选项只返回业务选择器需要的轻量字段", async () => {
+    const getMany = jest.fn().mockResolvedValue([
+      {
+        id: "user-1",
+        name: "zhangsan",
+        nickname: "张三",
+        avatar: "avatar.png",
+        password: "secret",
+        email: "zhangsan@example.com",
+        deptId: "dept-1",
+        dept: {
+          id: "dept-1",
+          name: "研发部",
+          parentId: "0",
+        },
+      },
+    ]);
+    const qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany,
+    };
+    usersRepository.createQueryBuilder.mockReturnValue(qb);
+    const service = createService();
+
+    const result = await service.getOptions({
+      pageNum: 1,
+      pageSize: 100,
+      keyword: "张",
+    } as any);
+
+    expect(result).toEqual([
+      {
+        id: "user-1",
+        name: "zhangsan",
+        nickname: "张三",
+        avatar: "avatar.png",
+        deptId: "dept-1",
+        dept: {
+          id: "dept-1",
+          name: "研发部",
+          parentId: "0",
+        },
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("secret");
+    expect(JSON.stringify(result)).not.toContain("zhangsan@example.com");
+  });
+
+  it("用户列表应按当前用户数据权限范围过滤到本人", async () => {
+    const getManyAndCount = jest.fn().mockResolvedValue([
+      [
+        {
+          id: "user-1",
+          name: "zhangsan",
+          deptId: "dept-1",
+          dept: {
+            id: "dept-1",
+            name: "研发部",
+            parentId: "0",
+          },
+        },
+      ],
+      1,
+    ]);
+    const qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount,
+    };
+    usersRepository.createQueryBuilder.mockReturnValue(qb);
+    const service = createService();
+
+    await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "user-1",
+      _operatorDeptId: "dept-1",
+      _operatorPermissions: [],
+      _operatorRoles: [
+        {
+          permissionKey: "normal",
+          dataPermissionType: "self",
+          isActive: "1",
+        },
+      ],
+    } as any);
+
+    expect(qb.andWhere).toHaveBeenCalledWith("User.id = :currentUserId", {
+      currentUserId: "user-1",
+    });
+  });
+
+  it("用户详情应拒绝访问数据范围外的用户", async () => {
+    const service = createService();
+    usersRepository.findOne.mockResolvedValue({
+      id: "user-2",
+      deptId: "dept-2",
+      dept: {
+        id: "dept-2",
+        name: "市场部",
+      },
+      roles: [],
+    });
+
+    const result = await service.getOne(
+      {
+        id: "user-2",
+        _operatorId: "user-1",
+        _operatorDeptId: "dept-1",
+        _operatorPermissions: [],
+        _operatorRoles: [
+          {
+            permissionKey: "normal",
+            dataPermissionType: "self",
+            isActive: "1",
+          },
+        ],
+      } as any,
+      false,
+    );
+
+    expect(result).toBeNull();
   });
 
   it("新增用户未填写密码时使用系统配置默认密码", async () => {

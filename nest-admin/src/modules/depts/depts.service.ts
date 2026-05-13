@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { CreateDeptDto } from "./dto/create-dept.dto";
 import { UpdateDeptDto } from "./dto/update-dept.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Like, TreeRepository } from "typeorm";
+import { Repository, Like, TreeRepository, IsNull } from "typeorm";
 import { Dept } from "./entities/dept.entity";
 import { DataSource } from "typeorm";
 import { validate } from "class-validator";
@@ -38,6 +38,23 @@ export class DeptService extends BaseService<Dept, CreateDeptDto> {
             })
           ).children // 获取指定id节点的子节点
       : this.repository.findTrees()); // 获取所有节点树
+  }
+
+  async getOptions(query = {}): Promise<Array<Partial<Dept>>> {
+    const rows = await this.repository.find({
+      where: {
+        isDelete: IsNull(),
+      },
+      order: {
+        createTime: "ASC",
+      },
+      take: Math.min(Number((query as any)?.pageSize || 1000), 1000),
+    } as any);
+    return rows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      parentId: item.parentId,
+    }));
   }
 
   async getChildren(query): Promise<Dept[]> {

@@ -117,4 +117,20 @@ export class UsersController extends BaseController<User, UsersService> {
     });
     return { success: true };
   }
+
+  @Get("options")
+  async getOptions(@Query() query: QueryListDto, @Req() req?: any) {
+    const user = req?.user;
+    return this.usersService.getOptions(
+      user
+        ? {
+            ...query,
+            _operatorId: user.id,
+            _operatorDeptId: user.deptId || user.dept?.id,
+            _operatorPermissions: user.permissions || [],
+            _operatorRoles: user.roles || [],
+          }
+        : query,
+    );
+  }
 }

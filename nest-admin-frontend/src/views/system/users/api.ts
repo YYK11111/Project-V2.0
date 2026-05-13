@@ -35,3 +35,5 @@ export const updateTheme = (data) => put(`${serve}/updateTheme`, data)
 export const getProjectReminderPreference = () => get(`${serve}/getProjectReminderPreference`)
 
 export const updateProjectReminderPreference = (data) => put(`${serve}/updateProjectReminderPreference`, data)
+
+export const getOptions = (data) => get(`${serve}/options`, data)

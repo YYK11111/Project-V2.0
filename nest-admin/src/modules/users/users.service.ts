@@ -13,7 +13,7 @@ import {
 import { ResponseListDto, QueryListDto } from "src/common/dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Dept } from "../depts/entities/dept.entity";
-import { Role } from "../roles/entity";
+import { DataPermissionType, Role } from "../roles/entity";
 import { BaseService } from "src/common/BaseService";
 import { DeptService } from "../depts/depts.service";
 import { HttpException } from "@nestjs/common";
@@ -26,6 +26,7 @@ import {
   verifyPassword,
 } from "src/common/utils/password";
 import { SystenConfigsService } from "../configs/service";
+import { BoolNum } from "src/common/type/base";
 
 @Injectable()
 export class UsersService extends BaseService<User, CreateUserDto> {
@@ -108,8 +109,15 @@ export class UsersService extends BaseService<User, CreateUserDto> {
   }
 
   async getOne(query, isError = true): Promise<User | null> {
+    const {
+      _operatorId,
+      _operatorDeptId,
+      _operatorPermissions,
+      _operatorRoles,
+      ...where
+    } = query as any;
     let res = await super.getOne(
-      { where: query, relations: ["dept", "roles"] },
+      { where, relations: ["dept", "roles"] },
       false,
     );
     if (!res) {
@@ -118,11 +126,36 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       }
       return null;
     }
+    if (_operatorId) {
+      const canSee = await this.isUserVisibleToCurrentUser(res, {
+        id: _operatorId,
+        deptId: _operatorDeptId,
+        permissions: _operatorPermissions,
+        roles: _operatorRoles,
+      });
+      if (!canSee) {
+        if (isError) {
+          throw new Error("用户不存在");
+        }
+        return null;
+      }
+    }
     return res;
   }
 
   // 列表
-  async list(query: QueryListDto): Promise<ResponseListDto<User>> {
+  async list(
+    query: QueryListDto & {
+      _operatorId?: string;
+      _operatorDeptId?: string;
+      _operatorPermissions?: string[];
+      _operatorRoles?: Array<{
+        permissionKey?: string;
+        dataPermissionType?: string;
+        isActive?: string | number;
+      }>;
+    },
+  ): Promise<ResponseListDto<User>> {
     let {
       deptId,
       name,
@@ -132,6 +165,10 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       includeNoDept,
       pageNum,
       pageSize,
+      _operatorId,
+      _operatorDeptId,
+      _operatorPermissions,
+      _operatorRoles,
     } = query;
 
     // 将字符串 'true'/'false' 转换为布尔值
@@ -187,6 +224,13 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       qb.andWhere("User.email LIKE :email", { email: `%${email}%` });
     }
 
+    await this.applyUserDataScope(qb, {
+      id: _operatorId,
+      deptId: _operatorDeptId,
+      permissions: _operatorPermissions,
+      roles: _operatorRoles,
+    });
+
     // Pagination
     const skip = (pageNum - 1) * pageSize;
     qb.skip(skip).take(pageSize);
@@ -195,6 +239,78 @@ export class UsersService extends BaseService<User, CreateUserDto> {
     const [data, total] = await qb.getManyAndCount();
     data.forEach((element) => delete element.password);
     return { total, data, _flag: true };
+  }
+
+  async getOptions(
+    query: QueryListDto & {
+      keyword?: string;
+      _operatorId?: string;
+      _operatorDeptId?: string;
+      _operatorPermissions?: string[];
+      _operatorRoles?: Array<{
+        permissionKey?: string;
+        dataPermissionType?: string;
+        isActive?: string | number;
+      }>;
+    },
+  ) {
+    const pageNum = Number(query?.pageNum || 1);
+    const pageSize = Math.min(Number(query?.pageSize || 50), 100);
+    const keyword = query?.keyword || query?.name || query?.nickname;
+    const qb = this.usersRepository
+      .createQueryBuilder("User")
+      .leftJoinAndSelect("User.dept", "dept")
+      .where("User.isDelete IS NULL")
+      .andWhere("User.isActive = :isActive", { isActive: BoolNum.Yes });
+
+    if (query?.deptId && query.deptId != "0") {
+      const deptIds = (await this.deptService.getChildren({ id: query.deptId }))
+        ?.map((item) => item.id)
+        .filter(Boolean);
+      if (deptIds?.length) {
+        qb.andWhere("User.deptId IN (:...deptIds)", { deptIds });
+      }
+    }
+
+    if (keyword) {
+      qb.andWhere(
+        new Brackets((subQb) => {
+          subQb
+            .where("User.name LIKE :keyword", { keyword: `%${keyword}%` })
+            .orWhere("User.nickname LIKE :keyword", {
+              keyword: `%${keyword}%`,
+            });
+        }),
+      );
+    }
+
+    await this.applyUserDataScope(qb, {
+      id: query._operatorId,
+      deptId: query._operatorDeptId,
+      permissions: query._operatorPermissions,
+      roles: query._operatorRoles,
+    });
+
+    const data = await qb
+      .orderBy("User.nickname", "ASC")
+      .skip((pageNum - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+
+    return data.map((item) => ({
+      id: item.id,
+      name: item.name,
+      nickname: item.nickname,
+      avatar: item.avatar,
+      deptId: item.deptId,
+      dept: item.dept
+        ? {
+            id: item.dept.id,
+            name: item.dept.name,
+            parentId: item.dept.parentId,
+          }
+        : null,
+    }));
   }
 
   async resetPassword(updateDto: UpdateUserDto): Promise<UpdateResult> {
@@ -242,6 +358,123 @@ export class UsersService extends BaseService<User, CreateUserDto> {
 
   private hasPermission(permissions: string[], key: string) {
     return permissions?.includes("*") || permissions?.includes(key);
+  }
+
+  private getCurrentUserDataPermissionType(currentUser?: Record<string, any>) {
+    if (!currentUser?.id) {
+      return DataPermissionType.self;
+    }
+    if (this.hasPermission(currentUser.permissions || [], "*")) {
+      return DataPermissionType.all;
+    }
+    const activeRoles = (currentUser.roles || []).filter((role) =>
+      ["1", 1, true].includes(role?.isActive as any),
+    );
+    if (activeRoles.some((role) => role?.permissionKey === config.adminKey)) {
+      return DataPermissionType.all;
+    }
+    const permissionWeight = {
+      [DataPermissionType.self]: 1,
+      [DataPermissionType.dept]: 2,
+      [DataPermissionType.deptAndChildren]: 3,
+      [DataPermissionType.all]: 4,
+    };
+
+    return activeRoles.reduce((bestType, role) => {
+      const roleType = role?.dataPermissionType || DataPermissionType.self;
+      return permissionWeight[roleType] > permissionWeight[bestType]
+        ? roleType
+        : bestType;
+    }, DataPermissionType.self);
+  }
+
+  private getCurrentUserDeptId(currentUser?: Record<string, any>) {
+    return String(
+      currentUser?.deptId ||
+        currentUser?.dept?.id ||
+        currentUser?.dept?.deptId ||
+        "",
+    );
+  }
+
+  private async getVisibleDeptIds(currentUserDeptId: string) {
+    if (!currentUserDeptId) return [];
+    const deptTree = await this.deptService.getChildren({
+      id: currentUserDeptId,
+    });
+    return Array.from(
+      new Set(
+        (deptTree || []).map((item) => String(item.id || "")).filter(Boolean),
+      ),
+    );
+  }
+
+  private async applyUserDataScope(qb: any, currentUser?: Record<string, any>) {
+    const currentUserId = String(currentUser?.id || "");
+    if (!currentUserId) return qb;
+
+    const dataPermissionType =
+      this.getCurrentUserDataPermissionType(currentUser);
+    if (dataPermissionType === DataPermissionType.all) {
+      return qb;
+    }
+
+    if (dataPermissionType === DataPermissionType.self) {
+      qb.andWhere("User.id = :currentUserId", { currentUserId });
+      return qb;
+    }
+
+    const currentUserDeptId = this.getCurrentUserDeptId(currentUser);
+    if (!currentUserDeptId) {
+      qb.andWhere("User.id = :currentUserId", { currentUserId });
+      return qb;
+    }
+
+    if (dataPermissionType === DataPermissionType.dept) {
+      qb.andWhere("User.deptId = :currentUserDeptId", {
+        currentUserDeptId,
+      });
+      return qb;
+    }
+
+    const deptIds = await this.getVisibleDeptIds(currentUserDeptId);
+    if (!deptIds.length) {
+      qb.andWhere("User.id = :currentUserId", { currentUserId });
+      return qb;
+    }
+
+    qb.andWhere("(User.deptId IN (:...deptIds) OR User.id = :currentUserId)", {
+      deptIds,
+      currentUserId,
+    });
+    return qb;
+  }
+
+  private async isUserVisibleToCurrentUser(
+    targetUser: User,
+    currentUser?: Record<string, any>,
+  ) {
+    if (!currentUser?.id) return true;
+    const dataPermissionType =
+      this.getCurrentUserDataPermissionType(currentUser);
+    if (dataPermissionType === DataPermissionType.all) return true;
+    if (String(targetUser?.id || "") === String(currentUser.id)) return true;
+
+    if (dataPermissionType === DataPermissionType.self) {
+      return false;
+    }
+
+    const currentUserDeptId = this.getCurrentUserDeptId(currentUser);
+    if (!currentUserDeptId) {
+      return false;
+    }
+
+    if (dataPermissionType === DataPermissionType.dept) {
+      return String(targetUser?.deptId || "") === currentUserDeptId;
+    }
+
+    const deptIds = await this.getVisibleDeptIds(currentUserDeptId);
+    return deptIds.includes(String(targetUser?.deptId || ""));
   }
 
   private async updateUserPassword(id: string, password: string) {

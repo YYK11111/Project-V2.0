@@ -5,6 +5,13 @@ describe("UsersController", () => {
     const usersService = {
       resetPassword: jest.fn().mockResolvedValue({ affected: 1 }),
       updatePassword: jest.fn().mockResolvedValue({ affected: 1 }),
+      getOptions: jest.fn().mockResolvedValue([
+        {
+          id: "user-1",
+          name: "zhangsan",
+          nickname: "张三",
+        },
+      ]),
     };
     const captchaService = {
       validateCaptcha: jest.fn().mockReturnValue("验证码错误"),
@@ -78,6 +85,53 @@ describe("UsersController", () => {
       passwordNew: "New@123456",
       passwordNewConfirm: "New@123456",
       id: "current-user",
+    });
+  });
+
+  it("人员选项接口应委托服务返回轻量人员数据", async () => {
+    const { controller, usersService } = createController();
+    const query = {
+      pageNum: 1,
+      pageSize: 50,
+      keyword: "张",
+    };
+    const req = {
+      user: {
+        id: "user-1",
+        deptId: "dept-1",
+        permissions: ["system/users/list"],
+        roles: [
+          {
+            permissionKey: "normal",
+            dataPermissionType: "self",
+            isActive: "1",
+          },
+        ],
+      },
+    };
+
+    await expect(
+      controller.getOptions(query as any, req as any),
+    ).resolves.toEqual([
+      {
+        id: "user-1",
+        name: "zhangsan",
+        nickname: "张三",
+      },
+    ]);
+
+    expect(usersService.getOptions).toHaveBeenCalledWith({
+      ...query,
+      _operatorId: "user-1",
+      _operatorDeptId: "dept-1",
+      _operatorPermissions: ["system/users/list"],
+      _operatorRoles: [
+        {
+          permissionKey: "normal",
+          dataPermissionType: "self",
+          isActive: "1",
+        },
+      ],
     });
   });
 });

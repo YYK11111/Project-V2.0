@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
-import { getList as getUserList } from '@/views/system/users/api'
-import { getList as getDeptList } from '@/views/system/depts/api'
+import { getOptions as getUserOptions } from '@/views/system/users/api'
+import { getOptions as getDeptOptions } from '@/views/system/depts/api'
 
 const props = defineProps({
   modelValue: {
@@ -109,7 +109,7 @@ function loadUserList(keywords = '') {
     query.deptId = searchDept.value
   }
 
-  getUserList(query)
+  getUserOptions(query)
     .then((res) => {
       userList.value = normalizeListResponse(res)
       updateSelectedUserMap(userList.value)
@@ -120,7 +120,7 @@ function loadUserList(keywords = '') {
 }
 
 function loadDeptList() {
-  getDeptList({ pageNum: 1, pageSize: 1000 }).then((res) => {
+  getDeptOptions({ pageNum: 1, pageSize: 1000 }).then((res) => {
     deptList.value = normalizeListResponse(res)
   })
 }

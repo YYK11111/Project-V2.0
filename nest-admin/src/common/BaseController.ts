@@ -81,7 +81,13 @@ export class BaseController<T, K> {
   ): Promise<ResponseListDto<T> | T[]> {
     query.pageNum ??= 1;
     query.pageSize ??= 10;
-    return this.service.list(query);
+    return this.service.list({
+      ...query,
+      _operatorId: req?.user?.id,
+      _operatorDeptId: req?.user?.deptId || req?.user?.dept?.id,
+      _operatorPermissions: req?.user?.permissions || [],
+      _operatorRoles: req?.user?.roles || [],
+    });
   }
 
   // 查询全部，返回所有结果
@@ -92,7 +98,13 @@ export class BaseController<T, K> {
 
   // 单个查询，获取详情
   @Get("getOne/:id")
-  async getOne(@Param("id") id: string): Promise<T> {
-    return this.service.getOne({ id });
+  async getOne(@Param("id") id: string, @Req() req?): Promise<T> {
+    return this.service.getOne({
+      id,
+      _operatorId: req?.user?.id,
+      _operatorDeptId: req?.user?.deptId || req?.user?.dept?.id,
+      _operatorPermissions: req?.user?.permissions || [],
+      _operatorRoles: req?.user?.roles || [],
+    });
   }
 }

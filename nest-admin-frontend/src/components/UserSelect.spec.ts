@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import UserSelect from './UserSelect.vue'
 
 vi.mock('@/views/system/users/api', () => ({
-  getList: vi.fn().mockResolvedValue({
+  getOptions: vi.fn().mockResolvedValue({
     data: {
       list: [
         {
@@ -20,7 +20,7 @@ vi.mock('@/views/system/users/api', () => ({
 }))
 
 vi.mock('@/views/system/depts/api', () => ({
-  getList: vi.fn().mockResolvedValue({ data: [] }),
+  getOptions: vi.fn().mockResolvedValue({ data: [] }),
 }))
 
 function readUserSelectSource() {
@@ -50,6 +50,8 @@ describe('UserSelect 多选弹窗结构守卫', () => {
     expect(source).toContain('confirmSelection')
     expect(source).toContain('selectPendingUser')
     expect(source).not.toContain('<el-select\n      class="user-select"')
+    expect(source).toContain('getOptions as getUserOptions')
+    expect(source).toContain('getOptions as getDeptOptions')
   })
 
   it('分页结构用户列表也能选择并确认回填', async () => {

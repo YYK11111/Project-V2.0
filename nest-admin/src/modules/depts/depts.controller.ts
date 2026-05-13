@@ -27,4 +27,9 @@ export class DeptController extends BaseController<Dept, DeptService> {
   getTrees(@Query() query) {
     return this.service.getTrees(query);
   }
+
+  @Get("options")
+  getOptions(@Query() query) {
+    return this.service.getOptions(query);
+  }
 }
