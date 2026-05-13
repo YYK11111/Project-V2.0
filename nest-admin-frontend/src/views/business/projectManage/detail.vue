@@ -52,6 +52,21 @@ const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canKnowledgeAdd = computed(() => checkPermi(['business/articles/add']))
+const canOperateExecutionObjects = computed(() => {
+  const context = projectPermissionContext.value || {}
+  return context.isVisitor !== true && (
+    context.canEdit !== false ||
+    context.isManager === true ||
+    context.isDeliveryManager === true ||
+    context.isFunctionalLead === true
+  )
+})
+const canAddTaskInProject = computed(() => canTaskAdd.value && canOperateExecutionObjects.value)
+const canAddTicketInProject = computed(() => canTicketAdd.value && canOperateExecutionObjects.value)
+const canAddRiskInProject = computed(() => canRiskAdd.value && canOperateExecutionObjects.value)
+const canAddChangeInProject = computed(() => canChangeAdd.value && canOperateExecutionObjects.value)
+const canAddSprintInProject = computed(() => canSprintAdd.value && canOperateExecutionObjects.value)
+const canAddKnowledgeInProject = computed(() => canKnowledgeAdd.value && canOperateExecutionObjects.value)
 const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false && String(project.value?.status || '') === '1')
 const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false)
 const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
@@ -862,12 +877,12 @@ function getProjectApprovalText(project) {
           <div class="hero-action-card__title">快捷发起</div>
           <div class="hero-action-card__desc">从项目上下文直接发起核心业务动作，把任务、风险、变更、工单、Sprint 和知识收口到同一个工作台。</div>
           <div class="hero-action-card__grid">
-            <el-button v-if="canTaskAdd" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
-            <el-button v-if="canRiskAdd" @click="createProjectScopedRecord('/projectManage/riskManage/form')">新增风险</el-button>
-            <el-button v-if="canChangeAdd" @click="createProjectScopedRecord('/changeManage/form')">新增变更</el-button>
-            <el-button v-if="canTicketAdd" @click="createProjectScopedRecord('/ticketManage/form')">新增工单</el-button>
-            <el-button v-if="canSprintAdd" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
-            <el-button v-if="canKnowledgeAdd" type="primary" @click="goToProjectKnowledgeCreate">新增知识</el-button>
+            <el-button v-if="canAddTaskInProject" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
+            <el-button v-if="canAddRiskInProject" @click="createProjectScopedRecord('/projectManage/riskManage/form')">新增风险</el-button>
+            <el-button v-if="canAddChangeInProject" @click="createProjectScopedRecord('/changeManage/form')">新增变更</el-button>
+            <el-button v-if="canAddTicketInProject" @click="createProjectScopedRecord('/ticketManage/form')">新增工单</el-button>
+            <el-button v-if="canAddSprintInProject" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
+            <el-button v-if="canAddKnowledgeInProject" type="primary" @click="goToProjectKnowledgeCreate">新增知识</el-button>
           </div>
         </div>
 
@@ -1413,8 +1428,8 @@ function getProjectApprovalText(project) {
               <div class="plan-action-card__desc">先维护里程碑和基线计划，再把任务纳入 Sprint，逐步把执行过程从零散推进转成结构化计划。</div>
             </div>
             <div class="plan-action-card__actions">
-              <el-button v-if="canSprintAdd" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
-              <el-button v-if="canTaskAdd" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
+              <el-button v-if="canAddSprintInProject" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
+              <el-button v-if="canAddTaskInProject" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
               <el-button type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
             </div>
           </div>
@@ -1957,7 +1972,7 @@ function getProjectApprovalText(project) {
             </div>
             <div class="knowledge-summary-card__actions">
               <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeList">查看全部</el-button>
-              <el-button v-if="!isProjectVisitor" type="primary" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeCreate">新增知识</el-button>
+              <el-button v-if="canAddKnowledgeInProject" type="primary" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeCreate">新增知识</el-button>
               <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('implementationGuide')">实施模板</el-button>
               <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('faq')">FAQ 模板</el-button>
             </div>

@@ -1,32 +1,118 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindManyOptions, Repository } from "typeorm";
+import { FindManyOptions, In, Repository } from "typeorm";
 import { Sprint, SprintStatus } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { SaveDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { CreateSprintDto } from "./dto";
 import { Task, TaskStatus } from "../tasks/entity";
 import { User } from "src/modules/users/entities/user.entity";
+import { ProjectExecutionPermissionService } from "../projects/project-execution-permission.service";
 
 @Injectable()
 export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
   constructor(
     @InjectRepository(Sprint) repository: Repository<Sprint>,
     @InjectRepository(Task) private taskRepository: Repository<Task>,
+    private readonly projectExecutionPermissionService: ProjectExecutionPermissionService,
   ) {
     super(Sprint, repository);
   }
 
+  private async assertSprintProjectPermissionById(
+    sprintId: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return null;
+    const sprint = await this.repository.findOne({
+      where: { id: sprintId, isDelete: null as any } as any,
+      select: ["id", "projectId"] as any,
+    });
+    if (!sprint) throw new Error("数据不存在");
+    if (sprint.projectId) {
+      await this.projectExecutionPermissionService.assertReadableProject(
+        sprint.projectId,
+        operatorId,
+        permissions,
+      );
+    }
+    return sprint;
+  }
+
+  private async assertSprintProjectPermissionForDto(
+    dto: SaveDto<CreateSprintDto>,
+  ) {
+    const operatorId = String(dto._operatorId || "");
+    const operatorPermissions = Array.isArray((dto as any)._operatorPermissions)
+      ? (dto as any)._operatorPermissions
+      : [];
+    if (!operatorId) return;
+    let oldProjectId = "";
+    if (dto.id) {
+      const sprint = await this.repository.findOne({
+        where: { id: String(dto.id), isDelete: null as any } as any,
+        select: ["id", "projectId"] as any,
+      });
+      if (!sprint) throw new Error("数据不存在");
+      oldProjectId = String(sprint.projectId || "");
+      if (oldProjectId) {
+        await this.projectExecutionPermissionService.assertWritableProject(
+          oldProjectId,
+          operatorId,
+          operatorPermissions,
+        );
+      }
+    }
+    const nextProjectId = String(dto.projectId || "");
+    if (nextProjectId && nextProjectId !== oldProjectId) {
+      await this.projectExecutionPermissionService.assertWritableProject(
+        nextProjectId,
+        operatorId,
+        operatorPermissions,
+      );
+    }
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<Sprint>> {
-    let { projectId, status, name, ownerId, changeImpactFlag } =
-      query as QueryListDto & {
-        ownerId?: string;
-        changeImpactFlag?: string;
-      };
+    let {
+      projectId,
+      status,
+      name,
+      ownerId,
+      changeImpactFlag,
+      _operatorId,
+      _operatorPermissions,
+    } = query as QueryListDto & {
+      ownerId?: string;
+      changeImpactFlag?: string;
+      _operatorId?: string;
+      _operatorPermissions?: string[];
+    };
+    const visibleProjectIds =
+      await this.projectExecutionPermissionService.getVisibleProjectIds(
+        String(_operatorId || ""),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
+    if (visibleProjectIds && !visibleProjectIds.length) {
+      return { data: [], total: 0, _flag: true } as any;
+    }
+    const explicitProjectId = String(projectId || "");
+    if (
+      explicitProjectId &&
+      visibleProjectIds &&
+      !visibleProjectIds.includes(explicitProjectId)
+    ) {
+      return { data: [], total: 0, _flag: true } as any;
+    }
+    const projectIdFilter =
+      explicitProjectId ||
+      (visibleProjectIds ? In(visibleProjectIds) : undefined);
     let queryOrm: FindManyOptions = {
       where: {
         name: this.sqlLike(name),
-        projectId: projectId || undefined,
+        projectId: projectIdFilter,
         status: status || undefined,
         ownerId: ownerId || undefined,
         changeImpactFlag:
@@ -131,10 +217,18 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     }));
   }
 
-  async startSprint(sprintId: string): Promise<any> {
+  async startSprint(sprintId: string, operatorId?: string): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
       throw new Error("Sprint不存在");
+    }
+    if (operatorId) {
+      if (sprint.projectId) {
+        await this.projectExecutionPermissionService.assertReadableProject(
+          sprint.projectId,
+          operatorId,
+        );
+      }
     }
 
     const tasks = await this.taskRepository.find({
@@ -155,10 +249,19 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
   async completeSprint(
     sprintId: string,
     options?: { carryOverMode?: "backlog" },
+    operatorId?: string,
   ): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
       throw new Error("Sprint不存在");
+    }
+    if (operatorId) {
+      if (sprint.projectId) {
+        await this.projectExecutionPermissionService.assertReadableProject(
+          sprint.projectId,
+          operatorId,
+        );
+      }
     }
 
     const tasks = await this.taskRepository.find({
@@ -222,14 +325,24 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
   }
 
   async getOne(query, isError = true): Promise<any | null> {
+    const { _operatorId, _operatorPermissions, ...where } = query as any;
     const sprint = await super.getOne(
       {
-        where: query,
+        where,
         relations: ["project", "scrumMaster", "owner"],
       },
       isError,
     );
     if (!sprint) return sprint;
+    if (_operatorId) {
+      if (sprint.projectId) {
+        await this.projectExecutionPermissionService.assertReadableProject(
+          sprint.projectId,
+          String(_operatorId),
+          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        );
+      }
+    }
 
     return {
       ...sprint,
@@ -237,5 +350,78 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       scrumMaster: this.mapUserSummary(sprint.scrumMaster),
       owner: this.mapUserSummary((sprint as any).owner),
     };
+  }
+
+  async save(dto: SaveDto<CreateSprintDto>) {
+    await this.assertSprintProjectPermissionForDto(dto);
+    return super.save(dto as any);
+  }
+
+  async add(dto: SaveDto<CreateSprintDto>) {
+    await this.assertSprintProjectPermissionForDto(dto);
+    return super.add(dto as any);
+  }
+
+  async update(dto: SaveDto<CreateSprintDto>) {
+    await this.assertSprintProjectPermissionForDto(dto);
+    return super.update(dto as any);
+  }
+
+  async del(
+    ids: string[] | string,
+    updateUser?: string,
+    permissions: string[] = [],
+    operatorName?: string,
+    operatorId?: string,
+  ) {
+    const idList = Array.isArray(ids)
+      ? ids.map((item) => String(item))
+      : String(ids || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    const successIds: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+    if (operatorId) {
+      for (const id of idList) {
+        try {
+          await this.assertSprintProjectPermissionById(
+            id,
+            operatorId,
+            permissions,
+          );
+          successIds.push(id);
+        } catch (error) {
+          failed.push({
+            id,
+            reason: error?.message || "当前无删除该 Sprint 的权限",
+          });
+        }
+      }
+    } else {
+      successIds.push(...idList);
+    }
+    if (!successIds.length) {
+      return {
+        successCount: 0,
+        failedCount: failed.length,
+        successIds: [],
+        failed,
+      } as any;
+    }
+    const result = await super.del(
+      successIds,
+      updateUser,
+      permissions,
+      operatorName,
+      operatorId,
+    );
+    return {
+      ...result,
+      successCount: successIds.length,
+      failedCount: failed.length,
+      successIds,
+      failed,
+    } as any;
   }
 }

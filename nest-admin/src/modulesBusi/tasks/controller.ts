@@ -84,12 +84,17 @@ export class TasksController extends BaseController<Task, TasksService> {
   }
 
   @Post("progress/:id")
-  updateProgress(@Param("id") id: string, @Body("progress") progress: number) {
-    return this.service.updateProgress(id, progress);
+  updateProgress(
+    @Param("id") id: string,
+    @Body("progress") progress: number,
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id || req.user?.name;
+    return this.service.updateProgress(id, progress, userId);
   }
 
   @Get("list")
-  async listWithProjectScope(@Query() query: QueryListDto, @Req() req: any) {
+  async list(@Query() query: QueryListDto, @Req() req: any) {
     query.pageNum ??= 1;
     query.pageSize ??= 10;
     return this.service.list({
@@ -100,10 +105,11 @@ export class TasksController extends BaseController<Task, TasksService> {
   }
 
   @Get("getOne/:id")
-  async getOneWithProjectScope(@Param("id") id: string, @Req() req: any) {
+  async getOne(@Param("id") id: string, @Req() req?: any) {
     return this.service.getOne({
       id,
       _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
     } as any);
   }
 

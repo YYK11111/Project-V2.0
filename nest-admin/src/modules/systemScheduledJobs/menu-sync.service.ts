@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { config } from "config";
 import { Menu } from "src/modules/menus/menu.entity";
 import { Repository } from "typeorm";
 import { scheduledJobsMenuSeed, type MenuSeedItem } from "./menu.seed";
@@ -7,6 +8,7 @@ import { scheduledJobsMenuSeed, type MenuSeedItem } from "./menu.seed";
 @Injectable()
 export class MenuSyncService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MenuSyncService.name);
+  private readonly appConfig = config;
 
   constructor(
     @InjectRepository(Menu)
@@ -14,6 +16,17 @@ export class MenuSyncService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    if (this.appConfig.featureFlags?.syncMenusOnBoot !== true) {
+      this.logger.log(
+        "跳过定时任务菜单同步：SYSTEM_MENU_SYNC_ON_BOOT 未设置为 true",
+      );
+      return;
+    }
+
+    await this.syncScheduledJobsMenus();
+  }
+
+  async syncScheduledJobsMenus() {
     const parentMenu = await this.menuRepository.findOne({
       where: {
         permissionKey: scheduledJobsMenuSeed.parentPermissionKey,

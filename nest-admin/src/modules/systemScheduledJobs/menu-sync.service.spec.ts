@@ -65,9 +65,14 @@ describe("MenuSyncService", () => {
     };
   }
 
-  function createService() {
+  function createService(syncMenusOnBoot = true) {
     const menuRepository = createMenuRepository();
     const service = new MenuSyncService(menuRepository as never);
+    (service as unknown as { appConfig: unknown }).appConfig = {
+      featureFlags: {
+        syncMenusOnBoot,
+      },
+    };
     const logger = (service as unknown as { logger: MockLogger }).logger;
     logger.error = jest.fn<void, [string]>();
     logger.log = jest.fn<void, [string]>();
@@ -76,6 +81,42 @@ describe("MenuSyncService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it("只通过构造函数注入菜单仓库", () => {
+    const paramTypes = Reflect.getMetadata(
+      "design:paramtypes",
+      MenuSyncService,
+    );
+
+    expect(paramTypes).toHaveLength(1);
+  });
+
+  it("默认未开启开关时，启动不会查询或保存菜单", async () => {
+    const menuRepository = createMenuRepository();
+    const service = new MenuSyncService(menuRepository as never);
+    const logger = (service as unknown as { logger: MockLogger }).logger;
+    logger.log = jest.fn<void, [string]>();
+
+    await service.onApplicationBootstrap();
+
+    expect(menuRepository.findOne).not.toHaveBeenCalled();
+    expect(menuRepository.save).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining("SYSTEM_MENU_SYNC_ON_BOOT"),
+    );
+  });
+
+  it("显式关闭开关时，启动不会查询或保存菜单", async () => {
+    const { service, menuRepository, logger } = createService(false);
+
+    await service.onApplicationBootstrap();
+
+    expect(menuRepository.findOne).not.toHaveBeenCalled();
+    expect(menuRepository.save).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining("SYSTEM_MENU_SYNC_ON_BOOT"),
+    );
   });
 
   it("缺失页面菜单时，会在系统管理下创建页面和按钮权限", async () => {

@@ -3,9 +3,10 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { HandoverRecord } from "./entity";
 import { HandoverRecordsController } from "./controller";
 import { HandoverRecordsService } from "./service";
+import { ProjectsModule } from "../projects/module";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([HandoverRecord])],
+  imports: [TypeOrmModule.forFeature([HandoverRecord]), ProjectsModule],
   controllers: [HandoverRecordsController],
   providers: [HandoverRecordsService],
   exports: [HandoverRecordsService],

@@ -1360,9 +1360,17 @@ export class TasksService extends BaseService<Task, TaskDto> {
   /**
    * 更新任务进度
    */
-  async updateProgress(id: string, progress: number): Promise<any> {
+  async updateProgress(
+    id: string,
+    progress: number,
+    operatorId?: string,
+  ): Promise<any> {
     if (progress < 0 || progress > 100) {
       throw new Error("进度必须在0-100之间");
+    }
+    if (operatorId) {
+      const task = await this.getTaskById(String(id));
+      await this.ensureTaskCanExecute(task, operatorId);
     }
     return this.repository.update(id, { progress });
   }

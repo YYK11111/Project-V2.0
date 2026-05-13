@@ -47,7 +47,7 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
   }
 
   @Get("list")
-  async listWithProjectScope(@Query() query: QueryListDto, @Req() req: any) {
+  async list(@Query() query: QueryListDto, @Req() req: any) {
     query.pageNum ??= 1;
     query.pageSize ??= 10;
     return this.service.list({
@@ -58,10 +58,11 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
   }
 
   @Get("getOne/:id")
-  async getOneWithProjectScope(@Param("id") id: string, @Req() req: any) {
+  async getOne(@Param("id") id: string, @Req() req?: any) {
     return this.service.getOne({
       id,
       _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
     } as any);
   }
 

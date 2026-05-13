@@ -1,4 +1,6 @@
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ChangesService } from "./service";
+import { ChangeStatus } from "./entity";
 
 describe("ChangesService apply impact", () => {
   it("可将变更应用到任务计划日期", async () => {
@@ -9,6 +11,7 @@ describe("ChangesService apply impact", () => {
       repository as any,
       {} as any,
       historyRepository as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -48,6 +51,7 @@ describe("ChangesService apply impact", () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     (service as any).milestoneRepository = milestoneRepository;
@@ -81,6 +85,7 @@ describe("ChangesService apply impact", () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     (service as any).sprintRepository = sprintRepository;
@@ -99,5 +104,194 @@ describe("ChangesService apply impact", () => {
       endDate: "2026-05-05",
       changeImpactFlag: "1",
     });
+  });
+
+  it("直接审批要求变更处于待审批状态", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "c1",
+        projectId: "p1",
+        status: ChangeStatus.draft,
+      }),
+      update: jest.fn(),
+    };
+    const projectsService = {
+      assertProjectPermission: jest.fn().mockResolvedValue({ isManager: true }),
+    };
+    const service = new ChangesService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+
+    await expect(service.approve("c1", "u1", "同意")).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("直接审批要求项目管理权限", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "c1",
+        projectId: "p1",
+        status: ChangeStatus.pending,
+      }),
+      update: jest.fn(),
+    };
+    const projectsService = {
+      assertProjectPermission: jest
+        .fn()
+        .mockResolvedValue({ isManager: false }),
+    };
+    const service = new ChangesService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+
+    await expect(service.reject("c1", "u1", "拒绝")).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("全量管理权限允许直接审批", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "c1",
+        projectId: "p1",
+        status: ChangeStatus.pending,
+      }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const projectsService = {
+      assertProjectPermission: jest.fn().mockResolvedValue({
+        isManager: false,
+        isDeliveryManager: false,
+        canManageAll: true,
+      }),
+    };
+    const service = new ChangesService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+
+    await service.approve("c1", "u1", "同意", ["business/projects/manageAll"]);
+
+    expect(projectsService.assertProjectPermission).toHaveBeenCalledWith(
+      "p1",
+      "u1",
+      "view",
+      ["business/projects/manageAll"],
+    );
+    expect(repository.update).toHaveBeenCalledWith(
+      "c1",
+      expect.objectContaining({
+        status: ChangeStatus.approved,
+        approverId: "u1",
+        approvalComment: "同意",
+      }),
+    );
+  });
+
+  it("项目经理允许直接审批", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "c1",
+        projectId: "p1",
+        status: ChangeStatus.pending,
+      }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const projectsService = {
+      assertProjectPermission: jest.fn().mockResolvedValue({
+        isManager: true,
+        isDeliveryManager: false,
+        canManageAll: false,
+      }),
+    };
+    const service = new ChangesService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+
+    await service.approve("c1", "u1", "同意");
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "c1",
+      expect.objectContaining({
+        status: ChangeStatus.approved,
+        approverId: "u1",
+        approvalComment: "同意",
+      }),
+    );
+  });
+
+  it("交付经理允许直接驳回", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "c1",
+        projectId: "p1",
+        status: ChangeStatus.pending,
+      }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const projectsService = {
+      assertProjectPermission: jest.fn().mockResolvedValue({
+        isManager: false,
+        isDeliveryManager: true,
+        canManageAll: false,
+      }),
+    };
+    const service = new ChangesService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+
+    await service.reject("c1", "u1", "拒绝");
+
+    expect(projectsService.assertProjectPermission).toHaveBeenCalledWith(
+      "p1",
+      "u1",
+      "view",
+      [],
+    );
+    expect(repository.update).toHaveBeenCalledWith(
+      "c1",
+      expect.objectContaining({
+        status: ChangeStatus.rejected,
+        approverId: "u1",
+        approvalComment: "拒绝",
+      }),
+    );
   });
 });

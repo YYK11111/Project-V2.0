@@ -176,7 +176,13 @@ export class ChangesService extends BaseService<
     return res;
   }
 
-  async approve(id: string, approverId: string, comment: string): Promise<any> {
+  async approve(
+    id: string,
+    approverId: string,
+    comment: string,
+    permissions: string[] = [],
+  ): Promise<any> {
+    await this.assertChangeApprovalPermission(id, approverId, permissions);
     return this.repository.update(id, {
       status: ChangeStatus.approved,
       approverId,
@@ -185,13 +191,46 @@ export class ChangesService extends BaseService<
     });
   }
 
-  async reject(id: string, approverId: string, comment: string): Promise<any> {
+  async reject(
+    id: string,
+    approverId: string,
+    comment: string,
+    permissions: string[] = [],
+  ): Promise<any> {
+    await this.assertChangeApprovalPermission(id, approverId, permissions);
     return this.repository.update(id, {
       status: ChangeStatus.rejected,
       approverId,
       approvalComment: comment,
       approvalDate: new Date().toISOString().split("T")[0],
     });
+  }
+
+  private async assertChangeApprovalPermission(
+    changeId: string,
+    approverId: string,
+    permissions: string[] = [],
+  ) {
+    const change = await this.repository.findOne({
+      where: { id: changeId, isDelete: null as any } as any,
+      select: ["id", "projectId", "status"] as any,
+    });
+    if (!change) throw new NotFoundException("变更不存在");
+    if (change.status !== ChangeStatus.pending) {
+      throw new BadRequestException("只有待审批状态的变更才能审批");
+    }
+    const context = await this.projectsService.assertProjectPermission(
+      change.projectId,
+      approverId,
+      "view",
+      permissions,
+    );
+    const canApprove =
+      context.isManager || context.isDeliveryManager || context.canManageAll;
+    if (!canApprove) {
+      throw new ForbiddenException("当前无审批该变更的权限");
+    }
+    return change;
   }
 
   async confirmPlanImpact(

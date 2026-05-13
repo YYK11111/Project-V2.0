@@ -182,6 +182,28 @@ describe("TasksService lifecycle actions", () => {
     expect(messagesService.sendMessage).not.toHaveBeenCalled();
   });
 
+  it("非执行人或管理者不能更新任务进度", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-4",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: ["executor-1"],
+      status: TaskStatus.inProgress,
+    });
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+    });
+
+    await expect(
+      service.updateProgress("task-4", 60, "viewer-1"),
+    ).rejects.toThrow("当前无执行该任务的权限");
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
   it("完成审批驳回后回退到处理中", async () => {
     const { service, repository } = createService();
     const queueCompletionRejectedReminders = jest

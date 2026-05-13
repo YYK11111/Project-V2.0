@@ -150,16 +150,14 @@ function reloadCurrent() {
 
 async function handleApprove() {
   if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  const approverId = $store.user?.id || ''
-  await approve(route.query.id, { approverId, comment: form.value.approvalComment || '同意' })
+  await approve(route.query.id, { comment: form.value.approvalComment || '同意' })
   $sdk.msgSuccess('审批通过')
   router.back()
 }
 
 async function handleReject() {
   if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  const approverId = $store.user?.id || ''
-  await reject(route.query.id, { approverId, comment: form.value.approvalComment || '不同意' })
+  await reject(route.query.id, { comment: form.value.approvalComment || '不同意' })
   $sdk.msgSuccess('已驳回')
   router.back()
 }

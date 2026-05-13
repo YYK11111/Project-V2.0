@@ -1,8 +1,19 @@
-import { TypeOrmModuleOptions } from '@nestjs/typeorm'
 import dayjs from 'dayjs'
 import { accessSync, constants } from 'fs'
 import merge from 'lodash.merge'
 const mode = process.argv.find((e) => e.includes('env=')).split('=')[1]
+
+type AppConfigWithDatabase = {
+  database?: {
+    synchronize?: boolean
+  }
+}
+
+export function enforceProductionDatabaseSafety(appConfig: AppConfigWithDatabase, currentMode: string) {
+  if (currentMode === 'prod' && appConfig.database) {
+    appConfig.database.synchronize = false
+  }
+}
 
 const env = {
   dev: {
@@ -29,7 +40,7 @@ const env = {
       username: 'root',
       password: '12345678',
       database: 'psd2',
-      synchronize: true,
+      synchronize: false,
       autoLoadEntities: true,
     },
   },
@@ -39,6 +50,13 @@ export const config = {
   apiBase: '/api',
   adminKey: 'admin',
   isPublicKey: 'isPublic',
+  server: {
+    port: 3000,
+    debugPort: 9229,
+  },
+  featureFlags: {
+    syncMenusOnBoot: process.env.SYSTEM_MENU_SYNC_ON_BOOT === 'true',
+  },
   get jwtExpires() {
     return dayjs().endOf('day').diff(dayjs(), 'second') + 's'
   }, // 到当天结束过期
@@ -60,6 +78,8 @@ try {
   const { secret } = require(`./${'secret.copy'}.js`)
   merge(config, secret[mode], secret)
 } catch (err) {}
+
+enforceProductionDatabaseSafety(config, mode)
 
 export const database = async () => {
   return config.database

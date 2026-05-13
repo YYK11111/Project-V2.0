@@ -104,6 +104,20 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
   ];
   private readonly projectReviewCatalogName = "项目复盘";
 
+  private canViewAllProjects(permissions: string[] = []) {
+    return (
+      permissions.includes("*") ||
+      permissions.includes("business/projects/listAll")
+    );
+  }
+
+  private canManageAllProjects(permissions: string[] = []) {
+    return (
+      permissions.includes("*") ||
+      permissions.includes("business/projects/manageAll")
+    );
+  }
+
   private mapContractSummary(contract?: Contract | null) {
     if (!contract) return null;
     return {
@@ -338,8 +352,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
     const isExistingProject = Boolean(dto.id);
     const canBypassProjectScope =
-      operatorPermissions.includes("*") ||
-      operatorPermissions.includes("business/projects/listAll");
+      this.canManageAllProjects(operatorPermissions);
     if (isExistingProject && operatorId && !canBypassProjectScope) {
       await this.assertProjectPermission(dto.id, operatorId, "edit");
       const originalProject = await this.getOne({ id: dto.id });
@@ -1060,8 +1073,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     };
 
     const canViewAll = Array.isArray(_operatorPermissions)
-      ? _operatorPermissions.includes("*") ||
-        _operatorPermissions.includes("business/projects/listAll")
+      ? this.canViewAllProjects(_operatorPermissions)
       : false;
 
     const queryBuilder = this.repository
@@ -1413,9 +1425,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean);
-    const canBypassProjectScope =
-      permissions.includes("*") ||
-      permissions.includes("business/projects/listAll");
+    const canBypassProjectScope = this.canManageAllProjects(permissions);
 
     const successIds: string[] = [];
     const failed: Array<{ id: string; reason: string }> = [];
@@ -1460,12 +1470,18 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     } as any;
   }
 
-  async getProjectPermissionContext(projectId: string, userId: string) {
+  async getProjectPermissionContext(
+    projectId: string,
+    userId: string,
+    permissions: string[] = [],
+  ) {
     const project = await this.repository.findOne({
       where: { id: projectId, isDelete: null as any } as any,
       relations: ["leader"],
     });
     if (!project) return null;
+    const canViewAll = this.canViewAllProjects(permissions);
+    const canManageAll = this.canManageAllProjects(permissions);
 
     const member = await this.projectMemberRepository.findOne({
       where: {
@@ -1492,17 +1508,19 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       project,
       member,
       role,
+      canViewAll,
+      canManageAll,
       isManager,
       isDeliveryManager,
       isFunctionalLead,
       isVisitor,
       isMember,
-      canView: isMember || isDeliveryManager,
-      canEdit: isManager,
-      canSubmitApproval: isManager,
-      canSubmitClose: isManager,
-      canArchive: isManager,
-      canDelete: isManager,
+      canView: canViewAll || isMember || isDeliveryManager,
+      canEdit: canManageAll || isManager,
+      canSubmitApproval: canManageAll || isManager,
+      canSubmitClose: canManageAll || isManager,
+      canArchive: canManageAll || isManager,
+      canDelete: canManageAll || isManager,
     };
   }
 
@@ -1510,9 +1528,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     userId: string,
     permissions: string[] = [],
   ): Promise<string[] | null> {
-    const canViewAll =
-      permissions.includes("*") ||
-      permissions.includes("business/projects/listAll");
+    const canViewAll = this.canViewAllProjects(permissions);
     if (canViewAll) return null;
     if (!userId) return [];
 
@@ -1551,8 +1567,13 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       | "submitClose"
       | "archive"
       | "delete",
+    permissions: string[] = [],
   ) {
-    const context = await this.getProjectPermissionContext(projectId, userId);
+    const context = await this.getProjectPermissionContext(
+      projectId,
+      userId,
+      permissions,
+    );
     if (!context) {
       throw new ForbiddenException("项目不存在或当前无访问权限");
     }
@@ -1570,11 +1591,16 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return context;
   }
 
-  async assertExecutionObjectPermission(projectId: string, userId: string) {
+  async assertExecutionObjectPermission(
+    projectId: string,
+    userId: string,
+    permissions: string[] = [],
+  ) {
     const context = await this.assertProjectPermission(
       projectId,
       userId,
       "view",
+      permissions,
     );
     if (context.isVisitor) {
       throw new ForbiddenException("访客角色不可查看项目内执行对象");
@@ -1650,30 +1676,30 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       trendSignals,
     ] = await Promise.all([
       this.taskRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         relations: ["leader"],
         order: { endDate: "ASC", createTime: "DESC" },
       }),
       this.ticketRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         relations: ["handler"],
         order: { createTime: "DESC" },
       }),
       this.milestoneRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         order: { dueDate: "ASC", sort: "ASC", createTime: "ASC" },
       }),
       this.riskRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         relations: ["riskOwner"],
         order: { level: "DESC", dueDate: "ASC", createTime: "DESC" },
       }),
       this.changeRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         order: { impact: "DESC", createTime: "DESC" },
       }),
       this.sprintRepository.find({
-        where: { projectId: id },
+        where: { projectId: id, isDelete: null as any } as any,
         order: { startDate: "DESC", createTime: "DESC" },
       }),
       this.goLiveRecordRepository.find({

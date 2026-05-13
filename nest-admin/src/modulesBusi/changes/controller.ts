@@ -39,7 +39,7 @@ export class ChangesController extends BaseController<
   }
 
   @Get("list")
-  async listWithProjectScope(@Query() query: QueryListDto, @Req() req: any) {
+  async list(@Query() query: QueryListDto, @Req() req: any) {
     query.pageNum ??= 1;
     query.pageSize ??= 10;
     return this.service.list({
@@ -50,10 +50,11 @@ export class ChangesController extends BaseController<
   }
 
   @Get("getOne/:id")
-  async getOneWithProjectScope(@Param("id") id: string, @Req() req: any) {
+  async getOne(@Param("id") id: string, @Req() req?: any) {
     return this.service.getOne({
       id,
       _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
     } as any);
   }
 
@@ -166,16 +167,30 @@ export class ChangesController extends BaseController<
   @Post("approve/:id")
   approve(
     @Param("id") id: string,
-    @Body() body: { approverId: string; comment: string },
+    @Body() body: { comment: string },
+    @Req() req: any,
   ) {
-    return this.service.approve(id, body.approverId, body.comment);
+    const userId = req.user?.id || req.user?.name;
+    return this.service.approve(
+      id,
+      userId,
+      body.comment,
+      req.user?.permissions || [],
+    );
   }
 
   @Post("reject/:id")
   reject(
     @Param("id") id: string,
-    @Body() body: { approverId: string; comment: string },
+    @Body() body: { comment: string },
+    @Req() req: any,
   ) {
-    return this.service.reject(id, body.approverId, body.comment);
+    const userId = req.user?.id || req.user?.name;
+    return this.service.reject(
+      id,
+      userId,
+      body.comment,
+      req.user?.permissions || [],
+    );
   }
 }

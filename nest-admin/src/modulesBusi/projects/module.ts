@@ -24,6 +24,7 @@ import { SystenConfigsModule } from "src/modules/configs/module";
 import { ProjectCockpitSnapshot } from "./entities/project-cockpit-snapshot.entity";
 import { ChangeImpactConfirmHistory } from "../changes/entities/change-impact-confirm-history.entity";
 import { ProjectFieldPermissionService } from "./project-field-permission.service";
+import { ProjectExecutionPermissionService } from "./project-execution-permission.service";
 import { GoLiveRecord } from "../go-live-records/entity";
 import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
@@ -66,12 +67,14 @@ import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/modul
     UserStoryService,
     ProjectMilestoneTemplateService,
     ProjectFieldPermissionService,
+    ProjectExecutionPermissionService,
   ],
   exports: [
     ProjectsService,
     UserStoryService,
     ProjectMilestoneTemplateService,
     ProjectFieldPermissionService,
+    ProjectExecutionPermissionService,
   ],
 })
 export class ProjectsModule {}

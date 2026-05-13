@@ -52,13 +52,23 @@ export class ProjectsController extends BaseController<
 
   @Post("archive/:id")
   async archive(@Param("id") id: string, @Req() req: any) {
-    await this.service.assertProjectPermission(id, req.user?.id, "archive");
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "archive",
+      req.user?.permissions || [],
+    );
     return this.service.archive(id);
   }
 
   @Get("statistics/:id")
   async getStatistics(@Param("id") id: string, @Req() req: any) {
-    await this.service.assertProjectPermission(id, req.user?.id, "view");
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "view",
+      req.user?.permissions || [],
+    );
     return this.service.getStatistics(id);
   }
 
@@ -68,6 +78,7 @@ export class ProjectsController extends BaseController<
       id,
       req.user?.id,
       "view",
+      req.user?.permissions || [],
     );
     const dashboard = await this.service.getDashboard(id);
     return {
@@ -90,6 +101,7 @@ export class ProjectsController extends BaseController<
       id,
       req.user?.id,
       "view",
+      req.user?.permissions || [],
     );
     const project = await this.service.getOne({ id });
     return this.projectFieldPermissionService.getProjectFieldPermissions({
@@ -137,6 +149,7 @@ export class ProjectsController extends BaseController<
       id,
       req.user?.id,
       "submitApproval",
+      req.user?.permissions || [],
     );
     await this.service.validateBaselinePlan(id);
     await this.service.ensureProjectApprovalReady(id);
@@ -150,7 +163,12 @@ export class ProjectsController extends BaseController<
   @Post(":id/submit-close")
   async submitClose(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name || "1";
-    await this.service.assertProjectPermission(id, req.user?.id, "submitClose");
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "submitClose",
+      req.user?.permissions || [],
+    );
     await this.service.validateClosePlan(id);
     const instanceId = await this.workflowService.startProjectCloseApproval(
       id,
@@ -161,7 +179,12 @@ export class ProjectsController extends BaseController<
 
   @Post(":id/publish-close-review")
   async publishCloseReview(@Param("id") id: string, @Req() req: any) {
-    await this.service.assertProjectPermission(id, req.user?.id, "edit");
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "edit",
+      req.user?.permissions || [],
+    );
     return this.service.publishCloseReviewToKnowledge(id, {
       id: req.user?.id,
       name: req.user?.name,

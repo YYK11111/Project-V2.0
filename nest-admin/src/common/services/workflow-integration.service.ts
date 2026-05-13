@@ -133,6 +133,13 @@ export class WorkflowIntegrationService {
       where: { id: recordId },
     });
     if (!record) throw new BadRequestException("上线单不存在");
+    if (record.status !== GoLiveRecordStatus.draft) {
+      throw new BadRequestException("只有草稿状态的上线单才能提交审批");
+    }
+    await this.projectsService.assertExecutionObjectPermission(
+      record.projectId,
+      initiatorId,
+    );
     const instance = await this.workflowService.startBusinessWorkflow(
       {
         businessType: "goLive",
@@ -160,6 +167,18 @@ export class WorkflowIntegrationService {
       where: { id: recordId },
     });
     if (!record) throw new BadRequestException("验收单不存在");
+    if (
+      ![
+        AcceptanceRecordResult.pending,
+        AcceptanceRecordResult.rectifying,
+      ].includes(record.result)
+    ) {
+      throw new BadRequestException("当前验收结果不允许提交审批");
+    }
+    await this.projectsService.assertExecutionObjectPermission(
+      record.projectId,
+      initiatorId,
+    );
     const instance = await this.workflowService.startBusinessWorkflow(
       {
         businessType: "acceptance",
@@ -187,6 +206,13 @@ export class WorkflowIntegrationService {
       where: { id: recordId },
     });
     if (!record) throw new BadRequestException("运维交接单不存在");
+    if (record.status !== HandoverRecordStatus.draft) {
+      throw new BadRequestException("只有草稿状态的交接单才能提交审批");
+    }
+    await this.projectsService.assertExecutionObjectPermission(
+      record.projectId,
+      initiatorId,
+    );
     const instance = await this.workflowService.startBusinessWorkflow(
       {
         businessType: "handover",
@@ -255,15 +281,38 @@ export class WorkflowIntegrationService {
       }
     } else if (businessKey?.startsWith("task_")) {
       const taskId = businessKey.replace("task_", "");
-      await this.taskRepository.update(taskId, {
-        status:
-          status === "completed" ? TaskStatus.inProgress : TaskStatus.rejected,
-        approvalStatus: status === "completed" ? "2" : "3",
-        currentNodeName:
-          status === "completed"
-            ? "任务审批已通过，进入处理中"
-            : "任务审批已驳回",
-      } as any);
+      const task = await this.taskRepository.findOne({
+        where: { id: taskId, isDelete: null as any } as any,
+      });
+      const isPendingCompletionApproval =
+        task?.status === TaskStatus.pendingCompletionApproval &&
+        String(task?.approvalStatus || "") === "1";
+      if (isPendingCompletionApproval) {
+        await this.taskRepository.update(taskId, {
+          status:
+            status === "completed"
+              ? TaskStatus.completed
+              : TaskStatus.inProgress,
+          approvalStatus: status === "completed" ? "2" : "3",
+          currentNodeName:
+            status === "completed" ? "完成审批已通过" : "完成审批已驳回",
+          ...(status === "completed" && !task?.actualEndDate
+            ? { actualEndDate: this.getTodayDate() }
+            : {}),
+        } as any);
+      } else {
+        await this.taskRepository.update(taskId, {
+          status:
+            status === "completed"
+              ? TaskStatus.inProgress
+              : TaskStatus.rejected,
+          approvalStatus: status === "completed" ? "2" : "3",
+          currentNodeName:
+            status === "completed"
+              ? "任务审批已通过，进入处理中"
+              : "任务审批已驳回",
+        } as any);
+      }
     } else if (businessKey?.startsWith("ticket_")) {
       const ticketId = businessKey.replace("ticket_", "");
       await this.ticketRepository.update(ticketId, {
@@ -300,6 +349,10 @@ export class WorkflowIntegrationService {
       } as any);
     } else if (businessKey?.startsWith("goLive_")) {
       const recordId = businessKey.replace("goLive_", "");
+      const record = await this.goLiveRecordRepository.findOne({
+        where: { id: recordId },
+      });
+      if (record?.status !== GoLiveRecordStatus.pendingApproval) return;
       await this.goLiveRecordRepository.update(recordId, {
         status:
           status === "completed"
@@ -308,6 +361,10 @@ export class WorkflowIntegrationService {
       } as any);
     } else if (businessKey?.startsWith("acceptance_")) {
       const recordId = businessKey.replace("acceptance_", "");
+      const record = await this.acceptanceRecordRepository.findOne({
+        where: { id: recordId },
+      });
+      if (record?.result !== AcceptanceRecordResult.pending) return;
       await this.acceptanceRecordRepository.update(recordId, {
         result:
           status === "completed"
@@ -316,6 +373,10 @@ export class WorkflowIntegrationService {
       } as any);
     } else if (businessKey?.startsWith("handover_")) {
       const recordId = businessKey.replace("handover_", "");
+      const record = await this.handoverRecordRepository.findOne({
+        where: { id: recordId },
+      });
+      if (record?.status !== HandoverRecordStatus.draft) return;
       await this.handoverRecordRepository.update(recordId, {
         status:
           status === "completed"
@@ -482,6 +543,10 @@ export class WorkflowIntegrationService {
   ): Promise<string> {
     const task = await this.taskRepository.findOne({ where: { id: taskId } });
     if (!task) throw new BadRequestException("任务不存在");
+    await this.projectsService.assertExecutionObjectPermission(
+      task.projectId,
+      initiatorId,
+    );
 
     const instance = await this.workflowService.startBusinessWorkflow(
       {
@@ -509,6 +574,10 @@ export class WorkflowIntegrationService {
       where: { id: ticketId },
     });
     if (!ticket) throw new BadRequestException("工单不存在");
+    await this.projectsService.assertExecutionObjectPermission(
+      ticket.projectId,
+      initiatorId,
+    );
 
     const instance = await this.workflowService.startBusinessWorkflow(
       {
@@ -536,6 +605,10 @@ export class WorkflowIntegrationService {
       where: { id: changeId },
     });
     if (!change) throw new BadRequestException("变更不存在");
+    await this.projectsService.assertExecutionObjectPermission(
+      change.projectId,
+      initiatorId,
+    );
 
     const instance = await this.workflowService.startBusinessWorkflow(
       {

@@ -16,7 +16,7 @@ describe("ProjectsService closure guards", () => {
       repository as any,
       { count: jest.fn(), find: jest.fn() } as any,
       { count: jest.fn(), find: jest.fn() } as any,
-      { count: jest.fn() } as any,
+      { count: jest.fn(), findOne: jest.fn() } as any,
       { find: jest.fn() } as any,
       { find: jest.fn() } as any,
       { find: jest.fn() } as any,
@@ -249,6 +249,45 @@ describe("ProjectsService closure guards", () => {
         "name",
       ]),
     ).not.toThrow();
+  });
+
+  it("全量查看权限不能绕过项目编辑权限", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "3",
+      leaderId: "leader-1",
+    });
+
+    await expect(
+      service.update({
+        id: "p1",
+        name: "已立项项目改名",
+        _operatorId: "viewer-1",
+        _operatorPermissions: ["business/projects/listAll"],
+      } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("全量查看权限可以查看项目详情", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "3",
+      leaderId: "leader-1",
+    });
+    (service as any).projectMemberRepository.findOne.mockResolvedValue(null);
+
+    const context = await service.assertProjectPermission(
+      "p1",
+      "viewer-1",
+      "view",
+      ["business/projects/listAll"],
+    );
+
+    expect(context.canView).toBe(true);
+    expect(context.canViewAll).toBe(true);
+    expect(context.canEdit).toBe(false);
   });
 
   it("驾驶舱应使用项目列表返回的 list 字段生成项目选项", async () => {

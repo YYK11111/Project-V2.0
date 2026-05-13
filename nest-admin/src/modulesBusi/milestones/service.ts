@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindManyOptions, Repository } from "typeorm";
+import { FindManyOptions, In, Repository } from "typeorm";
 import { Milestone, MilestoneStatus } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
+import { SaveDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { CreateMilestoneDto } from "./dto";
 import { User } from "src/modules/users/entities/user.entity";
 import { Task, TaskStatus } from "../tasks/entity";
+import { ProjectExecutionPermissionService } from "../projects/project-execution-permission.service";
 
 @Injectable()
 export class MilestonesService extends BaseService<
@@ -16,8 +18,64 @@ export class MilestonesService extends BaseService<
   constructor(
     @InjectRepository(Milestone) repository: Repository<Milestone>,
     @InjectRepository(Task) private taskRepository: Repository<Task>,
+    private readonly projectExecutionPermissionService: ProjectExecutionPermissionService,
   ) {
     super(Milestone, repository);
+  }
+
+  private async assertMilestoneProjectPermissionById(
+    milestoneId: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return null;
+    const milestone = await this.repository.findOne({
+      where: { id: milestoneId, isDelete: null as any } as any,
+      select: ["id", "projectId"] as any,
+    });
+    if (!milestone) throw new Error("数据不存在");
+    if (milestone.projectId) {
+      await this.projectExecutionPermissionService.assertReadableProject(
+        milestone.projectId,
+        operatorId,
+        permissions,
+      );
+    }
+    return milestone;
+  }
+
+  private async assertMilestoneProjectPermissionForDto(
+    dto: SaveDto<CreateMilestoneDto>,
+  ) {
+    const operatorId = String(dto._operatorId || "");
+    const operatorPermissions = Array.isArray((dto as any)._operatorPermissions)
+      ? (dto as any)._operatorPermissions
+      : [];
+    if (!operatorId) return;
+    let oldProjectId = "";
+    if (dto.id) {
+      const milestone = await this.repository.findOne({
+        where: { id: String(dto.id), isDelete: null as any } as any,
+        select: ["id", "projectId"] as any,
+      });
+      if (!milestone) throw new Error("数据不存在");
+      oldProjectId = String(milestone.projectId || "");
+      if (oldProjectId) {
+        await this.projectExecutionPermissionService.assertWritableProject(
+          oldProjectId,
+          operatorId,
+          operatorPermissions,
+        );
+      }
+    }
+    const nextProjectId = String(dto.projectId || "");
+    if (nextProjectId && nextProjectId !== oldProjectId) {
+      await this.projectExecutionPermissionService.assertWritableProject(
+        nextProjectId,
+        operatorId,
+        operatorPermissions,
+      );
+    }
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<Milestone>> {
@@ -29,16 +87,39 @@ export class MilestonesService extends BaseService<
       phase,
       changeImpactFlag,
       riskImpactFlag,
+      _operatorId,
+      _operatorPermissions,
     } = query as QueryListDto & {
       ownerId?: string;
       phase?: string;
       changeImpactFlag?: string;
       riskImpactFlag?: string;
+      _operatorId?: string;
+      _operatorPermissions?: string[];
     };
+    const visibleProjectIds =
+      await this.projectExecutionPermissionService.getVisibleProjectIds(
+        String(_operatorId || ""),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
+    if (visibleProjectIds && !visibleProjectIds.length) {
+      return { data: [], total: 0, _flag: true } as any;
+    }
+    const explicitProjectId = String(projectId || "");
+    if (
+      explicitProjectId &&
+      visibleProjectIds &&
+      !visibleProjectIds.includes(explicitProjectId)
+    ) {
+      return { data: [], total: 0, _flag: true } as any;
+    }
+    const projectIdFilter =
+      explicitProjectId ||
+      (visibleProjectIds ? In(visibleProjectIds) : undefined);
     let queryOrm: FindManyOptions = {
       where: {
         name: this.sqlLike(name),
-        projectId: projectId || undefined,
+        projectId: projectIdFilter,
         status: status || undefined,
         ownerId: ownerId || undefined,
         phase: phase || undefined,
@@ -57,7 +138,24 @@ export class MilestonesService extends BaseService<
     return this.listBy(queryOrm, query);
   }
 
-  async updateStatus(id: string, status: MilestoneStatus): Promise<any> {
+  async updateStatus(
+    id: string,
+    status: MilestoneStatus,
+    operatorId?: string,
+  ): Promise<any> {
+    if (operatorId) {
+      const milestone = await this.repository.findOne({
+        where: { id, isDelete: null as any } as any,
+        select: ["id", "projectId"] as any,
+      });
+      if (!milestone) throw new Error("数据不存在");
+      if (milestone.projectId) {
+        await this.projectExecutionPermissionService.assertReadableProject(
+          milestone.projectId,
+          operatorId,
+        );
+      }
+    }
     const updateData: any = { status };
     if (status === MilestoneStatus.completed) {
       updateData.completedDate = new Date().toISOString().split("T")[0];
@@ -85,14 +183,24 @@ export class MilestonesService extends BaseService<
   }
 
   async getOne(query, isError = true): Promise<any | null> {
+    const { _operatorId, _operatorPermissions, ...where } = query as any;
     const milestone = await super.getOne(
       {
-        where: query,
+        where,
         relations: ["project", "creator", "owner"],
       },
       isError,
     );
     if (!milestone) return milestone;
+    if (_operatorId) {
+      if (milestone.projectId) {
+        await this.projectExecutionPermissionService.assertReadableProject(
+          milestone.projectId,
+          String(_operatorId),
+          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        );
+      }
+    }
 
     const tasks = await this.taskRepository.find({
       where: { milestoneId: milestone.id, isDelete: null as any } as any,
@@ -143,5 +251,78 @@ export class MilestonesService extends BaseService<
             : 0,
       },
     };
+  }
+
+  async save(dto: SaveDto<CreateMilestoneDto>) {
+    await this.assertMilestoneProjectPermissionForDto(dto);
+    return super.save(dto as any);
+  }
+
+  async add(dto: SaveDto<CreateMilestoneDto>) {
+    await this.assertMilestoneProjectPermissionForDto(dto);
+    return super.add(dto as any);
+  }
+
+  async update(dto: SaveDto<CreateMilestoneDto>) {
+    await this.assertMilestoneProjectPermissionForDto(dto);
+    return super.update(dto as any);
+  }
+
+  async del(
+    ids: string[] | string,
+    updateUser?: string,
+    permissions: string[] = [],
+    operatorName?: string,
+    operatorId?: string,
+  ) {
+    const idList = Array.isArray(ids)
+      ? ids.map((item) => String(item))
+      : String(ids || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    const successIds: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+    if (operatorId) {
+      for (const id of idList) {
+        try {
+          await this.assertMilestoneProjectPermissionById(
+            id,
+            operatorId,
+            permissions,
+          );
+          successIds.push(id);
+        } catch (error) {
+          failed.push({
+            id,
+            reason: error?.message || "当前无删除该里程碑的权限",
+          });
+        }
+      }
+    } else {
+      successIds.push(...idList);
+    }
+    if (!successIds.length) {
+      return {
+        successCount: 0,
+        failedCount: failed.length,
+        successIds: [],
+        failed,
+      } as any;
+    }
+    const result = await super.del(
+      successIds,
+      updateUser,
+      permissions,
+      operatorName,
+      operatorId,
+    );
+    return {
+      ...result,
+      successCount: successIds.length,
+      failedCount: failed.length,
+      successIds,
+      failed,
+    } as any;
   }
 }

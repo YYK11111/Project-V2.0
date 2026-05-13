@@ -15,8 +15,9 @@ import { GlobalInterceptor } from "./common/interceptor/GlobalInterceptor";
 import { GlobalExceptionsFilter } from "./common/filters/GlobalExceptionsFilter";
 import compression from "compression";
 import { config } from "config";
+import { getHttpPort } from "./main.config";
 
-async function bootstrap() {
+export async function bootstrap() {
   const app = await NestFactory.create(AppModule, { abortOnError: false });
 
   app.use(json({ limit: "10mb" }));
@@ -33,8 +34,12 @@ async function bootstrap() {
 
   app.use(compression());
 
-  await app.listen(3000);
-  console.log(`localhost:3000 启动成功`);
+  const httpPort = getHttpPort(config);
+
+  await app.listen(httpPort);
+  console.log(`localhost:${httpPort} 启动成功`);
 }
 
-bootstrap();
+if (require.main === module) {
+  bootstrap();
+}

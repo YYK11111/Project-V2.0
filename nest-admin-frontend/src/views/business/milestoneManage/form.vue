@@ -92,7 +92,10 @@ const defaultForm = () => ({
 async function loadMilestone() {
   if (!isMilestoneFormRoute()) return
   if (!hasMilestoneId.value) {
-    form.value = defaultForm()
+    form.value = {
+      ...defaultForm(),
+      projectId: String(route.query.projectId || ''),
+    }
     return
   }
   const { data } = await getOne(route.query.id)

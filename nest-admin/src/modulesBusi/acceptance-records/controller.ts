@@ -18,15 +18,28 @@ export class AcceptanceRecordsController extends BaseController<
   }
 
   @Get("list")
-  async listWithDefaults(@Query() query: QueryListDto) {
+  async list(@Query() query: QueryListDto, @Req() req: any) {
     query.pageNum ??= 1;
     query.pageSize ??= 10;
-    return this.service.list(query);
+    return this.service.list({
+      ...query,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
   }
 
   @Get("getResults")
   getResults() {
     return this.service.getResults();
+  }
+
+  @Get("getOne/:id")
+  async getOne(@Param("id") id: string, @Req() req?: any) {
+    return this.service.getOne({
+      id,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
   }
 
   @Post(":id/submit-approval")
