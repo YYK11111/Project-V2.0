@@ -15,6 +15,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
   }
 
   async save(dto: any) {
+    this.normalizeNullableFields(dto);
     if (!dto.code) {
       dto.code = await this.generateCustomerCode();
     }
@@ -22,6 +23,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
   }
 
   async add(dto: any) {
+    this.normalizeNullableFields(dto);
     if (!dto.code) {
       dto.code = await this.generateCustomerCode();
     }
@@ -128,5 +130,13 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       ...customer,
       sales: this.mapUserSummary(customer.sales),
     };
+  }
+
+  private normalizeNullableFields(
+    dto: Partial<CustomerDto> & { salesId?: string },
+  ) {
+    if (dto.salesId === "") {
+      dto.salesId = null as never;
+    }
   }
 }
