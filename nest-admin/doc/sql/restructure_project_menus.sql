@@ -15,6 +15,10 @@ SELECT '项目信息', 'projectInfo', 'business/projectManage/index', 'menu', @p
 WHERE @projectRoot IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectRoot AND path = 'projectInfo' AND is_delete IS NULL);
 
+SET @projectListId := (
+  SELECT id FROM sys_menu WHERE path = 'projectInfo' AND is_delete IS NULL ORDER BY id LIMIT 1
+);
+
 -- 将项目相关模块挂到项目管理下
 UPDATE sys_menu SET parent_id = @projectRoot, `order` = '2' WHERE path = 'sprintManage' AND is_delete IS NULL;
 UPDATE sys_menu SET parent_id = @projectRoot, `order` = '3' WHERE path = 'milestoneManage' AND is_delete IS NULL;
@@ -22,6 +26,25 @@ UPDATE sys_menu SET parent_id = @projectRoot, `order` = '4' WHERE path = 'riskMa
 UPDATE sys_menu SET parent_id = @projectRoot, `order` = '5' WHERE path = 'changeManage' AND is_delete IS NULL;
 UPDATE sys_menu SET parent_id = @projectRoot, `order` = '6' WHERE path = 'projectMemberManage' AND is_delete IS NULL;
 UPDATE sys_menu SET parent_id = @projectRoot, `order` = '7' WHERE path = 'userStoryManage' AND is_delete IS NULL;
+
+-- 将项目按钮权限收敛到项目列表下
+UPDATE sys_menu
+SET parent_id = @projectListId
+WHERE @projectListId IS NOT NULL
+  AND is_delete IS NULL
+  AND permissionKey IN (
+    'business/projectManage/form',
+    'business/projectManage/detail',
+    'business/projects/list',
+    'business/projects/getOne',
+    'business/projects/add',
+    'business/projects/update',
+    'business/projects/delete',
+    'business/projects/archive',
+    'business/projects/statistics',
+    'business/projects/submitApproval',
+    'business/projects/submitClose'
+  );
 
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT 1, id FROM sys_menu WHERE is_delete IS NULL;

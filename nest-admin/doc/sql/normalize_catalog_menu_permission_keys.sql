@@ -73,7 +73,7 @@ UPDATE sys_menu SET permissionKey = 'business/projectManage/detail'
 WHERE id = 48 AND is_delete IS NULL AND (permissionKey IS NULL OR permissionKey = '');
 UPDATE sys_menu SET permissionKey = 'business/projectManage/index'
 WHERE id = 62 AND is_delete IS NULL AND (permissionKey IS NULL OR permissionKey = '');
-UPDATE sys_menu SET permissionKey = 'business/projectManage/cockpit'
+UPDATE sys_menu SET permissionKey = 'business/projects/dashboard'
 WHERE id = 204 AND is_delete IS NULL AND (permissionKey IS NULL OR permissionKey = '');
 
 UPDATE sys_menu SET permissionKey = 'business/taskManage'

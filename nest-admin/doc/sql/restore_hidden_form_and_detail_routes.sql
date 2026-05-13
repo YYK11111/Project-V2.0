@@ -1,6 +1,10 @@
 SET NAMES utf8mb4;
 
 SET @projectId := (SELECT id FROM sys_menu WHERE path = 'projectManage' AND is_delete IS NULL LIMIT 1);
+SET @projectListId := COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'projectInfo' AND is_delete IS NULL LIMIT 1),
+  @projectId
+);
 SET @taskId := (SELECT id FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL LIMIT 1);
 SET @ticketId := (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND is_delete IS NULL LIMIT 1);
 SET @documentId := (SELECT id FROM sys_menu WHERE path = 'documentManage' AND is_delete IS NULL LIMIT 1);
@@ -15,12 +19,12 @@ SET @opportunityId := (SELECT id FROM sys_menu WHERE path = 'opportunityManage' 
 SET @contractId := (SELECT id FROM sys_menu WHERE path = 'contractManage' AND is_delete IS NULL LIMIT 1);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
-WHERE @projectId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectId AND component = 'business/projectManage/form' AND is_delete IS NULL);
+SELECT '项目表单', 'form', 'business/projectManage/form', 'menu', @projectListId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
+WHERE @projectListId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectListId AND component = 'business/projectManage/form' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '项目详情', 'detail', 'business/projectManage/detail', 'menu', @projectId, '91', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
-WHERE @projectId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectId AND component = 'business/projectManage/detail' AND is_delete IS NULL);
+SELECT '项目详情', 'detail', 'business/projectManage/detail', 'menu', @projectListId, '91', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
+WHERE @projectListId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectListId AND component = 'business/projectManage/detail' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
 SELECT '任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'

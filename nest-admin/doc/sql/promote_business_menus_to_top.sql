@@ -2,8 +2,8 @@
 -- 执行前请备份数据库
 
 -- 1. 将所有业务子菜单的 parent_id 更新为对应的父菜单ID
--- 项目管理及其表单
-UPDATE sys_menu SET parent_id = '26' WHERE name = '项目表单';
+-- 项目管理及其表单 / 详情，统一挂到项目列表下
+UPDATE sys_menu SET parent_id = '62' WHERE name IN ('项目表单', '项目详情');
 
 -- 任务管理及其表单
 UPDATE sys_menu SET parent_id = '27' WHERE name = '任务表单';
@@ -42,5 +42,5 @@ UPDATE sys_menu SET is_hidden = '1' WHERE name = '业务管理';
 SELECT '菜单结构调整完成' AS status;
 SELECT id, name, path, component, type, parent_id, permissionKey, `order`, is_hidden 
 FROM sys_menu 
-WHERE name IN ('业务管理', '项目管理', '任务管理', '工单管理', '文档管理', 'CRM客户管理', '项目表单', '任务表单', '工单表单', '文档表单') 
+WHERE name IN ('业务管理', '项目管理', '项目列表', '项目表单', '项目详情', '任务管理', '工单管理', '文档管理', 'CRM客户管理', '任务表单', '工单表单', '文档表单')
 ORDER BY parent_id, `order`;

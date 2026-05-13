@@ -7,6 +7,10 @@ SET @business_root_id = (
   SELECT id FROM sys_menu WHERE path = 'business' AND type = 'menu' AND is_delete IS NULL ORDER BY id LIMIT 1
 );
 SET @project_menu_id = (SELECT id FROM sys_menu WHERE path = 'projectManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @project_list_menu_id = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'projectInfo' AND is_delete IS NULL ORDER BY id LIMIT 1),
+  (SELECT id FROM sys_menu WHERE permissionKey = 'business/projectManage/index' AND is_delete IS NULL ORDER BY id LIMIT 1)
+);
 SET @task_menu_id = (SELECT id FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @ticket_menu_id = (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @milestone_menu_id = (SELECT id FROM sys_menu WHERE path = 'milestoneManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
@@ -20,32 +24,53 @@ SET @admin_role_id = (SELECT id FROM sys_role WHERE permissionKey = 'admin' ORDE
 
 -- Projects
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '项目列表', '项目列表查询权限', @project_menu_id, '301', 'project-list', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/list'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/list' AND is_delete IS NULL);
+SELECT '项目列表', '项目列表查询权限', @project_list_menu_id, '301', 'project-list', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/list'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '项目详情', '项目详情查看权限', @project_menu_id, '302', 'project-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/getOne'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/getOne' AND is_delete IS NULL);
+SELECT '项目详情', '项目详情查看权限', @project_list_menu_id, '302', 'project-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/getOne'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/getOne' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '新增项目', '新增项目权限', @project_menu_id, '303', 'project-add', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/add'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/add' AND is_delete IS NULL);
+SELECT '新增项目', '新增项目权限', @project_list_menu_id, '303', 'project-add', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/add'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '修改项目', '修改项目权限', @project_menu_id, '304', 'project-update', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/update'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/update' AND is_delete IS NULL);
+SELECT '修改项目', '修改项目权限', @project_list_menu_id, '304', 'project-update', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/update'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/update' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '删除项目', '删除项目权限', @project_menu_id, '305', 'project-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/delete'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/delete' AND is_delete IS NULL);
+SELECT '删除项目', '删除项目权限', @project_list_menu_id, '305', 'project-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/delete'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/delete' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '归档项目', '归档项目权限', @project_menu_id, '306', 'project-archive', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/archive'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/archive' AND is_delete IS NULL);
+SELECT '归档项目', '归档项目权限', @project_list_menu_id, '306', 'project-archive', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/archive'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/archive' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '项目统计', '项目统计查看权限', @project_menu_id, '307', 'project-statistics', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/statistics'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/statistics' AND is_delete IS NULL);
+SELECT '项目统计', '项目统计查看权限', @project_list_menu_id, '307', 'project-statistics', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/statistics'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/statistics' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '提交项目审批', '提交项目审批权限', @project_menu_id, '308', 'project-submitApproval', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/submitApproval'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/submitApproval' AND is_delete IS NULL);
+SELECT '提交项目审批', '提交项目审批权限', @project_list_menu_id, '308', 'project-submitApproval', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/submitApproval'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/submitApproval' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '提交项目结项', '提交项目结项权限', @project_menu_id, '309', 'project-submitClose', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/submitClose'
-WHERE @project_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/submitClose' AND is_delete IS NULL);
+SELECT '提交项目结项', '提交项目结项权限', @project_list_menu_id, '309', 'project-submitClose', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/submitClose'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/submitClose' AND is_delete IS NULL);
+
+UPDATE sys_menu
+SET parent_id = @project_list_menu_id,
+    update_user = 'system',
+    update_time = NOW()
+WHERE @project_list_menu_id IS NOT NULL
+  AND is_delete IS NULL
+  AND parent_id = @project_menu_id
+  AND permissionKey IN (
+    'business/projectManage/form',
+    'business/projectManage/detail',
+    'business/projects/list',
+    'business/projects/getOne',
+    'business/projects/add',
+    'business/projects/update',
+    'business/projects/delete',
+    'business/projects/archive',
+    'business/projects/statistics',
+    'business/projects/submitApproval',
+    'business/projects/submitClose'
+  );
 
 -- Tasks
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)

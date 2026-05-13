@@ -70,7 +70,10 @@ SET permissionKey = 'business/projects/dashboard',
     update_user = 'system',
     update_time = NOW()
 WHERE id = @cockpit_menu_id
-  AND permissionKey = 'business/projects/cockpit'
+  AND permissionKey IN (
+    'business/projectManage/cockpit',
+    'business/projects/cockpit'
+  )
   AND is_delete IS NULL;
 
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)

@@ -21,9 +21,18 @@ DELETE FROM sys_menu WHERE path = '/projectManage/form' AND parent_id = @project
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
 VALUES ('项目列表', 'index', 'business/projectManage/index', 'menu', @projectId, '1', 'list', '0', '1', NULL, 'business/projectInfo', NOW(), 'system');
 
+SET @projectListId = (
+  SELECT id FROM sys_menu
+  WHERE parent_id = @projectId
+    AND path = 'index'
+    AND permissionKey = 'business/projectInfo'
+    AND is_delete IS NULL
+  LIMIT 1
+);
+
 -- 重新添加项目表单页（使用相对路径）
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '2', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system');
+VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectListId, '2', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system');
 
 -- =====================================================
 -- 2. 任务管理
@@ -73,12 +82,17 @@ VALUES ('文档表单', 'form', 'business/documentManage/form', 'menu', @documen
 -- 删除旧的关联关系
 DELETE mc FROM sys_menu_closure mc
 INNER JOIN sys_menu m ON mc.id_descendant = m.id
-WHERE m.parent_id IN (@projectId, @taskId, @ticketId, @documentId)
+WHERE m.parent_id IN (@projectId, @projectListId, @taskId, @ticketId, @documentId)
 AND mc.id_ancestor != mc.id_descendant;
 
 -- 添加新的关联关系（项目管理）
 INSERT INTO sys_menu_closure (id_ancestor, id_descendant)
 SELECT @projectId, id FROM sys_menu WHERE parent_id = @projectId
+ON DUPLICATE KEY UPDATE id_ancestor = id_ancestor;
+
+-- 添加新的关联关系（项目列表）
+INSERT INTO sys_menu_closure (id_ancestor, id_descendant)
+SELECT @projectListId, id FROM sys_menu WHERE parent_id = @projectListId
 ON DUPLICATE KEY UPDATE id_ancestor = id_ancestor;
 
 -- 添加新的关联关系（任务管理）

@@ -7,6 +7,10 @@ SET @businessId = (SELECT id FROM sys_menu WHERE path = 'business' AND type = 'c
 
 -- 获取各业务菜单ID
 SET @projectId = (SELECT id FROM sys_menu WHERE path = 'projectManage' AND parent_id = @businessId);
+SET @projectListId = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'projectInfo' AND parent_id = @projectId LIMIT 1),
+  @projectId
+);
 SET @taskId = (SELECT id FROM sys_menu WHERE path = 'taskManage' AND parent_id = @businessId);
 SET @ticketId = (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND parent_id = @businessId);
 SET @documentId = (SELECT id FROM sys_menu WHERE path = 'documentManage' AND parent_id = @businessId);
@@ -15,7 +19,7 @@ SET @documentId = (SELECT id FROM sys_menu WHERE path = 'documentManage' AND par
 -- 项目管理 - 表单路由
 -- =====================================================
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectId, '99', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system')
+VALUES ('项目表单', 'form', 'business/projectManage/form', 'menu', @projectListId, '99', '', '1', '1', NULL, 'business/projects/update', NOW(), 'system')
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- =====================================================
