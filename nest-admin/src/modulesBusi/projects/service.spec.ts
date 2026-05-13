@@ -340,4 +340,35 @@ describe("ProjectsService closure guards", () => {
     ]);
     expect(result.selectedProjectId).toBe("p1");
   });
+
+  it("自动生成里程碑缺少负责人时应默认回填项目负责人和操作人", async () => {
+    const { service } = createService();
+    const milestoneRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+      save: jest.fn(),
+    };
+    (service as any).repository.findOne = jest.fn().mockResolvedValue({
+      id: "p1",
+      leaderId: "leader-1",
+    });
+
+    await (service as any).syncMilestones(
+      "p1",
+      [
+        {
+          name: "项目启动",
+        },
+      ],
+      milestoneRepository as any,
+      "operator-1",
+    );
+
+    expect(milestoneRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: "leader-1",
+        creatorId: "operator-1",
+      }),
+    );
+  });
 });

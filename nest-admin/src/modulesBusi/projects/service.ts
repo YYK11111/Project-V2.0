@@ -424,7 +424,12 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       await this.syncProjectSourceLinks(manager, saved, previousProject);
 
       await this.syncMembers(saved.id, members, projectMemberRepository);
-      await this.syncMilestones(saved.id, milestones, milestoneRepository);
+      await this.syncMilestones(
+        saved.id,
+        milestones,
+        milestoneRepository,
+        operatorId,
+      );
       await this.associateFilesInTransaction(manager, saved.id, attachments);
 
       return projectRepository.findOne({
@@ -1328,8 +1333,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     projectId: string,
     milestones: any[],
     repository = this.milestoneRepository,
+    operatorId?: string,
   ) {
     const existingMilestones = await repository.find({ where: { projectId } });
+    const project = await this.repository.findOne({
+      where: { id: projectId, isDelete: null as any } as any,
+      select: ["id", "leaderId"] as any,
+    });
+    const fallbackOwnerId = String(project?.leaderId || "") || null;
     const today = new Date().toISOString().split("T")[0];
     const incomingIds = new Set(
       milestones.filter((item) => item.id).map((item) => String(item.id)),
@@ -1360,7 +1371,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         completedDate,
         status: normalizedStatus,
         deliverables: milestone.deliverables || [],
-        ownerId: milestone.ownerId || null,
+        ownerId: milestone.ownerId || fallbackOwnerId,
+        creatorId: existingMilestone?.creatorId || operatorId || null,
         delayReason: milestone.delayReason || "",
         sort: Number(milestone.sort ?? index),
       };

@@ -1,17 +1,5 @@
 import request from '@/utils/request'
-
-function normalizePageData(res) {
-  const page = res?.data?.data || res?.data || {}
-  const list = Array.isArray(page) ? page : page.list || page.rows || page.data || []
-  const total = Number((Array.isArray(page) ? res?.total : page.total) || res?.total || 0)
-  return {
-    ...res,
-    list,
-    data: list,
-    rows: list,
-    total,
-  }
-}
+import { normalizePageData } from '@/utils/pageData'
 
 // 获取项目成员列表
 export function getList(params) {

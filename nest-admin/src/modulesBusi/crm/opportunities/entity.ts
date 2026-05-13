@@ -36,7 +36,7 @@ export class SalesOpportunity extends BaseEntity {
   code: string;
 
   // 关联客户
-  @BaseColumn({ length: 36, comment: "客户ID" })
+  @BaseColumn({ type: "bigint", name: "customer_id", comment: "客户ID" })
   @IsNotEmpty({ message: "客户ID不能为空" })
   customerId: string;
 
@@ -81,7 +81,7 @@ export class SalesOpportunity extends BaseEntity {
   actualCloseDate: string;
 
   // 负责人
-  @BaseColumn({ length: 36, comment: "销售负责人ID" })
+  @BaseColumn({ type: "bigint", name: "sales_id", comment: "销售负责人ID" })
   @IsNotEmpty({ message: "销售负责人ID不能为空" })
   salesId: string;
 
@@ -98,6 +98,6 @@ export class SalesOpportunity extends BaseEntity {
   lossReason: string;
 
   // 关联项目
-  @BaseColumn({ length: 36, nullable: true, comment: "关联项目ID" })
+  @BaseColumn({ type: "bigint", nullable: true, comment: "关联项目ID" })
   projectId: string;
 }

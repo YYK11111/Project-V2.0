@@ -1,20 +1,8 @@
 // @ts-nocheck
 import request from '@/utils/request'
+import { normalizePageData } from '@/utils/pageData'
 
 const baseUrl = '/business/go-live-records'
-
-function normalizePageData(res) {
-  const page = res?.data?.data || res?.data || {}
-  const list = page.list || page.rows || []
-  const total = Number(page.total || res?.total || 0)
-  return {
-    ...res,
-    list,
-    data: list,
-    rows: list,
-    total,
-  }
-}
 
 export function getList(params) {
   return request({ url: `${baseUrl}/list`, method: 'get', params }).then(normalizePageData)

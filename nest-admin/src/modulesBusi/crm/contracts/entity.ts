@@ -35,7 +35,7 @@ export class Contract extends BaseEntity {
   code: string;
 
   // 关联信息
-  @BaseColumn({ length: 36, comment: "客户ID" })
+  @BaseColumn({ type: "bigint", name: "customer_id", comment: "客户ID" })
   @IsNotEmpty({ message: "客户ID不能为空" })
   customerId: string;
 
@@ -43,10 +43,10 @@ export class Contract extends BaseEntity {
   @JoinColumn({ name: "customer_id" })
   customer: Customer;
 
-  @BaseColumn({ length: 36, nullable: true, comment: "关联机会ID" })
+  @BaseColumn({ type: "bigint", nullable: true, comment: "关联机会ID" })
   opportunityId: string;
 
-  @BaseColumn({ length: 36, nullable: true, comment: "关联项目ID" })
+  @BaseColumn({ type: "bigint", nullable: true, comment: "关联项目ID" })
   projectId: string;
 
   // 合同金额
@@ -100,7 +100,7 @@ export class Contract extends BaseEntity {
   status: string;
 
   // 负责人
-  @BaseColumn({ length: 36, comment: "合同负责人ID" })
+  @BaseColumn({ type: "bigint", name: "owner_id", comment: "合同负责人ID" })
   @IsNotEmpty({ message: "合同负责人ID不能为空" })
   ownerId: string;
 

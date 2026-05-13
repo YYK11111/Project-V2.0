@@ -19,7 +19,7 @@ export class CustomerInteraction extends BaseEntity {
     this.assignOwn(obj);
   }
 
-  @BaseColumn({ length: 36, comment: "客户ID" })
+  @BaseColumn({ type: "bigint", name: "customer_id", comment: "客户ID" })
   @IsNotEmpty({ message: "客户ID不能为空" })
   customerId: string;
 

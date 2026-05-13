@@ -1,20 +1,8 @@
 // @ts-nocheck
 import request from '@/utils/request'
+import { normalizePageData } from '@/utils/pageData'
 
 const baseUrl = '/business/crm/customers'
-
-function normalizePageData(res) {
-  const page = res?.data?.data || res?.data || {}
-  const list = Array.isArray(page) ? page : page.list || page.rows || page.data || []
-  const total = Number((Array.isArray(page) ? res?.total : page.total) || res?.total || 0)
-  return {
-    ...res,
-    list,
-    data: list,
-    rows: list,
-    total,
-  }
-}
 
 export function getList(params) {
   return request({ url: `${baseUrl}/list`, method: 'get', params }).then(normalizePageData)
@@ -50,4 +38,16 @@ export function getCustomerStatuses() {
 
 export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
+}
+
+export function grantCustomerViewAccess(id, userIds) {
+  return request({ url: `${baseUrl}/${id}/auth`, method: 'post', data: { userIds } })
+}
+
+export function revokeCustomerViewAccess(id, userId) {
+  return request({ url: `${baseUrl}/${id}/auth/${userId}`, method: 'delete' })
+}
+
+export function getCustomerAuthUsers(id) {
+  return request({ url: `${baseUrl}/${id}/auth-users`, method: 'get' })
 }

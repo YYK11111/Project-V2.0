@@ -1,17 +1,5 @@
 import request from '@/utils/request'
-
-function normalizePageData(res) {
-  const page = res?.data?.data || res?.data || {}
-  const list = page.list || []
-  const total = Number(page.total || 0)
-  return {
-    ...res,
-    list,
-    data: list,
-    rows: list,
-    total,
-  }
-}
+import { normalizePageData } from '@/utils/pageData'
 
 export function getList(params) {
   return request.get('/business/changes/list', params).then(normalizePageData)
