@@ -383,4 +383,13 @@ WHERE @admin_role_id IS NOT NULL
     ,'business/workflow/fields/list', 'business/workflow/fields/generate', 'business/workflow/fields/update', 'business/workflow/fields/delete'
   );
 
+-- Grant all business action buttons to the normal user role.
+INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
+SELECT @user_role_id, id
+FROM sys_menu
+WHERE @user_role_id IS NOT NULL
+  AND is_delete IS NULL
+  AND type = 'button'
+  AND permissionKey LIKE 'business/%';
+
 SET FOREIGN_KEY_CHECKS = 1;

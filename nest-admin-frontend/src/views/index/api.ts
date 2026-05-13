@@ -17,6 +17,10 @@ export interface HomeMessageItem {
   id?: string | number
   title?: string
   businessTitle?: string
+  businessType?: string
+  sourceType?: string
+  linkUrl?: string
+  linkParams?: Record<string, any>
   createTime?: string
   updateTime?: string
   startTime?: string

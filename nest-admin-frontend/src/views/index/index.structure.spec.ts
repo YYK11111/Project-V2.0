@@ -32,6 +32,15 @@ describe('user home structure', () => {
     expect(source).toContain('负责人：')
   })
 
+  it('用户首页待办点击应走消息路由解析而不是固定跳消息中心', () => {
+    const source = readSource()
+
+    expect(source).toContain('function getTodoRoute(row: HomeMessageItem)')
+    expect(source).toContain('async function goTodo(row: HomeMessageItem)')
+    expect(source).toContain('const target = getTodoRoute(row)')
+    expect(source).toContain("@click=\"goTodo(item)\"")
+  })
+
   it('移除了首页文件中的 ts-nocheck 和未使用旧接口', () => {
     const source = readSource()
     const apiSource = readApiSource()

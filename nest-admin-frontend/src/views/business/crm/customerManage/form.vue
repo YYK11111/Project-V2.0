@@ -65,22 +65,6 @@ getCustomerLevels().then(({ data }) => (customerLevels.value = data))
 const customerStatuses = ref({})
 getCustomerStatuses().then(({ data }) => (customerStatuses.value = data))
 
-// 获取部门树
-const deptList = ref([])
-getDeptTrees().then((res) => {
-  // 将树形结构展平为列表
-  const flattenDepts = (depts, result = []) => {
-    depts.forEach(dept => {
-      result.push(dept)
-      if (dept.children && dept.children.length > 0) {
-        flattenDepts(dept.children, result)
-      }
-    })
-    return result
-  }
-  deptList.value = res.data ? flattenDepts(res.data).map(d => ({ ...d, id: String(d.id) })) : []
-})
-
 const isView = computed(() => route.query.action === 'view')
 const hasCustomerId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
@@ -96,13 +80,33 @@ const canSubmitCurrentApproval = computed(() => canSubmitApprovalAction.value)
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
 
+// 获取部门树
+const deptList = ref([])
+if (!isReadonly.value) {
+  getDeptTrees().then((res) => {
+    // 将树形结构展平为列表
+    const flattenDepts = (depts, result = []) => {
+      depts.forEach(dept => {
+        result.push(dept)
+        if (dept.children && dept.children.length > 0) {
+          flattenDepts(dept.children, result)
+        }
+      })
+      return result
+    }
+    deptList.value = res.data ? flattenDepts(res.data).map(d => ({ ...d, id: String(d.id) })) : []
+  })
+}
+
 const isCustomerFormRoute = useCurrentRouteGuard(route, '/crm/customerManage/form')
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map(dept => [String(dept.id), dept.name])))
 
-getUserList({ pageNum: 1, pageSize: 1000 }).then((res) => {
-  const page = res?.data?.data || res?.data || res || {}
-  salesUserList.value = Array.isArray(page) ? page : page.list || page.rows || page.data || []
-})
+if (!isReadonly.value) {
+  getUserList({ pageNum: 1, pageSize: 1000 }).then((res) => {
+    const page = res?.data?.data || res?.data || res || {}
+    salesUserList.value = Array.isArray(page) ? page : page.list || page.rows || page.data || []
+  })
+}
 
 const defaultForm = () => ({
   name: '',
@@ -139,6 +143,7 @@ async function syncDeptIdBySalesId(salesId) {
 }
 
 watch(() => form.value.salesId, (salesId) => {
+  if (isReadonly.value) return
   if (!salesId) {
     salesDeptSyncRequestId += 1
     form.value.deptId = ''

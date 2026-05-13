@@ -68,6 +68,32 @@ function getMessageTime(row: HomeMessageItem): string {
   return row.createTime || row.updateTime || row.startTime || '-'
 }
 
+function getTodoRoute(row: HomeMessageItem) {
+  const queryParams = row.linkParams || {}
+  const normalizedLinkUrl = row.linkUrl === '/system/messageCenter/index' ? '/messageCenter' : row.linkUrl
+  const isProjectWorkflowTodo =
+    (row.businessType === 'project' || row.sourceType === 'workflow_task')
+    && queryParams.fromWorkflow === '1'
+    && queryParams.taskId
+    && queryParams.id
+
+  if (isProjectWorkflowTodo && normalizedLinkUrl === '/projectManage/detail') {
+    return { path: '/projectManage/approval', query: queryParams }
+  }
+
+  if (!normalizedLinkUrl) return null
+  return { path: normalizedLinkUrl, query: queryParams }
+}
+
+async function goTodo(row: HomeMessageItem) {
+  const target = getTodoRoute(row)
+  if (target) {
+    await router.push(target)
+    return
+  }
+  await router.push('/user/messages')
+}
+
 function getMessageTitle(row: HomeMessageItem): string {
   return row.title || row.businessTitle || '暂无标题'
 }
@@ -156,7 +182,7 @@ onMounted(() => {
       <div class="Gcard flexCol stickyPadding" v-loading="loading">
         <div class="GcardTitle stickyTop !top-(--Padding)">我的待办</div>
         <div v-if="todoList.length" class="list-panel">
-          <button v-for="item in todoList" :key="item.id || item.title" class="list-item" type="button" @click="goTo('/user/messages')">
+          <button v-for="item in todoList" :key="item.id || item.title" class="list-item" type="button" @click="goTodo(item)">
             <span class="item-title">{{ getMessageTitle(item) }}</span>
             <span class="item-meta">{{ getMessageTime(item) }}</span>
           </button>

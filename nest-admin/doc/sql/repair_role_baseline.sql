@@ -48,6 +48,14 @@ FROM `sys_menu`
 WHERE `path` IN ('index', 'content')
    OR `name` IN ('首页', '工作台', '内容管理', '文章管理', '文章列表');
 
+-- 6. Restore normal user business button permissions.
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`)
+SELECT 2, `id`
+FROM `sys_menu`
+WHERE `is_delete` IS NULL
+  AND `type` = 'button'
+  AND `permissionKey` LIKE 'business/%';
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Verification snapshot

@@ -31,6 +31,16 @@ function getFooterActionsBlock(source: string) {
   return match?.[0] || ''
 }
 
+function getUserListBlock(source: string) {
+  const match = source.match(/if\s*\(!isReadonly\.value\)\s*\{[\s\S]*?getUserList\(\{ pageNum: 1, pageSize: 1000 \}\)[\s\S]*?\n\}/)
+  return match?.[0] || ''
+}
+
+function getDeptTreeBlock(source: string) {
+  const match = source.match(/if\s*\(!isReadonly\.value\)\s*\{[\s\S]*?getDeptTrees\(\)\.then\(\(res\) => \{[\s\S]*?\n\}/)
+  return match?.[0] || ''
+}
+
 function getHandleSubmitApprovalBlock(source: string) {
   const match = source.match(/async function handleSubmitApproval\(\) \{[\s\S]*?\n\}/)
   return match?.[0] || ''
@@ -48,6 +58,8 @@ describe('customer form approval contract', () => {
   const salesIdWatchBlock = getSalesIdWatchBlock(source)
   const customerAttributeSection = getSectionBlock(source, '客户属性与说明')
   const footerActionsBlock = getFooterActionsBlock(source)
+  const userListBlock = getUserListBlock(source)
+  const deptTreeBlock = getDeptTreeBlock(source)
   const handleSubmitApprovalBlock = getHandleSubmitApprovalBlock(source)
   const descriptionFormItemBlock = getFormItemBlock(customerAttributeSection, '客户描述')
 
@@ -55,11 +67,23 @@ describe('customer form approval contract', () => {
     expect(initialFormBlock).toMatch(/deptId\s*:\s*currentUserDeptId\.value/)
     expect(defaultFormBlock).toMatch(/deptId\s*:\s*currentUserDeptId\.value/)
     expect(source).toContain("import { getList as getUserList, getOne as getUserOne } from '@/views/system/users/api'")
+    expect(userListBlock).toContain("if (!isReadonly.value) {")
+    expect(userListBlock).toContain("getUserList({ pageNum: 1, pageSize: 1000 })")
     expect(source).toMatch(/async function syncDeptIdBySalesId\(salesId\) \{[\s\S]*?const selectedUser = salesUserList\.value\.find/) 
     expect(source).toMatch(/const \{ data \} = await getUserOne\(salesId\)/)
     expect(salesIdWatchBlock).toMatch(/watch\(\s*\(\)\s*=>\s*form\.value\.salesId/s)
     expect(salesIdWatchBlock).toMatch(/if\s*\(!salesId\)\s*\{[\s\S]*?form\.value\.deptId\s*=\s*''\s*return\s*\}/)
     expect(salesIdWatchBlock).toMatch(/syncDeptIdBySalesId\(salesId\)\.catch\(\(\)\s*=>\s*\{[\s\S]*?form\.value\.deptId\s*=\s*''/)
+  })
+
+  it('审批只读场景不应请求系统用户列表', () => {
+    expect(userListBlock).toContain('if (!isReadonly.value) {')
+    expect(userListBlock).toContain('getUserList({ pageNum: 1, pageSize: 1000 }).then((res) => {')
+  })
+
+  it('审批只读场景不应请求部门树', () => {
+    expect(deptTreeBlock).toContain('if (!isReadonly.value) {')
+    expect(deptTreeBlock).toContain('getDeptTrees().then((res) => {')
   })
 
   it('所属部门值统一使用字符串，避免选择器回填失效', () => {
