@@ -39,10 +39,11 @@ const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/s
 const recalculatingProgress = ref(false)
 
 function getProjectApprovalText(row) {
+  if (row?.approvalStatus === '0') return '未提交审批'
   const hasApprovalStarted = Boolean(row?.workflowInstanceId) || !['', '0', undefined, null].includes(row?.approvalStatus)
   if (!hasApprovalStarted) return '-'
   if (row?.approvalStatus === '3' && String(row?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
-  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row?.approvalStatus] || '-')
+  return ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row?.approvalStatus] || '-')
 }
 
 function canEditProject(row) {

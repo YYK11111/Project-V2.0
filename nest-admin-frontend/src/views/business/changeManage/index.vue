@@ -94,7 +94,7 @@ function exportChangeList() {
       typeMap.value[row.type] || row.type || '-',
       { '1': '低', '2': '中', '3': '高' }[row.impact] || '-',
       statusMap.value[row.status] || '-',
-      ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批'),
+      ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '未提交审批'),
       row.costImpact || 0,
       row.scheduleImpact || 0,
       row.knowledgeLinked === '1' ? '已关联' : '未关联',
@@ -210,7 +210,7 @@ watch(
         <el-table-column prop="approvalStatus" label="审批状态" width="110">
           <template #default="{ row }">
             <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '未提交审批') }}
             </el-tag>
           </template>
         </el-table-column>

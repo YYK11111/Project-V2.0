@@ -70,10 +70,8 @@ const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
 const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
 
 function getProjectApprovalText(project) {
-  const hasApprovalStarted = Boolean(project?.workflowInstanceId) || !['', '0', undefined, null].includes(project?.approvalStatus)
-  if (!hasApprovalStarted) return '-'
   if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
-  return ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
+  return ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[project?.approvalStatus] || '-')
 }
 
 function getApprovalType(status) {

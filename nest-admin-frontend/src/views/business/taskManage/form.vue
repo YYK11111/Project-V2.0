@@ -1068,7 +1068,7 @@ watch(hasTaskId, (value) => {
 
         <div class="task-approval-fields">
         <el-form-item v-if="hasTaskId" label="审批状态">
-          <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
+          <ViewTagField :text="{ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '未提交审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
         </el-form-item>
 
         <el-form-item label="当前审批节点" v-if="hasTaskId && form.currentNodeName">

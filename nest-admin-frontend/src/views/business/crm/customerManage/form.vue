@@ -2,10 +2,13 @@
 import { watch } from 'vue'
 import { getOne, save, update, getCustomerTypes, getCustomerLevels, getCustomerStatuses, submitApproval } from './api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
+import { getList as getUserList, getOne as getUserOne } from '@/views/system/users/api'
 import { ElMessageBox } from 'element-plus'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
 import { useUserStore } from '@/stores/user'
+import Editor from '@/components/Editor/index.vue'
 import UserSelect from '@/components/UserSelect.vue'
+import ViewRichText from '@/components/view/ViewRichText.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
@@ -17,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const currentUserId = computed(() => String(userStore.id || ''))
+const currentUserDeptId = computed(() => String(userStore.deptId || userStore.dept?.id || ''))
 
 const formRef = ref()
 const form = ref({
@@ -34,10 +38,13 @@ const form = ref({
   level: '2',
   status: '1',
   salesId: currentUserId.value,
-  deptId: '',
+  deptId: currentUserDeptId.value,
   description: '',
   customerValue: null,
 })
+const salesUserList = ref([])
+const isLoadingCustomer = ref(false)
+let salesDeptSyncRequestId = 0
 
 const rules = {
   name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
@@ -71,7 +78,7 @@ getDeptTrees().then((res) => {
     })
     return result
   }
-  deptList.value = res.data ? flattenDepts(res.data).map(d => ({...d, id: Number(d.id)})) : []
+  deptList.value = res.data ? flattenDepts(res.data).map(d => ({ ...d, id: String(d.id) })) : []
 })
 
 const isView = computed(() => route.query.action === 'view')
@@ -84,12 +91,18 @@ const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
-const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
+const canSubmitApprovalAction = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
+const canSubmitCurrentApproval = computed(() => canSubmitApprovalAction.value)
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
 
 const isCustomerFormRoute = useCurrentRouteGuard(route, '/crm/customerManage/form')
 const deptMap = computed(() => Object.fromEntries((deptList.value || []).map(dept => [String(dept.id), dept.name])))
+
+getUserList({ pageNum: 1, pageSize: 1000 }).then((res) => {
+  const page = res?.data?.data || res?.data || res || {}
+  salesUserList.value = Array.isArray(page) ? page : page.list || page.rows || page.data || []
+})
 
 const defaultForm = () => ({
   name: '',
@@ -106,9 +119,36 @@ const defaultForm = () => ({
   level: '2',
   status: '1',
   salesId: currentUserId.value,
-  deptId: '',
+  deptId: currentUserDeptId.value,
   description: '',
   customerValue: null,
+})
+
+async function syncDeptIdBySalesId(salesId) {
+  const currentRequestId = ++salesDeptSyncRequestId
+  const selectedUser = salesUserList.value.find((user) => String(user?.id || '') === String(salesId))
+
+  if (selectedUser) {
+    form.value.deptId = String(selectedUser?.deptId || selectedUser?.dept?.id || '')
+    return
+  }
+
+  const { data } = await getUserOne(salesId)
+  if (currentRequestId !== salesDeptSyncRequestId || String(form.value.salesId || '') !== String(salesId)) return
+  form.value.deptId = String(data?.deptId || data?.dept?.id || '')
+}
+
+watch(() => form.value.salesId, (salesId) => {
+  if (!salesId) {
+    salesDeptSyncRequestId += 1
+    form.value.deptId = ''
+    return
+  }
+  if (isLoadingCustomer.value) return
+  syncDeptIdBySalesId(salesId).catch(() => {
+    if (String(form.value.salesId || '') !== String(salesId)) return
+    form.value.deptId = ''
+  })
 })
 
 async function loadCustomer() {
@@ -117,8 +157,15 @@ async function loadCustomer() {
     form.value = defaultForm()
     return
   }
-  const { data } = await getOne(route.query.id)
-  form.value = { ...data }
+  isLoadingCustomer.value = true
+  try {
+    const { data } = await getOne(route.query.id)
+    form.value = { ...data }
+    form.value.salesId = String(data?.salesId || data?.sales?.id || '')
+    form.value.deptId = String(data?.deptId || data?.dept?.id || '')
+  } finally {
+    isLoadingCustomer.value = false
+  }
 }
 
 watch(
@@ -134,6 +181,20 @@ function reloadCurrent() {
   loadCustomer()
 }
 
+function persistCustomer(api) {
+  return api(form.value).then((res) => {
+    const customerId = String(res?.id || res?.data?.id || form.value.id || route.query.id || '')
+    if (!customerId) {
+      throw new Error('客户保存成功，但未获取到客户ID')
+    }
+    form.value.id = customerId
+    if (!isEdit.value) {
+      router.replace({ path: '/crm/customerManage/form', query: { id: customerId } })
+    }
+    return customerId
+  })
+}
+
 function submit() {
   if ((isEdit.value && !canCustomerUpdate.value) || (!isEdit.value && !canCustomerAdd.value)) {
     return $sdk.msgWarning('当前操作没有权限')
@@ -141,9 +202,11 @@ function submit() {
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
-      api(form.value).then(() => {
-        $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
+      persistCustomer(api).then(() => {
+        $sdk.msgSuccess(isEdit.value ? '暂存成功' : '新建客户已暂存')
         router.back()
+      }).catch((error) => {
+        $sdk.msgError(error?.message || '客户保存失败')
       })
     }
   })
@@ -154,17 +217,29 @@ function cancel() {
 }
 
 async function handleSubmitApproval() {
-  if (!canCustomerUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  if (canCloseReturnedInstance.value) {
-    await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
-    $sdk.msgSuccess('重新提交审批成功')
-    reloadCurrent()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    return
+  if ((isEdit.value && !canCustomerUpdate.value) || (!isEdit.value && !canCustomerAdd.value)) return $sdk.msgWarning('当前操作没有权限')
+  if (!canCloseReturnedInstance.value && !canSubmitApprovalAction.value) {
+    return $sdk.msgWarning('当前状态不允许提交审批')
   }
-  await submitApproval(route.query.id)
-  $sdk.msgSuccess('提交审批成功')
-  router.back()
+  formRef.value.validate(async (valid) => {
+    if (!valid) return
+    try {
+      const api = isEdit.value ? update : save
+      const customerId = await persistCustomer(api)
+      if (canCloseReturnedInstance.value) {
+        await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
+        $sdk.msgSuccess('重新提交审批成功')
+        reloadCurrent()
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return customerId
+      }
+      await submitApproval(customerId)
+      $sdk.msgSuccess('提交审批成功')
+      router.back()
+    } catch (error) {
+      $sdk.msgError(error?.message || '提交审批失败')
+    }
+  })
 }
 
 async function handleCloseReturnedInstance() {
@@ -339,7 +414,7 @@ function scrollToWorkflowPanel() {
       </el-row>
 
       <el-form-item label="审批状态" v-if="isEdit">
-        <ViewTagField :text="{ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '无需审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
+        <ViewTagField :text="{ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[form.approvalStatus] || '未提交审批'" :type="form.approvalStatus === '2' ? 'success' : form.approvalStatus === '1' ? 'warning' : form.approvalStatus === '3' ? 'danger' : 'info'" />
       </el-form-item>
 
       <el-form-item label="当前审批节点" v-if="isEdit && form.currentNodeName">
@@ -384,23 +459,16 @@ function scrollToWorkflowPanel() {
         <div class="customer-section-fields">
 
       <el-form-item label="客户描述" prop="description">
-        <ViewField v-if="isReadonly" :value="form.description" />
-        <el-input
-          v-else
-          v-model="form.description"
-          type="textarea"
-          :rows="4"
-          placeholder="请输入客户描述"
-          maxlength="1000"
-          show-word-limit />
+        <ViewRichText v-if="isReadonly" :html="form.description" />
+        <Editor v-else v-model="form.description" style="min-height: 220px" />
       </el-form-item>
         </div>
       </section>
 
       <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">提交</el-button>
+        <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">暂存</el-button>
         <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-        <el-button v-if="!isReadonly && isEdit && canCustomerUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+        <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd) && canSubmitApprovalAction" type="warning" @click="handleSubmitApproval">提交</el-button>
       </el-form-item>
       </div>
     </el-form>

@@ -6,6 +6,8 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     id: '',
     name: '',
+    deptId: '',
+    dept: null,
     avatar: new URL('@/assets/image/profile.jpg', import.meta.url).href,
     roles: [],
     permissions: [],
@@ -15,6 +17,8 @@ export const useUserStore = defineStore('user', {
     clearUserState() {
       this.id = ''
       this.name = ''
+      this.deptId = ''
+      this.dept = null
       this.avatar = new URL('@/assets/image/profile.jpg', import.meta.url).href
       this.roles = []
       this.permissions = []
@@ -38,6 +42,8 @@ export const useUserStore = defineStore('user', {
         const { data: user = {} } = await getUserInfo()
         this.id = user.id
         this.name = user.name
+        this.deptId = String(user.deptId || user.dept?.id || '')
+        this.dept = user.dept || null
         // 修复：只有当 avatar 存在且不为 null 时才拼接路径
         if (user.avatar && user.avatar !== 'null') {
           this.avatar = window.sysConfig.BASE_API + '/static/' + user.avatar

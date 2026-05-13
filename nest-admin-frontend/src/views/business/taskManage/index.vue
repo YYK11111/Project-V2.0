@@ -206,7 +206,7 @@ const getButtons = (row) => [
         <el-table-column label="审批状态" prop="approvalStatus" width="110">
           <template #default="{ row }">
             <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
-              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '无需审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '无需审批') }}
+              {{ row.approvalStatus === '3' && String(row.currentNodeName || '').includes('退回发起人') ? '已退回发起人' : ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row.approvalStatus] || '未提交审批') }}
             </el-tag>
           </template>
         </el-table-column>
