@@ -4,6 +4,7 @@ import { getOne, save, update, getCustomerTypes, getCustomerLevels, getCustomerS
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { ElMessageBox } from 'element-plus'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
+import { useUserStore } from '@/stores/user'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewField from '@/components/view/ViewField.vue'
@@ -14,6 +15,8 @@ import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const currentUserId = computed(() => String(userStore.id || ''))
 
 const formRef = ref()
 const form = ref({
@@ -30,7 +33,7 @@ const form = ref({
   contactEmail: '',
   level: '2',
   status: '1',
-  salesId: '',
+  salesId: currentUserId.value,
   deptId: '',
   description: '',
   customerValue: null,
@@ -43,6 +46,7 @@ const rules = {
     { required: true, message: '请输入联系电话', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
+  salesId: [{ required: true, message: '请选择销售负责人', trigger: 'change' }],
 }
 
 const customerTypes = ref({})
@@ -101,7 +105,7 @@ const defaultForm = () => ({
   contactEmail: '',
   level: '2',
   status: '1',
-  salesId: '',
+  salesId: currentUserId.value,
   deptId: '',
   description: '',
   customerValue: null,
