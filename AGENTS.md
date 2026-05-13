@@ -5,18 +5,20 @@
 - Root `package.json` is not an app entrypoint; it only provides a shared check script: `npm run check:api-contract`.
 
 ## Backend (`nest-admin`)
-- Use `npm run dev` for local backend work. It runs `nest start --debug --watch -- -b swc env=dev`.
+- Use `npm run dev` or `npm run start:dev` for local backend work. Both run `nest start --watch -- -b swc env=dev`.
 - `env=...` is required on backend start commands. `config/index.ts` reads `process.argv` to choose config; `npm run start:prod` works because it runs `node dist/src/main env=prod`.
 - Real entrypoint is `src/main.ts`. It registers `tsconfig-paths`, enables CORS, applies global prefix `/api`, and wraps responses with `GlobalInterceptor`.
 - `src/app.module.ts` is the composition root for system modules (`src/modules`), business modules (`src/modulesBusi`), AI (`src/modulesAi`), scheduled tasks, and workflow listeners.
 - `src/common/BaseController.ts` defines the common CRUD routes many modules inherit: `POST /save`, `POST /add`, `PUT /update`, `DELETE /del/:ids`, `GET /list`, `GET /getOne/:id`.
 - Jest unit tests only pick up `src/**/*.spec.ts` because `rootDir` is `src` and `testRegex` is `.*\.spec\.ts$`. E2E tests are separate under `test/*.e2e-spec.ts` via `npm run test:e2e`.
-- Default DB config points to MySQL database `psd2`, and both `dev` and `prod` have TypeORM `synchronize: true`; be conservative with entity changes.
+- Default DB config points to MySQL database `psd2`; `dev` enables TypeORM `synchronize`, while `prod` is forced to `false` by `enforceProductionDatabaseSafety()`.
 - `config/index.ts` merges `config/secret.js` or `config/secret.copy.js` if present. Do not hardcode real secrets into source.
+- `npm run lint` uses `eslint --fix`; expect it to rewrite files instead of only reporting issues.
 
 ## Frontend (`nest-admin-frontend`)
 - Use `npm run dev` for local frontend work. Vite serves on `1994` in development and `1995` in production mode.
 - `npm run test` is not a test runner; it starts Vite with `--mode=test`.
+- Frontend unit tests live behind `npm run test:unit`; for a single spec, use `npx vitest run src/path/to/file.spec.ts`.
 - Real entrypoint is `src/main.ts`, not the older `main.js` mentioned in upstream docs.
 - `sys.config.js` decides runtime environment from `window.location.origin` after build; do not simplify this to `NODE_ENV` only.
 - `src/utils/request.js` uses `/api` in local development and relies on the Vite proxy in `vite.config.ts`. Manual local API calls should usually include `/api`.
@@ -30,7 +32,7 @@
 
 ## Verification Order
 - Backend change: run `npm run lint` in `nest-admin`, then the narrowest relevant Jest command.
-- Frontend change: run `npm run type-check` in `nest-admin-frontend`, then the smallest useful build command only if config/build wiring changed.
+- Frontend change: run `npm run type-check` in `nest-admin-frontend`, then the narrowest relevant `npm run test:unit -- <pattern>` or `npx vitest run <spec>` when behavior changed; only run a build if config/build wiring changed.
 - Cross-stack API change: run the relevant backend/frontend verification plus root `npm run check:api-contract`.
 
 ## Dangerous Script
