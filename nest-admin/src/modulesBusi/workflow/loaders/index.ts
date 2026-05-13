@@ -5,3 +5,4 @@ export * from "./ticket.loader";
 export * from "./change.loader";
 export * from "./go-live.loader";
 export * from "./acceptance.loader";
+export * from "./handover.loader";

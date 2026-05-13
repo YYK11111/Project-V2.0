@@ -20,6 +20,9 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
     "Ticket",
     "ProjectChange",
     "Change",
+    "GoLiveRecord",
+    "AcceptanceRecord",
+    "HandoverRecord",
   ]);
 
   constructor(
@@ -44,6 +47,9 @@ export class WorkflowTriggerListener implements EntitySubscriberInterface {
       Ticket: "ticket",
       ProjectChange: "change",
       Change: "change",
+      GoLiveRecord: "goLive",
+      AcceptanceRecord: "acceptance",
+      HandoverRecord: "handover",
     };
     return map[entityName] || entityName.toLowerCase();
   }

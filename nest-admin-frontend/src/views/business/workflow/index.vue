@@ -87,6 +87,9 @@ const businessTypeMap = {
   customer: '客户',
   ticket: '工单',
   change: '变更请求',
+  goLive: '上线单',
+  acceptance: '验收单',
+  handover: '运维交接单',
 }
 
 const businessSceneOptions = {
@@ -98,6 +101,9 @@ const businessSceneOptions = {
   ticket: [{ label: '工单审批', value: 'approval' }],
   change: [{ label: '变更审批', value: 'approval' }],
   customer: [{ label: '客户审批', value: 'approval' }],
+  goLive: [{ label: '上线审批', value: 'approval' }],
+  acceptance: [{ label: '验收审批', value: 'approval' }],
+  handover: [{ label: '运维交接审批', value: 'approval' }],
 }
 
 const businessSceneLabelMap = {
@@ -207,6 +213,9 @@ const getButtons = (row: any) => [
           <el-option label="客户" value="customer" />
           <el-option label="工单" value="ticket" />
           <el-option label="变更请求" value="change" />
+          <el-option label="上线单" value="goLive" />
+          <el-option label="验收单" value="acceptance" />
+          <el-option label="运维交接单" value="handover" />
         </BaSelect>
         <BaSelect v-model="form.businessScene" prop="businessScene" label="业务场景">
           <el-option v-for="item in (businessSceneOptions[form.businessType] || [])" :key="item.value" :label="item.label" :value="item.value" />

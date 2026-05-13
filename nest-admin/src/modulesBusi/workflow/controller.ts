@@ -39,13 +39,15 @@ export class WorkflowController {
     return String(userId);
   }
 
+  private getCurrentPermissions(req: Record<string, any>): string[] {
+    const permissions = req.permissions || req.user?.permissions || [];
+    return Array.isArray(permissions) ? permissions : [];
+  }
+
   // ==================== 流程定义接口 ====================
 
   @Post("definitions/save")
   async saveDefinition(@Body() body, @Req() req) {
-    console.log(">>> saveDefinition req.body:", JSON.stringify(req.body));
-    console.log(">>> saveDefinition body param:", JSON.stringify(body));
-    console.log(">>> saveDefinition raw body:", req.rawBody);
     if (body.id) {
       delete body.createUser;
       body.updateUser = req.user?.name;
@@ -103,8 +105,12 @@ export class WorkflowController {
   }
 
   @Get("instances/:id")
-  async getInstance(@Param("id") id: string) {
-    return this.workflowService.getInstance(id);
+  async getInstance(@Param("id") id: string, @Req() req) {
+    return this.workflowService.getInstance(
+      id,
+      this.getCurrentUserId(req),
+      this.getCurrentPermissions(req),
+    );
   }
 
   @Get("instances")
@@ -221,13 +227,21 @@ export class WorkflowController {
   }
 
   @Get("instances/:id/history")
-  async getInstanceHistory(@Param("id") id: string) {
-    return this.workflowService.getInstanceHistory(id);
+  async getInstanceHistory(@Param("id") id: string, @Req() req) {
+    return this.workflowService.getInstanceHistory(
+      id,
+      this.getCurrentUserId(req),
+      this.getCurrentPermissions(req),
+    );
   }
 
   @Get("instances/:id/tasks")
-  async getInstanceTasks(@Param("id") id: string) {
-    return this.workflowService.getInstanceTasks(id);
+  async getInstanceTasks(@Param("id") id: string, @Req() req) {
+    return this.workflowService.getInstanceTasks(
+      id,
+      this.getCurrentUserId(req),
+      this.getCurrentPermissions(req),
+    );
   }
 
   @Get("history/my-handled")

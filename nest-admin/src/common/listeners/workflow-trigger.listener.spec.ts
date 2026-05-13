@@ -36,4 +36,34 @@ describe("WorkflowTriggerListener", () => {
     expect(dataLoader.getTriggerConfig).not.toHaveBeenCalled();
     expect(workflowService.startBusinessWorkflow).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["GoLiveRecord", "goLive"],
+    ["AcceptanceRecord", "acceptance"],
+    ["HandoverRecord", "handover"],
+  ])("%s 插入时按业务类型触发创建流程", async (entityName, businessType) => {
+    dataLoader.getTriggerConfig.mockResolvedValue({
+      businessScene: "approval",
+    });
+    const listener = createListener();
+
+    await listener.afterInsert({
+      entity: { id: "biz-1" },
+      metadata: { name: entityName },
+    } as any);
+
+    expect(dataLoader.getTriggerConfig).toHaveBeenCalledWith(
+      businessType,
+      "onCreate",
+    );
+    expect(workflowService.startBusinessWorkflow).toHaveBeenCalledWith(
+      {
+        businessType,
+        businessScene: "approval",
+        businessKey: `${businessType}_biz-1`,
+        variables: { triggerEvent: "onCreate", businessType },
+      },
+      "system",
+    );
+  });
 });

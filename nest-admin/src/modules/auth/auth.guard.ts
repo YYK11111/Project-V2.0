@@ -64,20 +64,22 @@ export class AuthGuard implements CanActivate {
     // 按钮/接口权限校验
     let permissions = await this.redisService.getPermissions();
     let api = request.path.replace(config.apiBase, "").replace(/^\//g, "");
-    if (
-      requiredPermission &&
-      permissions.includes(requiredPermission) &&
-      !this.hasPermission(payload.permissions || [], requiredPermission)
-    ) {
-      throw new HttpException("接口无权限", 403);
-    }
+    if (!this.isAuthenticatedSelfServiceRoute(request)) {
+      if (
+        requiredPermission &&
+        permissions.includes(requiredPermission) &&
+        !this.hasPermission(payload.permissions || [], requiredPermission)
+      ) {
+        throw new HttpException("接口无权限", 403);
+      }
 
-    if (
-      !requiredPermission &&
-      permissions.includes(api) &&
-      !this.hasPermission(payload.permissions || [], api)
-    ) {
-      throw new HttpException("接口无权限", 403);
+      if (
+        !requiredPermission &&
+        permissions.includes(api) &&
+        !this.hasPermission(payload.permissions || [], api)
+      ) {
+        throw new HttpException("接口无权限", 403);
+      }
     }
     const isOnline = await this.redisService.existsOnlineUser(payload.session);
     if (!isOnline) {
@@ -879,6 +881,15 @@ export class AuthGuard implements CanActivate {
 
   private hasPermission(permissions: string[], key: string) {
     return permissions.includes("*") || permissions.includes(key);
+  }
+
+  private isAuthenticatedSelfServiceRoute(request: Request): boolean {
+    const method = request.method.toUpperCase();
+    const api = request.path.replace(config.apiBase, "").replace(/^\//g, "");
+    return [
+      ["GET", "system/roles/getLoginUserMenus"],
+      ["GET", "system/users/getTheme"],
+    ].some(([m, path]) => m === method && path === api);
   }
 
   private isPublicRoute(request: Request): boolean {

@@ -54,6 +54,9 @@ import { WorkflowIntegrationService } from "../../common/services/workflow-integ
 
 @Injectable()
 export class WorkflowService {
+  private readonly businessStartLocks = new Map<string, Promise<void>>();
+  private readonly taskCompletionLocks = new Map<string, Promise<void>>();
+
   constructor(
     @InjectRepository(WorkflowDefinition)
     private definitionRepo: Repository<WorkflowDefinition>,
@@ -144,6 +147,30 @@ export class WorkflowService {
     }
 
     return properties as any;
+  }
+
+  private async runWithLock<T>(
+    locks: Map<string, Promise<void>>,
+    key: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const previousLock = locks.get(key) || Promise.resolve();
+    let release!: () => void;
+    const currentLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queuedLock = previousLock.then(() => currentLock);
+    locks.set(key, queuedLock);
+
+    await previousLock;
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (locks.get(key) === queuedLock) {
+        locks.delete(key);
+      }
+    }
   }
 
   private normalizeDefinitionNodes(nodes: NodeConfig[] = []): NodeConfig[] {
@@ -241,7 +268,6 @@ export class WorkflowService {
    */
   async saveDefinition(dto: any): Promise<any> {
     dto.isActive = dto.id ? undefined : "0";
-    await this.ensureUniquePublishedScene(dto);
 
     if (dto.id) {
       // 更新
@@ -251,7 +277,13 @@ export class WorkflowService {
       if (!definition) {
         throw new BadRequestException("工作流定义不存在");
       }
+
+      if (definition.isActive === "1") {
+        return this.createDraftFromPublishedDefinition(definition, dto);
+      }
+
       delete dto.isActive;
+      await this.ensureUniquePublishedScene({ ...definition, ...dto });
       Object.assign(definition, this.normalizeDefinition(dto));
       const savedDefinition = await this.definitionRepo.save(
         definition as WorkflowDefinition,
@@ -259,8 +291,41 @@ export class WorkflowService {
       return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
     } else {
       // 新增
+      await this.ensureUniquePublishedScene(dto);
       return this.createDefinition(dto);
     }
+  }
+
+  private async createDraftFromPublishedDefinition(
+    definition: WorkflowDefinition,
+    dto: any,
+  ): Promise<WorkflowDefinition> {
+    const latest = await this.definitionRepo.findOne({
+      where: { code: definition.code },
+      order: { version: "DESC" },
+    });
+    const newVersion = latest ? (latest.version || 1) + 1 : 1;
+    const normalizedDto = this.normalizeDefinition(
+      dto as Partial<WorkflowDefinition>,
+    ) as Partial<WorkflowDefinition>;
+    const draft = this.definitionRepo.create({
+      name: normalizedDto.name ?? definition.name,
+      code: definition.code,
+      version: newVersion,
+      category: normalizedDto.category ?? definition.category,
+      description: normalizedDto.description ?? definition.description,
+      nodes: normalizedDto.nodes ?? definition.nodes,
+      flows: normalizedDto.flows ?? definition.flows,
+      globalConfig: normalizedDto.globalConfig ?? definition.globalConfig,
+      businessType: normalizedDto.businessType ?? definition.businessType,
+      businessScene: normalizedDto.businessScene ?? definition.businessScene,
+      triggerEvent: normalizedDto.triggerEvent ?? definition.triggerEvent,
+      statusTriggerValues:
+        normalizedDto.statusTriggerValues ?? definition.statusTriggerValues,
+      isActive: "0",
+    }) as WorkflowDefinition;
+    const savedDefinition = await this.definitionRepo.save(draft);
+    return this.normalizeDefinition(savedDefinition as WorkflowDefinition);
   }
 
   /**
@@ -340,7 +405,16 @@ export class WorkflowService {
       throw new BadRequestException("工作流定义不存在");
     }
 
-    await this.ensureUniquePublishedScene({ ...definition, isActive: "1" }, id);
+    const normalizedDefinition = this.normalizeDefinition(definition);
+    this.validateDefinitionGraph(normalizedDefinition as WorkflowDefinition);
+    const previousPublished = await this.ensureUniquePublishedScene(
+      { ...definition, isActive: "1" },
+      id,
+    );
+    if (previousPublished && previousPublished.id !== id) {
+      previousPublished.isActive = "0";
+      await this.definitionRepo.save(previousPublished);
+    }
     definition.isActive = "1";
     return this.definitionRepo.save(definition);
   }
@@ -427,9 +501,67 @@ export class WorkflowService {
     dto: StartWorkflowDto,
     starterId: string,
   ): Promise<WorkflowInstance> {
+    if (dto.businessKey) {
+      return this.runWithLock(
+        this.businessStartLocks,
+        `start:${dto.businessKey}`,
+        () =>
+          this.runWithDatabaseLock(`workflow:start:${dto.businessKey}`, () =>
+            this.startWorkflowUnlocked(dto, starterId),
+          ),
+      );
+    }
+    return this.startWorkflowUnlocked(dto, starterId);
+  }
+
+  private async runWithDatabaseLock<T>(
+    key: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (typeof (this.instanceRepo as any).query !== "function") {
+      return fn();
+    }
+
+    let locked = false;
+    try {
+      const lockRows = await (this.instanceRepo as any).query(
+        "SELECT GET_LOCK(?, 5) AS locked",
+        [key],
+      );
+      locked = Number(lockRows?.[0]?.locked || 0) === 1;
+      if (!locked) {
+        throw new BadRequestException("当前业务流程正在发起，请稍后重试");
+      }
+      return await fn();
+    } finally {
+      if (locked) {
+        await (this.instanceRepo as any).query(
+          "SELECT RELEASE_LOCK(?) AS released",
+          [key],
+        );
+      }
+    }
+  }
+
+  private async startWorkflowUnlocked(
+    dto: StartWorkflowDto,
+    starterId: string,
+  ): Promise<WorkflowInstance> {
     const definition = dto.code
       ? await this.getDefinitionByCode(dto.code)
       : await this.getDefinitionByScene(dto.businessType, dto.businessScene);
+
+    if (dto.businessKey) {
+      const runningInstance = await this.instanceRepo.findOne({
+        where: {
+          businessKey: dto.businessKey,
+          status: InstanceStatus.RUNNING,
+        } as any,
+      });
+      if (runningInstance) {
+        throw new BadRequestException("该业务已存在运行中的流程实例");
+      }
+    }
 
     // 自动加载业务数据
     let variables = dto.variables || {};
@@ -498,9 +630,9 @@ export class WorkflowService {
   private async ensureUniquePublishedScene(
     dto: any,
     currentId?: string,
-  ): Promise<void> {
+  ): Promise<WorkflowDefinition | null> {
     if (!dto.businessType || !dto.businessScene || dto.isActive !== "1") {
-      return;
+      return null;
     }
 
     const existing = await this.definitionRepo.findOne({
@@ -511,10 +643,115 @@ export class WorkflowService {
       },
     });
 
-    if (existing && existing.id !== (currentId || dto.id)) {
+    const allowedSameCodeReplacement =
+      currentId && existing?.code && dto.code && existing.code === dto.code;
+    if (
+      existing &&
+      existing.id !== (currentId || dto.id) &&
+      !allowedSameCodeReplacement
+    ) {
       throw new BadRequestException(
         `该业务对象 + 业务场景已存在已发布流程（${existing.name}），请先停用后再发布`,
       );
+    }
+    return existing || null;
+  }
+
+  private validateDefinitionGraph(definition: WorkflowDefinition): void {
+    const nodes = definition.nodes || [];
+    const flows = definition.flows || [];
+    const startNodes = nodes.filter((node) => node.type === NodeType.START);
+    const endNodes = nodes.filter((node) => node.type === NodeType.END);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+
+    if (startNodes.length !== 1) {
+      throw new BadRequestException("流程必须配置且只能配置一个开始节点");
+    }
+    if (endNodes.length !== 1) {
+      throw new BadRequestException("流程必须且只能配置一个结束节点");
+    }
+
+    for (const flow of flows) {
+      if (!nodeIds.has(flow.sourceNodeId) || !nodeIds.has(flow.targetNodeId)) {
+        throw new BadRequestException("流程连线引用了不存在的节点");
+      }
+    }
+
+    for (const node of nodes) {
+      const incomingFlows = flows.filter(
+        (flow) => flow.targetNodeId === node.id,
+      );
+      const outgoingFlows = flows.filter(
+        (flow) => flow.sourceNodeId === node.id,
+      );
+
+      if (node.type !== NodeType.START && incomingFlows.length === 0) {
+        throw new BadRequestException(`节点「${node.name}」缺少入线`);
+      }
+      if (node.type !== NodeType.END && outgoingFlows.length === 0) {
+        throw new BadRequestException(`节点「${node.name}」缺少出线`);
+      }
+      if (node.type === NodeType.END && outgoingFlows.length > 0) {
+        throw new BadRequestException(`结束节点「${node.name}」不能存在出线`);
+      }
+      if (
+        node.type !== NodeType.CONDITION &&
+        node.type !== NodeType.END &&
+        outgoingFlows.length > 1
+      ) {
+        throw new BadRequestException(
+          `节点「${node.name}」存在多条流出连接线，仅条件节点允许多分支`,
+        );
+      }
+
+      if ([NodeType.APPROVAL, NodeType.CC].includes(node.type)) {
+        this.validateAssigneeNode(node);
+      }
+
+      if (node.type === NodeType.CONDITION) {
+        this.validateConditionNode(node, outgoingFlows);
+      }
+    }
+  }
+
+  private validateAssigneeNode(node: NodeConfig): void {
+    const props = (node.properties || {}) as any;
+    const hasAssignee =
+      props.assigneeType === AssigneeType.USER
+        ? Boolean(props.assigneeValue)
+        : props.assigneeType === AssigneeType.DEPARTMENT
+          ? Boolean(props.departmentId)
+          : props.assigneeType === AssigneeType.BUSINESS_FIELD
+            ? Boolean(props.fieldPath)
+            : false;
+
+    if (!hasAssignee) {
+      const nodeTypeName = node.type === NodeType.APPROVAL ? "审批" : "抄送";
+      throw new BadRequestException(
+        `${nodeTypeName}节点「${node.name}」未配置审批人`,
+      );
+    }
+  }
+
+  private validateConditionNode(
+    node: NodeConfig,
+    outgoingFlows: FlowConfig[],
+  ): void {
+    const conditions = ((node.properties as any)?.conditions || []) as any[];
+    if (!conditions.length) {
+      throw new BadRequestException(`条件节点「${node.name}」未配置条件`);
+    }
+
+    for (const condition of conditions) {
+      const matchedFlow = outgoingFlows.find(
+        (flow) =>
+          flow.flowType === "condition" && flow.conditionId === condition.id,
+      );
+      if (!matchedFlow) {
+        throw new BadRequestException(
+          `条件节点「${node.name}」的条件「${condition.name || condition.id}」缺少分支连线`,
+        );
+      }
     }
   }
 
@@ -538,7 +775,10 @@ export class WorkflowService {
     const context: NodeExecutionContext = {
       instanceId: instance.id,
       nodeId: node.id,
-      variables: instance.variables || {},
+      variables: {
+        ...(instance.variables || {}),
+        _nodeProperties: node.properties || {},
+      },
       startTime: new Date(),
     };
 
@@ -945,16 +1185,28 @@ export class WorkflowService {
 
     if (multiInstanceType === "sequential") {
       // 串行会签：只创建第一个人的任务
-      await this.createSingleTask(instance, node, assigneeIds[0], assigneeIds);
+      await this.createSingleTask(instance, node, assigneeIds[0], assigneeIds, {
+        multiInstanceType,
+        candidateIndex: 0,
+        requireAllComplete: true,
+      });
     } else if (multiInstanceType === "all") {
       // 会审（全部处理）：为所有人创建任务，全部完成才算通过
-      for (const userId of assigneeIds) {
-        await this.createSingleTask(instance, node, userId, assigneeIds, true);
+      for (const [index, userId] of assigneeIds.entries()) {
+        await this.createSingleTask(instance, node, userId, assigneeIds, {
+          multiInstanceType,
+          candidateIndex: index,
+          requireAllComplete: true,
+        });
       }
     } else {
       // 并行会签（默认）：为所有人创建任务，任一人处理即可
-      for (const userId of assigneeIds) {
-        await this.createSingleTask(instance, node, userId, assigneeIds);
+      for (const [index, userId] of assigneeIds.entries()) {
+        await this.createSingleTask(instance, node, userId, assigneeIds, {
+          multiInstanceType: "parallel",
+          candidateIndex: index,
+          requireAllComplete: false,
+        });
       }
     }
   }
@@ -968,9 +1220,20 @@ export class WorkflowService {
     node: NodeConfig,
     assigneeId: string,
     candidateIds?: string[],
-    requireAllComplete?: boolean,
+    options: {
+      multiInstanceType?: string;
+      candidateIndex?: number;
+      requireAllComplete?: boolean;
+    } = {},
   ): Promise<void> {
     const props = node.properties as any;
+    const taskInputData = {
+      multiInstanceType:
+        options.multiInstanceType || props.multiInstanceType || "sequential",
+      candidateIds: candidateIds || [],
+      candidateIndex: options.candidateIndex ?? 0,
+      requireAllComplete: options.requireAllComplete ?? false,
+    };
 
     const task = this.taskRepo.create({
       instanceId: instance.id,
@@ -979,6 +1242,7 @@ export class WorkflowService {
       nodeType: node.type,
       assigneeId,
       candidateIds: candidateIds || null,
+      inputData: taskInputData,
       status: TaskStatus.PENDING,
       startTime: new Date().toISOString(),
     });
@@ -991,7 +1255,7 @@ export class WorkflowService {
     }
 
     console.log(
-      `[Workflow] Created approval task for user ${assigneeId}, requireAllComplete: ${requireAllComplete}`,
+      `[Workflow] Created approval task for user ${assigneeId}, requireAllComplete: ${taskInputData.requireAllComplete}`,
     );
   }
 
@@ -1076,10 +1340,142 @@ export class WorkflowService {
     }
   }
 
+  private getTaskInputData(task: WorkflowTask): {
+    multiInstanceType: string;
+    candidateIds: string[];
+    candidateIndex: number;
+    requireAllComplete: boolean;
+  } {
+    const inputData = (task.inputData || {}) as any;
+    const candidateIds = Array.isArray(inputData.candidateIds)
+      ? inputData.candidateIds
+      : Array.isArray(task.candidateIds)
+        ? task.candidateIds
+        : [];
+    const multiInstanceType =
+      inputData.multiInstanceType ||
+      (inputData.requireAllComplete ? "all" : "sequential");
+
+    return {
+      multiInstanceType,
+      candidateIds,
+      candidateIndex: Number(inputData.candidateIndex || 0),
+      requireAllComplete:
+        Boolean(inputData.requireAllComplete) || multiInstanceType === "all",
+    };
+  }
+
+  private async findPendingPeerTasks(
+    task: WorkflowTask,
+  ): Promise<WorkflowTask[]> {
+    const peerTasks = await this.taskRepo.find({
+      where: {
+        instanceId: task.instanceId,
+        nodeId: task.nodeId,
+        status: TaskStatus.PENDING,
+      } as any,
+      select: ["id"] as any,
+    });
+    return peerTasks.filter((item) => String(item.id) !== String(task.id));
+  }
+
+  private async cancelPendingPeerTasks(
+    task: WorkflowTask,
+    comment?: string,
+  ): Promise<void> {
+    const peerTasks = await this.findPendingPeerTasks(task);
+    if (!peerTasks.length) {
+      return;
+    }
+    await this.taskRepo.update(
+      {
+        instanceId: task.instanceId,
+        nodeId: task.nodeId,
+        status: TaskStatus.PENDING,
+      },
+      {
+        status: TaskStatus.CANCELLED,
+        comment: comment || "同节点其他审批任务已自动取消",
+      },
+    );
+    await this.messagesService.deactivateWorkflowTaskMessages(
+      peerTasks.map((item) => item.id),
+    );
+  }
+
+  private async handleApprovalTaskCompletion(
+    task: WorkflowTask,
+    instance: WorkflowInstance,
+  ): Promise<boolean> {
+    if (this.isAddSignTask(task)) {
+      return false;
+    }
+
+    const taskInputData = this.getTaskInputData(task);
+
+    if (taskInputData.multiInstanceType === "all") {
+      const pendingPeerTasks = await this.findPendingPeerTasks(task);
+      return pendingPeerTasks.length === 0;
+    }
+
+    if (taskInputData.multiInstanceType === "parallel") {
+      await this.cancelPendingPeerTasks(task, "并行会签已由其他审批人处理");
+      return true;
+    }
+
+    const nextCandidateIndex = taskInputData.candidateIndex + 1;
+    const nextAssigneeId = taskInputData.candidateIds[nextCandidateIndex];
+    if (nextAssigneeId) {
+      await this.createSingleTask(
+        instance,
+        {
+          id: task.nodeId,
+          name: task.nodeName,
+          type: task.nodeType as NodeType,
+          properties: {},
+        } as NodeConfig,
+        nextAssigneeId,
+        taskInputData.candidateIds,
+        {
+          multiInstanceType: "sequential",
+          candidateIndex: nextCandidateIndex,
+          requireAllComplete: true,
+        },
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  private isAddSignTask(task: WorkflowTask): boolean {
+    return (
+      task.action === TaskAction.SIGN ||
+      (task.inputData as any)?.taskKind === "addSign"
+    );
+  }
+
   /**
    * 完成任务
    */
   async completeTask(
+    taskId: string,
+    userId: string,
+    dto: CompleteTaskDto,
+  ): Promise<WorkflowInstance> {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) {
+      throw new BadRequestException("任务不存在");
+    }
+
+    return this.runWithLock(
+      this.taskCompletionLocks,
+      `complete:${task.instanceId}:${task.nodeId}`,
+      () => this.completeTaskUnlocked(taskId, userId, dto),
+    );
+  }
+
+  private async completeTaskUnlocked(
     taskId: string,
     userId: string,
     dto: CompleteTaskDto,
@@ -1136,6 +1532,14 @@ export class WorkflowService {
     }
 
     if (dto.action === "approve") {
+      const shouldAdvance = await this.handleApprovalTaskCompletion(
+        task,
+        instance,
+      );
+      if (!shouldAdvance) {
+        return this.instanceRepo.findOne({ where: { id: instance.id } });
+      }
+
       const currentNode = definition.nodes.find((n) => n.id === task.nodeId);
       if (currentNode) {
         const nextNodeIds = await this.findNextNodes(
@@ -1159,6 +1563,7 @@ export class WorkflowService {
         await this.completeInstance(instance);
       }
     } else if (dto.targetNodeId) {
+      await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
       // 驳回到指定节点
       const targetNodeIndex = definition.nodes.findIndex(
         (n) => n.id === dto.targetNodeId,
@@ -1206,6 +1611,7 @@ export class WorkflowService {
         await this.failInstance(instance);
       }
     } else {
+      await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
       await this.failInstance(instance);
     }
 
@@ -1532,12 +1938,61 @@ export class WorkflowService {
     };
   }
 
+  private hasWorkflowManageAllPermission(permissions: string[] = []) {
+    return (
+      permissions.includes("business/workflow/instances/manageAll") ||
+      permissions.includes("business/workflow/manageAll")
+    );
+  }
+
+  private async assertInstanceAccessible(
+    instanceId: string,
+    userId?: string,
+    permissions: string[] = [],
+  ): Promise<WorkflowInstance> {
+    const instance = await this.instanceRepo.findOne({
+      where: { id: instanceId },
+    });
+    if (!instance) {
+      throw new BadRequestException("流程实例不存在");
+    }
+    if (!userId || this.hasWorkflowManageAllPermission(permissions)) {
+      return instance;
+    }
+    if (String(instance.starterId || "") === String(userId)) {
+      return instance;
+    }
+    const task = await this.taskRepo.findOne({
+      where: { instanceId, assigneeId: userId } as any,
+      select: ["id"] as any,
+    });
+    if (task) {
+      return instance;
+    }
+    const history = await this.historyRepo.findOne({
+      where: { instanceId, operatorId: userId } as any,
+      select: ["id"] as any,
+    });
+    if (history) {
+      return instance;
+    }
+    throw new ForbiddenException("当前无权查看该流程实例");
+  }
+
   /**
    * 获取流程实例详情
    */
-  async getInstance(id: string): Promise<any> {
-    const instance = await this.instanceRepo.findOne({ where: { id } });
-    return instance ? this.attachBusinessSummaryToInstance(instance) : null;
+  async getInstance(
+    id: string,
+    userId?: string,
+    permissions: string[] = [],
+  ): Promise<any> {
+    const instance = await this.assertInstanceAccessible(
+      id,
+      userId,
+      permissions,
+    );
+    return this.attachBusinessSummaryToInstance(instance);
   }
 
   /**
@@ -1675,6 +2130,9 @@ export class WorkflowService {
       ticket: businessData?.title,
       change: businessData?.title,
       customer: businessData?.name,
+      goLive: businessData?.title,
+      acceptance: businessData?.title,
+      handover: businessData?.title,
     };
 
     const codeFieldMap: Record<string, string> = {
@@ -1683,6 +2141,9 @@ export class WorkflowService {
       ticket: businessData?.id,
       change: businessData?.id,
       customer: businessData?.code,
+      goLive: businessData?.id,
+      acceptance: businessData?.id,
+      handover: businessData?.id,
     };
 
     return {
@@ -1704,6 +2165,9 @@ export class WorkflowService {
     if (businessType === "change") return "/changeManage/form";
     if (businessType === "ticket") return "/ticketManage/form";
     if (businessType === "task") return "/taskManage/form";
+    if (businessType === "goLive") return "/goLiveManage/form";
+    if (businessType === "acceptance") return "/acceptanceManage/form";
+    if (businessType === "handover") return "/handoverManage/form";
     if (businessType === "customer") return "/crm/customerManage/form";
     if (businessType === "interaction") return "/crm/interactionManage/form";
     if (businessType === "opportunity") return "/crm/opportunityManage/form";
@@ -1753,6 +2217,9 @@ export class WorkflowService {
       ticket: "工单",
       change: "变更",
       customer: "客户",
+      goLive: "上线单",
+      acceptance: "验收单",
+      handover: "运维交接单",
     };
     const typeLabel = typeMap[businessType] || businessType || "业务";
     return `【已办】${typeLabel}审批 - ${businessTitle}${businessCode ? `（${businessCode}）` : ""}`;
@@ -1772,6 +2239,9 @@ export class WorkflowService {
       ticket: "工单",
       change: "变更",
       customer: "客户",
+      goLive: "上线单",
+      acceptance: "验收单",
+      handover: "运维交接单",
     };
     const typeLabel =
       typeMap[summary.businessType] || summary.businessType || "业务";
@@ -1900,6 +2370,10 @@ export class WorkflowService {
       startTime: new Date().toISOString(),
       comment: `加签：${dto.comment || ""}`,
       action: TaskAction.SIGN,
+      inputData: {
+        taskKind: "addSign",
+        parentTaskId: task.id,
+      },
     });
 
     const savedTask = await this.taskRepo.save(signTask);
@@ -2026,7 +2500,12 @@ export class WorkflowService {
   /**
    * 获取流程实例历史记录
    */
-  async getInstanceHistory(instanceId: string): Promise<WorkflowHistory[]> {
+  async getInstanceHistory(
+    instanceId: string,
+    userId?: string,
+    permissions: string[] = [],
+  ): Promise<WorkflowHistory[]> {
+    await this.assertInstanceAccessible(instanceId, userId, permissions);
     const historyList = await this.historyRepo
       .createQueryBuilder("history")
       .select([
@@ -2059,7 +2538,12 @@ export class WorkflowService {
   /**
    * 获取流程实例的所有任务
    */
-  async getInstanceTasks(instanceId: string): Promise<WorkflowTask[]> {
+  async getInstanceTasks(
+    instanceId: string,
+    userId?: string,
+    permissions: string[] = [],
+  ): Promise<WorkflowTask[]> {
+    await this.assertInstanceAccessible(instanceId, userId, permissions);
     const tasks = await this.taskRepo.find({
       where: { instanceId },
       order: { createTime: "DESC" },

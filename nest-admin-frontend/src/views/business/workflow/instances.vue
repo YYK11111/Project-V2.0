@@ -17,7 +17,7 @@ const highlightedInstanceId = computed(() => String(route.query.highlight || '')
 const canWorkflowInstanceGetOne = computed(() => checkPermi(['business/workflow/instances/getOne']))
 const canWorkflowInstanceCancel = computed(() => checkPermi(['business/workflow/instances/cancel']))
 const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflow/instances/withdraw']))
-const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/instances/cancel']))
+const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/closeReturned']))
 const canWorkflowInstanceBatchOperate = computed(() => canWorkflowInstanceCancel.value || canWorkflowInstanceWithdraw.value || canWorkflowInstanceCloseReturned.value)
 
 const getButtons = (row: any) => [
@@ -83,6 +83,9 @@ const getBusinessTypeLabel = (type: string) => {
     ticket: '工单',
     change: '变更',
     customer: '客户',
+    goLive: '上线单',
+    acceptance: '验收单',
+    handover: '运维交接单',
     interaction: '互动',
     opportunity: '商机',
     contract: '合同',

@@ -191,6 +191,70 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("登录后获取当前用户菜单不要求菜单或角色管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/roles/getLoginUserMenus",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "project_member" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/project/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/roles/list",
+      "system/roles/getLoginUserMenus",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后获取当前用户主题不要求用户管理权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/users/getTheme",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "project_member" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/project/list" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "system/users/getOne",
+      "system/users/getTheme",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("缺少定时任务列表权限时拒绝访问列表接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

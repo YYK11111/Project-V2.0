@@ -2,6 +2,9 @@ import { WorkflowController } from "./controller";
 
 describe("WorkflowController", () => {
   const workflowService = {
+    getInstance: jest.fn(),
+    getInstanceHistory: jest.fn(),
+    getInstanceTasks: jest.fn(),
     startWorkflow: jest.fn(),
     listInstances: jest.fn(),
     getPendingTasks: jest.fn(),
@@ -67,5 +70,39 @@ describe("WorkflowController", () => {
       }),
     ).rejects.toThrow("当前用户不存在");
     expect(workflowService.completeTask).not.toHaveBeenCalled();
+  });
+
+  it("获取实例详情、历史和任务时透传服务端认证用户 ID 与权限", async () => {
+    const controller = new WorkflowController(
+      workflowService as any,
+      businessFieldService,
+    );
+    workflowService.getInstance.mockResolvedValue({});
+    workflowService.getInstanceHistory.mockResolvedValue([]);
+    workflowService.getInstanceTasks.mockResolvedValue([]);
+    const req = {
+      user: { id: "server-user-id" },
+      permissions: ["business/workflow/instances/getOne"],
+    };
+
+    await controller.getInstance("wf-1", req as any);
+    await controller.getInstanceHistory("wf-1", req as any);
+    await controller.getInstanceTasks("wf-1", req as any);
+
+    expect(workflowService.getInstance).toHaveBeenCalledWith(
+      "wf-1",
+      "server-user-id",
+      ["business/workflow/instances/getOne"],
+    );
+    expect(workflowService.getInstanceHistory).toHaveBeenCalledWith(
+      "wf-1",
+      "server-user-id",
+      ["business/workflow/instances/getOne"],
+    );
+    expect(workflowService.getInstanceTasks).toHaveBeenCalledWith(
+      "wf-1",
+      "server-user-id",
+      ["business/workflow/instances/getOne"],
+    );
   });
 });

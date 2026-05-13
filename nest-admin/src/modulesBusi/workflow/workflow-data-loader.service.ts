@@ -17,6 +17,7 @@ import { ChangeLoader } from "./loaders/change.loader";
 import { TaskLoader } from "./loaders/task.loader";
 import { GoLiveLoader } from "./loaders/go-live.loader";
 import { AcceptanceLoader } from "./loaders/acceptance.loader";
+import { HandoverLoader } from "./loaders/handover.loader";
 
 @Injectable()
 export class WorkflowDataLoaderService {
@@ -32,6 +33,7 @@ export class WorkflowDataLoaderService {
     private changeLoader: ChangeLoader,
     private goLiveLoader: GoLiveLoader,
     private acceptanceLoader: AcceptanceLoader,
+    private handoverLoader: HandoverLoader,
   ) {
     this.registerDefaultLoaders();
   }
@@ -44,6 +46,7 @@ export class WorkflowDataLoaderService {
     this.loaders.set("change", this.changeLoader);
     this.loaders.set("goLive", this.goLiveLoader);
     this.loaders.set("acceptance", this.acceptanceLoader);
+    this.loaders.set("handover", this.handoverLoader);
   }
 
   async loadData(

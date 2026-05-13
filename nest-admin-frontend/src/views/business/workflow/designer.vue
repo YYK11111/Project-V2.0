@@ -1,33 +1,55 @@
 <template>
   <div class="workflow-designer">
     <!-- 工具栏 -->
-      <div class="designer-toolbar">
-        <el-button-group>
+    <div class="designer-toolbar">
+      <el-button-group>
         <el-button v-if="canWorkflowDefinitionSave" type="primary" @click="handleSave" :loading="saving">保存</el-button>
         <el-button v-if="canWorkflowDefinitionPublish" type="success" @click="handleSaveAndPublish" :loading="publishing">保存并发布</el-button>
         <el-button @click="handlePreview">预览</el-button>
+        <el-button :disabled="!undoAction" @click="undoLastAction">撤销</el-button>
         <el-button @click="handleReset">重置</el-button>
       </el-button-group>
       <el-button v-if="validationIssues.length" type="danger" plain style="margin-left: 12px;" @click="showIssuePanel = !showIssuePanel">
-        问题 {{ validationIssues.length }} 项
+        错误 {{ errorIssues.length }} / 警告 {{ warningIssues.length }}
       </el-button>
+      <el-select placeholder="套用模板" clearable style="width: 150px; margin-left: 12px;" @change="applyWorkflowTemplate">
+        <el-option v-for="item in workflowTemplates" :key="item.key" :label="item.name" :value="item.key" />
+      </el-select>
       <el-button-group style="margin-left: 12px;">
         <el-button @click="zoomOut">缩小</el-button>
-        <el-button @click="resetViewport">100%</el-button>
+        <el-button @click="resetViewport">{{ Math.round(zoom * 100) }}%</el-button>
         <el-button @click="zoomIn">放大</el-button>
         <el-button @click="fitCanvas">适应画布</el-button>
+        <el-button @click="centerSelectedNode">居中当前节点</el-button>
       </el-button-group>
-      <el-select v-model="selectedDefinitionId" placeholder="选择流程" @change="loadDefinition" style="width: 200px; margin-left: 20px;">
-        <el-option v-for="item in definitions" :key="item.id" :label="item.name" :value="item.id" />
+      <el-select v-model="definitionFilterBusinessType" placeholder="筛选业务" clearable style="width: 120px; margin-left: 20px;">
+        <el-option label="项目" value="project" />
+        <el-option label="任务" value="task" />
+        <el-option label="上线单" value="goLive" />
+        <el-option label="验收单" value="acceptance" />
+        <el-option label="运维交接单" value="handover" />
       </el-select>
+      <el-select v-model="selectedDefinitionId" placeholder="选择流程" filterable @change="loadDefinition" style="width: 200px; margin-left: 8px;">
+        <el-option v-for="item in filteredDefinitions" :key="item.id" :label="item.name" :value="item.id" />
+      </el-select>
+      <div class="definition-state">
+        <el-tag size="small" :type="currentDefinitionIsPublished ? 'success' : 'info'">{{ currentDefinitionStateText }}</el-tag>
+        <el-tag v-if="currentDefinitionVersion" size="small" type="info">v{{ currentDefinitionVersion }}</el-tag>
+        <el-tag v-if="hasUnpublishedChanges" size="small" type="warning">未发布改动</el-tag>
+      </div>
     </div>
 
     <div class="designer-body">
       <!-- 左侧节点面板 -->
       <div class="designer-palette">
-        <div class="panel-title">基础节点</div>
+        <el-input v-model="nodeSearchKeyword" class="palette-search" placeholder="搜索节点" clearable />
+        <div class="panel-title panel-title--clickable" @click="paletteCollapse.basic = !paletteCollapse.basic">
+          <span>基础节点</span>
+          <span>{{ paletteCollapse.basic ? '展开' : '收起' }}</span>
+        </div>
         <div
-          v-for="node in basicNodes"
+          v-show="!paletteCollapse.basic"
+          v-for="node in filteredBasicNodes"
           :key="node.type"
           class="palette-node"
           draggable="true"
@@ -37,9 +59,13 @@
           <span>{{ node.name }}</span>
         </div>
 
-        <div class="panel-title">审批节点</div>
+        <div class="panel-title panel-title--clickable" @click="paletteCollapse.approval = !paletteCollapse.approval">
+          <span>审批节点</span>
+          <span>{{ paletteCollapse.approval ? '展开' : '收起' }}</span>
+        </div>
         <div
-          v-for="node in approvalNodes"
+          v-show="!paletteCollapse.approval"
+          v-for="node in filteredApprovalNodes"
           :key="node.type"
           class="palette-node approval-node"
           draggable="true"
@@ -49,9 +75,13 @@
           <span>{{ node.name }}</span>
         </div>
 
-        <div class="panel-title">逻辑节点</div>
+        <div class="panel-title panel-title--clickable" @click="paletteCollapse.logic = !paletteCollapse.logic">
+          <span>逻辑节点</span>
+          <span>{{ paletteCollapse.logic ? '展开' : '收起' }}</span>
+        </div>
         <div
-          v-for="node in logicNodes"
+          v-show="!paletteCollapse.logic"
+          v-for="node in filteredLogicNodes"
           :key="node.type"
           class="palette-node"
           draggable="true"
@@ -68,6 +98,7 @@
           <p>从左侧拖拽节点到此处开始设计流程</p>
         </div>
         <div class="canvas-content" v-else :style="canvasContentStyle" @click="onCanvasClick">
+          <div v-if="connectionHint" class="connection-hint">{{ connectionHint }}</div>
           <!-- SVG 连线层 -->
           <svg class="flow-lines" :width="canvasWidth" :height="canvasHeight">
             <defs>
@@ -178,6 +209,21 @@
             <div class="node-icon">{{ getNodeIcon(node.type) }}</div>
             <div class="node-name">{{ node.name }}</div>
             <div class="node-type">{{ getNodeTypeName(node.type) }}</div>
+            <div v-if="getCanvasNodeSummary(node)" class="node-summary">{{ getCanvasNodeSummary(node) }}</div>
+          </div>
+          <div class="canvas-minimap">
+            <div class="minimap-title">小地图</div>
+            <div class="minimap-body">
+              <div
+                v-for="node in nodes"
+                :key="`mini-${node.id}`"
+                class="minimap-node"
+                :class="{ active: selectedNodeId === node.id }"
+                :style="getMinimapNodeStyle(node)"
+                @click.stop="centerNode(node)"
+              />
+              <div class="minimap-viewport" :style="minimapViewportStyle"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -186,7 +232,7 @@
       <div class="designer-properties">
         <div v-if="showIssuePanel && validationIssues.length" class="issue-panel">
           <div class="issue-panel-title">发布前检查</div>
-            <div v-for="(issue, index) in validationIssues" :key="`${issue.type}-${index}`" class="issue-item" @click="focusIssue(issue)">
+            <div v-for="(issue, index) in sortedValidationIssues" :key="`${issue.type}-${index}`" class="issue-item" :class="`issue-item--${issue.level}`" @click="focusIssue(issue)">
             <div class="issue-item-title">{{ index + 1 }}. {{ issue.message }}</div>
             <div v-if="issue.nodeName" class="issue-item-meta">节点：{{ issue.nodeName }}</div>
           </div>
@@ -205,12 +251,15 @@
               </el-form-item>
               <el-divider content-position="left">业务关联配置</el-divider>
               <el-form-item label="业务对象">
-                <el-select v-model="businessType" placeholder="选择业务对象类型" @change="onBusinessTypeChange">
+                <el-select v-model="businessType" placeholder="选择业务对象类型">
                   <el-option label="项目" value="project" />
                   <el-option label="任务" value="task" />
                   <el-option label="客户" value="customer" />
                   <el-option label="工单" value="ticket" />
                   <el-option label="变更请求" value="change" />
+                  <el-option label="上线单" value="goLive" />
+                  <el-option label="验收单" value="acceptance" />
+                  <el-option label="运维交接单" value="handover" />
                 </el-select>
               </el-form-item>
               <el-form-item label="业务场景">
@@ -268,19 +317,18 @@
                 <template v-if="selectedNode.type === 'condition'">
                   <el-divider>条件配置</el-divider>
                   <div class="condition-list">
+                    <el-button class="condition-add-button" size="small" type="primary" plain @click="addCondition(selectedNode)">新增条件</el-button>
                     <div v-for="(cond, idx) in selectedNode.properties.conditions" :key="cond.id" class="condition-item">
                       <div class="condition-header">
                         <span class="condition-label">分支 {{ idx + 1 }}</span>
                         <div class="condition-actions">
-                          <el-radio
+                          <el-button
                             size="small"
-                            :model-value="getDefaultFlow(selectedNode.id)?.conditionId || ''"
-                            :label="getConditionFlow(selectedNode.id, cond.id)?.conditionId"
                             :disabled="!getConditionFlow(selectedNode.id, cond.id)?.targetNodeId"
-                            @change="() => setDefaultConditionFlow(getConditionFlow(selectedNode.id, cond.id)?.id)"
+                            @click="setDefaultConditionFlow(getConditionFlow(selectedNode.id, cond.id)?.id)"
                           >
-                            设为默认分支
-                          </el-radio>
+                            {{ getConditionFlow(selectedNode.id, cond.id)?.flowType === 'default' ? '默认分支' : '设为默认' }}
+                          </el-button>
                           <el-button size="small" text :disabled="idx === 0" @click="moveCondition(idx, -1)">上移</el-button>
                           <el-button size="small" text :disabled="idx === selectedNode.properties.conditions.length - 1" @click="moveCondition(idx, 1)">下移</el-button>
                           <el-button size="small" type="danger" text @click="removeCondition(idx)">删除</el-button>
@@ -528,6 +576,15 @@ const showIssuePanel = ref(true)
 const canvasRef = ref(null)
 const definitions = ref([])
 const selectedDefinitionId = ref('')
+const definitionFilterBusinessType = ref('')
+const nodeSearchKeyword = ref('')
+const connectionHint = ref('')
+const undoAction = ref(null)
+const paletteCollapse = reactive({
+  basic: false,
+  approval: false,
+  logic: false,
+})
 const canWorkflowDefinitionAdd = computed(() => checkPermi(['business/workflow/definitions/add']))
 const canWorkflowDefinitionUpdate = computed(() => checkPermi(['business/workflow/definitions/update']))
 const canWorkflowDefinitionPublish = computed(() => checkPermi(['business/workflow/definitions/publish']))
@@ -552,11 +609,18 @@ const businessFieldMappings = ref([])
 const deptTreeData = ref([])
 const notificationTitleVariable = ref('')
 const notificationContentVariable = ref('')
+const lastBusinessType = ref('')
+const restoringBusinessType = ref(false)
 
 // 节点配置
 const nodes = ref([])
 const selectedNodeId = ref('')
 const flows = ref([])
+const loadedDefinitionSnapshot = ref(null)
+const currentDefinitionMeta = reactive({
+  isActive: '0',
+  version: '',
+})
 
 // 连接线状态
 const connecting = ref(false)          // 是否正在连接
@@ -633,6 +697,10 @@ const getNodeAssigneeConfig = (node) => normalizeNodeProperties(node)
 
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
 const selectedFlow = computed(() => flows.value.find(f => f.id === selectedFlowId.value))
+const filteredDefinitions = computed(() => {
+  if (!definitionFilterBusinessType.value) return definitions.value
+  return definitions.value.filter((item) => item.businessType === definitionFilterBusinessType.value)
+})
 
 const hasNodes = computed(() => nodes.value.length > 0)
 
@@ -663,9 +731,39 @@ const businessSceneOptions = {
   ticket: [{ label: '工单审批', value: 'approval' }],
   change: [{ label: '变更审批', value: 'approval' }],
   customer: [{ label: '客户审批', value: 'approval' }],
+  goLive: [{ label: '上线审批', value: 'approval' }],
+  acceptance: [{ label: '验收审批', value: 'approval' }],
+  handover: [{ label: '运维交接审批', value: 'approval' }],
 }
 
 const currentBusinessSceneOptions = computed(() => businessSceneOptions[businessType.value] || [])
+const currentDefinitionIsPublished = computed(() => currentDefinitionMeta.isActive === '1')
+const currentDefinitionStateText = computed(() => (currentDefinitionIsPublished.value ? '已发布' : '草稿'))
+const currentDefinitionVersion = computed(() => currentDefinitionMeta.version || '')
+const buildCurrentDefinitionSnapshot = () => ({
+  businessType: businessType.value,
+  businessScene: businessScene.value,
+  nodes: cloneData(nodes.value),
+  flows: cloneData(flows.value),
+})
+const hasUnpublishedChanges = computed(() => {
+  const snapshot = loadedDefinitionSnapshot.value
+  if (!snapshot) return Boolean(nodes.value.length || flows.value.length || workflowName.value || businessType.value || businessScene.value)
+  return JSON.stringify(buildCurrentDefinitionSnapshot()) !== JSON.stringify({
+    businessType: snapshot.businessType,
+    businessScene: snapshot.businessScene,
+    nodes: snapshot.nodes || [],
+    flows: snapshot.flows || [],
+  })
+})
+const syncSavedDefinitionState = (savedDefinition) => {
+  if (!savedDefinition) return
+  if (savedDefinition.id) {
+    selectedDefinitionId.value = savedDefinition.id
+  }
+  currentDefinitionMeta.isActive = savedDefinition.isActive || '0'
+  currentDefinitionMeta.version = savedDefinition.version || ''
+}
 const businessFieldLabelMap = computed(() => {
   const map = new Map()
   for (const field of businessFieldMappings.value) {
@@ -740,6 +838,34 @@ const canvasContentStyle = computed(() => ({
   transform: `scale(${zoom.value})`,
   transformOrigin: 'top left',
 }))
+
+const minimapScale = computed(() => {
+  const scaleX = 160 / canvasWidth.value
+  const scaleY = 100 / canvasHeight.value
+  return Math.min(scaleX, scaleY)
+})
+
+const minimapViewportStyle = computed(() => {
+  const canvasEl = canvasRef.value
+  if (!canvasEl) return {}
+  const scale = minimapScale.value
+  return {
+    left: `${canvasEl.scrollLeft * scale / zoom.value}px`,
+    top: `${canvasEl.scrollTop * scale / zoom.value}px`,
+    width: `${canvasEl.clientWidth * scale / zoom.value}px`,
+    height: `${canvasEl.clientHeight * scale / zoom.value}px`,
+  }
+})
+
+const getMinimapNodeStyle = (node) => {
+  const scale = minimapScale.value
+  return {
+    left: `${node.x * scale}px`,
+    top: `${node.y * scale}px`,
+    width: `${Math.max(4, NODE_WIDTH * scale)}px`,
+    height: `${Math.max(4, NODE_HEIGHT * scale)}px`,
+  }
+}
 
 // 辅助函数：获取源节点和目标节点
 const getSourceNode = (flow) => nodes.value.find(n => n.id === flow.sourceNodeId)
@@ -1008,6 +1134,23 @@ const logicNodes = [
   { type: 'form', name: '表单', icon: '📝' },
 ]
 
+const workflowTemplates = [
+  { key: 'projectInitiation', name: '项目立项模板', businessType: 'project', businessScene: 'initiation', workflowName: '项目立项审批' },
+  { key: 'taskApproval', name: '任务审批模板', businessType: 'task', businessScene: 'approval', workflowName: '任务审批流程' },
+  { key: 'goLiveApproval', name: '上线审批模板', businessType: 'goLive', businessScene: 'approval', workflowName: '上线审批流程' },
+  { key: 'acceptanceApproval', name: '验收审批模板', businessType: 'acceptance', businessScene: 'approval', workflowName: '验收审批流程' },
+]
+
+const filterPaletteNodes = (list) => {
+  const keyword = nodeSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return list
+  return list.filter((node) => `${node.name} ${getNodeTypeName(node.type)} ${node.type}`.toLowerCase().includes(keyword))
+}
+
+const filteredBasicNodes = computed(() => filterPaletteNodes(basicNodes))
+const filteredApprovalNodes = computed(() => filterPaletteNodes(approvalNodes))
+const filteredLogicNodes = computed(() => filterPaletteNodes(logicNodes))
+
 const getNodeIcon = (type) => {
   const icons = {
     start: '▶',
@@ -1068,9 +1211,12 @@ const getFlowStatusHint = (flow) => {
 const getFlowLabelPosition = (flow) => {
   const start = getFlowStartPoint(flow)
   const end = getFlowEndPoint(flow)
+  const sameDirectionIndex = flows.value
+    .filter((item) => item.sourceNodeId === flow.sourceNodeId && item.targetNodeId === flow.targetNodeId)
+    .findIndex((item) => item.id === flow.id)
   return {
     x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2 - 8,
+    y: (start.y + end.y) / 2 - 8 - sameDirectionIndex * 18,
   }
 }
 
@@ -1233,7 +1379,7 @@ const validationIssues = computed(() => {
     }
 
     if (node.type !== 'start' && node.type !== 'condition' && incomingFlows.length === 0) {
-      issues.push({ type: 'structure', level: 'warning', message: `${getNodeTypeName(node.type)}未接入主流程`, nodeName: node.name, nodeId: node.id })
+      issues.push({ type: 'structure', level: 'error', message: `${getNodeTypeName(node.type)}未接入主流程`, nodeName: node.name, nodeId: node.id })
     }
 
     if (!multiOutgoingNodeTypes.includes(node.type) && node.type !== 'end' && outgoingFlows.length > 1) {
@@ -1290,13 +1436,13 @@ const validationIssues = computed(() => {
     if (node.type === 'notification') {
       const config = getNodeAssigneeConfig(node)
       if (!config.assigneeType) {
-        issues.push({ type: 'notification', level: 'error', message: '通知对象来源未配置', nodeName: node.name, nodeId: node.id })
+        issues.push({ type: 'notification', level: 'warning', message: '通知对象来源未配置，运行时将跳过通知', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'user' && !config.assigneeValue) {
-        issues.push({ type: 'notification', level: 'error', message: '固定人员未选择', nodeName: node.name, nodeId: node.id })
+        issues.push({ type: 'notification', level: 'warning', message: '固定人员未选择，运行时将跳过通知', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) {
-        issues.push({ type: 'notification', level: 'error', message: '固定部门配置不完整', nodeName: node.name, nodeId: node.id })
+        issues.push({ type: 'notification', level: 'warning', message: '固定部门配置不完整，运行时将跳过通知', nodeName: node.name, nodeId: node.id })
       } else if (config.assigneeType === 'business_field' && !config.fieldPath) {
-        issues.push({ type: 'notification', level: 'error', message: '业务字段未选择', nodeName: node.name, nodeId: node.id })
+        issues.push({ type: 'notification', level: 'warning', message: '业务字段未选择，运行时将跳过通知', nodeName: node.name, nodeId: node.id })
       }
     }
 
@@ -1320,6 +1466,14 @@ const validationIssues = computed(() => {
 
   return issues
 })
+
+const errorIssues = computed(() => validationIssues.value.filter((issue) => issue.level === 'error'))
+const warningIssues = computed(() => validationIssues.value.filter((issue) => issue.level === 'warning'))
+const sortedValidationIssues = computed(() => [
+  ...errorIssues.value,
+  ...warningIssues.value,
+])
+const blockingIssues = computed(() => validationIssues.value.filter((issue) => issue.level === 'error'))
 
 const focusIssue = (issue) => {
   if (issue.nodeId) {
@@ -1356,14 +1510,6 @@ const isNodeIncomplete = (node) => {
   }
 
   if (node.type === 'cc') {
-    const config = getNodeAssigneeConfig(node)
-    if (!config.assigneeType) return true
-    if (config.assigneeType === 'user' && !config.assigneeValue) return true
-    if (config.assigneeType === 'department' && (!config.departmentId || !config.departmentMode)) return true
-    if (config.assigneeType === 'business_field' && !config.fieldPath) return true
-  }
-
-  if (node.type === 'notification') {
     const config = getNodeAssigneeConfig(node)
     if (!config.assigneeType) return true
     if (config.assigneeType === 'user' && !config.assigneeValue) return true
@@ -1414,6 +1560,12 @@ const getPreviewNodeSummary = (node) => {
   return ''
 }
 
+const getCanvasNodeSummary = (node) => {
+  const summary = getPreviewNodeSummary(node)
+  if (!summary) return ''
+  return summary.length > 28 ? `${summary.slice(0, 28)}...` : summary
+}
+
 const getNodeSummary = (node) => {
   if (node.type === 'approval') {
     const config = getNodeAssigneeConfig(node)
@@ -1453,6 +1605,67 @@ let conditionCounter = 1
 
 const generateConditionId = () => `cond_${Date.now()}_${conditionCounter++}`
 
+const createCondition = () => ({
+  id: generateConditionId(),
+  fieldSource: 'field',
+  field: [],
+  operator: 'eq',
+  value: '',
+})
+
+const createTemplateNode = (type, name, x, y) => ({
+  id: `node_${type}_${nodeCounter++}`,
+  name,
+  type,
+  x,
+  y,
+  properties: getDefaultProperties(type),
+})
+
+const createTemplateFlow = (sourceNodeId, targetNodeId, flowType = 'normal', conditionId = '') => ({
+  id: `flow_${sourceNodeId}_${targetNodeId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  sourceNodeId,
+  targetNodeId,
+  sourceAnchor: 'right',
+  targetAnchor: 'left',
+  flowType,
+  conditionId,
+})
+
+const recordUndoAction = (action) => {
+  undoAction.value = action
+}
+
+const undoLastAction = () => {
+  const action = undoAction.value
+  if (!action) return
+  if (action.type === 'deleteFlow') {
+    flows.value.push(action.flow)
+    if (action.ownerNodeId && action.condition) {
+      const ownerNode = nodes.value.find((node) => node.id === action.ownerNodeId)
+      if (ownerNode) {
+        ownerNode.properties.conditions = [
+          ...(ownerNode.properties?.conditions || []),
+          action.condition,
+        ]
+      }
+    }
+    selectedFlowId.value = action.flow.id
+    selectedNodeId.value = ''
+  }
+  if (action.type === 'deleteNode') {
+    nodes.value.push(action.node)
+    flows.value.push(...action.flows)
+    selectedNodeId.value = action.node.id
+    selectedFlowId.value = ''
+  }
+  undoAction.value = null
+  ElMessage.success('已撤销上一步删除')
+  nextTick(() => updateNodeSizeCache())
+}
+
+const cloneData = (data) => JSON.parse(JSON.stringify(data))
+
 const onDragStart = (event, node) => {
   event.dataTransfer.setData('nodeType', node.type)
   event.dataTransfer.setData('nodeName', node.name)
@@ -1479,6 +1692,47 @@ const onDrop = (event) => {
   selectNode(newNode)
   
   // 延迟更新节点尺寸
+  nextTick(() => updateNodeSizeCache())
+}
+
+const applyWorkflowTemplate = async (templateKey) => {
+  if (!templateKey) return
+  const template = workflowTemplates.find((item) => item.key === templateKey)
+  if (!template) return
+  if (nodes.value.length || flows.value.length) {
+    const confirmed = await ElMessageBox.confirm(
+      '套用模板会替换当前画布内容，未保存的节点和连线将丢失。是否继续？',
+      '套用流程模板',
+      {
+        confirmButtonText: '继续',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    ).then(() => true).catch(() => false)
+    if (!confirmed) return
+  }
+
+  const startNode = createTemplateNode('start', '开始', 80, 180)
+  const approvalNode = createTemplateNode('approval', '审批', 300, 180)
+  const endNode = createTemplateNode('end', '结束', 520, 180)
+
+  workflowName.value = template.workflowName
+  businessType.value = template.businessType
+  lastBusinessType.value = template.businessType
+  businessScene.value = template.businessScene
+  triggerEvent.value = 'manual'
+  nodes.value = [startNode, approvalNode, endNode]
+  flows.value = [
+    createTemplateFlow(startNode.id, approvalNode.id),
+    createTemplateFlow(approvalNode.id, endNode.id),
+  ]
+  selectedNodeId.value = approvalNode.id
+  selectedFlowId.value = ''
+  activeTab.value = 'node'
+  undoAction.value = null
+  currentDefinitionMeta.isActive = '0'
+  currentDefinitionMeta.version = ''
+  await loadBusinessFieldMappings(template.businessType)
   nextTick(() => updateNodeSizeCache())
 }
 
@@ -1542,6 +1796,7 @@ const onAnchorMouseDown = (event, nodeId, position) => {
   
   connecting.value = true
   connectSource.value = { nodeId, position }
+  connectionHint.value = '拖到目标节点锚点创建连线'
   
   // 初始化临时连线终点
   const anchor = getAnchorPoint(nodeId, position)
@@ -1592,7 +1847,12 @@ const updateHoveredAnchor = throttle((event) => {
         Math.pow(mouseX - anchor.x, 2) + Math.pow(mouseY - anchor.y, 2)
       )
       if (dist < 15) { // 15px 范围内触发
-        hoveredAnchor.value = { nodeId: node.id, position: anchor.position }
+        const target = { nodeId: node.id, position: anchor.position }
+        const sourceNode = nodes.value.find((item) => item.id === connectSource.value?.nodeId)
+        const flowType = sourceNode?.type === 'condition' ? 'condition' : 'normal'
+        const error = getInvalidConnectionReason(connectSource.value, target, flowType)
+        connectionHint.value = error || '释放鼠标创建连线'
+        hoveredAnchor.value = target
         break
       }
     }
@@ -1611,7 +1871,8 @@ const onMouseUp = (event) => {
     if (target) {
       createFlow(connectSource.value, target)
     } else {
-      ElMessage.info('请将连线连接到其他节点的锚点')
+      connectionHint.value = '请将连线连接到其他节点的锚点'
+      ElMessage.info(connectionHint.value)
     }
   }
   
@@ -1619,6 +1880,9 @@ const onMouseUp = (event) => {
   connectSource.value = null
   tempLineEnd.value = { x: 0, y: 0 }
   hoveredAnchor.value = null
+  setTimeout(() => {
+    if (!connecting.value) connectionHint.value = ''
+  }, 1200)
 }
 
 // 直接检测鼠标位置下的锚点
@@ -1668,6 +1932,7 @@ const createFlow = (source, target) => {
   const flowType = isConditionSource ? 'condition' : 'normal'
   const error = getInvalidConnectionReason(source, target, flowType)
   if (error) {
+    connectionHint.value = error
     ElMessage.warning(error)
     return
   }
@@ -1697,6 +1962,7 @@ const createFlow = (source, target) => {
   }
 
   flows.value.push(flow)
+  connectionHint.value = '连线已创建'
 }
 
 // 删除连线
@@ -1716,13 +1982,26 @@ const deleteFlow = async (flowId) => {
 
   if (!confirmed) return
 
+  let undoPayload = {
+    type: 'deleteFlow',
+    flow: cloneData(flow),
+    ownerNodeId: '',
+    condition: null,
+  }
   flows.value = flows.value.filter(f => f.id !== flowId)
   if (flow.conditionId) {
     const ownerNode = nodes.value.find((node) => node.type === 'condition' && (node.properties?.conditions || []).some((item) => item.id === flow.conditionId))
     if (ownerNode) {
+      const condition = ownerNode.properties.conditions.find((item) => item.id === flow.conditionId)
+      undoPayload = {
+        ...undoPayload,
+        ownerNodeId: ownerNode.id,
+        condition: condition ? cloneData(condition) : null,
+      }
       ownerNode.properties.conditions = ownerNode.properties.conditions.filter((item) => item.id !== flow.conditionId)
     }
   }
+  recordUndoAction(undoPayload)
   if (selectedFlowId.value === flowId) {
     selectedFlowId.value = ''
   }
@@ -1748,6 +2027,11 @@ const updateSelectedFlowTarget = (targetNodeId) => {
 const onFlowEndpointMouseDown = (event, flow, endpoint) => {
   event.preventDefault()
   event.stopPropagation()
+
+  if (endpoint === 'source' && (flow.flowType === 'condition' || flow.flowType === 'default')) {
+    ElMessage.warning('条件分支不能拖动源端，请删除后从条件节点重新连线')
+    return
+  }
   
   // 只有当该连接线已被选中时才允许拖动端点
   if (selectedFlowId.value !== flow.id) {
@@ -1804,6 +2088,7 @@ const onFlowEndpointMouseMove = (event) => {
   const error = getInvalidConnectionReason(nextSource, nextTarget, checkFlowType)
   if (error) {
     flows.value[flowIndex] = currentFlow
+    connectionHint.value = error
     return
   }
   if (endpoint === 'source') {
@@ -1815,6 +2100,7 @@ const onFlowEndpointMouseMove = (event) => {
   }
   flows.value[flowIndex] = updatedFlow
   draggingFlowEndpoint.value.flow = updatedFlow
+  connectionHint.value = '释放鼠标更新连线'
 }
 
 // 结束拖动连接线端点
@@ -1822,11 +2108,15 @@ const onFlowEndpointMouseUp = () => {
   document.removeEventListener('mousemove', onFlowEndpointMouseMove)
   document.removeEventListener('mouseup', onFlowEndpointMouseUp)
   if (draggingFlowEndpoint.value && !draggingFlowNearestAnchor.value) {
-    ElMessage.info('请将连线端点拖到合法节点锚点上')
+    connectionHint.value = '请将连线端点拖到合法节点锚点上'
+    ElMessage.info(connectionHint.value)
   }
   draggingFlowPreviewPoint.value = null
   draggingFlowNearestAnchor.value = null
   draggingFlowEndpoint.value = null
+  setTimeout(() => {
+    connectionHint.value = ''
+  }, 1200)
 }
 
 // 按键删除
@@ -1912,6 +2202,12 @@ const removeNode = async () => {
 
   if (!confirmed || selectedNodeId.value !== currentNodeId) return
 
+  const removedNode = nodes.value.find(n => n.id === currentNodeId)
+  recordUndoAction({
+    type: 'deleteNode',
+    node: cloneData(removedNode),
+    flows: cloneData(relatedFlows),
+  })
   nodes.value = nodes.value.filter(n => n.id !== selectedNodeId.value)
   flows.value = flows.value.filter(
     f => f.sourceNodeId !== selectedNodeId.value && f.targetNodeId !== selectedNodeId.value
@@ -1927,6 +2223,13 @@ const removeCondition = (index) => {
 
   const removedFlow = flows.value.find(f => (f.flowType === 'condition' || f.flowType === 'default') && f.conditionId === removed.id)
   flows.value = flows.value.filter(f => f.id !== removedFlow?.id)
+}
+
+const addCondition = (node = selectedNode.value) => {
+  if (!node || node.type !== 'condition') return
+  if (!node.properties) node.properties = { conditions: [] }
+  if (!node.properties.conditions) node.properties.conditions = []
+  node.properties.conditions.push(createCondition())
 }
 
 const moveCondition = (index, direction) => {
@@ -1991,11 +2294,28 @@ const normalizeLoadedData = (data) => {
   })
 }
 
-const onBusinessTypeChange = () => {
+const onBusinessTypeChange = async (nextType = businessType.value, previousType = lastBusinessType.value) => {
+  if (restoringBusinessType.value) return false
+  if (previousType && nextType !== previousType && (nodes.value.length || flows.value.length)) {
+    const confirmed = await ElMessageBox.confirm('切换业务对象会影响审批人、通知对象和条件字段配置，已配置的业务字段可能不再匹配。是否继续？', '切换业务对象', {
+      confirmButtonText: '继续切换',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }).then(() => true).catch(() => false)
+    if (!confirmed) {
+      restoringBusinessType.value = true
+      businessType.value = previousType
+      await nextTick()
+      restoringBusinessType.value = false
+      return false
+    }
+  }
   if (!currentBusinessSceneOptions.value.some((item) => item.value === businessScene.value)) {
     businessScene.value = currentBusinessSceneOptions.value[0]?.value || ''
   }
   triggerEvent.value = ''
+  lastBusinessType.value = nextType
+  return true
 }
 
 const zoomIn = () => {
@@ -2020,13 +2340,35 @@ const fitCanvas = () => {
   zoom.value = Math.max(0.5, Math.min(1.2, Number(Math.min(scaleX, scaleY).toFixed(2))))
 }
 
+const centerNode = (node) => {
+  const canvasEl = canvasRef.value
+  if (!canvasEl || !node) return
+  canvasEl.scrollLeft = Math.max(0, (node.x + NODE_WIDTH / 2) * zoom.value - canvasEl.clientWidth / 2)
+  canvasEl.scrollTop = Math.max(0, (node.y + NODE_HEIGHT / 2) * zoom.value - canvasEl.clientHeight / 2)
+}
+
+const centerSelectedNode = () => {
+  const node = selectedNode.value || nodes.value[0]
+  if (!node) {
+    ElMessage.info('当前没有可居中的节点')
+    return
+  }
+  centerNode(node)
+}
+
 const validateWorkflowDefinition = () => {
-  if (validationIssues.value.length) {
-    ElMessage.warning(`当前流程还有 ${validationIssues.value.length} 项问题待处理`)
+  if (blockingIssues.value.length) {
+    ElMessage.warning(`当前流程还有 ${blockingIssues.value.length} 项错误待处理`)
     return false
   }
 
   return true
+}
+
+const ensureWorkflowCode = () => {
+  if (!workflowCode.value) {
+    workflowCode.value = 'WF_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
+  }
 }
 
 const buildSubmitNodes = () => {
@@ -2062,6 +2404,45 @@ const buildSubmitFlows = () => {
     flowType: flow.flowType || 'normal',
     conditionId: flow.conditionId || '',
   }))
+}
+
+const buildPublishDiffSummary = () => {
+  const previous = loadedDefinitionSnapshot.value
+  if (!previous) {
+    return [
+      `新增节点 ${nodes.value.length} 个`,
+      `新增连线 ${flows.value.length} 条`,
+      `业务对象：${businessType.value || '-'}`,
+      `业务场景：${businessScene.value || '-'}`,
+    ]
+  }
+  const previousNodeIds = new Set((previous.nodes || []).map((node) => node.id))
+  const currentNodeIds = new Set(nodes.value.map((node) => node.id))
+  const addedNodes = nodes.value.filter((node) => !previousNodeIds.has(node.id)).length
+  const removedNodes = (previous.nodes || []).filter((node) => !currentNodeIds.has(node.id)).length
+  const addedFlows = Math.max(0, flows.value.length - (previous.flows || []).length)
+  const removedFlows = Math.max(0, (previous.flows || []).length - flows.value.length)
+  const changes = []
+  if (addedNodes) changes.push(`新增节点 ${addedNodes} 个`)
+  if (removedNodes) changes.push(`删除节点 ${removedNodes} 个`)
+  if (addedFlows) changes.push(`新增连线 ${addedFlows} 条`)
+  if (removedFlows) changes.push(`删除连线 ${removedFlows} 条`)
+  if (previous.businessType !== businessType.value) changes.push(`业务对象：${previous.businessType || '-'} -> ${businessType.value || '-'}`)
+  if (previous.businessScene !== businessScene.value) changes.push(`业务场景：${previous.businessScene || '-'} -> ${businessScene.value || '-'}`)
+  return changes.length ? changes : ['未检测到结构性差异，将发布当前保存内容。']
+}
+
+const showPublishDiffConfirm = async () => {
+  const summary = buildPublishDiffSummary()
+  return ElMessageBox.confirm(
+    summary.join('\n'),
+    '发布前差异确认',
+    {
+      confirmButtonText: '确认发布',
+      cancelButtonText: '取消',
+      type: 'warning',
+    },
+  ).then(() => true).catch(() => false)
 }
 
 // ========== 连线验证函数 ==========
@@ -2121,10 +2502,7 @@ const handleSave = async () => {
 
   saving.value = true
   try {
-    // 自动生成流程编码（如果为空）
-    if (!workflowCode.value) {
-      workflowCode.value = 'WF_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
-    }
+    ensureWorkflowCode()
     
     const data = {
       name: workflowName.value,
@@ -2139,13 +2517,16 @@ const handleSave = async () => {
     }
 
     if (selectedDefinitionId.value) {
-      await api.updateWorkflowDefinition(selectedDefinitionId.value, data)
+      const res = await api.updateWorkflowDefinition(selectedDefinitionId.value, data)
+      syncSavedDefinitionState(res.data)
     } else {
       const res = await api.createWorkflowDefinition(data)
-      selectedDefinitionId.value = res.data?.id || ''
+      syncSavedDefinitionState(res.data)
     }
 
     ElMessage.success('保存成功')
+    loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
+    loadDefinitions()
   } catch (error) {
     const message = error.response?.data?.message || error.message || '保存失败'
     ElMessage.error(message)
@@ -2160,14 +2541,14 @@ const handleSaveAndPublish = async () => {
     ElMessage.warning('当前操作没有权限')
     return
   }
-  if (!workflowCode.value) {
-    ElMessage.warning('请填写流程名称和编码')
-    return
-  }
   if (!validateWorkflowDefinition()) return
+  const confirmedPublish = await showPublishDiffConfirm()
+  if (!confirmedPublish) return
 
   publishing.value = true
   try {
+    ensureWorkflowCode()
+
     const data = {
       name: workflowName.value,
       code: workflowCode.value,
@@ -2183,16 +2564,20 @@ const handleSaveAndPublish = async () => {
     let definitionId = selectedDefinitionId.value
     
     if (definitionId) {
-      await api.updateWorkflowDefinition(definitionId, data)
+      const res = await api.updateWorkflowDefinition(definitionId, data)
+      syncSavedDefinitionState(res.data)
+      definitionId = res.data?.id || definitionId
     } else {
       const res = await api.createWorkflowDefinition(data)
+      syncSavedDefinitionState(res.data)
       definitionId = res.data?.id || ''
     }
 
-    await api.publishWorkflowDefinition(definitionId)
-    
+    const publishRes = await api.publishWorkflowDefinition(definitionId)
+    syncSavedDefinitionState(publishRes.data)
+
     ElMessage.success('保存并发布成功')
-    selectedDefinitionId.value = definitionId
+    loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
     loadDefinitions()
   } catch (error) {
     const message = error.response?.data?.message || error.message || '发布失败'
@@ -2224,6 +2609,10 @@ const handleReset = () => {
     flows.value = []
     selectedDefinitionId.value = ''
     selectedNodeId.value = ''
+    selectedFlowId.value = ''
+    loadedDefinitionSnapshot.value = null
+    currentDefinitionMeta.isActive = '0'
+    currentDefinitionMeta.version = ''
     ElMessage.success('已重置')
   }).catch(() => {})
 }
@@ -2238,10 +2627,14 @@ const loadDefinition = async (id) => {
     workflowCategory.value = data.category || ''
     workflowDescription.value = data.description || ''
     businessType.value = data.businessType || ''
+    lastBusinessType.value = data.businessType || ''
     businessScene.value = data.businessScene || ''
     triggerEvent.value = data.triggerEvent || ''
     await loadBusinessFieldMappings(data.businessType || '')
     normalizeLoadedData(data)
+    loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
+    currentDefinitionMeta.isActive = data.isActive || '0'
+    currentDefinitionMeta.version = data.version || ''
     
     // 更新节点尺寸缓存
     nextTick(() => updateNodeSizeCache())
@@ -2300,8 +2693,11 @@ onMounted(() => {
   document.addEventListener('keydown', onKeyDown)
 })
 
-watch(businessType, (newType, oldType) => {
+watch(businessType, async (newType, oldType) => {
   if (newType === oldType) return
+  if (restoringBusinessType.value) return
+  const confirmed = await onBusinessTypeChange(newType, oldType)
+  if (!confirmed) return
   loadBusinessFieldMappings(newType)
 })
 
@@ -2330,6 +2726,15 @@ const onCanvasClick = () => {
   border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 0;
+}
+
+.definition-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
 }
 
 .designer-body {
@@ -2351,6 +2756,18 @@ const onCanvasClick = () => {
   font-size: 14px;
   margin: 15px 0 10px;
   color: var(--el-text-color-regular);
+}
+
+.panel-title--clickable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.palette-search {
+  margin-bottom: 10px;
 }
 
 .palette-node {
@@ -2398,6 +2815,22 @@ const onCanvasClick = () => {
   position: relative;
   min-width: 800px;
   min-height: 600px;
+}
+
+.connection-hint {
+  position: sticky;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  display: inline-flex;
+  max-width: 360px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color);
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .flow-lines {
@@ -2459,6 +2892,64 @@ const onCanvasClick = () => {
 .canvas-node .node-type {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.canvas-node .node-summary {
+  max-width: 180px;
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-minimap {
+  position: sticky;
+  left: calc(100% - 180px);
+  bottom: 12px;
+  z-index: 25;
+  width: 172px;
+  padding: 6px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.minimap-title {
+  margin-bottom: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.minimap-body {
+  position: relative;
+  width: 160px;
+  height: 100px;
+  background: var(--el-fill-color-extra-light);
+  overflow: hidden;
+}
+
+.minimap-node {
+  position: absolute;
+  min-width: 4px;
+  min-height: 4px;
+  border-radius: 2px;
+  background: var(--el-color-primary-light-3);
+  cursor: pointer;
+}
+
+.minimap-node.active {
+  background: var(--el-color-danger);
+}
+
+.minimap-viewport {
+  position: absolute;
+  border: 1px solid var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+  pointer-events: none;
 }
 
 /* 连接点样式 */
@@ -2606,6 +3097,15 @@ const onCanvasClick = () => {
 .issue-item {
   padding: 8px 0;
   border-top: 1px dashed #f2d3a2;
+  cursor: pointer;
+}
+
+.issue-item--error .issue-item-title {
+  color: var(--el-color-danger);
+}
+
+.issue-item--warning .issue-item-title {
+  color: var(--el-color-warning);
 }
 
 .issue-item:first-child {
@@ -2628,6 +3128,11 @@ const onCanvasClick = () => {
 .condition-list {
   padding: 10px 0;
   min-width: 0;
+}
+
+.condition-add-button {
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .condition-item {
