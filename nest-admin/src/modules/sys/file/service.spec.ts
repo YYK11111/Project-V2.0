@@ -3,6 +3,7 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { SysFileService } from "./service";
 import { SysFile, FileStatus } from "./entity";
+import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 
 describe("SysFileService", () => {
   let service: SysFileService;
@@ -15,6 +16,10 @@ describe("SysFileService", () => {
     update: jest.fn(),
     remove: jest.fn(),
   };
+  const mockSystemScheduledJobsService = {
+    isJobEnabled: jest.fn(),
+    runJob: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -23,6 +28,10 @@ describe("SysFileService", () => {
         {
           provide: getRepositoryToken(SysFile),
           useValue: mockRepository,
+        },
+        {
+          provide: SystemScheduledJobsService,
+          useValue: mockSystemScheduledJobsService,
         },
       ],
     }).compile();
