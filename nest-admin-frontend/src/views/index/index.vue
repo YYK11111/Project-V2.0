@@ -7,7 +7,6 @@ const router = useRouter()
 const userStore = useUserStore()
 const sysConfig = window.sysConfig
 
-const greeting = ref('')
 const loading = ref(false)
 const unread = ref<HomeUnreadStats>({ total: 0, todo: 0, cc: 0 })
 const todoList = ref<HomeMessageItem[]>([])
@@ -43,22 +42,6 @@ const workSummaryCards = computed<SummaryCardItem[]>(() => [
     path: '/business/projectManage/index',
   },
 ])
-
-function greetingFun() {
-  const date = new Date()
-  const hour = date.getHours()
-  if (0 <= hour && hour < 8) {
-    greeting.value = '早上好'
-  } else if (8 <= hour && hour < 12) {
-    greeting.value = '上午好'
-  } else if (12 <= hour && hour < 14) {
-    greeting.value = '中午好'
-  } else if (14 <= hour && hour < 18) {
-    greeting.value = '下午好'
-  } else {
-    greeting.value = '晚上好'
-  }
-}
 
 function goTo(path: string) {
   router.push(path)
@@ -107,7 +90,14 @@ function getProjectStatus(row: HomeProjectItem): string {
 }
 
 function getProjectProgress(row: HomeProjectItem): number {
-  return Number(row.progress ?? row.schedule ?? row.planProgress ?? 0)
+  const rawProgress = row.progress ?? row.schedule ?? row.planProgress
+  const normalizedProgress = Number(rawProgress)
+
+  if (!Number.isFinite(normalizedProgress)) {
+    return 0
+  }
+
+  return Math.min(100, Math.max(0, normalizedProgress))
 }
 
 function getProjectOwner(row: HomeProjectItem): string {
@@ -117,22 +107,21 @@ function getProjectOwner(row: HomeProjectItem): string {
 async function loadHomeData() {
   loading.value = true
   try {
-    const [unreadRes, todoRes, ccRes, projectRes] = await Promise.all([
+    const [unreadRes, todoRes, ccRes, projectRes] = await Promise.allSettled([
       api.getHomeUnreadCount(),
       api.getHomeTodoList(),
       api.getHomeCcList(),
       api.getHomeProjectList(),
     ])
-    unread.value = unreadRes
-    todoList.value = todoRes.list || []
-    ccList.value = ccRes.list || []
-    projectList.value = projectRes.list || []
+
+    unread.value = unreadRes.status === 'fulfilled' ? unreadRes.value : { total: 0, todo: 0, cc: 0 }
+    todoList.value = todoRes.status === 'fulfilled' ? todoRes.value.list || [] : []
+    ccList.value = ccRes.status === 'fulfilled' ? ccRes.value.list || [] : []
+    projectList.value = projectRes.status === 'fulfilled' ? projectRes.value.list || [] : []
   } finally {
     loading.value = false
   }
 }
-
-greetingFun()
 
 onMounted(() => {
   loadHomeData()
@@ -140,92 +129,124 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="user-home-page">
-    <div class="grid grid-cols-[3fr_1fr] --Gap hero-grid">
-      <div class="flexBetween --Gap hero-card Gcard">
-        <div class="userinfo flex flexAuto flexCenter pointer" @click="goTo('/user/profile')">
-          <div class="portrait">
-            <img v-if="userStore.avatar" class="portraitImg" :src="userStore.avatar" alt="" />
-          </div>
-          <div class="hero-copy">
-            <el-tooltip :content="userStore.name" placement="top-end" effect="light" :disabled="userStore.name?.length < 7">
-              <div class="wel ellipsis --Color">{{ greeting }}，{{ userStore.name }}</div>
-            </el-tooltip>
-            <div class="hero-desc">围绕消息、项目和知识入口开始今天的工作。</div>
-          </div>
-        </div>
+  <div class="page-shell user-home-page">
+    <div class="Gcard page-header">
+      <div class="page-header__main">
+        <h1 class="page-header__title">工作台</h1>
+        <p class="page-header__desc">优先处理待办、待阅和当前项目，快速进入今天的工作。</p>
       </div>
-
-      <div class="Gcard hero-meta">
-        <div>
-          <span class="--FontBlack5">更新时间：</span>
-          <span class="--FontBlack2 blod">{{ sysConfig._packDateTime }}</span>
-        </div>
-        <div>
-          <span class="--FontBlack5">系统版本：</span>
-          <span class="--FontBlack2 blod">{{ sysConfig.SYSTEM_VERSION }}</span>
-        </div>
+      <div class="page-header__actions">
+        <el-button @click="goTo('/user/messages')">消息中心</el-button>
+        <el-button type="primary" @click="goTo('/business/projectManage/index')">进入项目列表</el-button>
       </div>
     </div>
 
-    <div class="Gcard --MarginT" v-loading="loading">
-      <div class="GcardTitle">我的工作摘要</div>
+    <div class="page-subline">
+      <button class="subline-link" type="button" @click="goTo('/user/profile')">
+        个人中心：{{ userStore.name || '查看个人资料' }}
+      </button>
+      <div class="subline-meta">
+        <span>围绕消息、项目和知识入口开始今天的工作。</span>
+        <span>系统版本：{{ sysConfig.SYSTEM_VERSION }}</span>
+        <span>更新时间：{{ sysConfig._packDateTime }}</span>
+      </div>
+    </div>
+
+    <div class="Gcard work-summary" v-loading="loading">
+      <div class="section-header">
+        <div>
+          <div class="GcardTitle">我的工作摘要</div>
+          <div class="section-desc">用紧凑摘要先看清今天最需要处理的事项与项目分布。</div>
+        </div>
+      </div>
       <div class="summary-grid">
-        <div v-for="item in workSummaryCards" :key="item.title" class="summary-card pointer" @click="goTo(item.path)">
-          <div class="summary-title">{{ item.title }}</div>
-          <div class="summary-value">{{ item.value }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="gridCard --MarginT content-grid">
-      <div class="Gcard flexCol stickyPadding" v-loading="loading">
-        <div class="GcardTitle stickyTop !top-(--Padding)">我的待办</div>
-        <div v-if="todoList.length" class="list-panel">
-          <button v-for="item in todoList" :key="item.id || item.title" class="list-item" type="button" @click="goTodo(item)">
-            <span class="item-title">{{ getMessageTitle(item) }}</span>
-            <span class="item-meta">{{ getMessageTime(item) }}</span>
-          </button>
-        </div>
-        <el-empty v-else description="暂无待办" :image-size="80" />
-      </div>
-
-      <div class="Gcard flexCol stickyPadding" v-loading="loading">
-        <div class="GcardTitle stickyTop !top-(--Padding)">我的待阅</div>
-        <div v-if="ccList.length" class="list-panel">
-          <button v-for="item in ccList" :key="item.id || item.title" class="list-item" type="button" @click="goTo('/user/messages')">
-            <span class="item-title">{{ getMessageTitle(item) }}</span>
-            <span class="item-meta">{{ getMessageTime(item) }}</span>
-          </button>
-        </div>
-        <el-empty v-else description="暂无待阅" :image-size="80" />
-      </div>
-    </div>
-
-    <div class="gridCard --MarginT content-grid">
-      <div class="Gcard flexCol stickyPadding" v-loading="loading">
-        <div class="GcardTitle stickyTop !top-(--Padding)">我参与的项目</div>
-        <div v-if="projectList.length" class="project-panel">
-          <div v-for="item in projectList" :key="item.id || item.projectName || item.name" class="project-card pointer" @click="goTo('/business/projectManage/index')">
-            <div class="project-head">
-              <div class="project-name">{{ getProjectName(item) }}</div>
-              <el-tag size="small" effect="plain">{{ getProjectStatus(item) }}</el-tag>
-            </div>
-            <div class="project-meta">负责人：{{ getProjectOwner(item) }}</div>
-            <div class="project-meta">进度：{{ getProjectProgress(item) }}%</div>
-            <el-progress :percentage="Number(getProjectProgress(item)) || 0" :stroke-width="8" />
+        <button
+          v-for="item in workSummaryCards"
+          :key="item.title"
+          class="summary-card"
+          type="button"
+          @click="goTo(item.path)"
+        >
+          <span class="summary-card__icon" aria-hidden="true"></span>
+          <div class="summary-card__body">
+            <div class="summary-title">{{ item.title }}</div>
+            <div class="summary-value">{{ item.value }}</div>
           </div>
+        </button>
+      </div>
+    </div>
+
+    <div class="main-workspace">
+      <div class="workspace-primary">
+        <div class="Gcard flexCol stickyPadding" v-loading="loading">
+          <div class="section-header section-header--compact stickyTop !top-(--Padding)">
+            <div>
+              <div class="GcardTitle">我的待办</div>
+              <div class="section-desc">优先处理需要立即推进的流程与任务。</div>
+            </div>
+          </div>
+          <div v-if="todoList.length" class="list-panel">
+            <button v-for="item in todoList" :key="item.id || item.title" class="list-item" type="button" @click="goTodo(item)">
+              <span class="item-title">{{ getMessageTitle(item) }}</span>
+              <span class="item-meta">{{ getMessageTime(item) }}</span>
+            </button>
+          </div>
+          <el-empty v-else description="暂无待办，可前往项目列表查看最新进展" :image-size="80" />
         </div>
-        <el-empty v-else description="暂无参与项目" :image-size="80" />
+
+        <div class="Gcard flexCol stickyPadding" v-loading="loading">
+          <div class="section-header section-header--compact stickyTop !top-(--Padding)">
+            <div>
+              <div class="GcardTitle">我的待阅</div>
+              <div class="section-desc">集中查看抄送和同步信息，避免遗漏关键通知。</div>
+            </div>
+          </div>
+          <div v-if="ccList.length" class="list-panel">
+            <button v-for="item in ccList" :key="item.id || item.title" class="list-item" type="button" @click="goTo('/user/messages')">
+              <span class="item-title">{{ getMessageTitle(item) }}</span>
+              <span class="item-meta">{{ getMessageTime(item) }}</span>
+            </button>
+          </div>
+          <el-empty v-else description="暂无待阅，可前往消息中心查看历史通知" :image-size="80" />
+        </div>
       </div>
 
-      <div class="Gcard flexCol stickyPadding">
-        <div class="GcardTitle stickyTop !top-(--Padding)">快捷入口</div>
-        <div class="quick-grid">
-          <button v-for="item in quickLinks" :key="item.title" class="quick-card" type="button" @click="goTo(item.path)">
-            <span class="quick-title">{{ item.title }}</span>
-            <span class="quick-desc">{{ item.desc }}</span>
-          </button>
+      <div class="workspace-secondary">
+        <div class="Gcard flexCol stickyPadding" v-loading="loading">
+          <div class="section-header section-header--compact stickyTop !top-(--Padding)">
+            <div>
+              <div class="GcardTitle">我参与的项目</div>
+              <div class="section-desc">快速浏览当前参与项目的负责人、状态和推进进度。</div>
+            </div>
+          </div>
+          <div v-if="projectList.length" class="project-panel">
+            <div v-for="item in projectList" :key="item.id || item.projectName || item.name" class="project-card pointer" @click="goTo('/business/projectManage/index')">
+              <div class="project-head">
+                <div class="project-name">{{ getProjectName(item) }}</div>
+                <el-tag size="small" effect="plain">{{ getProjectStatus(item) }}</el-tag>
+              </div>
+              <div class="project-meta">负责人：{{ getProjectOwner(item) }}</div>
+              <div class="project-meta">进度：{{ getProjectProgress(item) }}%</div>
+              <el-progress :percentage="Number(getProjectProgress(item)) || 0" :stroke-width="8" />
+            </div>
+          </div>
+          <el-empty v-else description="暂无参与项目，可进入项目列表认领或查看最新项目" :image-size="80" />
+        </div>
+
+        <div class="Gcard flexCol stickyPadding quick-entry-card">
+          <div class="section-header section-header--compact stickyTop !top-(--Padding)">
+            <div>
+              <div class="GcardTitle">快捷入口</div>
+              <div class="section-desc">保留常用入口，减少往返菜单的操作成本。</div>
+            </div>
+          </div>
+          <div class="quick-grid">
+            <button v-for="item in quickLinks" :key="item.title" class="quick-card" type="button" @click="goTo(item.path)">
+              <span class="quick-card__icon" aria-hidden="true"></span>
+              <span class="quick-title">{{ item.title }}</span>
+              <span class="quick-desc">{{ item.desc }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -236,61 +257,102 @@ onMounted(() => {
 .user-home-page {
   height: 100%;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--Margin);
 }
 
-.hero-grid {
-  align-items: stretch;
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--Margin);
 }
 
-.hero-card,
-.hero-meta {
-  min-height: 120px;
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
 }
 
-.hero-meta {
-  display: grid;
-  align-content: center;
-  gap: 12px;
+.page-header__main {
+  min-width: 0;
+  flex: 1;
 }
 
-.userinfo {
-  &:hover {
-    color: var(--Color);
-  }
-
-  .portrait {
-    position: relative;
-    padding-right: 10px;
-
-    .portraitImg {
-      display: block;
-      margin: 0 auto;
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      border: 1px solid var(--BorderBlack10);
-    }
-  }
-
-  .wel {
-    position: relative;
-    font-size: 20px;
-    font-weight: bold;
-    margin: 2px 0 16px;
-    width: 100%;
-  }
+.page-header__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: var(--FontBlack1);
 }
 
-.hero-copy {
-  max-width: 320px;
+.page-header__desc {
+  margin: 10px 0 0;
+  color: var(--FontBlack2);
 }
 
-.hero-desc {
+.section-desc,
+.summary-title,
+.quick-desc,
+.item-meta,
+.project-meta {
   color: var(--FontBlack5);
 }
 
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-subline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 0 4px;
+}
+
+.subline-link,
+.subline-meta {
+  font-size: 13px;
+  color: var(--FontBlack5);
+}
+
+.subline-link {
+  text-align: left;
+}
+
+.subline-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-header--compact {
+  margin-bottom: 2px;
+}
+
+.work-summary,
+.main-workspace,
+.workspace-primary,
+.workspace-secondary,
 .summary-grid,
-.quick-grid {
+.quick-grid,
+.list-panel,
+.project-panel {
   display: grid;
   gap: var(--Margin);
 }
@@ -310,41 +372,46 @@ onMounted(() => {
 }
 
 .summary-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
   padding: 18px;
+  text-align: left;
 }
 
-.summary-title,
-.quick-desc,
-.item-meta,
-.project-meta {
-  color: var(--FontBlack5);
+.summary-card__icon,
+.quick-card__icon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #10b981, #3b82f6);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+}
+
+.summary-card__body {
+  min-width: 0;
 }
 
 .summary-value {
-  margin-top: 12px;
+  margin-top: 10px;
   font-size: 28px;
   font-weight: 700;
   color: var(--Color);
 }
 
-.gridCard {
-  display: grid;
-  grid-template: auto / 1fr 1fr;
-  gap: var(--Margin);
-
-  > .Gcard {
-    margin-top: 0;
-  }
+.main-workspace {
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
 }
 
-.content-grid {
+.workspace-primary,
+.workspace-secondary {
   align-items: start;
 }
 
 .list-panel,
 .project-panel {
-  display: grid;
-  gap: 12px;
   margin-top: var(--Margin);
 }
 
@@ -381,6 +448,10 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 
+.quick-entry-card {
+  align-self: start;
+}
+
 .quick-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: var(--Margin);
@@ -392,11 +463,28 @@ onMounted(() => {
 }
 
 @media (max-width: 960px) {
-  .hero-grid,
-  .gridCard,
+  .main-workspace,
   .summary-grid,
   .quick-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
+
+  .page-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .page-subline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .subline-meta {
+    justify-content: flex-start;
   }
 
   .list-item {

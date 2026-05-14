@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval, submitClose, getFieldPermissions } from './api'
@@ -134,8 +134,12 @@ function createMilestonesByType(projectType) {
 }
 
 const formRef = ref()
+const shellRef = ref(null)
 const milestonesManuallyEdited = ref(false)
 const form = ref(createDefaultForm())
+const stickyBarStyle = ref({})
+let stickyBarResizeObserver = null
+const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 
 const rules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
@@ -202,10 +206,21 @@ const isEdit = computed(() => !!route.query.id && !isView.value)
 const isCreate = computed(() => !route.query.id && !isView.value)
 const isDraftMode = computed(() => isCreate.value || String(form.value.status || '') === '1')
 const isClosureMode = computed(() => !isCreate.value && String(form.value.status || '') !== '1')
+const pageStatusText = computed(() => {
+  if (isView.value) {
+    return isClosureMode.value ? '已进入结项阶段' : '查看中'
+  }
+  if (isDraftMode.value) return '草稿'
+  return '审批/执行中'
+})
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const canEditCurrentProject = computed(() => isDraftMode.value)
+const isMobileScreen = computed(() => viewportWidth.value < 768)
+const isTabletScreen = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1024)
+const isCompactScreen = computed(() => viewportWidth.value < 1024)
+const formLabelPosition = computed(() => (isCompactScreen.value ? 'top' : 'right'))
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
 const fieldPermissionResult = ref(null)
@@ -392,6 +407,14 @@ function removeMemberRow(index) {
     form.value.members.splice(index, 1)
   }
   resequenceMembers()
+}
+
+function getMemberRoleText(role) {
+  return memberRoleOptions[role] || '-'
+}
+
+function getMilestoneStatusText(statusValue) {
+  return ({ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[statusValue] || '-')
 }
 
 function addMilestoneRow() {
@@ -597,16 +620,47 @@ function submitProjectApproval() {
 function cancel() {
   router.back()
 }
+
+function updateStickyBarStyle() {
+  const shellElement = shellRef.value
+  if (!shellElement) return
+  const rect = shellElement.getBoundingClientRect()
+  stickyBarStyle.value = {
+    left: `${Math.max(rect.left, 12)}px`,
+    width: `${Math.max(rect.width, 0)}px`,
+  }
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  updateViewportWidth()
+  updateStickyBarStyle()
+  window.addEventListener('resize', updateViewportWidth)
+  window.addEventListener('resize', updateStickyBarStyle)
+  if (typeof ResizeObserver !== 'undefined' && shellRef.value) {
+    stickyBarResizeObserver = new ResizeObserver(() => {
+      updateViewportWidth()
+      updateStickyBarStyle()
+    })
+    stickyBarResizeObserver.observe(shellRef.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateViewportWidth)
+  window.removeEventListener('resize', updateStickyBarStyle)
+  stickyBarResizeObserver?.disconnect()
+  stickyBarResizeObserver = null
+})
 </script>
 
 <template>
   <div class="project-form-page km-page">
-    <div class="Gcard km-panel project-form-shell">
-    <div class="project-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isView ? '项目详情' : isEdit ? '编辑项目' : '新增项目'" />
-    </div>
-
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="--FormItemContentMaxWidth: 100%;">
+    <div ref="shellRef" class="Gcard km-panel project-form-shell">
+      <el-form ref="formRef" :model="form" :rules="rules" :label-position="formLabelPosition" :label-width="isCompactScreen ? 'auto' : '100px'" style="--FormItemContentMaxWidth: 100%;">
       <div class="project-sections">
         <el-alert
           v-if="!isCreate && isClosureMode && !isView"
@@ -864,7 +918,7 @@ function cancel() {
             <el-button v-if="!isView" type="primary" :icon="Plus" @click="addMemberRow">添加成员</el-button>
           </div>
 
-          <div class="table-wrapper">
+          <div v-if="!isMobileScreen" class="table-wrapper table-wrapper--members" :class="{ 'table-wrapper--members-compact': isTabletScreen }">
             <el-table :data="form.members" border class="edit-table members-table">
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="成员" width="260">
@@ -916,6 +970,38 @@ function cancel() {
               </el-table-column>
             </el-table>
           </div>
+          <div v-else class="mobile-card-list">
+            <div v-for="(row, index) in form.members" :key="row.id || index" class="mobile-edit-card">
+              <div class="mobile-edit-card__header">
+                <div class="mobile-edit-card__title">成员 {{ index + 1 }}</div>
+                <el-button v-if="!isView" type="danger" link :icon="Delete" @click="removeMemberRow(index)">{{ row.id ? '退出' : '移除' }}</el-button>
+              </div>
+              <div class="mobile-edit-card__grid">
+                <el-form-item label="成员" class="mobile-edit-card__item">
+                  <ViewUser v-if="isView" :user="row.user" />
+                  <UserSelect v-else v-model="row.userId" placeholder="请选择成员" clearable />
+                </el-form-item>
+                <el-form-item label="角色" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="getMemberRoleText(row.role)" />
+                  <el-select v-else v-model="row.role" placeholder="请选择角色" style="width: 100%">
+                    <el-option v-for="(label, key) in memberRoleOptions" :key="key" :label="label" :value="key" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="核心成员" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="row.isCore === '1' ? '是' : '否'" />
+                  <el-switch v-else v-model="row.isCore" active-value="1" inactive-value="0" />
+                </el-form-item>
+                <el-form-item label="排序" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="row.sort" />
+                  <el-input-number v-else v-model="row.sort" :min="0" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="备注" class="mobile-edit-card__item mobile-edit-card__item--full">
+                  <ViewField v-if="isView" :value="row.remark" />
+                  <el-input v-else v-model="row.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+                </el-form-item>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section v-if="canViewGroup('projectPlan') && isDraftMode" class="section-card section-card--table" style="--FormItemContentMaxWidth: 100%;">
@@ -956,7 +1042,7 @@ function cancel() {
             </div>
           </div>
 
-          <div class="table-wrapper table-wrapper--milestones" :class="{ 'table-wrapper--milestones-wide': !isCreate }">
+          <div v-if="!isMobileScreen" class="table-wrapper table-wrapper--milestones" :class="{ 'table-wrapper--milestones-wide': !isCreate, 'table-wrapper--milestones-compact': isTabletScreen }">
             <el-table :data="form.milestones" border class="edit-table milestones-table" @cell-click="milestonesManuallyEdited = true">
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="里程碑名称" width="180">
@@ -1039,6 +1125,55 @@ function cancel() {
               </el-table-column>
             </el-table>
           </div>
+          <div v-else class="mobile-card-list">
+            <div v-for="(row, index) in form.milestones" :key="row.id || `${row.name}-${index}`" class="mobile-edit-card">
+              <div class="mobile-edit-card__header">
+                <div class="mobile-edit-card__title">里程碑 {{ index + 1 }}</div>
+                <el-button v-if="!isView" type="danger" link :icon="Delete" @click="removeMilestoneRow(index)">删除</el-button>
+              </div>
+              <div class="mobile-edit-card__grid">
+                <el-form-item label="名称" class="mobile-edit-card__item mobile-edit-card__item--full">
+                  <ViewField v-if="isView" :value="row.name" />
+                  <el-input v-else v-model="row.name" placeholder="请输入里程碑名称" />
+                </el-form-item>
+                <el-form-item label="计划日期" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="row.dueDate" />
+                  <el-date-picker v-else v-model="row.dueDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+                </el-form-item>
+                <el-form-item v-if="!isCreate" label="责任人" class="mobile-edit-card__item">
+                  <ViewUser v-if="isView" :user="row.owner" />
+                  <UserSelect v-else v-model="row.ownerId" placeholder="请选择责任人" clearable />
+                </el-form-item>
+                <el-form-item v-if="!isCreate" label="状态" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="getMilestoneStatusText(row.status)" />
+                  <el-select v-else v-model="row.status" style="width: 100%">
+                    <el-option label="待完成" value="1" />
+                    <el-option label="已完成" value="2" />
+                    <el-option label="已延期" value="3" />
+                    <el-option label="已取消" value="4" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="排序" class="mobile-edit-card__item">
+                  <ViewField v-if="isView" :value="row.sort" />
+                  <el-input-number v-else v-model="row.sort" :min="0" style="width: 100%" />
+                </el-form-item>
+                <el-form-item v-if="!isCreate" label="交付物" class="mobile-edit-card__item mobile-edit-card__item--full">
+                  <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
+                  <el-select v-else v-model="row.deliverables" multiple filterable allow-create default-first-option collapse-tags collapse-tags-tooltip placeholder="请输入交付物" style="width: 100%">
+                    <el-option v-for="item in row.deliverables || []" :key="item" :label="item" :value="item" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="!isCreate" label="描述" class="mobile-edit-card__item mobile-edit-card__item--full">
+                  <ViewField v-if="isView" :value="row.description" />
+                  <el-input v-else v-model="row.description" type="textarea" :rows="2" placeholder="请输入说明" />
+                </el-form-item>
+                <el-form-item v-if="!isCreate" label="延期原因" class="mobile-edit-card__item mobile-edit-card__item--full">
+                  <ViewField v-if="isView" :value="row.delayReason" />
+                  <el-input v-else v-model="row.delayReason" type="textarea" :rows="2" placeholder="请输入延期原因" />
+                </el-form-item>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section v-if="isDraftMode" class="section-card section-card--content">
@@ -1103,25 +1238,33 @@ function cancel() {
         </section>
       </div>
 
-      <el-form-item class="footer-actions">
-        <el-button
-          v-if="!isView && ((isEdit && isDraftMode && canProjectUpdate) || (isCreate && canProjectAdd))"
-          type="primary"
-          :loading="saveLoading"
-          :disabled="approvalLoading"
-          @click="submit">
-          暂存
-        </el-button>
-        <el-button
-          v-if="!isView && canProjectSubmitApproval && form.status === '1'"
-          type="warning"
-          :loading="approvalLoading"
-          :disabled="saveLoading"
-          @click="submitProjectApproval">
-          发起项目立项审批
-        </el-button>
-        <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
-      </el-form-item>
+      <div class="project-form-sticky-actions" :style="stickyBarStyle">
+        <div class="project-form-sticky-actions__meta">
+          <span class="project-form-sticky-actions__title">{{ pageStatusText }}</span>
+          <span v-if="!isMobileScreen" class="project-form-sticky-actions__desc">
+            {{ isView ? '当前为查看模式，可直接返回上一页。' : '当前页面支持分区录入，底部统一收口操作。' }}
+          </span>
+        </div>
+        <div class="footer-actions project-form-sticky-actions__buttons">
+          <el-button
+            v-if="!isView && ((isEdit && isDraftMode && canProjectUpdate) || (isCreate && canProjectAdd))"
+            type="primary"
+            :loading="saveLoading"
+            :disabled="approvalLoading"
+            @click="submit">
+            暂存
+          </el-button>
+          <el-button
+            v-if="!isView && canProjectSubmitApproval && form.status === '1'"
+            type="primary"
+            :loading="approvalLoading"
+            :disabled="saveLoading"
+            @click="submitProjectApproval">
+            发起项目立项审批
+          </el-button>
+          <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
+        </div>
+      </div>
     </el-form>
     </div>
   </div>
@@ -1130,6 +1273,7 @@ function cancel() {
 <style lang="scss" scoped>
 .project-form-page {
   min-height: 100%;
+  padding-bottom: 120px;
 }
 
 .project-form-shell {
@@ -1139,8 +1283,8 @@ function cancel() {
   overflow-x: hidden;
 }
 
-.project-form-shell__top {
-  margin-bottom: 20px;
+.project-form-shell :deep(.el-form--label-top .el-form-item__label) {
+  padding: 0 0 6px;
 }
 
 .project-sections {
@@ -1153,7 +1297,7 @@ function cancel() {
 .section-card {
   padding: 22px;
   background: var(--el-bg-color);
-  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
   min-width: 0;
   max-width: 100%;
@@ -1222,11 +1366,52 @@ function cancel() {
   color: var(--el-text-color-primary);
 }
 
+.mobile-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-edit-card {
+  padding: 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.mobile-edit-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mobile-edit-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.mobile-edit-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mobile-edit-card__item {
+  margin-bottom: 0 !important;
+}
+
+.mobile-edit-card__item--full {
+  grid-column: 1 / -1;
+}
+
 .progress-readonly-field {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--el-fill-color-extra-light);
+  background: #f7f7f7;
   border: 1px solid var(--el-border-color-lighter);
 }
 
@@ -1275,7 +1460,7 @@ function cancel() {
 }
 
 .edit-table :deep(th.el-table__cell) {
-  background: color-mix(in srgb, var(--Color) 3%, var(--el-fill-color-extra-light));
+  background: #f7f7f7;
   height: 34px;
   font-weight: 600;
   color: var(--el-text-color-primary);
@@ -1385,16 +1570,13 @@ function cancel() {
 }
 
 .footer-actions {
-  margin-top: 24px;
-}
-
-.footer-actions :deep(.el-form-item__content) {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.footer-actions :deep(.el-button) {
+.footer-actions :deep(.el-button),
+.footer-actions .el-button {
   min-width: 112px;
 }
 
@@ -1402,7 +1584,59 @@ function cancel() {
   margin-left: 0;
 }
 
+.project-form-sticky-actions {
+  position: fixed;
+  bottom: 16px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+.project-form-sticky-actions--mobile {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.project-form-sticky-actions__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-form-sticky-actions__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.project-form-sticky-actions__desc {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.project-form-sticky-actions__buttons {
+  justify-content: flex-end;
+}
+
+.project-form-sticky-actions__buttons :deep(.el-button) {
+  min-width: 112px;
+}
+
 @media (max-width: 1024px) {
+  .project-form-page {
+    padding-bottom: 132px;
+  }
+
   .project-baseline-plan-grid {
     grid-template-columns: 1fr;
   }
@@ -1415,20 +1649,90 @@ function cancel() {
     min-width: 1120px;
     width: 1120px;
   }
+
+  .table-wrapper--members-compact :deep(.el-table),
+  .table-wrapper--members-compact :deep(.el-table__inner-wrapper),
+  .table-wrapper--members-compact :deep(.el-table__header-wrapper),
+  .table-wrapper--members-compact :deep(.el-table__body-wrapper),
+  .table-wrapper--members-compact :deep(table) {
+    min-width: 860px;
+    width: 860px;
+  }
+
+  .table-wrapper--milestones-compact :deep(.el-table),
+  .table-wrapper--milestones-compact :deep(.el-table__inner-wrapper),
+  .table-wrapper--milestones-compact :deep(.el-table__header-wrapper),
+  .table-wrapper--milestones-compact :deep(.el-table__body-wrapper),
+  .table-wrapper--milestones-compact :deep(table) {
+    min-width: 960px;
+    width: 960px;
+  }
 }
 
 @media (max-width: 768px) {
-  .project-form-shell__top {
-    margin-bottom: 16px;
+  .project-form-page {
+    padding-bottom: 212px;
   }
 
   .section-card {
     padding: 18px;
   }
 
+  .project-sections {
+    gap: 16px;
+  }
+
+  .project-form-shell :deep(.el-form-item__label) {
+    padding: 0 0 6px;
+  }
+
+  .project-form-sticky-actions {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 12px;
+    padding: 14px;
+  }
+
+  .project-form-sticky-actions__meta {
+    gap: 0;
+  }
+
+  .project-form-sticky-actions__title {
+    line-height: 1.2;
+  }
+
+  .project-form-sticky-actions__buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .project-form-sticky-actions__buttons :deep(.el-button) {
+    width: 100%;
+    min-width: 0;
+  }
+
   .table-wrapper--milestones {
     margin-inline: -6px;
     padding-inline: 6px;
+  }
+
+  .mobile-edit-card__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-edit-card {
+    padding: 12px;
+  }
+
+  .mobile-edit-card__header {
+    margin-bottom: 10px;
+  }
+
+  .mobile-edit-card__item--full {
+    grid-column: auto;
   }
 
   .table-wrapper--milestones-wide :deep(.el-table),
