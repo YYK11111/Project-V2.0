@@ -84,6 +84,7 @@ export class BaseController<T, K> {
     return this.service.list({
       ...query,
       _operatorId: req?.user?.id,
+      _operatorName: req?.user?.name,
       _operatorDeptId: req?.user?.deptId || req?.user?.dept?.id,
       _operatorPermissions: req?.user?.permissions || [],
       _operatorRoles: req?.user?.roles || [],
@@ -91,8 +92,8 @@ export class BaseController<T, K> {
   }
 
   // 查询全部，返回所有结果
-  // @Get('listAll')
-  // async listAll(@Query() query: QueryListDto): Promise<ResponseListDto<T>> {
+  // @Get('manageAll')
+  // async manageAll(@Query() query: QueryListDto): Promise<ResponseListDto<T>> {
   //   return this.service.list(query)
   // }
 

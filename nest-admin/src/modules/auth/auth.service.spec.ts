@@ -110,7 +110,7 @@ describe("AuthService", () => {
     jest.spyOn(passwordUtils, "verifyPassword").mockResolvedValue(true);
     const req = {
       body: {
-        account: "NestAdmin",
+        account: "admin",
         password: "Password@123",
         uuid: "uuid-1",
         code: "1234",
@@ -124,7 +124,7 @@ describe("AuthService", () => {
 
     usersService.getOne.mockResolvedValue({
       id: "1",
-      name: "NestAdmin",
+      name: "admin",
       password: "scrypt$hash",
       roles: [{ id: "1", permissionKey: "admin", isActive: 1 }],
     });

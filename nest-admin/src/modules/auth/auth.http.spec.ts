@@ -86,8 +86,8 @@ describe("Auth HTTP 集成", () => {
     const response = await request(app.getHttpServer())
       .post("/auth/login")
       .send({
-        account: "NestAdmin",
-        password: "NestAdmin#2026!Reset",
+        account: "admin",
+        password: "Password@123",
         uuid: "uuid-1",
         code: "1234",
       });

@@ -86,7 +86,7 @@ describe("RolesService", () => {
     });
 
     const menus = await service.getUserMenus({
-      name: "NestAdmin",
+      name: "admin",
       roles: [{ permissionKey: "admin", isActive: "1" }],
     });
 
@@ -118,11 +118,33 @@ describe("RolesService", () => {
     });
 
     const menus = await service.getUserMenus({
-      name: "NestAdmin",
+      name: "admin",
       roles: [{ permissionKey: "admin", isActive: "1" }],
     });
 
     expect(menus).toHaveLength(1);
     expect(menus[0].permissionKey).toBe("business/projects/dashboard");
+  });
+
+  it("获取角色详情时应过滤操作人上下文字段", async () => {
+    const service = createService();
+    repository.findOne.mockResolvedValue({
+      id: "1",
+      name: "超级管理员",
+      menus: [],
+    });
+
+    await service.getOne({
+      id: "1",
+      _operatorId: "u1",
+      _operatorDeptId: "d1",
+      _operatorPermissions: ["system/roles/getOne"],
+      _operatorRoles: [{ permissionKey: "admin" }],
+    });
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { id: "1" },
+      relations: { menus: true },
+    });
   });
 });

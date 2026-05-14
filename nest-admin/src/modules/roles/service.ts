@@ -158,9 +158,21 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
   }
 
   async getOne(query, isError = true) {
+    const rawWhere =
+      typeof query === "object" && query?.where ? query.where : query;
+    const whereSource =
+      rawWhere && typeof rawWhere === "object" ? rawWhere : {};
+    const {
+      _operatorId,
+      _operatorName,
+      _operatorDeptId,
+      _operatorPermissions,
+      _operatorRoles,
+      ...where
+    } = whereSource as Record<string, any>;
     return super.getOne(
       {
-        where: typeof query === "object" && query?.where ? query.where : query,
+        where,
         relations: { menus: true },
       } as any,
       isError,

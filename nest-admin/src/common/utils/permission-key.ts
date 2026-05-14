@@ -8,6 +8,10 @@ export function normalizePermissionKey(permissionKey?: string) {
     return permissionKey || "";
   }
 
+  if (permissionKey.endsWith("/listAll")) {
+    return permissionKey.replace(/\/listAll$/, "/manageAll");
+  }
+
   return permissionKeyAliasMap.get(permissionKey) || permissionKey;
 }
 

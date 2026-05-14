@@ -16,6 +16,7 @@ import {
   CustomerViewerSourceType,
 } from "./entities/customer-viewer.entity";
 import { WorkflowHistory } from "src/modulesBusi/workflow/entity/workflow-history.entity";
+import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class CustomersService extends BaseService<Customer, CustomerDto> {
@@ -50,17 +51,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
   }
 
   private canViewAllCustomers(permissions: string[] = []) {
-    return (
-      permissions.includes("*") ||
-      permissions.includes("business/crm/customers/listAll")
-    );
+    return hasModuleFullAccess(permissions, "business/crm/customers/list");
   }
 
   private canManageAllCustomers(permissions: string[] = []) {
-    return (
-      permissions.includes("*") ||
-      permissions.includes("business/crm/customers/manageAll")
-    );
+    return hasModuleFullAccess(permissions, "business/crm/customers/update");
   }
 
   async getVisibleCustomerIds(
