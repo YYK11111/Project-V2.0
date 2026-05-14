@@ -22,6 +22,7 @@
         <el-button @click="fitCanvas">适应画布</el-button>
         <el-button @click="centerSelectedNode">居中当前节点</el-button>
       </el-button-group>
+      <el-button :disabled="!workflowCode" :loading="versionHistoryLoading" style="margin-left: 12px;" @click="openVersionHistory">历史版本</el-button>
       <div class="definition-state">
         <el-tag size="small" :type="currentDefinitionIsPublished ? 'success' : 'info'">{{ currentDefinitionStateText }}</el-tag>
         <el-tag v-if="currentDefinitionVersion" size="small" type="info">v{{ currentDefinitionVersion }}</el-tag>
@@ -530,6 +531,30 @@
         </el-tab-pane>
       </el-tabs>
     </el-dialog>
+
+    <el-dialog v-model="versionHistoryVisible" title="历史版本" width="720px">
+      <el-table :data="currentDefinitionVersions" v-loading="versionHistoryLoading" border>
+        <el-table-column prop="version" label="版本" width="90">
+          <template #default="{ row }">v{{ row.version || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="name" label="流程名称" min-width="160" />
+        <el-table-column prop="isActive" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isActive === '1' ? 'success' : 'info'" size="small">
+              {{ row.isActive === '1' ? '已发布' : '草稿' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateTime" label="更新时间" width="180">
+          <template #default="{ row }">{{ row.updateTime || row.createTime || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" :disabled="row.id === selectedDefinitionId" @click="viewDefinitionVersion(row)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -546,6 +571,8 @@ import { checkPermi } from '@/utils/permission'
 const saving = ref(false)
 const publishing = ref(false)
 const previewVisible = ref(false)
+const versionHistoryVisible = ref(false)
+const versionHistoryLoading = ref(false)
 const activeTab = ref('process')
 const previewActiveTab = ref('visual')
 const showIssuePanel = ref(true)
@@ -590,6 +617,7 @@ const restoringBusinessType = ref(false)
 const nodes = ref([])
 const selectedNodeId = ref('')
 const flows = ref([])
+const currentDefinitionVersions = ref([])
 const loadedDefinitionSnapshot = ref(null)
 const currentDefinitionMeta = reactive({
   isActive: '0',
@@ -731,11 +759,15 @@ const currentBusinessSceneOptions = computed(() => businessSceneOptions[business
 const currentDefinitionIsPublished = computed(() => currentDefinitionMeta.isActive === '1')
 const currentDefinitionStateText = computed(() => (currentDefinitionIsPublished.value ? '已发布' : '草稿'))
 const currentDefinitionVersion = computed(() => currentDefinitionMeta.version || '')
+const buildComparableNodes = (nodeList = []) => nodeList.map((node) => {
+  const { x, y, ...nodeWithoutPosition } = node
+  return nodeWithoutPosition
+})
 const buildCurrentDefinitionSnapshot = () => ({
   businessType: businessType.value,
   businessScene: businessScene.value,
   triggerEvent: triggerEvent.value,
-  nodes: cloneData(nodes.value),
+  nodes: buildComparableNodes(nodes.value),
   flows: cloneData(flows.value),
 })
 const hasUnpublishedChanges = computed(() => {
@@ -2594,17 +2626,46 @@ const handleReset = () => {
     selectedNodeId.value = ''
     selectedFlowId.value = ''
     loadedDefinitionSnapshot.value = null
+    currentDefinitionVersions.value = []
     currentDefinitionMeta.isActive = '0'
     currentDefinitionMeta.version = ''
     ElMessage.success('已重置')
   }).catch(() => {})
 }
 
+const openVersionHistory = async () => {
+  if (!workflowCode.value) {
+    ElMessage.warning('当前流程还没有编码，保存后才能查看历史版本')
+    return
+  }
+
+  versionHistoryVisible.value = true
+  versionHistoryLoading.value = true
+  try {
+    const res = await api.getWorkflowDefinitionVersions(workflowCode.value)
+    currentDefinitionVersions.value = res.list || []
+  } catch (error) {
+    ElMessage.error('加载历史版本失败')
+    currentDefinitionVersions.value = []
+  } finally {
+    versionHistoryLoading.value = false
+  }
+}
+
+const viewDefinitionVersion = async (row) => {
+  if (!row?.id || row.id === selectedDefinitionId.value) return
+  const loaded = await loadDefinition(row.id)
+  if (loaded) {
+    versionHistoryVisible.value = false
+  }
+}
+
 const loadDefinition = async (id) => {
-  if (!id) return
+  if (!id) return false
   try {
     const res = await api.getWorkflowDefinition(id)
     const data = unwrapWorkflowDefinition(res)
+    selectedDefinitionId.value = data.id || id
     workflowName.value = data.name
     workflowCode.value = data.code
     workflowCategory.value = normalizeWorkflowCategory(data.category || '')
@@ -2618,12 +2679,22 @@ const loadDefinition = async (id) => {
     loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
     currentDefinitionMeta.isActive = data.isActive || '0'
     currentDefinitionMeta.version = data.version || ''
+    syncDefinitionIdToUrl(selectedDefinitionId.value)
     
     // 更新节点尺寸缓存
     nextTick(() => updateNodeSizeCache())
+    return true
   } catch (error) {
     ElMessage.error('加载失败')
+    return false
   }
+}
+
+const syncDefinitionIdToUrl = (id) => {
+  if (!id || typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  url.searchParams.set('id', id)
+  window.history.replaceState(null, '', url.toString())
 }
 
 const loadBusinessFieldMappings = async (type = businessType.value) => {

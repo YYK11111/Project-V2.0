@@ -194,6 +194,27 @@ describe('workflow 设计器契约守卫', () => {
     expect(source).toContain('currentDefinitionMeta.isActive = data.isActive || \'0\'')
   })
 
+  it('未发布改动判断忽略节点画布坐标变化', () => {
+    const source = readDesignerSource()
+
+    expect(source).toContain('const buildComparableNodes = (nodeList = []) =>')
+    expect(source).toContain('const { x, y, ...nodeWithoutPosition } = node')
+    expect(source).toContain('nodes: buildComparableNodes(nodes.value)')
+    expect(source).not.toContain('nodes: cloneData(nodes.value)')
+  })
+
+  it('设计器内提供当前流程历史版本查看入口', () => {
+    const source = readDesignerSource()
+
+    expect(source).toContain('@click="openVersionHistory"')
+    expect(source).toContain('历史版本')
+    expect(source).toContain('versionHistoryVisible')
+    expect(source).toContain('currentDefinitionVersions')
+    expect(source).toContain('api.getWorkflowDefinitionVersions(workflowCode.value)')
+    expect(source).toContain('loadDefinition(row.id)')
+    expect(source).not.toContain('placeholder="选择流程"')
+  })
+
   it('加载流程详情时兼容响应包裹并回填触发时机', () => {
     const source = readDesignerSource()
 

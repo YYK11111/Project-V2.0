@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectLatestPublishedWorkflowDefinitions } from './api'
+import { selectLatestPublishedWorkflowDefinitions, selectWorkflowDefinitionVersions } from './api'
 
 describe('workflow 列表版本筛选', () => {
   it('优先显示每个流程已发布的最新版本', () => {
@@ -29,5 +29,18 @@ describe('workflow 列表版本筛选', () => {
     expect(result).toEqual([
       expect.objectContaining({ id: 'def-a2', version: 2, isActive: '0' }),
     ])
+  })
+
+  it('按流程编码筛选并倒序返回全部历史版本', () => {
+    const list = [
+      { id: 'def-v1', code: 'WF_PROJECT_APPROVAL', version: 1, isActive: '1', createTime: '2026-05-12 10:00:00' },
+      { id: 'def-v3', code: 'WF_PROJECT_APPROVAL', version: 3, isActive: '0', createTime: '2026-05-14 10:00:00' },
+      { id: 'def-task-v2', code: 'WF_TASK_APPROVAL', version: 2, isActive: '1', createTime: '2026-05-13 10:00:00' },
+      { id: 'def-v2', code: 'WF_PROJECT_APPROVAL', version: 2, isActive: '0', createTime: '2026-05-13 10:00:00' },
+    ]
+
+    const result = selectWorkflowDefinitionVersions(list, 'WF_PROJECT_APPROVAL')
+
+    expect(result.map((item) => item.id)).toEqual(['def-v3', 'def-v2', 'def-v1'])
   })
 })
