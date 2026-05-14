@@ -2006,6 +2006,44 @@ export class WorkflowService {
     return this.getDefinition(instance.definitionId);
   }
 
+  private async getRecentStarterInstances(
+    userId: string,
+    status?: string,
+    limit = 100,
+  ): Promise<WorkflowInstance[]> {
+    const instanceQb = this.instanceRepo.createQueryBuilder("instance");
+    instanceQb.where("instance.starterId = :userId", { userId });
+    if (status) {
+      instanceQb.andWhere("instance.status = :status", { status });
+    }
+    return instanceQb
+      .orderBy("instance.startTime", "DESC")
+      .limit(limit)
+      .getMany();
+  }
+
+  private async getRecentParticipantInstanceIds(
+    userId: string,
+    source: "task" | "history",
+    limit = 100,
+  ): Promise<string[]> {
+    const alias = source === "task" ? "task" : "history";
+    const userField = source === "task" ? "assigneeId" : "operatorId";
+    const repo = source === "task" ? this.taskRepo : this.historyRepo;
+    const rows = await repo
+      .createQueryBuilder(alias)
+      .select(`${alias}.instanceId`, "instanceId")
+      .where(`${alias}.${userField} = :userId`, { userId })
+      .orderBy(`${alias}.createTime`, "DESC")
+      .limit(limit)
+      .getRawMany<{ instanceId?: string }>();
+    return [
+      ...new Set(
+        rows.map((item) => String(item.instanceId || "")).filter(Boolean),
+      ),
+    ];
+  }
+
   /**
    * 获取流程实例列表（支持筛选）
    */
@@ -2017,47 +2055,34 @@ export class WorkflowService {
     let instances: WorkflowInstance[] = [];
 
     if (mode === "participant" && userId) {
-      const sql = `
-        SELECT
-          id,
-          create_time AS createTime,
-          create_user AS createUser,
-          update_time AS updateTime,
-          update_user AS updateUser,
-          definition_id AS definitionId,
-          definition_code AS definitionCode,
-          business_key AS businessKey,
-          starter_id AS starterId,
-          current_node_id AS currentNodeId,
-          variables,
-          status,
-          start_time AS startTime,
-          end_time AS endTime,
-          duration
-        FROM wf_instance
-        WHERE is_delete IS NULL
-          AND (
-            starter_id = ?
-            OR id IN (
-              SELECT DISTINCT instance_id
-              FROM wf_task
-              WHERE assignee_id = ?
-            )
-            OR id IN (
-              SELECT DISTINCT instance_id
-              FROM wf_history
-              WHERE operator_id = ?
-            )
-          )
-          ${status ? "AND status = ?" : ""}
-        ORDER BY start_time DESC
-        LIMIT 100
-      `;
-      const rawInstances = await this.instanceRepo.query(
-        sql,
-        status ? [userId, userId, userId, status] : [userId, userId, userId],
-      );
-      instances = rawInstances.map((item) => new WorkflowInstance(item));
+      const [starterInstances, taskInstanceIds, historyInstanceIds] =
+        await Promise.all([
+          this.getRecentStarterInstances(userId, status),
+          this.getRecentParticipantInstanceIds(userId, "task"),
+          this.getRecentParticipantInstanceIds(userId, "history"),
+        ]);
+      const instanceIds = [
+        ...new Set(
+          [
+            ...starterInstances.map((instance) => String(instance.id || "")),
+            ...taskInstanceIds,
+            ...historyInstanceIds,
+          ].filter(Boolean),
+        ),
+      ];
+      if (!instanceIds.length) {
+        return [];
+      }
+      const instanceQb = this.instanceRepo
+        .createQueryBuilder("instance")
+        .where("instance.id IN (:...instanceIds)", { instanceIds });
+      if (status) {
+        instanceQb.andWhere("instance.status = :status", { status });
+      }
+      instances = await instanceQb
+        .orderBy("instance.startTime", "DESC")
+        .limit(100)
+        .getMany();
     } else {
       const instanceQb = this.instanceRepo.createQueryBuilder("instance");
 

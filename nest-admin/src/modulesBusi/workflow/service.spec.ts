@@ -453,16 +453,6 @@ describe("WorkflowService 条件路由", () => {
 
 describe("WorkflowService listInstances", () => {
   const createService = () => {
-    const taskQb = {
-      select: jest.fn().mockReturnThis(),
-      addSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      groupBy: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn(),
-    };
-
     const instanceQb = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -477,8 +467,8 @@ describe("WorkflowService listInstances", () => {
         createQueryBuilder: jest.fn(() => instanceQb),
         query: jest.fn(),
       } as any,
-      { createQueryBuilder: jest.fn(() => taskQb) } as any,
-      {} as any,
+      { createQueryBuilder: jest.fn() } as any,
+      { createQueryBuilder: jest.fn() } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -493,32 +483,82 @@ describe("WorkflowService listInstances", () => {
       .spyOn(service as any, "attachBusinessSummaryToInstance")
       .mockImplementation(async (instance) => instance);
 
-    return { service, taskQb, instanceQb };
+    return { service, instanceQb };
   };
 
   it("participant 模式查询自己发起、参与和审批过的实例", async () => {
     const { service, instanceQb } = createService();
-    ((service as any).instanceRepo.query as jest.Mock).mockResolvedValue([
-      { id: "ins_2", startTime: "2026-04-16 10:00:00" },
-      { id: "ins_1", startTime: "2026-04-16 09:00:00" },
-    ]);
+    instanceQb.getMany.mockResolvedValue([{ id: "ins_3" }, { id: "ins_1" }]);
+    const taskQb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValue([{ instanceId: "ins_2" }, { instanceId: "ins_1" }]),
+    };
+    const historyQb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValue([{ instanceId: "ins_4" }, { instanceId: "ins_2" }]),
+    };
+    const finalInstanceQb = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([
+        { id: "ins_4", startTime: "2026-04-16 12:00:00" },
+        { id: "ins_3", startTime: "2026-04-16 11:00:00" },
+        { id: "ins_2", startTime: "2026-04-16 10:00:00" },
+        { id: "ins_1", startTime: "2026-04-16 09:00:00" },
+      ]),
+    };
+    (service as any).taskRepo.createQueryBuilder = jest.fn(() => taskQb);
+    (service as any).historyRepo.createQueryBuilder = jest.fn(() => historyQb);
+    (service as any).instanceRepo.createQueryBuilder = jest
+      .fn()
+      .mockReturnValueOnce(instanceQb)
+      .mockReturnValueOnce(finalInstanceQb);
 
     const result = await service.listInstances("user_1", "1", "participant");
 
-    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
-      expect.stringContaining("starter_id = ?"),
-      ["user_1", "user_1", "user_1", "1"],
+    expect(instanceQb.where).toHaveBeenCalledWith(
+      "instance.starterId = :userId",
+      { userId: "user_1" },
     );
-    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
-      expect.stringContaining("wf_task"),
-      expect.any(Array),
+    expect(instanceQb.andWhere).toHaveBeenCalledWith(
+      "instance.status = :status",
+      { status: "1" },
     );
-    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
-      expect.stringContaining("wf_history"),
-      expect.any(Array),
+    expect(taskQb.where).toHaveBeenCalledWith("task.assigneeId = :userId", {
+      userId: "user_1",
+    });
+    expect(taskQb.orderBy).toHaveBeenCalledWith("task.createTime", "DESC");
+    expect(historyQb.where).toHaveBeenCalledWith(
+      "history.operatorId = :userId",
+      { userId: "user_1" },
     );
-    expect(instanceQb.orderBy).not.toHaveBeenCalled();
+    expect(historyQb.orderBy).toHaveBeenCalledWith(
+      "history.createTime",
+      "DESC",
+    );
+    expect(finalInstanceQb.where).toHaveBeenCalledWith(
+      "instance.id IN (:...instanceIds)",
+      { instanceIds: ["ins_3", "ins_1", "ins_2", "ins_4"] },
+    );
+    expect(finalInstanceQb.andWhere).toHaveBeenCalledWith(
+      "instance.status = :status",
+      { status: "1" },
+    );
     expect(result).toEqual([
+      { id: "ins_4", startTime: "2026-04-16 12:00:00" },
+      { id: "ins_3", startTime: "2026-04-16 11:00:00" },
       { id: "ins_2", startTime: "2026-04-16 10:00:00" },
       { id: "ins_1", startTime: "2026-04-16 09:00:00" },
     ]);

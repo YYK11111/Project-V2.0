@@ -10,6 +10,7 @@ import { Index } from "typeorm";
  */
 @MyEntity("wf_history")
 @Index("idx_wf_history_instance_time", ["instanceId", "createTime"])
+@Index("idx_wf_history_operator_time", ["operatorId", "createTime"])
 export class WorkflowHistory extends BaseEntity {
   constructor(obj = {}) {
     super();
