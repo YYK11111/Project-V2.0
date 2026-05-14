@@ -29,6 +29,7 @@
 - 吸收任务评论、任务汇报、工作流等当前功能的最终菜单状态
 - 不要求手工逐个运行历史菜单修复脚本
 - 当前已切换为“正式基线模式”：直接导入从真实运行库导出的 `sys_menu`、`sys_menu_closure`、`sys_role_menu` 最终种子数据
+- 基线导入后会补跑 `repair_business_permission_granularity.sql`，用于补齐业务表单的全量查看管理员权限
 
 4. `04_optional_modules.sql`
 作用：恢复可选扩展能力。

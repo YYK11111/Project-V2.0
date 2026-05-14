@@ -54,4 +54,5 @@ FROM sys_menu
 WHERE @user_role_id IS NOT NULL
   AND is_delete IS NULL
   AND type = 'button'
-  AND permissionKey LIKE 'business/%';
+  AND permissionKey LIKE 'business/%'
+  AND permissionKey NOT LIKE '%/manageAll';

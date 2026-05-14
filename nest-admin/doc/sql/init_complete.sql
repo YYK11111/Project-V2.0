@@ -1,5 +1,5 @@
 -- ========================================
--- Nest Admin 系统一键初始化脚本
+-- 系统 系统一键初始化脚本
 -- ========================================
 -- 使用方法：
 -- 1. 先创建数据库: CREATE DATABASE psd2 DEFAULT CHARSET utf8mb4;
@@ -233,7 +233,7 @@ INSERT INTO `sys_menu_closure` (`id_ancestor`, `id_descendant`) VALUES
 -- 4.1 插入超级管理员用户
 -- 密码: 123456 (AES加密后: s3wmd2VReF1IjZhK59gLBY0OjYlzjA==)
 INSERT INTO `sys_user` (`id`, `name`, `nickname`, `password`, `email`, `phone`, `is_active`, `create_time`, `create_user`) 
-VALUES (1, 'NestAdmin', '超级管理员', 's3wmd2VReF1IjZhK59gLBY0OjYlzjA==', 'admin@nestadmin.com', '13800138000', '1', NOW(), 'system');
+VALUES (1, 'system', '超级管理员', 's3wmd2VReF1IjZhK59gLBY0OjYlzjA==', 'admin@nestadmin.com', '13800138000', '1', NOW(), 'system');
 
 -- 4.2 插入角色数据
 INSERT INTO `sys_role` (`id`, `name`, `permissionKey`, `order`, `is_active`, `remark`, `create_time`, `create_user`, `update_user`) 
@@ -250,7 +250,7 @@ SELECT 1, id FROM `sys_menu`;
 
 -- 4.5 插入系统配置
 INSERT INTO `sys_config` (`id`, `system_name`, `system_logo`, `create_time`, `create_user`, `update_user`) 
-VALUES (1, 'Nest Admin', '/static/logo.svg', NOW(), 'system', 'system');
+VALUES (1, '系统', '/static/logo.svg', NOW(), 'system', 'system');
 
 -- 4.6 插入顶级部门
 INSERT INTO `sys_dept` (`id`, `name`, `parent_id`, `create_time`, `create_user`, `update_user`) 
@@ -262,7 +262,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 验证初始化结果
 -- ========================================
 SELECT '========================================' AS '';
-SELECT '✅ Nest Admin 系统初始化完成！' AS '';
+SELECT '✅ 系统 系统初始化完成！' AS '';
 SELECT '========================================' AS '';
 
 SELECT '用户数量' AS '统计项', COUNT(*) AS '数量' FROM sys_user
@@ -288,6 +288,6 @@ LEFT JOIN sys_role r ON ur.roleId = r.id;
 -- ========================================
 SELECT '========================================' AS '';
 SELECT '🔐 登录信息' AS '';
-SELECT '用户名: NestAdmin' AS '';
+SELECT '用户名: system' AS '';
 SELECT '密码: 123456' AS '';
 SELECT '========================================' AS '';

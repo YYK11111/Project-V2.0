@@ -383,12 +383,12 @@ describe("ProjectExecutionPermissionService", () => {
     const service = new ProjectExecutionPermissionService(projectsService as any);
 
     await expect(
-      service.getVisibleProjectIds("u1", ["business/projects/listAll"]),
+      service.getVisibleProjectIds("u1", ["business/projects/manageAll"]),
     ).resolves.toEqual(["p1"]);
 
     expect(projectsService.getVisibleProjectIdsForUser).toHaveBeenCalledWith(
       "u1",
-      ["business/projects/listAll"],
+      ["business/projects/manageAll"],
     );
   });
 

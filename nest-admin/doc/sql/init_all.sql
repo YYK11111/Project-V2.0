@@ -1,5 +1,5 @@
 -- ========================================
--- Nest Admin 系统完整初始化脚本
+-- 系统 系统完整初始化脚本
 -- ========================================
 -- 使用说明：
 -- 1. 确保数据库已创建：CREATE DATABASE IF NOT EXISTS psd2 DEFAULT CHARSET utf8mb4;
@@ -17,7 +17,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 1. 初始化用户数据
 -- ========================================
 -- 删除已存在的用户（避免重复）
-DELETE FROM sys_user WHERE name IN ('admin', 'NestAdmin');
+DELETE FROM sys_user WHERE name IN ('admin', 'system');
 
 -- 插入超级管理员用户
 -- 密码: 123456 (AES加密后: s3wmd2VReF1IjZhK59gLBY0OjYlzjA==)
@@ -75,7 +75,7 @@ INSERT INTO sys_config (
   id, system_name, system_logo, 
   create_time, create_user, update_user
 ) VALUES (
-  1, 'Nest Admin', '/static/logo.svg', 
+  1, '系统', '/static/logo.svg', 
   NOW(), 'system', 'system'
 );
 
@@ -98,7 +98,7 @@ INSERT INTO sys_dept (
 -- 验证初始化结果
 -- ========================================
 SELECT '========================================' AS '';
-SELECT 'Nest Admin 系统初始化完成！' AS '';
+SELECT '系统 系统初始化完成！' AS '';
 SELECT '========================================' AS '';
 
 -- 显示统计信息

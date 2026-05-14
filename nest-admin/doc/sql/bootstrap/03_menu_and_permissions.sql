@@ -18,3 +18,4 @@ SOURCE generated/sys_menu_seed.sql;
 SOURCE generated/sys_menu_closure_seed.sql;
 SOURCE generated/sys_role_menu_seed.sql;
 SOURCE generated/sys_role_menu_user_business_seed.sql;
+SOURCE ../repair_business_permission_granularity.sql;

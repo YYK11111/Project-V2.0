@@ -18,14 +18,55 @@ SET @risk_menu_id = (SELECT id FROM sys_menu WHERE path = 'riskManage' AND is_de
 SET @sprint_menu_id = (SELECT id FROM sys_menu WHERE path = 'sprintManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @change_menu_id = (SELECT id FROM sys_menu WHERE path = 'changeManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @story_menu_id = COALESCE((SELECT id FROM sys_menu WHERE path = 'userStoryManage' AND is_delete IS NULL ORDER BY id LIMIT 1), @business_root_id);
+SET @go_live_menu_id = (SELECT id FROM sys_menu WHERE path = 'goLiveManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @acceptance_menu_id = (SELECT id FROM sys_menu WHERE path = 'acceptanceManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @handover_menu_id = (SELECT id FROM sys_menu WHERE path = 'handoverManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @project_member_menu_id = (SELECT id FROM sys_menu WHERE path = 'projectMemberManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @task_comment_menu_id = (SELECT id FROM sys_menu WHERE path = 'taskCommentManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @customer_menu_id = (SELECT id FROM sys_menu WHERE path = 'customerManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @interaction_menu_id = (SELECT id FROM sys_menu WHERE path = 'interactionManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @opportunity_menu_id = (SELECT id FROM sys_menu WHERE path = 'opportunityManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @contract_menu_id = (SELECT id FROM sys_menu WHERE path = 'contractManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @document_menu_id = (SELECT id FROM sys_menu WHERE path = 'documentManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @workflow_menu_id = (SELECT id FROM sys_menu WHERE path = 'workflow' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @admin_role_id = (SELECT id FROM sys_role WHERE permissionKey = 'admin' ORDER BY id LIMIT 1);
+
+-- Migrate legacy listAll permission rows in place so existing role bindings keep working.
+UPDATE sys_menu
+SET permissionKey = REPLACE(permissionKey, '/listAll', '/manageAll'),
+    path = REPLACE(path, '-list-all', '-manage-all'),
+    name = REPLACE(name, '全量列表', '全量管理'),
+    `desc` = REPLACE(`desc`, '列表全量查看权限', '管理全部数据权限'),
+    update_user = 'system',
+    update_time = NOW()
+WHERE is_delete IS NULL
+  AND permissionKey IN (
+    'business/projects/listAll',
+    'business/tasks/listAll',
+    'business/tickets/listAll',
+    'business/stories/listAll',
+    'business/sprints/listAll',
+    'business/milestones/listAll',
+    'business/risks/listAll',
+    'business/changes/listAll',
+    'business/go-live-records/listAll',
+    'business/acceptance-records/listAll',
+    'business/handover-records/listAll',
+    'business/projectMembers/listAll',
+    'business/taskComments/listAll',
+    'business/crm/customers/listAll',
+    'business/crm/opportunities/listAll',
+    'business/crm/contracts/listAll',
+    'business/crm/interactions/listAll'
+  );
 
 -- Projects
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '项目列表', '项目列表查询权限', @project_list_menu_id, '301', 'project-list', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/list'
 WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/list' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '项目全量管理', '项目管理全部数据权限', @project_list_menu_id, '319', 'project-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/manageAll'
+WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/manageAll' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '项目详情', '项目详情查看权限', @project_list_menu_id, '302', 'project-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/projects/getOne'
 WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/getOne' AND is_delete IS NULL);
@@ -77,6 +118,9 @@ INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, i
 SELECT '任务列表', '任务列表查询权限', @task_menu_id, '321', 'task-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/list'
 WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '任务全量管理', '任务管理全部数据权限', @task_menu_id, '339', 'task-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/manageAll'
+WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '任务详情', '任务详情查看权限', @task_menu_id, '322', 'task-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/getOne'
 WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/getOne' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -118,6 +162,9 @@ INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, i
 SELECT '工单列表', '工单列表查询权限', @ticket_menu_id, '341', 'ticket-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tickets/list'
 WHERE @ticket_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tickets/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '工单全量管理', '工单管理全部数据权限', @ticket_menu_id, '349', 'ticket-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/tickets/manageAll'
+WHERE @ticket_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tickets/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '工单详情', '工单详情查看权限', @ticket_menu_id, '342', 'ticket-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/tickets/getOne'
 WHERE @ticket_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tickets/getOne' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -134,6 +181,9 @@ WHERE @ticket_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE p
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '故事列表', '故事列表查询权限', @story_menu_id, '361', 'story-list', '', 'button', '', '1', '1', 'system', 'system', 'business/stories/list'
 WHERE @story_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/stories/list' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '故事全量管理', '故事管理全部数据权限', @story_menu_id, '369', 'story-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/stories/manageAll'
+WHERE @story_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/stories/manageAll' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '故事详情', '故事详情查看权限', @story_menu_id, '362', 'story-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/stories/getOne'
 WHERE @story_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/stories/getOne' AND is_delete IS NULL);
@@ -158,6 +208,9 @@ INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, i
 SELECT 'Sprint列表', 'Sprint列表查询权限', @sprint_menu_id, '381', 'sprint-list', '', 'button', '', '1', '1', 'system', 'system', 'business/sprints/list'
 WHERE @sprint_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/sprints/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT 'Sprint全量管理', 'Sprint管理全部数据权限', @sprint_menu_id, '389', 'sprint-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/sprints/manageAll'
+WHERE @sprint_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/sprints/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT 'Sprint新增', 'Sprint新增权限', @sprint_menu_id, '382', 'sprint-add', '', 'button', '', '1', '1', 'system', 'system', 'business/sprints/add'
 WHERE @sprint_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/sprints/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -170,6 +223,9 @@ WHERE @sprint_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE p
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '里程碑列表', '里程碑列表查询权限', @milestone_menu_id, '401', 'milestone-list', '', 'button', '', '1', '1', 'system', 'system', 'business/milestones/list'
 WHERE @milestone_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/milestones/list' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '里程碑全量管理', '里程碑管理全部数据权限', @milestone_menu_id, '409', 'milestone-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/milestones/manageAll'
+WHERE @milestone_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/milestones/manageAll' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '里程碑新增', '里程碑新增权限', @milestone_menu_id, '402', 'milestone-add', '', 'button', '', '1', '1', 'system', 'system', 'business/milestones/add'
 WHERE @milestone_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/milestones/add' AND is_delete IS NULL);
@@ -184,6 +240,9 @@ INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, i
 SELECT '风险列表', '风险列表查询权限', @risk_menu_id, '421', 'risk-list', '', 'button', '', '1', '1', 'system', 'system', 'business/risks/list'
 WHERE @risk_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/risks/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '风险全量管理', '风险管理全部数据权限', @risk_menu_id, '429', 'risk-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/risks/manageAll'
+WHERE @risk_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/risks/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '风险新增', '风险新增权限', @risk_menu_id, '422', 'risk-add', '', 'button', '', '1', '1', 'system', 'system', 'business/risks/add'
 WHERE @risk_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/risks/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -196,6 +255,9 @@ WHERE @risk_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE per
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '变更列表', '变更列表查询权限', @change_menu_id, '441', 'change-list', '', 'button', '', '1', '1', 'system', 'system', 'business/changes/list'
 WHERE @change_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/changes/list' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '变更全量管理', '变更管理全部数据权限', @change_menu_id, '449', 'change-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/changes/manageAll'
+WHERE @change_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/changes/manageAll' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '变更新增', '变更新增权限', @change_menu_id, '442', 'change-add', '', 'button', '', '1', '1', 'system', 'system', 'business/changes/add'
 WHERE @change_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/changes/add' AND is_delete IS NULL);
@@ -219,6 +281,17 @@ WHERE @document_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '文档删除', '文档删除权限', @document_menu_id, '464', 'document-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/documents/delete'
 WHERE @document_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/documents/delete' AND is_delete IS NULL);
+
+-- Project delivery records
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '上线单全量管理', '上线单管理全部数据权限', @go_live_menu_id, '459', 'go-live-records-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/go-live-records/manageAll'
+WHERE @go_live_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/go-live-records/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '验收单全量管理', '验收单管理全部数据权限', @acceptance_menu_id, '469', 'acceptance-records-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/acceptance-records/manageAll'
+WHERE @acceptance_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/acceptance-records/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '运维交接单全量管理', '运维交接单管理全部数据权限', @handover_menu_id, '479', 'handover-records-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/handover-records/manageAll'
+WHERE @handover_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/handover-records/manageAll' AND is_delete IS NULL);
 
 -- Project members / task comments / CRM under business root
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -246,6 +319,13 @@ WHERE @business_root_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '任务评论删除', '任务评论删除权限', @business_root_id, '488', 'task-comments-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/taskComments/delete'
 WHERE @business_root_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/taskComments/delete' AND is_delete IS NULL);
+
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '项目成员全量管理', '项目成员管理全部数据权限', @project_member_menu_id, '489', 'project-members-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/projectMembers/manageAll'
+WHERE @project_member_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projectMembers/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '任务评论全量管理', '任务评论管理全部数据权限', @task_comment_menu_id, '499', 'task-comments-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/taskComments/manageAll'
+WHERE @task_comment_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/taskComments/manageAll' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '客户列表', '客户列表查询权限', @business_root_id, '501', 'crm-customers-list', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/customers/list'
@@ -298,6 +378,104 @@ WHERE @business_root_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '互动删除', '互动删除权限', @business_root_id, '534', 'crm-interactions-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/interactions/delete'
 WHERE @business_root_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/crm/interactions/delete' AND is_delete IS NULL);
+
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '客户全量管理', '客户管理全部数据权限', @customer_menu_id, '509', 'crm-customers-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/customers/manageAll'
+WHERE @customer_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/crm/customers/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '商机全量管理', '商机管理全部数据权限', @opportunity_menu_id, '519', 'crm-opportunities-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/opportunities/manageAll'
+WHERE @opportunity_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/crm/opportunities/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '合同全量管理', '合同管理全部数据权限', @contract_menu_id, '529', 'crm-contracts-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/contracts/manageAll'
+WHERE @contract_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/crm/contracts/manageAll' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '互动全量管理', '互动管理全部数据权限', @interaction_menu_id, '539', 'crm-interactions-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/crm/interactions/manageAll'
+WHERE @interaction_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/crm/interactions/manageAll' AND is_delete IS NULL);
+
+-- Normalize existing manageAll rows that were created with the old listAll wording.
+UPDATE sys_menu
+SET name = CASE permissionKey
+    WHEN 'business/projects/manageAll' THEN '项目全量管理'
+    WHEN 'business/tasks/manageAll' THEN '任务全量管理'
+    WHEN 'business/tickets/manageAll' THEN '工单全量管理'
+    WHEN 'business/stories/manageAll' THEN '故事全量管理'
+    WHEN 'business/sprints/manageAll' THEN 'Sprint全量管理'
+    WHEN 'business/milestones/manageAll' THEN '里程碑全量管理'
+    WHEN 'business/risks/manageAll' THEN '风险全量管理'
+    WHEN 'business/changes/manageAll' THEN '变更全量管理'
+    WHEN 'business/go-live-records/manageAll' THEN '上线单全量管理'
+    WHEN 'business/acceptance-records/manageAll' THEN '验收单全量管理'
+    WHEN 'business/handover-records/manageAll' THEN '运维交接单全量管理'
+    WHEN 'business/projectMembers/manageAll' THEN '项目成员全量管理'
+    WHEN 'business/taskComments/manageAll' THEN '任务评论全量管理'
+    WHEN 'business/crm/customers/manageAll' THEN '客户全量管理'
+    WHEN 'business/crm/opportunities/manageAll' THEN '商机全量管理'
+    WHEN 'business/crm/contracts/manageAll' THEN '合同全量管理'
+    WHEN 'business/crm/interactions/manageAll' THEN '互动全量管理'
+    ELSE name
+  END,
+  `desc` = CASE permissionKey
+    WHEN 'business/projects/manageAll' THEN '项目管理全部数据权限'
+    WHEN 'business/tasks/manageAll' THEN '任务管理全部数据权限'
+    WHEN 'business/tickets/manageAll' THEN '工单管理全部数据权限'
+    WHEN 'business/stories/manageAll' THEN '故事管理全部数据权限'
+    WHEN 'business/sprints/manageAll' THEN 'Sprint管理全部数据权限'
+    WHEN 'business/milestones/manageAll' THEN '里程碑管理全部数据权限'
+    WHEN 'business/risks/manageAll' THEN '风险管理全部数据权限'
+    WHEN 'business/changes/manageAll' THEN '变更管理全部数据权限'
+    WHEN 'business/go-live-records/manageAll' THEN '上线单管理全部数据权限'
+    WHEN 'business/acceptance-records/manageAll' THEN '验收单管理全部数据权限'
+    WHEN 'business/handover-records/manageAll' THEN '运维交接单管理全部数据权限'
+    WHEN 'business/projectMembers/manageAll' THEN '项目成员管理全部数据权限'
+    WHEN 'business/taskComments/manageAll' THEN '任务评论管理全部数据权限'
+    WHEN 'business/crm/customers/manageAll' THEN '客户管理全部数据权限'
+    WHEN 'business/crm/opportunities/manageAll' THEN '商机管理全部数据权限'
+    WHEN 'business/crm/contracts/manageAll' THEN '合同管理全部数据权限'
+    WHEN 'business/crm/interactions/manageAll' THEN '互动管理全部数据权限'
+    ELSE `desc`
+  END,
+  path = CASE permissionKey
+    WHEN 'business/projects/manageAll' THEN 'project-manage-all'
+    WHEN 'business/tasks/manageAll' THEN 'task-manage-all'
+    WHEN 'business/tickets/manageAll' THEN 'ticket-manage-all'
+    WHEN 'business/stories/manageAll' THEN 'story-manage-all'
+    WHEN 'business/sprints/manageAll' THEN 'sprint-manage-all'
+    WHEN 'business/milestones/manageAll' THEN 'milestone-manage-all'
+    WHEN 'business/risks/manageAll' THEN 'risk-manage-all'
+    WHEN 'business/changes/manageAll' THEN 'change-manage-all'
+    WHEN 'business/go-live-records/manageAll' THEN 'go-live-records-manage-all'
+    WHEN 'business/acceptance-records/manageAll' THEN 'acceptance-records-manage-all'
+    WHEN 'business/handover-records/manageAll' THEN 'handover-records-manage-all'
+    WHEN 'business/projectMembers/manageAll' THEN 'project-members-manage-all'
+    WHEN 'business/taskComments/manageAll' THEN 'task-comments-manage-all'
+    WHEN 'business/crm/customers/manageAll' THEN 'crm-customers-manage-all'
+    WHEN 'business/crm/opportunities/manageAll' THEN 'crm-opportunities-manage-all'
+    WHEN 'business/crm/contracts/manageAll' THEN 'crm-contracts-manage-all'
+    WHEN 'business/crm/interactions/manageAll' THEN 'crm-interactions-manage-all'
+    ELSE path
+  END,
+  update_user = 'system',
+  update_time = NOW()
+WHERE is_delete IS NULL
+  AND permissionKey IN (
+    'business/projects/manageAll',
+    'business/tasks/manageAll',
+    'business/tickets/manageAll',
+    'business/stories/manageAll',
+    'business/sprints/manageAll',
+    'business/milestones/manageAll',
+    'business/risks/manageAll',
+    'business/changes/manageAll',
+    'business/go-live-records/manageAll',
+    'business/acceptance-records/manageAll',
+    'business/handover-records/manageAll',
+    'business/projectMembers/manageAll',
+    'business/taskComments/manageAll',
+    'business/crm/customers/manageAll',
+    'business/crm/opportunities/manageAll',
+    'business/crm/contracts/manageAll',
+    'business/crm/interactions/manageAll'
+  );
 
 -- Workflow
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
@@ -387,20 +565,22 @@ WHERE @admin_role_id IS NOT NULL
   AND is_delete IS NULL
   AND permissionKey IN (
     'business/projects/list', 'business/projects/getOne', 'business/projects/add', 'business/projects/update', 'business/projects/delete', 'business/projects/archive', 'business/projects/statistics', 'business/projects/submitApproval', 'business/projects/submitClose',
-    'business/tasks/list', 'business/tasks/getOne', 'business/tasks/add', 'business/tasks/update', 'business/tasks/delete', 'business/tasks/updateProgress', 'business/tasks/kanban', 'business/tasks/dependency/list', 'business/tasks/dependency/add', 'business/tasks/dependency/delete', 'business/tasks/timelog/list', 'business/tasks/timelog/add', 'business/tasks/timelog/delete',
-    'business/tickets/list', 'business/tickets/getOne', 'business/tickets/add', 'business/tickets/update', 'business/tickets/delete',
-    'business/stories/list', 'business/stories/getOne', 'business/stories/add', 'business/stories/update', 'business/stories/delete', 'business/stories/backlog', 'business/stories/children',
-    'business/sprints/list', 'business/sprints/add', 'business/sprints/update', 'business/sprints/delete',
-    'business/milestones/list', 'business/milestones/add', 'business/milestones/update', 'business/milestones/delete',
-    'business/risks/list', 'business/risks/add', 'business/risks/update', 'business/risks/delete',
-    'business/changes/list', 'business/changes/add', 'business/changes/update', 'business/changes/delete'
+    'business/projects/manageAll',
+    'business/tasks/list', 'business/tasks/manageAll', 'business/tasks/getOne', 'business/tasks/add', 'business/tasks/update', 'business/tasks/delete', 'business/tasks/updateProgress', 'business/tasks/kanban', 'business/tasks/dependency/list', 'business/tasks/dependency/add', 'business/tasks/dependency/delete', 'business/tasks/timelog/list', 'business/tasks/timelog/add', 'business/tasks/timelog/delete',
+    'business/tickets/list', 'business/tickets/manageAll', 'business/tickets/getOne', 'business/tickets/add', 'business/tickets/update', 'business/tickets/delete',
+    'business/stories/list', 'business/stories/manageAll', 'business/stories/getOne', 'business/stories/add', 'business/stories/update', 'business/stories/delete', 'business/stories/backlog', 'business/stories/children',
+    'business/sprints/list', 'business/sprints/manageAll', 'business/sprints/add', 'business/sprints/update', 'business/sprints/delete',
+    'business/milestones/list', 'business/milestones/manageAll', 'business/milestones/add', 'business/milestones/update', 'business/milestones/delete',
+    'business/risks/list', 'business/risks/manageAll', 'business/risks/add', 'business/risks/update', 'business/risks/delete',
+    'business/changes/list', 'business/changes/manageAll', 'business/changes/add', 'business/changes/update', 'business/changes/delete'
+    ,'business/go-live-records/manageAll', 'business/acceptance-records/manageAll', 'business/handover-records/manageAll'
     ,'business/documents/list', 'business/documents/add', 'business/documents/update', 'business/documents/delete'
-    ,'business/projectMembers/list', 'business/projectMembers/add', 'business/projectMembers/update', 'business/projectMembers/delete'
-    ,'business/taskComments/list', 'business/taskComments/add', 'business/taskComments/update', 'business/taskComments/delete'
-    ,'business/crm/customers/list', 'business/crm/customers/add', 'business/crm/customers/update', 'business/crm/customers/delete'
-    ,'business/crm/opportunities/list', 'business/crm/opportunities/add', 'business/crm/opportunities/update', 'business/crm/opportunities/delete'
-    ,'business/crm/contracts/list', 'business/crm/contracts/add', 'business/crm/contracts/update', 'business/crm/contracts/delete'
-    ,'business/crm/interactions/list', 'business/crm/interactions/add', 'business/crm/interactions/update', 'business/crm/interactions/delete'
+    ,'business/projectMembers/list', 'business/projectMembers/manageAll', 'business/projectMembers/add', 'business/projectMembers/update', 'business/projectMembers/delete'
+    ,'business/taskComments/list', 'business/taskComments/manageAll', 'business/taskComments/add', 'business/taskComments/update', 'business/taskComments/delete'
+    ,'business/crm/customers/list', 'business/crm/customers/manageAll', 'business/crm/customers/add', 'business/crm/customers/update', 'business/crm/customers/delete'
+    ,'business/crm/opportunities/list', 'business/crm/opportunities/manageAll', 'business/crm/opportunities/add', 'business/crm/opportunities/update', 'business/crm/opportunities/delete'
+    ,'business/crm/contracts/list', 'business/crm/contracts/manageAll', 'business/crm/contracts/add', 'business/crm/contracts/update', 'business/crm/contracts/delete'
+    ,'business/crm/interactions/list', 'business/crm/interactions/manageAll', 'business/crm/interactions/add', 'business/crm/interactions/update', 'business/crm/interactions/delete'
     ,'business/workflow/definitions/list', 'business/workflow/definitions/add', 'business/workflow/definitions/update', 'business/workflow/definitions/delete', 'business/workflow/definitions/publish', 'business/workflow/definitions/start', 'business/workflow/definitions/copy'
     ,'business/workflow/instances/list', 'business/workflow/instances/getOne', 'business/workflow/instances/withdraw', 'business/workflow/instances/cancel', 'business/workflow/instances/history', 'business/workflow/instances/tasks'
     ,'business/workflow/tasks/list', 'business/workflow/tasks/complete', 'business/workflow/tasks/transfer', 'business/workflow/tasks/addSign'
@@ -415,6 +595,7 @@ FROM sys_menu
 WHERE @user_role_id IS NOT NULL
   AND is_delete IS NULL
   AND type = 'button'
-  AND permissionKey LIKE 'business/%';
+  AND permissionKey LIKE 'business/%'
+  AND permissionKey NOT LIKE '%/manageAll';
 
 SET FOREIGN_KEY_CHECKS = 1;
