@@ -27,6 +27,7 @@ import { Ticket } from "../tickets/entity";
 import { MessageType } from "src/modules/messages/entity";
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 import { MessagesService } from "src/modules/messages/service";
+import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -91,8 +92,16 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
   }
 
-  private async assertTaskEditPermission(taskId: string, operatorId: string) {
+  private async assertTaskEditPermission(
+    taskId: string,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     if (!taskId || !operatorId) return;
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/tasks/manageAll",
+    );
     const task = await this.repository.findOne({
       where: { id: taskId, isDelete: null as any } as any,
       select: ["id", "projectId", "leaderId", "createUser"] as any,
@@ -102,6 +111,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       task.projectId,
       operatorId,
       "view",
+      operatorPermissions,
     );
     const canEdit =
       context.isManager ||
@@ -128,11 +138,20 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return task;
   }
 
-  private async getTaskPermissionContext(task: Task, operatorId: string) {
+  private async getTaskPermissionContext(
+    task: Task,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/tasks/manageAll",
+    );
     const context = operatorId
       ? await this.projectsService.getProjectPermissionContext(
           task.projectId,
           operatorId,
+          operatorPermissions,
         )
       : null;
     const canManage =
@@ -153,10 +172,15 @@ export class TasksService extends BaseService<Task, TaskDto> {
     };
   }
 
-  private async ensureTaskCanManage(task: Task, operatorId: string) {
+  private async ensureTaskCanManage(
+    task: Task,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     const permissionContext = await this.getTaskPermissionContext(
       task,
       operatorId,
+      permissions,
     );
     if (!permissionContext.canManage) {
       throw new ForbiddenException("当前无管理该任务的权限");
@@ -164,10 +188,15 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return permissionContext;
   }
 
-  private async ensureTaskCanExecute(task: Task, operatorId: string) {
+  private async ensureTaskCanExecute(
+    task: Task,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     const permissionContext = await this.getTaskPermissionContext(
       task,
       operatorId,
+      permissions,
     );
     if (!permissionContext.canExecute) {
       throw new ForbiddenException("当前无执行该任务的权限");
@@ -645,7 +674,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
   }
 
-  private async getTaskPermissions(task: Task, operatorId: string) {
+  private async getTaskPermissions(
+    task: Task,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     if (!operatorId)
       return {
         canEdit: false,
@@ -654,7 +687,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
         canExecute: false,
       };
     const { context, canManage, canExecute } =
-      await this.getTaskPermissionContext(task, operatorId);
+      await this.getTaskPermissionContext(task, operatorId, permissions);
     return {
       canEdit: canManage,
       canDelete:
@@ -667,9 +700,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
     };
   }
 
-  async startTask(id: string, operatorId: string) {
+  async startTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
-    await this.ensureTaskCanExecute(task, operatorId);
+    await this.ensureTaskCanExecute(task, operatorId, permissions);
     await this.ensureTaskCanStart(task);
     const payload: Partial<Task> = {
       status: TaskStatus.inProgress,
@@ -683,9 +716,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return this.getTaskById(task.id);
   }
 
-  async pauseTask(id: string, operatorId: string) {
+  async pauseTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
-    await this.ensureTaskCanManage(task, operatorId);
+    await this.ensureTaskCanManage(task, operatorId, permissions);
     await this.repository.update(task.id, {
       status: TaskStatus.deferred,
     } as any);
@@ -693,9 +726,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return this.getTaskById(task.id);
   }
 
-  async resumeTask(id: string, operatorId: string) {
+  async resumeTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
-    await this.ensureTaskCanExecute(task, operatorId);
+    await this.ensureTaskCanExecute(task, operatorId, permissions);
     await this.ensureTaskCanStart(task);
     await this.repository.update(task.id, {
       status: TaskStatus.inProgress,
@@ -704,9 +737,13 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return this.getTaskById(task.id);
   }
 
-  async submitCompletionApproval(id: string, operatorId: string) {
+  async submitCompletionApproval(
+    id: string,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     const task = await this.getTaskById(String(id));
-    await this.ensureTaskCanExecute(task, operatorId);
+    await this.ensureTaskCanExecute(task, operatorId, permissions);
     await this.repository.update(task.id, {
       status: TaskStatus.pendingCompletionApproval,
       approvalStatus: "1",
@@ -759,10 +796,14 @@ export class TasksService extends BaseService<Task, TaskDto> {
   async delayTask(
     id: string,
     body: { afterEndDate?: string; reason?: string },
-    operator: { id?: string; name?: string },
+    operator: { id?: string; name?: string; permissions?: string[] },
   ) {
     const task = await this.getTaskById(String(id));
-    await this.ensureTaskCanManage(task, String(operator?.id || ""));
+    await this.ensureTaskCanManage(
+      task,
+      String(operator?.id || ""),
+      operator?.permissions || [],
+    );
 
     const allowedStatuses = [
       TaskStatus.pending,
@@ -859,6 +900,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
       await this.assertTaskEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeTaskPayload(dto);
@@ -946,6 +990,9 @@ export class TasksService extends BaseService<Task, TaskDto> {
       await this.assertTaskEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeTaskPayload(dto);
@@ -1000,6 +1047,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
           await this.assertTaskEditPermission(
             String(task.id),
             String(operatorId),
+            permissions,
           );
           successIds.push(String(task.id));
         } catch (error) {
@@ -1154,17 +1202,28 @@ export class TasksService extends BaseService<Task, TaskDto> {
       isError,
     );
     if (!task) return task;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray((query as any)._operatorPermissions)
+        ? (query as any)._operatorPermissions
+        : [],
+      "business/tasks/manageAll",
+    );
     if ((query as any)._operatorId) {
       await this.projectsService.assertExecutionObjectPermission(
         task.projectId,
         String((query as any)._operatorId),
+        operatorPermissions,
       );
     }
     const detail = (await this.buildTaskDetail(task)) as any;
     if ((query as any)._operatorId) {
       Object.assign(
         detail,
-        await this.getTaskPermissions(task, String((query as any)._operatorId)),
+        await this.getTaskPermissions(
+          task,
+          String((query as any)._operatorId),
+          operatorPermissions,
+        ),
       );
     }
     return detail;
@@ -1186,10 +1245,14 @@ export class TasksService extends BaseService<Task, TaskDto> {
       _operatorId,
       _operatorPermissions,
     } = query;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      "business/tasks/manageAll",
+    );
     const visibleProjectIds =
       await this.projectsService.getVisibleProjectIdsForUser(
         String(_operatorId || ""),
-        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        operatorPermissions,
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -1202,6 +1265,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
           await this.projectsService.assertExecutionObjectPermission(
             id,
             String(_operatorId),
+            operatorPermissions,
           );
           executionVisibleProjectIds.push(id);
         } catch {
@@ -1350,7 +1414,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
       if (_operatorId) {
         Object.assign(
           row,
-          await this.getTaskPermissions(row, String(_operatorId)),
+          await this.getTaskPermissions(
+            row,
+            String(_operatorId),
+            operatorPermissions,
+          ),
         );
       }
     }
@@ -1364,13 +1432,14 @@ export class TasksService extends BaseService<Task, TaskDto> {
     id: string,
     progress: number,
     operatorId?: string,
+    permissions: string[] = [],
   ): Promise<any> {
     if (progress < 0 || progress > 100) {
       throw new Error("进度必须在0-100之间");
     }
     if (operatorId) {
       const task = await this.getTaskById(String(id));
-      await this.ensureTaskCanExecute(task, operatorId);
+      await this.ensureTaskCanExecute(task, operatorId, permissions);
     }
     return this.repository.update(id, { progress });
   }

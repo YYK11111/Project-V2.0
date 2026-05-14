@@ -46,6 +46,7 @@ export class HandoverRecordsService extends BaseService<
         record.projectId,
         operatorId,
         permissions,
+        "business/handover-records/manageAll",
       );
     }
     return record;
@@ -72,6 +73,7 @@ export class HandoverRecordsService extends BaseService<
           oldProjectId,
           operatorId,
           operatorPermissions,
+          "business/handover-records/manageAll",
         );
       }
     }
@@ -81,6 +83,7 @@ export class HandoverRecordsService extends BaseService<
         nextProjectId,
         operatorId,
         operatorPermissions,
+        "business/handover-records/manageAll",
       );
     }
   }
@@ -111,6 +114,7 @@ export class HandoverRecordsService extends BaseService<
       await this.projectExecutionPermissionService.getVisibleProjectIds(
         String(_operatorId || ""),
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/handover-records/manageAll",
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -158,6 +162,7 @@ export class HandoverRecordsService extends BaseService<
           record.projectId,
           String(_operatorId),
           Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          "business/handover-records/manageAll",
         );
       }
     }

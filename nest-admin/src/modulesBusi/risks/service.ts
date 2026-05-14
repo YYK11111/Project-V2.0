@@ -13,6 +13,7 @@ import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { ProjectsService } from "../projects/service";
 import { TasksService } from "../tasks/service";
 import { Task } from "../tasks/entity";
+import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class RisksService extends BaseService<Risk, CreateRiskDto> {
@@ -26,8 +27,16 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     super(Risk, repository);
   }
 
-  private async assertRiskEditPermission(riskId: string, operatorId: string) {
+  private async assertRiskEditPermission(
+    riskId: string,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     if (!riskId || !operatorId) return;
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/risks/manageAll",
+    );
     const risk = await this.repository.findOne({
       where: { id: riskId, isDelete: null as any } as any,
       select: ["id", "projectId", "riskOwnerId", "createUser"] as any,
@@ -37,6 +46,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       risk.projectId,
       operatorId,
       "view",
+      operatorPermissions,
     );
     const canEdit =
       context.isManager ||
@@ -49,11 +59,20 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     }
   }
 
-  private async getRiskPermissions(risk: Risk, operatorId: string) {
+  private async getRiskPermissions(
+    risk: Risk,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     if (!operatorId) return { canEdit: false, canDelete: false };
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/risks/manageAll",
+    );
     const context = await this.projectsService.getProjectPermissionContext(
       risk.projectId,
       operatorId,
+      operatorPermissions,
     );
     const canEdit =
       Boolean(context?.isManager) ||
@@ -86,6 +105,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       await this.assertRiskEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     return super.save(dto);
@@ -99,6 +121,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       await this.assertRiskEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     return super.update(dto);
@@ -122,7 +147,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     if (operatorId) {
       for (const id of idList) {
         try {
-          await this.assertRiskEditPermission(id, operatorId);
+          await this.assertRiskEditPermission(id, operatorId, permissions);
           successIds.push(id);
         } catch (error) {
           failed.push({
@@ -186,10 +211,17 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       isError,
     );
     if (!risk) return risk;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray((query as any)._operatorPermissions)
+        ? (query as any)._operatorPermissions
+        : [],
+      "business/risks/manageAll",
+    );
     if ((query as any)._operatorId) {
       await this.projectsService.assertExecutionObjectPermission(
         risk.projectId,
         String((query as any)._operatorId),
+        operatorPermissions,
       );
     }
 
@@ -207,7 +239,11 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     if ((query as any)._operatorId) {
       Object.assign(
         detail,
-        await this.getRiskPermissions(risk, String((query as any)._operatorId)),
+        await this.getRiskPermissions(
+          risk,
+          String((query as any)._operatorId),
+          operatorPermissions,
+        ),
       );
     }
     return detail;
@@ -224,10 +260,14 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       _operatorId,
       _operatorPermissions,
     } = query as any;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      "business/risks/manageAll",
+    );
     const visibleProjectIds =
       await this.projectsService.getVisibleProjectIdsForUser(
         String(_operatorId || ""),
-        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        operatorPermissions,
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { list: [], total: 0 } as any;
@@ -240,6 +280,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
           await this.projectsService.assertExecutionObjectPermission(
             id,
             String(_operatorId),
+            operatorPermissions,
           );
           executionVisibleProjectIds.push(id);
         } catch {}
@@ -272,7 +313,11 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       if (_operatorId) {
         Object.assign(
           row,
-          await this.getRiskPermissions(row, String(_operatorId)),
+          await this.getRiskPermissions(
+            row,
+            String(_operatorId),
+            operatorPermissions,
+          ),
         );
       }
     }

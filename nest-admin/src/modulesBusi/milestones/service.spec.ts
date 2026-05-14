@@ -50,7 +50,7 @@ describe("MilestonesService project scope guards", () => {
 
     expect(
       projectExecutionPermissionService.assertWritableProject,
-    ).toHaveBeenCalledWith("old-p1", "u1", []);
+    ).toHaveBeenCalledWith("old-p1", "u1", [], "business/milestones/manageAll");
     expect(
       projectExecutionPermissionService.assertReadableProject,
     ).not.toHaveBeenCalled();

@@ -58,10 +58,18 @@ describe("TasksService lifecycle actions", () => {
       find: jest.fn(),
       query: jest.fn(),
     };
+    const taskCommentRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      query: jest.fn(),
+    };
+    const userRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
     const projectsService = {
       getProjectPermissionContext: jest.fn(),
       assertProjectPermission: jest.fn(),
       assertExecutionObjectPermission: jest.fn(),
+      getVisibleProjectIdsForUser: jest.fn(),
       assertProjectNotArchived: jest.fn(),
       recalculateProjectProgress: jest.fn(),
       recalculateProjectSpentHours: jest.fn(),
@@ -82,8 +90,8 @@ describe("TasksService lifecycle actions", () => {
       dependencyRepository as any,
       delayRecordRepository as any,
       timeLogRepository as any,
-      { find: jest.fn().mockResolvedValue([]) } as any,
-      { find: jest.fn().mockResolvedValue([]) } as any,
+      taskCommentRepository as any,
+      userRepository as any,
       { findOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
@@ -101,6 +109,8 @@ describe("TasksService lifecycle actions", () => {
       dependencyRepository,
       delayRecordRepository,
       timeLogRepository,
+      taskCommentRepository,
+      userRepository,
       projectsService,
       messagesService,
       sysFileService,
@@ -202,6 +212,69 @@ describe("TasksService lifecycle actions", () => {
       service.updateProgress("task-4", 60, "viewer-1"),
     ).rejects.toThrow("当前无执行该任务的权限");
     expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("任务全量管理权限在列表行上返回可操作权限", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      timeLogRepository,
+      taskCommentRepository,
+      userRepository,
+    } = createService() as any;
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "task-1",
+            projectId: "project-1",
+            leaderId: "leader-1",
+            createUser: "creator-1",
+            executorIds: ["executor-1"],
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue(null);
+    projectsService.getProjectPermissionContext.mockImplementation(
+      async (_projectId, _operatorId, permissions = []) => ({
+        isManager: permissions.includes("business/projects/manageAll"),
+        isDeliveryManager: false,
+        isFunctionalLead: false,
+      }),
+    );
+    userRepository.find.mockResolvedValue([]);
+    taskCommentRepository.query.mockResolvedValue([]);
+    timeLogRepository.query.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/tasks/manageAll"],
+    });
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+        canManage: true,
+        canExecute: true,
+      }),
+    );
+    expect(projectsService.getProjectPermissionContext).toHaveBeenCalledWith(
+      "project-1",
+      "admin-1",
+      expect.arrayContaining(["business/projects/manageAll"]),
+    );
   });
 
   it("完成审批驳回后回退到处理中", async () => {

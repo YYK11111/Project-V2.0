@@ -162,12 +162,17 @@ describe("SprintsService completeSprint guards", () => {
     await service.getOne({
       id: "s1",
       _operatorId: "viewer-1",
-      _operatorPermissions: ["business/projects/listAll"],
+      _operatorPermissions: ["business/projects/manageAll"],
     } as any);
 
     expect(
       projectExecutionPermissionService.assertReadableProject,
-    ).toHaveBeenCalledWith("p1", "viewer-1", ["business/projects/listAll"]);
+    ).toHaveBeenCalledWith(
+      "p1",
+      "viewer-1",
+      ["business/projects/manageAll"],
+      "business/sprints/manageAll",
+    );
   });
 
   it("详情查询不会把内部权限字段传入 where", async () => {
@@ -190,7 +195,7 @@ describe("SprintsService completeSprint guards", () => {
     await service.getOne({
       id: "s1",
       _operatorId: "viewer-1",
-      _operatorPermissions: ["business/projects/listAll"],
+      _operatorPermissions: ["business/projects/manageAll"],
     } as any);
 
     expect(repository.findOne).toHaveBeenCalledWith(
@@ -201,7 +206,12 @@ describe("SprintsService completeSprint guards", () => {
     );
     expect(
       projectExecutionPermissionService.assertReadableProject,
-    ).toHaveBeenCalledWith("p1", "viewer-1", ["business/projects/listAll"]);
+    ).toHaveBeenCalledWith(
+      "p1",
+      "viewer-1",
+      ["business/projects/manageAll"],
+      "business/sprints/manageAll",
+    );
   });
 
   it("更新仅传 id 时按旧项目校验可写权限", async () => {
@@ -228,7 +238,7 @@ describe("SprintsService completeSprint guards", () => {
 
     expect(
       projectExecutionPermissionService.assertWritableProject,
-    ).toHaveBeenCalledWith("old-p1", "u1", []);
+    ).toHaveBeenCalledWith("old-p1", "u1", [], "business/sprints/manageAll");
     expect(
       projectExecutionPermissionService.assertReadableProject,
     ).not.toHaveBeenCalled();

@@ -54,6 +54,7 @@ export class AcceptanceRecordsService extends BaseService<
         record.projectId,
         operatorId,
         permissions,
+        "business/acceptance-records/manageAll",
       );
     }
     return record;
@@ -80,6 +81,7 @@ export class AcceptanceRecordsService extends BaseService<
           oldProjectId,
           operatorId,
           operatorPermissions,
+          "business/acceptance-records/manageAll",
         );
       }
     }
@@ -89,6 +91,7 @@ export class AcceptanceRecordsService extends BaseService<
         nextProjectId,
         operatorId,
         operatorPermissions,
+        "business/acceptance-records/manageAll",
       );
     }
   }
@@ -119,6 +122,7 @@ export class AcceptanceRecordsService extends BaseService<
       await this.projectExecutionPermissionService.getVisibleProjectIds(
         String(_operatorId || ""),
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/acceptance-records/manageAll",
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -166,6 +170,7 @@ export class AcceptanceRecordsService extends BaseService<
           record.projectId,
           String(_operatorId),
           Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          "business/acceptance-records/manageAll",
         );
       }
     }

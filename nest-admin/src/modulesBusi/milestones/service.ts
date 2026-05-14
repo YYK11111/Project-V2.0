@@ -39,6 +39,7 @@ export class MilestonesService extends BaseService<
         milestone.projectId,
         operatorId,
         permissions,
+        "business/milestones/manageAll",
       );
     }
     return milestone;
@@ -65,6 +66,7 @@ export class MilestonesService extends BaseService<
           oldProjectId,
           operatorId,
           operatorPermissions,
+          "business/milestones/manageAll",
         );
       }
     }
@@ -74,6 +76,7 @@ export class MilestonesService extends BaseService<
         nextProjectId,
         operatorId,
         operatorPermissions,
+        "business/milestones/manageAll",
       );
     }
   }
@@ -101,6 +104,7 @@ export class MilestonesService extends BaseService<
       await this.projectExecutionPermissionService.getVisibleProjectIds(
         String(_operatorId || ""),
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/milestones/manageAll",
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -142,6 +146,7 @@ export class MilestonesService extends BaseService<
     id: string,
     status: MilestoneStatus,
     operatorId?: string,
+    permissions: string[] = [],
   ): Promise<any> {
     if (operatorId) {
       const milestone = await this.repository.findOne({
@@ -153,6 +158,8 @@ export class MilestonesService extends BaseService<
         await this.projectExecutionPermissionService.assertReadableProject(
           milestone.projectId,
           operatorId,
+          permissions,
+          "business/milestones/manageAll",
         );
       }
     }
@@ -198,6 +205,7 @@ export class MilestonesService extends BaseService<
           milestone.projectId,
           String(_operatorId),
           Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          "business/milestones/manageAll",
         );
       }
     }

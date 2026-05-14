@@ -45,19 +45,19 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Post(":id/start")
   startTask(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name;
-    return this.service.startTask(id, userId);
+    return this.service.startTask(id, userId, req.user?.permissions || []);
   }
 
   @Post(":id/pause")
   pauseTask(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name;
-    return this.service.pauseTask(id, userId);
+    return this.service.pauseTask(id, userId, req.user?.permissions || []);
   }
 
   @Post(":id/resume")
   resumeTask(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name;
-    return this.service.resumeTask(id, userId);
+    return this.service.resumeTask(id, userId, req.user?.permissions || []);
   }
 
   @Post(":id/delay")
@@ -69,6 +69,7 @@ export class TasksController extends BaseController<Task, TasksService> {
     return this.service.delayTask(id, body, {
       id: req.user?.id || req.user?.name,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
     });
   }
 
@@ -80,7 +81,11 @@ export class TasksController extends BaseController<Task, TasksService> {
   @Post(":id/submit-completion-approval")
   submitCompletionApproval(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name;
-    return this.service.submitCompletionApproval(id, userId);
+    return this.service.submitCompletionApproval(
+      id,
+      userId,
+      req.user?.permissions || [],
+    );
   }
 
   @Post("progress/:id")
@@ -90,7 +95,12 @@ export class TasksController extends BaseController<Task, TasksService> {
     @Req() req: any,
   ) {
     const userId = req.user?.id || req.user?.name;
-    return this.service.updateProgress(id, progress, userId);
+    return this.service.updateProgress(
+      id,
+      progress,
+      userId,
+      req.user?.permissions || [],
+    );
   }
 
   @Get("list")

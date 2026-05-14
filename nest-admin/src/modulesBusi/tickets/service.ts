@@ -18,6 +18,7 @@ import { Article, Status as ArticleStatus } from "../articles/entity";
 import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { Task } from "../tasks/entity";
+import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class TicketsService extends BaseService<Ticket, TicketDto> {
@@ -31,11 +32,20 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     super(Ticket, repository);
   }
 
-  private async getTicketPermissions(ticket: Ticket, operatorId: string) {
+  private async getTicketPermissions(
+    ticket: Ticket,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
     if (!operatorId) return { canEdit: false, canDelete: false };
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/tickets/manageAll",
+    );
     const context = await this.projectsService.getProjectPermissionContext(
       ticket.projectId,
       operatorId,
+      operatorPermissions,
     );
     const canEdit =
       Boolean(context?.isManager) ||
@@ -58,8 +68,13 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
   private async assertTicketEditPermission(
     ticketId: string,
     operatorId: string,
+    permissions: string[] = [],
   ) {
     if (!ticketId || !operatorId) return;
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/tickets/manageAll",
+    );
     const ticket = await this.repository.findOne({
       where: { id: ticketId, isDelete: null as any } as any,
       select: [
@@ -75,6 +90,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       ticket.projectId,
       operatorId,
       "view",
+      operatorPermissions,
     );
     const canEdit =
       context.isManager ||
@@ -111,10 +127,14 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       _operatorId,
       _operatorPermissions,
     } = query as any;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      "business/tickets/manageAll",
+    );
     const visibleProjectIds =
       await this.projectsService.getVisibleProjectIdsForUser(
         String(_operatorId || ""),
-        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        operatorPermissions,
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { list: [], total: 0 } as any;
@@ -127,6 +147,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
           await this.projectsService.assertExecutionObjectPermission(
             id,
             String(_operatorId),
+            operatorPermissions,
           );
           executionVisibleProjectIds.push(id);
         } catch {}
@@ -158,7 +179,11 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       if (_operatorId) {
         Object.assign(
           row,
-          await this.getTicketPermissions(row, String(_operatorId)),
+          await this.getTicketPermissions(
+            row,
+            String(_operatorId),
+            operatorPermissions,
+          ),
         );
       }
     }
@@ -173,6 +198,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       await this.assertTicketEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeTicketPayload(dto);
@@ -235,6 +263,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       await this.assertTicketEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeTicketPayload(dto);
@@ -312,10 +343,17 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       isError,
     );
     if (!ticket) return ticket;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray((query as any)._operatorPermissions)
+        ? (query as any)._operatorPermissions
+        : [],
+      "business/tickets/manageAll",
+    );
     if ((query as any)._operatorId) {
       await this.projectsService.assertExecutionObjectPermission(
         ticket.projectId,
         String((query as any)._operatorId),
+        operatorPermissions,
       );
     }
     const detail: any = this.buildTicketDetail(ticket);
@@ -331,6 +369,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
         await this.getTicketPermissions(
           ticket,
           String((query as any)._operatorId),
+          operatorPermissions,
         ),
       );
     }
@@ -457,7 +496,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     if (operatorId) {
       for (const id of idList) {
         try {
-          await this.assertTicketEditPermission(id, operatorId);
+          await this.assertTicketEditPermission(id, operatorId, permissions);
           successIds.push(id);
         } catch (error) {
           failed.push({

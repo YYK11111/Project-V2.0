@@ -62,6 +62,7 @@ export class GoLiveRecordsService extends BaseService<
         record.projectId,
         operatorId,
         permissions,
+        "business/go-live-records/manageAll",
       );
     }
     return record;
@@ -88,6 +89,7 @@ export class GoLiveRecordsService extends BaseService<
           oldProjectId,
           operatorId,
           operatorPermissions,
+          "business/go-live-records/manageAll",
         );
       }
     }
@@ -97,6 +99,7 @@ export class GoLiveRecordsService extends BaseService<
         nextProjectId,
         operatorId,
         operatorPermissions,
+        "business/go-live-records/manageAll",
       );
     }
   }
@@ -127,6 +130,7 @@ export class GoLiveRecordsService extends BaseService<
       await this.projectExecutionPermissionService.getVisibleProjectIds(
         String(_operatorId || ""),
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/go-live-records/manageAll",
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -174,6 +178,7 @@ export class GoLiveRecordsService extends BaseService<
           record.projectId,
           String(_operatorId),
           Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          "business/go-live-records/manageAll",
         );
       }
     }

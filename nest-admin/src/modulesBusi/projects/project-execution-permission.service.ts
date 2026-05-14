@@ -1,15 +1,24 @@
 import { Injectable } from "@nestjs/common";
+import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 import { ProjectsService } from "./service";
 
 @Injectable()
 export class ProjectExecutionPermissionService {
   constructor(private readonly projectsService: ProjectsService) {}
 
-  async getVisibleProjectIds(userId: string, permissions: string[] = []) {
+  async getVisibleProjectIds(
+    userId: string,
+    permissions: string[] = [],
+    manageAllPermissionKey?: string,
+  ) {
     if (!userId) return [];
+    const scopedPermissions = getProjectScopedPermissions(
+      permissions,
+      manageAllPermissionKey,
+    );
     const projectIds = await this.projectsService.getVisibleProjectIdsForUser(
       userId,
-      permissions,
+      scopedPermissions,
     );
     if (projectIds === null) return null;
     const visibleProjectIds: string[] = [];
@@ -20,7 +29,7 @@ export class ProjectExecutionPermissionService {
         await this.assertReadableProject(
           normalizedProjectId,
           userId,
-          permissions,
+          scopedPermissions,
         );
         visibleProjectIds.push(normalizedProjectId);
       } catch (error) {
@@ -34,11 +43,16 @@ export class ProjectExecutionPermissionService {
     projectId: string,
     userId: string,
     permissions: string[] = [],
+    manageAllPermissionKey?: string,
   ) {
+    const scopedPermissions = getProjectScopedPermissions(
+      permissions,
+      manageAllPermissionKey,
+    );
     return this.projectsService.assertExecutionObjectPermission(
       projectId,
       userId,
-      permissions,
+      scopedPermissions,
     );
   }
 
@@ -46,12 +60,17 @@ export class ProjectExecutionPermissionService {
     projectId: string,
     userId: string,
     permissions: string[] = [],
+    manageAllPermissionKey?: string,
   ) {
+    const scopedPermissions = getProjectScopedPermissions(
+      permissions,
+      manageAllPermissionKey,
+    );
     await this.projectsService.assertProjectNotArchived(projectId);
     return this.projectsService.assertExecutionObjectPermission(
       projectId,
       userId,
-      permissions,
+      scopedPermissions,
     );
   }
 }

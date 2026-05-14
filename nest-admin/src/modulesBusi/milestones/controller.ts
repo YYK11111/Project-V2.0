@@ -48,6 +48,7 @@ export class MilestonesController extends BaseController<
       id,
       status as any,
       req.user?.id || req.user?.name,
+      req.user?.permissions || [],
     );
   }
 }

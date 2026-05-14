@@ -19,13 +19,30 @@ describe("ProjectExecutionPermissionService", () => {
     projectsService.assertExecutionObjectPermission.mockResolvedValue({});
 
     const result = await service.getVisibleProjectIds("u1", [
-      "business/projects/listAll",
+      "business/projects/manageAll",
     ]);
 
     expect(result).toEqual(["p1", "p2"]);
     expect(projectsService.getVisibleProjectIdsForUser).toHaveBeenCalledWith(
       "u1",
-      ["business/projects/listAll"],
+      ["business/projects/manageAll"],
+    );
+  });
+
+  it("模块全量查看权限应按项目全量查看权限计算执行对象可见范围", async () => {
+    const { service, projectsService } = createService();
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue(null);
+
+    const result = await service.getVisibleProjectIds(
+      "u1",
+      ["business/tasks/manageAll"],
+      "business/tasks/manageAll",
+    );
+
+    expect(result).toBeNull();
+    expect(projectsService.getVisibleProjectIdsForUser).toHaveBeenCalledWith(
+      "u1",
+      ["business/tasks/manageAll", "business/projects/manageAll"],
     );
   });
 
@@ -57,12 +74,12 @@ describe("ProjectExecutionPermissionService", () => {
     projectsService.assertExecutionObjectPermission.mockResolvedValue({});
 
     await service.assertReadableProject("p1", "u1", [
-      "business/projects/listAll",
+      "business/projects/manageAll",
     ]);
 
     expect(
       projectsService.assertExecutionObjectPermission,
-    ).toHaveBeenCalledWith("p1", "u1", ["business/projects/listAll"]);
+    ).toHaveBeenCalledWith("p1", "u1", ["business/projects/manageAll"]);
   });
 
   it("写入时先校验项目未归档再校验执行对象权限", async () => {
@@ -84,5 +101,25 @@ describe("ProjectExecutionPermissionService", () => {
     expect(
       projectsService.assertExecutionObjectPermission,
     ).toHaveBeenCalledWith("p1", "u1", []);
+  });
+
+  it("模块全量管理权限应允许写入项目执行对象", async () => {
+    const { service, projectsService } = createService();
+    projectsService.assertProjectNotArchived.mockResolvedValue(undefined);
+    projectsService.assertExecutionObjectPermission.mockResolvedValue({});
+
+    await service.assertWritableProject(
+      "p1",
+      "u1",
+      ["business/sprints/manageAll"],
+      "business/sprints/manageAll",
+    );
+
+    expect(
+      projectsService.assertExecutionObjectPermission,
+    ).toHaveBeenCalledWith("p1", "u1", [
+      "business/sprints/manageAll",
+      "business/projects/manageAll",
+    ]);
   });
 });

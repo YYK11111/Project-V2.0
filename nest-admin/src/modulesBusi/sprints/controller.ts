@@ -47,7 +47,11 @@ export class SprintsController extends BaseController<Sprint, SprintsService> {
 
   @Post(":id/start")
   async startSprint(@Param("id") id: string, @Req() req: any) {
-    return this.service.startSprint(id, req.user?.id || req.user?.name);
+    return this.service.startSprint(
+      id,
+      req.user?.id || req.user?.name,
+      req.user?.permissions || [],
+    );
   }
 
   @Post(":id/complete")
@@ -60,6 +64,7 @@ export class SprintsController extends BaseController<Sprint, SprintsService> {
       id,
       body,
       req.user?.id || req.user?.name,
+      req.user?.permissions || [],
     );
   }
 }

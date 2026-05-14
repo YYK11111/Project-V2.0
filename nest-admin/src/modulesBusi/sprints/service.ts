@@ -36,6 +36,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
         sprint.projectId,
         operatorId,
         permissions,
+        "business/sprints/manageAll",
       );
     }
     return sprint;
@@ -62,6 +63,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
           oldProjectId,
           operatorId,
           operatorPermissions,
+          "business/sprints/manageAll",
         );
       }
     }
@@ -71,6 +73,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
         nextProjectId,
         operatorId,
         operatorPermissions,
+        "business/sprints/manageAll",
       );
     }
   }
@@ -94,6 +97,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       await this.projectExecutionPermissionService.getVisibleProjectIds(
         String(_operatorId || ""),
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/sprints/manageAll",
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { data: [], total: 0, _flag: true } as any;
@@ -217,7 +221,11 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     }));
   }
 
-  async startSprint(sprintId: string, operatorId?: string): Promise<any> {
+  async startSprint(
+    sprintId: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
       throw new Error("Sprint不存在");
@@ -227,6 +235,8 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
         await this.projectExecutionPermissionService.assertReadableProject(
           sprint.projectId,
           operatorId,
+          permissions,
+          "business/sprints/manageAll",
         );
       }
     }
@@ -250,6 +260,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     sprintId: string,
     options?: { carryOverMode?: "backlog" },
     operatorId?: string,
+    permissions: string[] = [],
   ): Promise<any> {
     const sprint = await this.getOne({ id: sprintId });
     if (!sprint) {
@@ -260,6 +271,8 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
         await this.projectExecutionPermissionService.assertReadableProject(
           sprint.projectId,
           operatorId,
+          permissions,
+          "business/sprints/manageAll",
         );
       }
     }
@@ -340,6 +353,7 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
           sprint.projectId,
           String(_operatorId),
           Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          "business/sprints/manageAll",
         );
       }
     }

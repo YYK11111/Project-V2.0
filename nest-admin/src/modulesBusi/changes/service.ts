@@ -26,6 +26,7 @@ import { ChangeImpactConfirmHistory } from "./entities/change-impact-confirm-his
 import { Task } from "../tasks/entity";
 import { Milestone } from "../milestones/entity";
 import { Sprint } from "../sprints/entity";
+import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class ChangesService extends BaseService<
@@ -52,11 +53,17 @@ export class ChangesService extends BaseService<
   private async getChangePermissions(
     change: ProjectChange,
     operatorId: string,
+    permissions: string[] = [],
   ) {
     if (!operatorId) return { canEdit: false, canDelete: false };
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/changes/manageAll",
+    );
     const context = await this.projectsService.getProjectPermissionContext(
       change.projectId,
       operatorId,
+      operatorPermissions,
     );
     const canEdit =
       Boolean(context?.isManager) ||
@@ -77,8 +84,13 @@ export class ChangesService extends BaseService<
   private async assertChangeEditPermission(
     changeId: string,
     operatorId: string,
+    permissions: string[] = [],
   ) {
     if (!changeId || !operatorId) return;
+    const operatorPermissions = getProjectScopedPermissions(
+      permissions,
+      "business/changes/manageAll",
+    );
     const change = await this.repository.findOne({
       where: { id: changeId, isDelete: null as any } as any,
       select: ["id", "projectId", "requesterId", "createUser"] as any,
@@ -88,6 +100,7 @@ export class ChangesService extends BaseService<
       change.projectId,
       operatorId,
       "view",
+      operatorPermissions,
     );
     const canEdit =
       context.isManager ||
@@ -122,10 +135,14 @@ export class ChangesService extends BaseService<
       _operatorId,
       _operatorPermissions,
     } = query as any;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      "business/changes/manageAll",
+    );
     const visibleProjectIds =
       await this.projectsService.getVisibleProjectIdsForUser(
         String(_operatorId || ""),
-        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        operatorPermissions,
       );
     if (visibleProjectIds && !visibleProjectIds.length) {
       return { list: [], total: 0 } as any;
@@ -138,6 +155,7 @@ export class ChangesService extends BaseService<
           await this.projectsService.assertExecutionObjectPermission(
             id,
             String(_operatorId),
+            operatorPermissions,
           );
           executionVisibleProjectIds.push(id);
         } catch {}
@@ -169,7 +187,11 @@ export class ChangesService extends BaseService<
       if (_operatorId) {
         Object.assign(
           row,
-          await this.getChangePermissions(row, String(_operatorId)),
+          await this.getChangePermissions(
+            row,
+            String(_operatorId),
+            operatorPermissions,
+          ),
         );
       }
     }
@@ -394,6 +416,9 @@ export class ChangesService extends BaseService<
       await this.assertChangeEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeChangePayload(dto);
@@ -456,6 +481,9 @@ export class ChangesService extends BaseService<
       await this.assertChangeEditPermission(
         String(dto.id),
         String(dto._operatorId),
+        Array.isArray((dto as any)._operatorPermissions)
+          ? (dto as any)._operatorPermissions
+          : [],
       );
     }
     this.normalizeChangePayload(dto);
@@ -552,10 +580,17 @@ export class ChangesService extends BaseService<
       isError,
     );
     if (!change) return change;
+    const operatorPermissions = getProjectScopedPermissions(
+      Array.isArray((query as any)._operatorPermissions)
+        ? (query as any)._operatorPermissions
+        : [],
+      "business/changes/manageAll",
+    );
     if ((query as any)._operatorId) {
       await this.projectsService.assertExecutionObjectPermission(
         change.projectId,
         String((query as any)._operatorId),
+        operatorPermissions,
       );
     }
     const history = await this.historyRepository.find({
@@ -573,6 +608,7 @@ export class ChangesService extends BaseService<
         await this.getChangePermissions(
           change,
           String((query as any)._operatorId),
+          operatorPermissions,
         ),
       );
     }
@@ -695,7 +731,7 @@ export class ChangesService extends BaseService<
     if (operatorId) {
       for (const id of idList) {
         try {
-          await this.assertChangeEditPermission(id, operatorId);
+          await this.assertChangeEditPermission(id, operatorId, permissions);
           successIds.push(id);
         } catch (error) {
           failed.push({

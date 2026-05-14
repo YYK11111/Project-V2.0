@@ -3,6 +3,59 @@ import { ChangesService } from "./service";
 import { ChangeStatus } from "./entity";
 
 describe("ChangesService apply impact", () => {
+  it("变更全量管理权限在列表行上返回可操作权限", async () => {
+    const projectsService = {
+      getVisibleProjectIdsForUser: jest.fn().mockResolvedValue(null),
+      getProjectPermissionContext: jest.fn(
+        async (_projectId, _operatorId, permissions = []) => ({
+          isManager: permissions.includes("business/projects/manageAll"),
+          isDeliveryManager: false,
+          isFunctionalLead: false,
+        }),
+      ),
+    };
+    const service = new ChangesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+    );
+    jest.spyOn(service as any, "listBy").mockResolvedValue({
+      list: [
+        {
+          id: "change-1",
+          projectId: "project-1",
+          requesterId: "requester-1",
+          createUser: "creator-1",
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/changes/manageAll"],
+    } as any);
+
+    expect(result.list[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+      }),
+    );
+    expect(projectsService.getProjectPermissionContext).toHaveBeenCalledWith(
+      "project-1",
+      "admin-1",
+      expect.arrayContaining(["business/projects/manageAll"]),
+    );
+  });
+
   it("可将变更应用到任务计划日期", async () => {
     const repository = { update: jest.fn(), findOne: jest.fn() };
     const historyRepository = { save: jest.fn() };
