@@ -90,6 +90,7 @@ describe("ProjectsService closure guards", () => {
       { findOne: jest.fn() } as any,
       { findOne: jest.fn() } as any,
       { getRepository: jest.fn(), transaction: jest.fn() } as any,
+      { findOne: jest.fn() } as any,
     );
 
     (service as any).projectFieldPermissionService = {
@@ -142,6 +143,18 @@ describe("ProjectsService closure guards", () => {
         ],
         projectKnowledge: [],
       }),
+    };
+    (service as any).projectMemberRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+    };
+    (service as any).workflowTaskRepository = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+    };
+    (service as any).workflowHistoryRepository = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     return { service, repository };
@@ -251,22 +264,127 @@ describe("ProjectsService closure guards", () => {
     ).not.toThrow();
   });
 
-  it("全量查看权限不能绕过项目编辑权限", async () => {
+  it("项目列表应返回创建人自己的草稿项目", async () => {
     const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p1",
+            name: "我的草稿项目",
+            creatorId: "operator-1",
+            leaderId: "other-leader",
+            status: "1",
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    (service as any).projectMemberRepository.find.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "operator-1",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result.list).toHaveLength(1);
+    expect(result.list[0]).toEqual(
+      expect.objectContaining({
+        id: "p1",
+        creatorId: "operator-1",
+        status: "1",
+      }),
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(project.leaderId = :operatorId OR project.creatorId = :operatorId OR project.createUser = :operatorName OR projectMember.id IS NOT NULL)",
+      { operatorId: "operator-1", operatorName: "" },
+    );
+  });
+
+  it("项目管理全部权限应让列表行展示编辑删除等管理操作", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p1",
+            name: "非成员草稿项目",
+            creatorId: "creator-1",
+            leaderId: "leader-1",
+            status: "1",
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    (service as any).projectMemberRepository.find.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/projects/manageAll"],
+    } as any);
+
+    expect(result.list[0].permissionContext).toEqual(
+      expect.objectContaining({
+        canViewAll: true,
+        canManageAll: true,
+        isManager: true,
+        canView: true,
+        canEdit: true,
+        canSubmitApproval: true,
+        canSubmitClose: true,
+        canArchive: true,
+        canDelete: true,
+      }),
+    );
+    expect(queryBuilder.andWhere).not.toHaveBeenCalledWith(
+      "(project.leaderId = :operatorId OR project.creatorId = :operatorId OR project.createUser = :operatorName OR projectMember.id IS NOT NULL)",
+      expect.anything(),
+    );
+  });
+
+  it("项目全量权限可以绕过项目编辑权限", async () => {
+    const { service, repository } = createService();
+    const assertProjectPermissionSpy = jest.spyOn(
+      service,
+      "assertProjectPermission",
+    );
     repository.findOne.mockResolvedValue({
       id: "p1",
       status: "3",
       leaderId: "leader-1",
     });
+    repository.update.mockResolvedValue({ affected: 1 });
 
     await expect(
       service.update({
         id: "p1",
         name: "已立项项目改名",
         _operatorId: "viewer-1",
-        _operatorPermissions: ["business/projects/listAll"],
+        _operatorPermissions: ["business/projects/manageAll"],
       } as any),
-    ).rejects.toThrow(ForbiddenException);
+    ).resolves.toBeUndefined();
+    expect(assertProjectPermissionSpy).not.toHaveBeenCalled();
   });
 
   it("全量查看权限可以查看项目详情", async () => {
@@ -282,12 +400,111 @@ describe("ProjectsService closure guards", () => {
       "p1",
       "viewer-1",
       "view",
-      ["business/projects/listAll"],
+      ["business/projects/manageAll"],
     );
 
     expect(context.canView).toBe(true);
     expect(context.canViewAll).toBe(true);
+    expect(context.canEdit).toBe(true);
+    expect(context.canSubmitApproval).toBe(true);
+  });
+
+  it("当前待办审批人可以查看项目详情", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "1",
+      workflowInstanceId: "inst-1",
+      leaderId: "leader-1",
+    });
+    (service as any).projectMemberRepository.findOne.mockResolvedValue(null);
+    (service as any).workflowTaskRepository.findOne.mockResolvedValue({
+      id: "task-1",
+    });
+
+    const context = await service.assertProjectPermission(
+      "p1",
+      "approver-1",
+      "view",
+      [],
+    );
+
+    expect(context.canView).toBe(true);
     expect(context.canEdit).toBe(false);
+    expect(context.canSubmitApproval).toBe(false);
+  });
+
+  it("历史审批人可以查看项目详情", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "2",
+      workflowInstanceId: "inst-1",
+      leaderId: "leader-1",
+    });
+    (service as any).projectMemberRepository.findOne.mockResolvedValue(null);
+    (service as any).workflowTaskRepository.findOne.mockResolvedValue(null);
+    (service as any).workflowHistoryRepository.findOne.mockResolvedValue({
+      id: "history-1",
+    });
+
+    const context = await service.assertProjectPermission(
+      "p1",
+      "approver-1",
+      "view",
+      [],
+    );
+
+    expect(context.canView).toBe(true);
+    expect(context.canEdit).toBe(false);
+    expect(context.canSubmitApproval).toBe(false);
+  });
+
+  it("历史审批人应能在项目列表中看到项目", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p18",
+            name: "审批项目",
+            creatorId: "1",
+            leaderId: "1",
+            status: "2",
+            workflowInstanceId: "21",
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    (service as any).projectMemberRepository.find.mockResolvedValue([]);
+    jest
+      .spyOn(service as any, "getWorkflowVisibleProjectIdsForUser")
+      .mockResolvedValue(["p18"]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "2",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result.list).toHaveLength(1);
+    expect(result.list[0].id).toBe("p18");
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("project.id IN"),
+      expect.objectContaining({
+        workflowVisibleProjectIds: ["p18"],
+      }),
+    );
   });
 
   it("驾驶舱应使用项目列表返回的 list 字段生成项目选项", async () => {
@@ -297,7 +514,7 @@ describe("ProjectsService closure guards", () => {
         {
           id: "p1",
           name: "项目A",
-          leader: { id: "u1", name: "NestAdmin" },
+          leader: { id: "u1", name: "admin" },
           status: "2",
           priority: "1",
           progress: 60,

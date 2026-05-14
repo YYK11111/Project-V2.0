@@ -20,6 +20,7 @@ import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { ProjectDto } from "./dto";
 import { Task, TaskStatus } from "../tasks/entity";
+import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
 import { Ticket, TicketStatus } from "../tickets/entity";
 import { SysFileService } from "src/modules/sys/file/service";
 import { FileStatus, SysFile } from "src/modules/sys/file/entity";
@@ -51,6 +52,8 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { ChangeImpactConfirmHistory } from "../changes/entities/change-impact-confirm-history.entity";
 import { ProjectFieldPermissionService } from "./project-field-permission.service";
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
+import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
+import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
 
 @Injectable()
 export class ProjectsService extends BaseService<Project, ProjectDto> {
@@ -90,6 +93,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private readonly sysFileService: SysFileService,
     private readonly dataSource: DataSource,
     private readonly systemScheduledJobsService: SystemScheduledJobsService,
+    @InjectRepository(WorkflowTask)
+    private workflowTaskRepository: Repository<WorkflowTask>,
+    @InjectRepository(WorkflowHistory)
+    private workflowHistoryRepository: Repository<WorkflowHistory>,
   ) {
     super(Project, repository);
   }
@@ -105,17 +112,11 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
   private readonly projectReviewCatalogName = "项目复盘";
 
   private canViewAllProjects(permissions: string[] = []) {
-    return (
-      permissions.includes("*") ||
-      permissions.includes("business/projects/listAll")
-    );
+    return hasModuleFullAccess(permissions, "business/projects/list");
   }
 
   private canManageAllProjects(permissions: string[] = []) {
-    return (
-      permissions.includes("*") ||
-      permissions.includes("business/projects/manageAll")
-    );
+    return hasModuleFullAccess(permissions, "business/projects/update");
   }
 
   private mapContractSummary(contract?: Contract | null) {
@@ -1070,16 +1071,24 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isArchived,
       projectType,
       _operatorId,
+      _operatorName,
       _operatorPermissions,
     } = query as QueryListDto & {
       projectType?: string;
       _operatorId?: string;
+      _operatorName?: string;
       _operatorPermissions?: string[];
     };
 
     const canViewAll = Array.isArray(_operatorPermissions)
       ? this.canViewAllProjects(_operatorPermissions)
       : false;
+    const canManageAll = Array.isArray(_operatorPermissions)
+      ? this.canManageAllProjects(_operatorPermissions)
+      : false;
+    const workflowVisibleProjectIds = canViewAll
+      ? []
+      : await this.getWorkflowVisibleProjectIdsForUser(_operatorId || "");
 
     const queryBuilder = this.repository
       .createQueryBuilder("project")
@@ -1139,10 +1148,21 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       });
 
     if (!canViewAll) {
-      queryBuilder.andWhere(
-        "(project.leaderId = :operatorId OR projectMember.id IS NOT NULL)",
-        { operatorId: _operatorId || "" },
-      );
+      const scopeConditions = [
+        "project.leaderId = :operatorId",
+        "project.creatorId = :operatorId",
+        "project.createUser = :operatorName",
+        "projectMember.id IS NOT NULL",
+      ];
+      const scopeParams: Record<string, any> = {
+        operatorId: _operatorId || "",
+        operatorName: _operatorName || "",
+      };
+      if (workflowVisibleProjectIds.length) {
+        scopeConditions.push("project.id IN (:...workflowVisibleProjectIds)");
+        scopeParams.workflowVisibleProjectIds = workflowVisibleProjectIds;
+      }
+      queryBuilder.andWhere(`(${scopeConditions.join(" OR ")})`, scopeParams);
     }
 
     const pageNum = Number(query.pageNum || 1);
@@ -1173,7 +1193,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         const isLeader = String(project.leaderId || "") === String(_operatorId);
         const role =
           member?.role || (isLeader ? ProjectMemberRole.manager : null);
-        const isManager = isLeader || role === ProjectMemberRole.manager;
+        const isManager =
+          canManageAll || isLeader || role === ProjectMemberRole.manager;
         const isDeliveryManager = role === ProjectMemberRole.deliveryManager;
         const isFunctionalLead = [
           ProjectMemberRole.techLead,
@@ -1184,16 +1205,23 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         Object.assign(project, {
           permissionContext: {
             role,
+            canViewAll,
+            canManageAll,
             isManager,
             isDeliveryManager,
             isFunctionalLead,
             isVisitor,
-            canView: !isVisitor || Boolean(member) || isLeader,
-            canEdit: isManager,
-            canSubmitApproval: isManager,
-            canSubmitClose: isManager,
-            canArchive: isManager,
-            canDelete: isManager,
+            canView:
+              canViewAll ||
+              canManageAll ||
+              !isVisitor ||
+              Boolean(member) ||
+              isLeader,
+            canEdit: canManageAll || isManager,
+            canSubmitApproval: canManageAll || isManager,
+            canSubmitClose: canManageAll || isManager,
+            canArchive: canManageAll || isManager,
+            canDelete: canManageAll || isManager,
           },
         });
       }
@@ -1206,9 +1234,17 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
   }
 
   async getOne(query, isError = true): Promise<any | null> {
+    const {
+      _operatorId,
+      _operatorName,
+      _operatorDeptId,
+      _operatorPermissions,
+      _operatorRoles,
+      ...whereQuery
+    } = query || {};
     const project = await super.getOne(
       {
-        where: { ...query },
+        where: { ...whereQuery },
         relations: ["leader", "creator", "customer"],
       },
       isError,
@@ -1506,7 +1542,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
 
     const isLeader = String(project.leaderId || "") === String(userId || "");
     const role = member?.role || (isLeader ? ProjectMemberRole.manager : null);
-    const isManager = isLeader || role === ProjectMemberRole.manager;
+    const isManager =
+      canManageAll || isLeader || role === ProjectMemberRole.manager;
     const isDeliveryManager = role === ProjectMemberRole.deliveryManager;
     const isFunctionalLead = [
       ProjectMemberRole.techLead,
@@ -1515,6 +1552,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     ].includes(role as any);
     const isVisitor = role === ProjectMemberRole.visitor;
     const isMember = Boolean(member) || isLeader;
+    const hasWorkflowAccess = await this.hasWorkflowAccess(
+      project.workflowInstanceId,
+      userId,
+    );
 
     return {
       project,
@@ -1527,7 +1568,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isFunctionalLead,
       isVisitor,
       isMember,
-      canView: canViewAll || isMember || isDeliveryManager,
+      canView: canViewAll || isMember || isDeliveryManager || hasWorkflowAccess,
       canEdit: canManageAll || isManager,
       canSubmitApproval: canManageAll || isManager,
       canSubmitClose: canManageAll || isManager,
@@ -1558,15 +1599,78 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         select: ["projectId"] as any,
       }),
     ]);
+    const workflowProjectIds =
+      await this.getWorkflowVisibleProjectIdsForUser(userId);
 
     return Array.from(
       new Set(
         [
           ...leaderProjects.map((item) => String(item.id)),
           ...memberProjects.map((item) => String(item.projectId)),
+          ...workflowProjectIds,
         ].filter(Boolean),
       ),
     );
+  }
+
+  private async hasWorkflowAccess(
+    workflowInstanceId?: string | null,
+    userId?: string,
+  ) {
+    if (!workflowInstanceId || !userId) return false;
+    const [pendingTask, history] = await Promise.all([
+      this.workflowTaskRepository.findOne({
+        where: {
+          instanceId: workflowInstanceId,
+          assigneeId: userId,
+          status: "1",
+        } as any,
+        select: ["id"] as any,
+      }),
+      this.workflowHistoryRepository.findOne({
+        where: {
+          instanceId: workflowInstanceId,
+          operatorId: userId,
+        } as any,
+        select: ["id"] as any,
+      }),
+    ]);
+    return Boolean(pendingTask || history);
+  }
+
+  private async getWorkflowVisibleProjectIdsForUser(userId: string) {
+    if (!userId) return [];
+    const [pendingTasks, histories] = await Promise.all([
+      this.workflowTaskRepository.find({
+        where: {
+          assigneeId: userId,
+          status: "1",
+        } as any,
+        select: ["instanceId"] as any,
+      }),
+      this.workflowHistoryRepository.find({
+        where: {
+          operatorId: userId,
+        } as any,
+        select: ["instanceId"] as any,
+      }),
+    ]);
+    const instanceIds = Array.from(
+      new Set(
+        [...pendingTasks, ...histories]
+          .map((item) => String(item.instanceId || ""))
+          .filter(Boolean),
+      ),
+    );
+    if (!instanceIds.length) return [];
+    const projects = await this.repository.find({
+      where: {
+        workflowInstanceId: In(instanceIds),
+        isDelete: null as any,
+      } as any,
+      select: ["id"] as any,
+    });
+    return projects.map((item) => String(item.id)).filter(Boolean);
   }
 
   async assertProjectPermission(

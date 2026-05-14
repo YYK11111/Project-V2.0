@@ -412,7 +412,12 @@ export class Project extends BaseEntity {
   @JoinColumn({ name: "creator_id" })
   creator: User;
 
-  @BaseColumn({ type: "int", nullable: true, name: "customer_id", comment: "关联客户ID" })
+  @BaseColumn({
+    type: "int",
+    nullable: true,
+    name: "customer_id",
+    comment: "关联客户ID",
+  })
   customerId: number;
 
   @BaseColumn({
