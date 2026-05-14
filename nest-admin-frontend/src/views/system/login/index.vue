@@ -7,7 +7,6 @@
         <el-icon-Moon v-if="dark" class="el-icon-Moon font18 mr5" />
         <el-icon-Sunny v-else class="el-icon-Sunny font18 mr5" />
       </div>
-      <div class="loginSlogan mt20">{{ sysConfig.SYSTEM_SLOGAN }}</div>
     </div>
     <div class="flexBetween mb20">
       <div class="font16 blod --Color">密码登录</div>
@@ -73,8 +72,8 @@ const loginType = ref('account')
 const redirect = ref()
 const formRef = ref()
 const form = ref({
-  account: 'NestAdmin',
-  password: '123456',
+  account: '',
+  password: '',
   rememberMe: false,
   code: '',
   uuid: '',
@@ -153,10 +152,6 @@ async function submit() {
 
 .loginTitle {
   font-size: 30px;
-}
-.loginSlogan {
-  font-size: 15px;
-  color: var(--FontBlack5);
 }
 
 .form {

@@ -62,8 +62,16 @@ initRequest().catch(err => {
 import router from './router'
 import { ensureDynamicRoutes } from './router/routes'
 import stores, { store } from '@/stores'
+import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 app.use(store)
+
+const appStore = useAppStore()
+try {
+  await appStore.getConfig()
+} catch (error) {
+  console.error('Failed to load system config:', error)
+}
 
 const userStore = useUserStore()
 if (!userStore.name) {

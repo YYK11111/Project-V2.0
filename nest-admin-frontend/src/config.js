@@ -19,9 +19,18 @@ globalThis.sysConfig = {
   _mode: import.meta.env.MODE, // 前端打包模式
 }
 
-function resolveAssetUrl(url) {
+export function resolveStaticAssetUrl(url) {
   if (!url) return ''
-  return url.includes('http') ? url : `${window.sysConfig.BASE_API}/static/${url}`
+  if (/^(https?:)?\/\//.test(url) || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url
+  }
+
+  const normalizedUrl = url.replace(/^\/+/, '')
+  if (normalizedUrl.startsWith('static/') || normalizedUrl.startsWith('upload/')) {
+    return `${window.sysConfig.BASE_API}/${normalizedUrl}`
+  }
+
+  return `${window.sysConfig.BASE_API}/static/${normalizedUrl}`
 }
 
 export function applyBrowserBranding({ browserTitle, browserIcon, systemName, systemLogo } = {}) {
@@ -30,7 +39,7 @@ export function applyBrowserBranding({ browserTitle, browserIcon, systemName, sy
     document.title = title
   }
 
-  const iconUrl = resolveAssetUrl(browserIcon || systemLogo || window.sysConfig.BROWSER_ICON || window.sysConfig.LOGO)
+  const iconUrl = resolveStaticAssetUrl(browserIcon || systemLogo || window.sysConfig.BROWSER_ICON || window.sysConfig.LOGO)
   if (!iconUrl) return
 
   let favicon = document.querySelector('link[rel="icon"]')
@@ -51,8 +60,6 @@ if (h) {
   style.setProperty('--L', l)
 }
 
-applyBrowserBranding()
-
 // 灰色主题
 // if (window.sysConfig.ENV === 'production') document.documentElement.style.filter = 'grayscale(100%)'
 
@@ -66,9 +73,9 @@ document.addEventListener(
   'error',
   function (e) {
     let target = e.target
-    let src = target.attributes.getNamedItem('src').value
+    let src = target.getAttribute?.('src') || target.attributes.getNamedItem('src')?.value
     if (target.tagName.toUpperCase() === 'IMG' && src && !src.includes('http')) {
-      target.src = window.sysConfig.BASE_API + '/static/' + src
+      target.src = resolveStaticAssetUrl(src)
       e.stopPropagation()
     }
   },

@@ -32,13 +32,11 @@ useDark().value
 // 配置项
 export let config = {
   ...env,
-  SYSTEM_NAME: 'Nest Admin', // 系统简称
-  SYSTEM_SLOGAN: '基于 Nestjs + Vue3 的前后端分离快速开发框架', // 系统标语
-  SYSTEM_NAME_ALL: 'Nest Admin -- 基于 Nestjs + Vue3 的前后端分离快速开发框架', // 系统全称，浏览器标题
-  COPYRIGHT: 'Copyright © 2024 Nest Admin All Rights Reserved.', // 版权信息
-  // LOGO_DARK: BASE_URL + 'static/logo.svg', // 深色logo
-  // LOGO_LIGHT: BASE_URL + 'static/logo.svg', // 淡色logo
-  LOGO: `${BASE_URL}static/logo.svg`,
+  SYSTEM_NAME: '',
+  SYSTEM_SLOGAN: '',
+  SYSTEM_NAME_ALL: '',
+  COPYRIGHT: '',
+  LOGO: '',
   BASE_URL,
   RUN_ENV: runMode,
 }

@@ -1,6 +1,6 @@
 import { getList } from '@/views/system/configs/api'
 import Cookies from 'js-cookie'
-import { applyBrowserBranding } from '@/config'
+import { applyBrowserBranding, resolveStaticAssetUrl } from '@/config'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -39,12 +39,12 @@ export const useAppStore = defineStore('app', {
         getList().then(({ list = [] }) => {
           const data = list[0] || {}
           this.sysConfig = data
-          data.systemName && (window.sysConfig.SYSTEM_NAME = data.systemName)
-          data.systemLogo && (window.sysConfig.LOGO = data.systemLogo)
-          data.browserTitle && (window.sysConfig.SYSTEM_NAME_ALL = data.browserTitle)
+          window.sysConfig.SYSTEM_NAME = data.systemName || ''
+          window.sysConfig.LOGO = resolveStaticAssetUrl(data.systemLogo)
+          window.sysConfig.SYSTEM_NAME_ALL = data.browserTitle || ''
           window.sysConfig.SYSTEM_VERSION = data.systemVersion || ''
-          data.browserIcon && (window.sysConfig.BROWSER_ICON = data.browserIcon)
-          applyBrowserBranding(data)
+          window.sysConfig.BROWSER_ICON = resolveStaticAssetUrl(data.browserIcon)
+          applyBrowserBranding()
         })
       )
     },

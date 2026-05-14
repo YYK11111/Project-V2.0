@@ -24,6 +24,7 @@ const menuNodeTypeLabelMap: Record<string, string> = {
   menu: '菜单',
   button: '按钮',
   list: '列表',
+  manage: '管理',
   form: '表单',
   detail: '详情',
   page: '页面',
@@ -34,13 +35,23 @@ const menuNodeTypeTagTypeMap: Record<string, 'info' | 'success' | 'warning'> = {
   menu: 'success',
   button: 'warning',
   list: 'success',
+  manage: 'warning',
   form: 'warning',
   detail: 'info',
   page: 'success',
 }
 
+function normalizePermissionKey(permissionKey?: string) {
+  return String(permissionKey || '').trim().replace(/\/listAll$/i, '/manageAll')
+}
+
+function normalizePath(path?: string) {
+  return String(path || '').trim().toLowerCase().replace(/-list-all$/i, '-manage-all')
+}
+
 const permissionActionMap: Record<string, string> = {
   'business/projects/list': '查看项目列表',
+  'business/projects/manageAll': '管理全部项目数据',
   'business/projects/getOne': '查看项目详情',
   'business/projects/add': '新增项目',
   'business/projects/update': '修改项目',
@@ -49,6 +60,22 @@ const permissionActionMap: Record<string, string> = {
   'business/projects/statistics': '查看项目统计',
   'business/projects/submitApproval': '提交项目审批',
   'business/projects/submitClose': '提交项目结项',
+  'business/tasks/manageAll': '管理全部任务数据',
+  'business/tickets/manageAll': '管理全部工单数据',
+  'business/stories/manageAll': '管理全部用户故事数据',
+  'business/sprints/manageAll': '管理全部 Sprint 数据',
+  'business/milestones/manageAll': '管理全部里程碑数据',
+  'business/risks/manageAll': '管理全部风险数据',
+  'business/changes/manageAll': '管理全部变更数据',
+  'business/go-live-records/manageAll': '管理全部上线单数据',
+  'business/acceptance-records/manageAll': '管理全部验收单数据',
+  'business/handover-records/manageAll': '管理全部运维交接单数据',
+  'business/projectMembers/manageAll': '管理全部项目成员数据',
+  'business/taskComments/manageAll': '管理全部任务评论数据',
+  'business/crm/customers/manageAll': '管理全部客户数据',
+  'business/crm/opportunities/manageAll': '管理全部商机数据',
+  'business/crm/contracts/manageAll': '管理全部合同数据',
+  'business/crm/interactions/manageAll': '管理全部互动记录数据',
   'system/messages/recent': '查看最近消息',
   'system/messages/list': '查看消息列表',
   'system/messages/unread-count': '查看未读消息数量',
@@ -75,13 +102,14 @@ export function getMenuTypeTagType(type?: string) {
 
 export function getPermissionAction(permissionKey?: string) {
   if (!permissionKey) return ''
-  return permissionActionMap[permissionKey] || ''
+  const normalizedKey = normalizePermissionKey(permissionKey)
+  return permissionActionMap[normalizedKey] || permissionActionMap[permissionKey] || ''
 }
 
 function inferMenuNodeType(data: MenuTreeNode) {
-  const path = String(data?.path || '').trim().toLowerCase()
+  const path = normalizePath(data?.path)
   const component = String(data?.component || '').trim().toLowerCase()
-  const permissionKey = String(data?.permissionKey || '').trim().toLowerCase()
+  const permissionKey = normalizePermissionKey(data?.permissionKey).toLowerCase()
 
   if (data?.type === 'catalog') {
     return 'catalog'
@@ -103,7 +131,19 @@ function inferMenuNodeType(data: MenuTreeNode) {
     return 'menu'
   }
 
-  if (permissionKey.endsWith('/list')) {
+  if (
+    path.endsWith('-manage-all') ||
+    path === 'manage-all' ||
+    permissionKey.endsWith('/manageall')
+  ) {
+    return 'manage'
+  }
+
+  if (
+    path.endsWith('-list') ||
+    path === 'list' ||
+    permissionKey.endsWith('/list')
+  ) {
     return 'list'
   }
 
@@ -151,6 +191,8 @@ export function getMenuNodeTooltipLines(data: MenuTreeNode) {
     lines.push('作用：拥有后可以进入对应页面。')
   } else if (nodeType === 'list') {
     lines.push(`作用：拥有后可以${actionText || '查看对应列表'}。`)
+  } else if (nodeType === 'manage') {
+    lines.push(`作用：拥有后可以${actionText || '管理对应模块全部数据'}。`)
   } else if (nodeType === 'page') {
     lines.push('作用：拥有后可以进入对应页面。')
   } else if (nodeType === 'button') {

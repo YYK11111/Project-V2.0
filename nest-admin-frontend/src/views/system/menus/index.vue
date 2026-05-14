@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // @ts-nocheck
 import { getTrees, getTypes, save, del } from './api'
+import { getMenuDisplayTypeLabel, getMenuDisplayTypeTagType } from './menu-display'
 import { yesOrNO } from '@/utils/dictionary'
 import { checkPermi } from '@/utils/permission'
 
@@ -23,17 +24,6 @@ function isAdmin(row) {
 
 function canOperateProtectedMenu(row) {
   return !isAdmin(row) || canManageProtectedMenu.value
-}
-
-function getMenuTypeLabel(type) {
-  return menuTypes.value?.[type] || type || '-'
-}
-
-function getMenuTypeTagType(type) {
-  if (type === 'catalog') return 'warning'
-  if (type === 'menu') return 'primary'
-  if (type === 'button') return 'success'
-  return 'info'
 }
 
 function findMenuById(rows, targetId) {
@@ -152,7 +142,7 @@ getTreesFun()
                   <div class="menu-tree-node__main">
                     <div class="menu-tree-node__title">{{ node.label }}</div>
                     <div class="menu-tree-node__meta">
-                      <el-tag size="small" :type="getMenuTypeTagType(data.type)" effect="light">{{ getMenuTypeLabel(data.type) }}</el-tag>
+                      <el-tag size="small" :type="getMenuDisplayTypeTagType(data)" effect="light">{{ getMenuDisplayTypeLabel(data, menuTypes) }}</el-tag>
                       <span>{{ data.path || '-' }}</span>
                     </div>
                     <div class="menu-tree-node__badges">
@@ -186,7 +176,7 @@ getTreesFun()
             <template v-if="currentMenu">
               <el-descriptions :column="2" border class="menu-detail-card">
                 <el-descriptions-item label="菜单名称">{{ currentMenu.name || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="菜单类型">{{ getMenuTypeLabel(currentMenu.type) }}</el-descriptions-item>
+                <el-descriptions-item label="菜单类型">{{ getMenuDisplayTypeLabel(currentMenu, menuTypes) }}</el-descriptions-item>
                 <el-descriptions-item label="上级菜单">{{ currentParentMenu?.name || '顶级菜单' }}</el-descriptions-item>
                 <el-descriptions-item label="子菜单数量">{{ currentMenu.children?.length || 0 }}</el-descriptions-item>
                 <el-descriptions-item label="路由地址">{{ currentMenu.path || '-' }}</el-descriptions-item>

@@ -16,6 +16,9 @@ export class SDK {
   msgError(msg = '操作失败') {
     ElMessage({ showClose: true, message: msg, type: 'error', grouping: true })
   }
+  msgWarning(msg = '操作提醒') {
+    ElMessage({ showClose: true, message: msg, type: 'warning', grouping: true })
+  }
   msgInfo(msg: string) {
     ElMessage.info(msg)
   }

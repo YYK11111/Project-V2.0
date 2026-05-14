@@ -34,6 +34,22 @@ describe('role menu tree helpers', () => {
     expect(tooltip).toContain('作用：拥有后可以新增项目。')
   })
 
+  it('能为业务管理权限生成可读说明', () => {
+    const tooltip = getMenuNodeTooltip({
+      type: 'button',
+      permissionKey: 'business/tasks/listAll',
+      desc: '任务管理权限',
+      path: 'task-list-all',
+    })
+
+    expect(getPermissionAction('business/tasks/manageAll')).toBe('管理全部任务数据')
+    expect(getPermissionAction('business/tasks/listAll')).toBe('管理全部任务数据')
+    expect(tooltip).toContain('类型：管理')
+    expect(tooltip).toContain('权限字符：business/tasks/listAll')
+    expect(tooltip).toContain('说明：任务管理权限')
+    expect(tooltip).toContain('作用：拥有后可以管理全部任务数据。')
+  })
+
   it('能识别表单、详情、菜单、页面和列表节点', () => {
     const formNode = {
       type: 'menu',

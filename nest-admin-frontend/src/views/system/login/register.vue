@@ -7,7 +7,6 @@
         <el-icon-Moon v-if="dark" class="el-icon-Moon font18 mr5" />
         <el-icon-Sunny v-else class="el-icon-Sunny font18 mr5" />
       </div>
-      <div class="loginSlogan mt20">{{ sysConfig.SYSTEM_SLOGAN }}</div>
     </div>
     <div class="font16 --Color mb20 blod">{{ isRegister ? '用户注册' : '重置密码' }}</div>
 
@@ -149,9 +148,5 @@ function submit() {
 }
 .loginTitle {
   font-size: 30px;
-}
-.loginSlogan {
-  font-size: 15px;
-  color: var(--FontBlack5);
 }
 </style>

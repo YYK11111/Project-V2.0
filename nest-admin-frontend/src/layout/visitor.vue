@@ -19,11 +19,6 @@ export default {
 <template>
   <div class="visitor">
     <router-view></router-view>
-
-    <!--  底部  -->
-    <div class="login-footer">
-      <span v-html="sysConfig.COPYRIGHT"></span>
-    </div>
   </div>
 </template>
 
@@ -57,18 +52,4 @@ export default {
   }
 }
 
-.login-footer {
-  height: 40px;
-  line-height: 40px;
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  // color: var(--FontWhite, #fff);
-  font-family: Arial;
-  font-size: 12px;
-  letter-spacing: 1px;
-  z-index: 90;
-}
 </style>
