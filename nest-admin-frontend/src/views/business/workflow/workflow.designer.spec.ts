@@ -112,30 +112,71 @@ describe('workflow 设计器契约守卫', () => {
     expect(source).toContain('ElMessageBox.confirm(\'切换业务对象会影响审批人、通知对象和条件字段配置')
   })
 
-  it('画布增强提供缩放比例、当前节点居中和小地图入口', () => {
+  it('画布增强保留缩放和当前节点居中并移除小地图入口', () => {
     const source = readDesignerSource()
 
     expect(source).toContain('{{ Math.round(zoom * 100) }}%')
     expect(source).toContain('@click="centerSelectedNode"')
     expect(source).toContain('const centerSelectedNode = () => {')
-    expect(source).toContain('class="canvas-minimap"')
-    expect(source).toContain('minimapViewportStyle')
+    expect(source).not.toContain('class="canvas-minimap"')
+    expect(source).not.toContain('minimapViewportStyle')
+    expect(source).not.toContain('getMinimapNodeStyle')
+    expect(source).not.toContain('小地图')
   })
 
-  it('节点卡片显示配置摘要并优化线条标签位置', () => {
+  it('画布节点只显示图标和节点名称并使用长方形布局', () => {
     const source = readDesignerSource()
 
-    expect(source).toContain('<div v-if="getCanvasNodeSummary(node)" class="node-summary">{{ getCanvasNodeSummary(node) }}</div>')
-    expect(source).toContain('const getCanvasNodeSummary = (node) => {')
+    expect(source).toContain('<div class="node-icon">{{ getNodeIcon(node.type) }}</div>')
+    expect(source).toContain('<div class="node-name">{{ node.name }}</div>')
+    expect(source).not.toContain('<div class="node-type">{{ getNodeTypeName(node.type) }}</div>')
+    expect(source).not.toContain('<div v-if="getCanvasNodeSummary(node)" class="node-summary">{{ getCanvasNodeSummary(node) }}</div>')
+    expect(source).toContain('width: 180px;')
+    expect(source).toContain('height: 56px;')
+    expect(source).toContain('display: flex;')
+    expect(source).toContain('align-items: center;')
+    expect(source).toContain('gap: 10px;')
+  })
+
+  it('拖拽生成节点时以鼠标落点为中心定位', () => {
+    const source = readDesignerSource()
+
+    expect(source).toContain('<div class="canvas-content" :style="canvasContentStyle" @click="onCanvasClick">')
+    expect(source).not.toContain('<div class="canvas-content" v-else')
+    expect(source).toContain('const getDropNodePosition = (event) => {')
+    expect(source).toContain('point.x - NODE_WIDTH / 2')
+    expect(source).toContain('point.y - NODE_HEIGHT / 2')
+    expect(source).toContain('const { x, y } = getDropNodePosition(event)')
+  })
+
+  it('开始和结束节点每个流程只允许拖入一个', () => {
+    const source = readDesignerSource()
+
+    expect(source).toContain('const getSingleNodeDropWarning = (type) => {')
+    expect(source).toContain("const singleNodeNames = { start: '开始节点', end: '结束节点' }")
+    expect(source).toContain('if (!singleNodeNames[type]) return \'\'')
+    expect(source).toContain('nodes.value.some((node) => node.type === type)')
+    expect(source).toContain('ElMessage.warning(dropWarning)')
+    expect(source).toContain('if (dropWarning) {')
+    expect(source).toContain('return\n  }')
+  })
+
+  it('线条标签位置按同向连线错开', () => {
+    const source = readDesignerSource()
+
     expect(source).toContain('const sameDirectionIndex = flows.value')
     expect(source).toContain('y: (start.y + end.y) / 2 - 8 - sameDirectionIndex * 18')
   })
 
-  it('发布前展示差异摘要并支持流程选择筛选', () => {
+  it('发布前展示差异摘要并移除流程选择筛选', () => {
     const source = readDesignerSource()
 
-    expect(source).toContain('definitionFilterBusinessType')
-    expect(source).toContain('filteredDefinitions')
+    expect(source).not.toContain('definitionFilterBusinessType')
+    expect(source).not.toContain('filteredDefinitions')
+    expect(source).not.toContain('placeholder="筛选业务"')
+    expect(source).not.toContain('placeholder="选择流程"')
+    expect(source).not.toContain('loadDefinitions()')
+    expect(source).not.toContain('const loadDefinitions = async () => {')
     expect(source).toContain('showPublishDiffConfirm')
     expect(source).toContain('const buildPublishDiffSummary = () => {')
     expect(source).toContain('发布前差异确认')
@@ -149,7 +190,32 @@ describe('workflow 设计器契约守卫', () => {
     expect(source).toContain('hasUnpublishedChanges')
     expect(source).toContain('未发布改动')
     expect(source).toContain('const buildCurrentDefinitionSnapshot = () => ({')
+    expect(source).toContain('triggerEvent: triggerEvent.value')
     expect(source).toContain('currentDefinitionMeta.isActive = data.isActive || \'0\'')
+  })
+
+  it('加载流程详情时兼容响应包裹并回填触发时机', () => {
+    const source = readDesignerSource()
+
+    expect(source).toContain('const unwrapWorkflowDefinition = (res) => res?.data?.data || res?.data || res')
+    expect(source).toContain('const data = unwrapWorkflowDefinition(res)')
+    expect(source).toContain("triggerEvent.value = data.triggerEvent || ''")
+  })
+
+  it('业务对象变更不清空已回填的触发时机', () => {
+    const source = readDesignerSource()
+    const businessTypeChangeBlock = source.match(/const onBusinessTypeChange = async[\s\S]*?return true\n}/)?.[0] || ''
+
+    expect(businessTypeChangeBlock).not.toContain("triggerEvent.value = ''")
+  })
+
+  it('流程分类使用字典选择并在加载时兼容旧值', () => {
+    const source = readDesignerSource()
+
+    expect(source).toMatch(/<el-select v-model="workflowCategory" placeholder="请选择流程分类">/)
+    expect(source).toContain('<el-option v-for="item in workflowCategoryOptions"')
+    expect(source).toContain("const normalizeWorkflowCategory = (category = '') =>")
+    expect(source).toContain('workflowCategory.value = normalizeWorkflowCategory(data.category || \'\')')
   })
 
   it('保存已发布流程返回新草稿时切换到新定义 ID', () => {

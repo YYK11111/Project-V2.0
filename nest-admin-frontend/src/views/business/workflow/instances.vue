@@ -156,7 +156,7 @@ onMounted(async () => {
 
 <template>
   <div class="workflow-instance-index-page">
-    <RequestChartTable ref="rctRef" class="workflow-instance-index-panel" :params="params" :request="api.getWorkflowInstances" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="workflow-instance-index-panel business-list-panel" :params="params" :request="api.getWorkflowInstances" :is-selection="true">
       <template #query="{ query }">
         <BaSelect v-model="query.mode" label="查看范围" prop="mode">
           <el-option label="我参与的" value="participant" />

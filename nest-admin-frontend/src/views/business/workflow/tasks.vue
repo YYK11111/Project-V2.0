@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import * as api from './api'
 import { checkPermi } from '@/utils/permission'
 import { useRouter } from 'vue-router'
+import TableOperation from '@/components/TableOperation.vue'
 
 const params = ref({})
 const rctRef = ref()
@@ -86,11 +87,17 @@ const viewInstanceDetail = (row: any) => {
   }
   router.push(target)
 }
+
+const getButtons = (row: any) => [
+  canWorkflowTaskComplete.value ? { key: 'approve', label: '同意', type: 'primary', onClick: () => handleApprove(row) } : null,
+  canWorkflowTaskComplete.value ? { key: 'reject', label: '驳回', danger: true, onClick: () => handleReject(row) } : null,
+  canWorkflowTaskTransfer.value ? { key: 'transfer', label: '转交', type: 'warning', onClick: () => handleTransfer(row) } : null,
+].filter(Boolean)
 </script>
 
 <template>
   <div class="workflow-task-index-page">
-    <RequestChartTable ref="rctRef" class="workflow-task-index-panel" :params="params" :request="api.getMyTasks">
+    <RequestChartTable ref="rctRef" class="workflow-task-index-panel business-list-panel" :params="params" :request="api.getMyTasks">
       <template #operation>
         <div class="workflow-task-index-operation">
           <div class="workflow-task-index-operation__left"></div>
@@ -108,9 +115,7 @@ const viewInstanceDetail = (row: any) => {
         <el-table-column prop="startTime" label="创建时间" width="180" />
       </template>
       <template #tableOperation="{ row }">
-        <el-button v-if="canWorkflowTaskComplete" type="primary" size="small" @click="handleApprove(row)">同意</el-button>
-        <el-button v-if="canWorkflowTaskComplete" type="danger" size="small" @click="handleReject(row)">驳回</el-button>
-        <el-button v-if="canWorkflowTaskTransfer" type="warning" size="small" @click="handleTransfer(row)">转交</el-button>
+        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
 

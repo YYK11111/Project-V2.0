@@ -22,16 +22,6 @@
         <el-button @click="fitCanvas">适应画布</el-button>
         <el-button @click="centerSelectedNode">居中当前节点</el-button>
       </el-button-group>
-      <el-select v-model="definitionFilterBusinessType" placeholder="筛选业务" clearable style="width: 120px; margin-left: 20px;">
-        <el-option label="项目" value="project" />
-        <el-option label="任务" value="task" />
-        <el-option label="上线单" value="goLive" />
-        <el-option label="验收单" value="acceptance" />
-        <el-option label="运维交接单" value="handover" />
-      </el-select>
-      <el-select v-model="selectedDefinitionId" placeholder="选择流程" filterable @change="loadDefinition" style="width: 200px; margin-left: 8px;">
-        <el-option v-for="item in filteredDefinitions" :key="item.id" :label="item.name" :value="item.id" />
-      </el-select>
       <div class="definition-state">
         <el-tag size="small" :type="currentDefinitionIsPublished ? 'success' : 'info'">{{ currentDefinitionStateText }}</el-tag>
         <el-tag v-if="currentDefinitionVersion" size="small" type="info">v{{ currentDefinitionVersion }}</el-tag>
@@ -94,10 +84,10 @@
 
       <!-- 画布 -->
       <div class="designer-canvas" ref="canvasRef" @drop="onDrop" @dragover.prevent>
-        <div class="canvas-hint" v-if="!hasNodes">
-          <p>从左侧拖拽节点到此处开始设计流程</p>
-        </div>
-        <div class="canvas-content" v-else :style="canvasContentStyle" @click="onCanvasClick">
+        <div class="canvas-content" :style="canvasContentStyle" @click="onCanvasClick">
+          <div class="canvas-hint" v-if="!hasNodes">
+            <p>从左侧拖拽节点到此处开始设计流程</p>
+          </div>
           <div v-if="connectionHint" class="connection-hint">{{ connectionHint }}</div>
           <!-- SVG 连线层 -->
           <svg class="flow-lines" :width="canvasWidth" :height="canvasHeight">
@@ -208,22 +198,6 @@
                  @mousedown.stop="onAnchorMouseDown($event, node.id, 'right')"></div>
             <div class="node-icon">{{ getNodeIcon(node.type) }}</div>
             <div class="node-name">{{ node.name }}</div>
-            <div class="node-type">{{ getNodeTypeName(node.type) }}</div>
-            <div v-if="getCanvasNodeSummary(node)" class="node-summary">{{ getCanvasNodeSummary(node) }}</div>
-          </div>
-          <div class="canvas-minimap">
-            <div class="minimap-title">小地图</div>
-            <div class="minimap-body">
-              <div
-                v-for="node in nodes"
-                :key="`mini-${node.id}`"
-                class="minimap-node"
-                :class="{ active: selectedNodeId === node.id }"
-                :style="getMinimapNodeStyle(node)"
-                @click.stop="centerNode(node)"
-              />
-              <div class="minimap-viewport" :style="minimapViewportStyle"></div>
-            </div>
           </div>
         </div>
       </div>
@@ -247,7 +221,9 @@
                 <el-input v-model="workflowCode" />
               </el-form-item>
               <el-form-item label="流程分类">
-                <el-input v-model="workflowCategory" />
+                <el-select v-model="workflowCategory" placeholder="请选择流程分类">
+                  <el-option v-for="item in workflowCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
               </el-form-item>
               <el-divider content-position="left">业务关联配置</el-divider>
               <el-form-item label="业务对象">
@@ -574,9 +550,7 @@ const activeTab = ref('process')
 const previewActiveTab = ref('visual')
 const showIssuePanel = ref(true)
 const canvasRef = ref(null)
-const definitions = ref([])
 const selectedDefinitionId = ref('')
-const definitionFilterBusinessType = ref('')
 const nodeSearchKeyword = ref('')
 const connectionHint = ref('')
 const undoAction = ref(null)
@@ -591,8 +565,8 @@ const canWorkflowDefinitionPublish = computed(() => checkPermi(['business/workfl
 const canWorkflowDefinitionSave = computed(() => (selectedDefinitionId.value ? canWorkflowDefinitionUpdate.value : canWorkflowDefinitionAdd.value))
 
 // 节点尺寸常量（包含 padding 和 border 的估算值）
-const NODE_WIDTH = 160
-const NODE_HEIGHT = 80
+const NODE_WIDTH = 180
+const NODE_HEIGHT = 56
 
 // 节点尺寸缓存
 const nodeSizeCache = reactive({})
@@ -697,10 +671,6 @@ const getNodeAssigneeConfig = (node) => normalizeNodeProperties(node)
 
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
 const selectedFlow = computed(() => flows.value.find(f => f.id === selectedFlowId.value))
-const filteredDefinitions = computed(() => {
-  if (!definitionFilterBusinessType.value) return definitions.value
-  return definitions.value.filter((item) => item.businessType === definitionFilterBusinessType.value)
-})
 
 const hasNodes = computed(() => nodes.value.length > 0)
 
@@ -721,6 +691,27 @@ const workflowData = computed(() => JSON.stringify({
   nodes: nodes.value,
   flows: flows.value,
 }, null, 2))
+
+const workflowCategoryOptions = [
+  { label: '人事审批', value: 'HR' },
+  { label: '财务审批', value: 'Finance' },
+  { label: '项目管理', value: 'Project' },
+  { label: '行政办公', value: 'Admin' },
+  { label: '其他', value: 'Other' },
+]
+
+const normalizeWorkflowCategory = (category = '') => {
+  const value = String(category || '').trim()
+  if (!value) return ''
+  if (value === 'project') return 'Project'
+  if (value === 'finance') return 'Finance'
+  if (value === 'admin') return 'Admin'
+  if (value === 'other') return 'Other'
+  if (value === 'hr') return 'HR'
+  return value
+}
+
+const unwrapWorkflowDefinition = (res) => res?.data?.data || res?.data || res
 
 const businessSceneOptions = {
   project: [
@@ -743,6 +734,7 @@ const currentDefinitionVersion = computed(() => currentDefinitionMeta.version ||
 const buildCurrentDefinitionSnapshot = () => ({
   businessType: businessType.value,
   businessScene: businessScene.value,
+  triggerEvent: triggerEvent.value,
   nodes: cloneData(nodes.value),
   flows: cloneData(flows.value),
 })
@@ -752,6 +744,7 @@ const hasUnpublishedChanges = computed(() => {
   return JSON.stringify(buildCurrentDefinitionSnapshot()) !== JSON.stringify({
     businessType: snapshot.businessType,
     businessScene: snapshot.businessScene,
+    triggerEvent: snapshot.triggerEvent,
     nodes: snapshot.nodes || [],
     flows: snapshot.flows || [],
   })
@@ -824,6 +817,21 @@ const getCanvasPoint = (clientX, clientY) => {
   }
 }
 
+const getDropNodePosition = (event) => {
+  const point = getCanvasPoint(event.clientX, event.clientY)
+  return {
+    x: Math.max(50, point.x - NODE_WIDTH / 2),
+    y: Math.max(50, point.y - NODE_HEIGHT / 2),
+  }
+}
+
+const getSingleNodeDropWarning = (type) => {
+  const singleNodeNames = { start: '开始节点', end: '结束节点' }
+  if (!singleNodeNames[type]) return ''
+  const exists = nodes.value.some((node) => node.type === type)
+  return exists ? `一个流程只允许有一个${singleNodeNames[type]}` : ''
+}
+
 const canvasHeight = computed(() => {
   if (nodes.value.length === 0) return 600
   const maxY = Math.max(...nodes.value.map(n => n.y + NODE_HEIGHT))
@@ -838,34 +846,6 @@ const canvasContentStyle = computed(() => ({
   transform: `scale(${zoom.value})`,
   transformOrigin: 'top left',
 }))
-
-const minimapScale = computed(() => {
-  const scaleX = 160 / canvasWidth.value
-  const scaleY = 100 / canvasHeight.value
-  return Math.min(scaleX, scaleY)
-})
-
-const minimapViewportStyle = computed(() => {
-  const canvasEl = canvasRef.value
-  if (!canvasEl) return {}
-  const scale = minimapScale.value
-  return {
-    left: `${canvasEl.scrollLeft * scale / zoom.value}px`,
-    top: `${canvasEl.scrollTop * scale / zoom.value}px`,
-    width: `${canvasEl.clientWidth * scale / zoom.value}px`,
-    height: `${canvasEl.clientHeight * scale / zoom.value}px`,
-  }
-})
-
-const getMinimapNodeStyle = (node) => {
-  const scale = minimapScale.value
-  return {
-    left: `${node.x * scale}px`,
-    top: `${node.y * scale}px`,
-    width: `${Math.max(4, NODE_WIDTH * scale)}px`,
-    height: `${Math.max(4, NODE_HEIGHT * scale)}px`,
-  }
-}
 
 // 辅助函数：获取源节点和目标节点
 const getSourceNode = (flow) => nodes.value.find(n => n.id === flow.sourceNodeId)
@@ -1676,15 +1656,20 @@ const onDrop = (event) => {
   const name = event.dataTransfer.getData('nodeName')
   if (!type) return
 
-  // 获取 canvas-content 或使用 canvas 本身（当没有节点时只有 hint）
-  const { x, y } = getCanvasPoint(event.clientX, event.clientY)
+  const dropWarning = getSingleNodeDropWarning(type)
+  if (dropWarning) {
+    ElMessage.warning(dropWarning)
+    return
+  }
+
+  const { x, y } = getDropNodePosition(event)
 
   const newNode = {
     id: `node_${type}_${nodeCounter++}`,
     name: name || type,
     type,
-    x: Math.max(50, x),
-    y: Math.max(50, y),
+    x,
+    y,
     properties: getDefaultProperties(type),
   }
 
@@ -2313,7 +2298,6 @@ const onBusinessTypeChange = async (nextType = businessType.value, previousType 
   if (!currentBusinessSceneOptions.value.some((item) => item.value === businessScene.value)) {
     businessScene.value = currentBusinessSceneOptions.value[0]?.value || ''
   }
-  triggerEvent.value = ''
   lastBusinessType.value = nextType
   return true
 }
@@ -2429,6 +2413,7 @@ const buildPublishDiffSummary = () => {
   if (removedFlows) changes.push(`删除连线 ${removedFlows} 条`)
   if (previous.businessType !== businessType.value) changes.push(`业务对象：${previous.businessType || '-'} -> ${businessType.value || '-'}`)
   if (previous.businessScene !== businessScene.value) changes.push(`业务场景：${previous.businessScene || '-'} -> ${businessScene.value || '-'}`)
+  if (previous.triggerEvent !== triggerEvent.value) changes.push(`触发时机：${previous.triggerEvent || '-'} -> ${triggerEvent.value || '-'}`)
   return changes.length ? changes : ['未检测到结构性差异，将发布当前保存内容。']
 }
 
@@ -2526,7 +2511,6 @@ const handleSave = async () => {
 
     ElMessage.success('保存成功')
     loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
-    loadDefinitions()
   } catch (error) {
     const message = error.response?.data?.message || error.message || '保存失败'
     ElMessage.error(message)
@@ -2578,7 +2562,6 @@ const handleSaveAndPublish = async () => {
 
     ElMessage.success('保存并发布成功')
     loadedDefinitionSnapshot.value = buildCurrentDefinitionSnapshot()
-    loadDefinitions()
   } catch (error) {
     const message = error.response?.data?.message || error.message || '发布失败'
     ElMessage.error(message)
@@ -2621,10 +2604,10 @@ const loadDefinition = async (id) => {
   if (!id) return
   try {
     const res = await api.getWorkflowDefinition(id)
-    const data = res.data
+    const data = unwrapWorkflowDefinition(res)
     workflowName.value = data.name
     workflowCode.value = data.code
-    workflowCategory.value = data.category || ''
+    workflowCategory.value = normalizeWorkflowCategory(data.category || '')
     workflowDescription.value = data.description || ''
     businessType.value = data.businessType || ''
     lastBusinessType.value = data.businessType || ''
@@ -2640,15 +2623,6 @@ const loadDefinition = async (id) => {
     nextTick(() => updateNodeSizeCache())
   } catch (error) {
     ElMessage.error('加载失败')
-  }
-}
-
-const loadDefinitions = async () => {
-  try {
-    const res = await api.getWorkflowDefinitions()
-    definitions.value = res.list || []
-  } catch (error) {
-    console.error('加载流程列表失败', error)
   }
 }
 
@@ -2678,7 +2652,6 @@ const loadDeptTree = async () => {
 }
 
 onMounted(() => {
-  loadDefinitions()
   loadDeptTree()
 
   // 检查URL参数
@@ -2844,14 +2817,18 @@ const onCanvasClick = () => {
 
 .canvas-node {
   position: absolute;
-  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 180px;
+  height: 56px;
+  padding: 0 16px;
   border: 2px solid var(--el-border-color);
   border-radius: 8px;
   background: var(--el-bg-color);
   cursor: pointer;
-  min-width: 120px;
-  text-align: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
 .canvas-node:hover {
@@ -2880,76 +2857,24 @@ const onCanvasClick = () => {
 }
 
 .canvas-node .node-icon {
-  font-size: 24px;
-  margin-bottom: 5px;
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .canvas-node .node-name {
-  font-weight: bold;
-  margin-bottom: 3px;
-}
-
-.canvas-node .node-type {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.canvas-node .node-summary {
-  max-width: 180px;
-  margin-top: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.4;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.canvas-minimap {
-  position: sticky;
-  left: calc(100% - 180px);
-  bottom: 12px;
-  z-index: 25;
-  width: 172px;
-  padding: 6px;
-  border: 1px solid var(--el-border-color);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.minimap-title {
-  margin-bottom: 4px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.minimap-body {
-  position: relative;
-  width: 160px;
-  height: 100px;
-  background: var(--el-fill-color-extra-light);
-  overflow: hidden;
-}
-
-.minimap-node {
-  position: absolute;
-  min-width: 4px;
-  min-height: 4px;
-  border-radius: 2px;
-  background: var(--el-color-primary-light-3);
-  cursor: pointer;
-}
-
-.minimap-node.active {
-  background: var(--el-color-danger);
-}
-
-.minimap-viewport {
-  position: absolute;
-  border: 1px solid var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
-  pointer-events: none;
 }
 
 /* 连接点样式 */

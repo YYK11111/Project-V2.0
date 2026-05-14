@@ -13,12 +13,45 @@ const normalizeTableData = (res: any) => {
   }
 }
 
+const compareWorkflowDefinitionVersion = (a: any, b: any) => {
+  const versionDiff = Number(b?.version || 0) - Number(a?.version || 0)
+  if (versionDiff !== 0) return versionDiff
+  return String(b?.createTime || '').localeCompare(String(a?.createTime || ''))
+}
+
+export const selectLatestPublishedWorkflowDefinitions = (list: any[] = []) => {
+  const groups = new Map<string, any[]>()
+  for (const item of list) {
+    const key = item?.code || item?.id
+    if (!key) continue
+    groups.set(key, [...(groups.get(key) || []), item])
+  }
+
+  return Array.from(groups.values()).map((items) => {
+    const published = items.filter((item) => item?.isActive === '1')
+    return [...(published.length ? published : items)].sort(compareWorkflowDefinitionVersion)[0]
+  })
+}
+
 // 工作流定义 API
 export function getWorkflowDefinitions() {
   return request({
     url: '/workflow/definitions',
     method: 'get',
   }).then(normalizeTableData)
+}
+
+export function getWorkflowDefinitionList() {
+  return getWorkflowDefinitions().then((res: any) => {
+    const list = selectLatestPublishedWorkflowDefinitions(res.list || [])
+    return {
+      ...res,
+      list,
+      data: list,
+      rows: list,
+      total: list.length,
+    }
+  })
 }
 
 export function getWorkflowDefinition(id: string) {
@@ -41,6 +74,14 @@ export function updateWorkflowDefinition(id: string, data: any) {
     url: '/workflow/definitions/save',
     method: 'post',
     data: { ...data, id },
+  })
+}
+
+export function updateWorkflowDefinitionById(id: string, data: any) {
+  return request({
+    url: `/workflow/definitions/${id}`,
+    method: 'put',
+    data,
   })
 }
 

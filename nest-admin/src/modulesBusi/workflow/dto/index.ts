@@ -94,6 +94,9 @@ export class UpdateWorkflowDefinitionDto {
 
   @IsOptional()
   isActive?: string;
+
+  @IsOptional()
+  updateUser?: string;
 }
 
 /**

@@ -15,6 +15,7 @@ describe("WorkflowController", () => {
     cancelInstance: jest.fn(),
     closeReturnedInstance: jest.fn(),
     resubmitReturnedInstance: jest.fn(),
+    updateDefinition: jest.fn(),
   };
 
   const businessFieldService = {} as any;
@@ -103,6 +104,30 @@ describe("WorkflowController", () => {
       "wf-1",
       "server-user-id",
       ["business/workflow/instances/getOne"],
+    );
+  });
+
+  it("按 ID 更新流程定义时只使用服务端认证用户作为更新人", async () => {
+    const controller = new WorkflowController(
+      workflowService as any,
+      businessFieldService,
+    );
+    workflowService.updateDefinition.mockResolvedValue({ id: "wf-1" });
+
+    await controller.updateDefinition(
+      "wf-1",
+      { businessScene: "approval" } as any,
+      {
+        user: { name: "server-user-name" },
+      } as any,
+    );
+
+    expect(workflowService.updateDefinition).toHaveBeenCalledWith(
+      "wf-1",
+      expect.objectContaining({
+        businessScene: "approval",
+        updateUser: "server-user-name",
+      }),
     );
   });
 });

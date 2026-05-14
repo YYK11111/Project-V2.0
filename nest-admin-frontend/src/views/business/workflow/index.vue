@@ -3,7 +3,7 @@
 import { ref, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getWorkflowDefinitions, createWorkflowDefinition, updateWorkflowDefinition, deleteWorkflowDefinition, publishWorkflowDefinition, unpublishWorkflowDefinition, startWorkflow, copyWorkflowDefinition } from './api'
+import { getWorkflowDefinitionList, createWorkflowDefinition, updateWorkflowDefinitionById, deleteWorkflowDefinition, publishWorkflowDefinition, unpublishWorkflowDefinition, startWorkflow, copyWorkflowDefinition } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
@@ -29,6 +29,40 @@ const generateWorkflowCode = (businessType: string) => {
   return `WF_${businessType || 'default'}_${ym}${seq}`
 }
 
+const workflowCategoryOptions = [
+  { label: '人事审批', value: 'HR' },
+  { label: '财务审批', value: 'Finance' },
+  { label: '项目管理', value: 'Project' },
+  { label: '行政办公', value: 'Admin' },
+  { label: '其他', value: 'Other' },
+]
+
+const workflowCategoryNameMap = {
+  HR: '人事审批',
+  hr: '人事审批',
+  Finance: '财务审批',
+  finance: '财务审批',
+  Project: '项目管理',
+  project: '项目管理',
+  Admin: '行政办公',
+  admin: '行政办公',
+  Other: '其他',
+  other: '其他',
+}
+
+const normalizeWorkflowCategory = (category = '') => {
+  const value = String(category || '').trim()
+  if (!value) return ''
+  if (value === 'project') return 'Project'
+  if (value === 'finance') return 'Finance'
+  if (value === 'admin') return 'Admin'
+  if (value === 'other') return 'Other'
+  if (value === 'hr') return 'HR'
+  return value
+}
+
+const getWorkflowCategoryName = (category: string) => workflowCategoryNameMap[category] || category || '-'
+
 watch(() => dialogRef.value?.visible, (visible) => {
   if (visible && !dialogRef.value?.form?.value?.id) {
     dialogRef.value.form.value.code = generateWorkflowCode(dialogRef.value.form.value.businessType || '')
@@ -47,7 +81,8 @@ const save = (data: any) => {
     return $sdk.msgWarning('当前操作没有权限')
   }
   const form = data.form
-  const action = form.value.id ? updateWorkflowDefinition(form.value.id, form.value) : createWorkflowDefinition(form.value)
+  form.value.category = normalizeWorkflowCategory(form.value.category)
+  const action = form.value.id ? updateWorkflowDefinitionById(form.value.id, form.value) : createWorkflowDefinition(form.value)
   action.then(() => {
     ElMessage.success('保存成功')
     data.visible.value = false
@@ -131,7 +166,7 @@ const getTriggerEventType = (event: string) => triggerEventTypeMap[event] || 'in
 
 const getButtons = (row: any) => [
   { key: 'design', label: '设计', onClick: () => router.push({ path: '/workflow/designer', query: { id: row.id } }) },
-  canWorkflowUpdate.value ? { key: 'edit', label: '修改', onClick: () => dialogRef.value.action(row) } : null,
+  canWorkflowUpdate.value ? { key: 'edit', label: '修改', onClick: () => dialogRef.value.action({ ...row, category: normalizeWorkflowCategory(row.category) }) } : null,
   canWorkflowPublish.value ? { key: 'publish', label: row.isActive !== '1' ? '发布' : '停用', type: row.isActive !== '1' ? 'success' : 'info', onClick: () => row.isActive !== '1' ? handlePublish(row) : handleUnpublish(row) } : null,
   canWorkflowStart.value ? { key: 'start', label: '发起', type: 'warning', onClick: () => handleStart(row) } : null,
   canWorkflowCopy.value ? { key: 'copy', label: '复制', type: 'info', onClick: () => handleCopy(row) } : null,
@@ -141,7 +176,7 @@ const getButtons = (row: any) => [
 
 <template>
   <div class="workflow-index-page">
-    <RequestChartTable ref="rctRef" class="workflow-index-panel" :params="params" :request="getWorkflowDefinitions" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="workflow-index-panel business-list-panel" :params="params" :request="getWorkflowDefinitionList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">
@@ -168,7 +203,12 @@ const getButtons = (row: any) => [
         <el-table-column prop="name" label="流程名称" width="150" />
         <el-table-column prop="code" label="流程编码" width="150" />
         <el-table-column prop="version" label="版本" width="80" />
-        <el-table-column prop="category" label="分类" width="100" />
+        <el-table-column prop="category" label="分类" width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.category" size="small">{{ getWorkflowCategoryName(row.category) }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="businessType" label="业务对象" width="100">
           <template #default="{ row }">
             <el-tag v-if="row.businessType" size="small">{{ getBusinessTypeName(row.businessType) }}</el-tag>
@@ -203,9 +243,7 @@ const getButtons = (row: any) => [
         <BaInput v-model="form.name" prop="name" label="流程名称" />
         <BaInput v-model="form.code" prop="code" label="流程编码" disabled />
         <BaSelect v-model="form.category" prop="category" label="流程分类">
-          <el-option label="人事审批" value="HR" /><el-option label="财务审批" value="Finance" />
-          <el-option label="项目管理" value="Project" /><el-option label="行政办公" value="Admin" />
-          <el-option label="其他" value="Other" />
+          <el-option v-for="item in workflowCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
         </BaSelect>
         <BaSelect v-model="form.businessType" prop="businessType" label="业务对象">
           <el-option label="项目" value="project" />

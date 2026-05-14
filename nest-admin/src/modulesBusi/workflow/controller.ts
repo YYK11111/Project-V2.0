@@ -72,7 +72,9 @@ export class WorkflowController {
   async updateDefinition(
     @Param("id") id: string,
     @Body() dto: UpdateWorkflowDefinitionDto,
+    @Req() req,
   ) {
+    dto.updateUser = req.user?.name;
     return this.workflowService.updateDefinition(id, dto);
   }
 
