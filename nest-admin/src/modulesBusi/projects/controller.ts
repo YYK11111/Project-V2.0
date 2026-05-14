@@ -117,6 +117,29 @@ export class ProjectsController extends BaseController<
     return this.service.syncProjectAlertsToMessages(id, userId);
   }
 
+  @Get("cockpit/overview")
+  getCockpitOverview(@Query() query: QueryListDto, @Req() req: any) {
+    return this.service.getCockpitOverview({
+      ...query,
+      _operatorId: req.user?.id,
+      _operatorName: req.user?.name,
+      _operatorDeptId: req.user?.deptId || req.user?.dept?.id,
+      _operatorPermissions: req.user?.permissions || [],
+      _operatorRoles: req.user?.roles || [],
+    } as any);
+  }
+
+  @Get("cockpit/project/:id")
+  async getProjectCockpit(@Param("id") id: string, @Req() req: any) {
+    await this.service.assertProjectPermission(
+      id,
+      req.user?.id,
+      "view",
+      req.user?.permissions || [],
+    );
+    return this.service.getProjectCockpit(id);
+  }
+
   @Get("cockpit")
   getCockpit(@Query() query: QueryListDto, @Req() req: any) {
     return this.service.getCockpit({

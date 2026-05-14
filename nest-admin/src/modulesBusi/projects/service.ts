@@ -2430,7 +2430,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return true;
   }
 
-  async getCockpit(query: QueryListDto): Promise<any> {
+  async getCockpitOverview(query: QueryListDto): Promise<any> {
     const projectListRes = await this.list(query);
     const rawProjects = projectListRes?.list || [];
     const cockpitSampleProjects = rawProjects.slice(0, 20);
@@ -2464,13 +2464,6 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     const filteredSampleMetrics = cockpitSampleMetrics.filter((item) =>
       projects.some((project) => String(project.id) === String(item.id)),
     );
-    const selectedProjectId = String(query.projectId || projects[0]?.id || "");
-    const selectedProject = selectedProjectId
-      ? await this.getDashboard(selectedProjectId)
-      : null;
-    const selectedTrend = selectedProjectId
-      ? await this.getProjectTrend(selectedProjectId, selectedProject)
-      : null;
 
     const totalProjects = projects.length;
     const activeProjects = projects.filter((item) =>
@@ -2748,7 +2741,6 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         spentHours: item.spentHours,
         leader: item.leader,
       })),
-      selectedProjectId,
       filters: {
         healthLevel,
         category,
@@ -2784,6 +2776,33 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         healthRiskProjects: healthRiskRanking,
         knowledgeActiveProjects: knowledgeActiveRanking,
       },
+    };
+  }
+
+  async getProjectCockpit(projectId: string): Promise<any> {
+    const dashboard = await this.getDashboard(projectId);
+    const trend = await this.getProjectTrend(projectId, dashboard);
+    return {
+      ...dashboard,
+      trend,
+    };
+  }
+
+  async getCockpit(query: QueryListDto): Promise<any> {
+    const overview = await this.getCockpitOverview(query);
+    const selectedProjectId = String(
+      query.projectId || overview.projectOptions?.[0]?.id || "",
+    );
+    const selectedProject = selectedProjectId
+      ? await this.getDashboard(selectedProjectId)
+      : null;
+    const selectedTrend = selectedProjectId
+      ? await this.getProjectTrend(selectedProjectId, selectedProject)
+      : null;
+
+    return {
+      ...overview,
+      selectedProjectId,
       selectedProject,
       selectedTrend,
     };

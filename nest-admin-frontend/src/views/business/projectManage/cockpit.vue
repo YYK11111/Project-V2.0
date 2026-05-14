@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getCockpit, getStatus, getPriority } from './api'
+import { getCockpitOverview, getProjectCockpit, getStatus, getPriority } from './api'
 import ChartPie from '@/components/ChartPie.vue'
 import ChartLine from '@/components/ChartLine.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
@@ -13,10 +13,12 @@ const route = useRoute()
 const router = useRouter()
 
 const loading = ref(false)
-const cockpit = ref({})
+const overview = ref({})
+const projectCockpit = ref({})
 const statusMap = ref({})
 const priorityMap = ref({})
 const projectId = ref(String(route.query.projectId || ''))
+const activeView = ref(projectId.value ? 'project' : 'overview')
 const filterState = ref({
   leaderId: String(route.query.leaderId || ''),
   status: String(route.query.status || ''),
@@ -27,7 +29,11 @@ const filterState = ref({
   healthLevel: String(route.query.healthLevel || ''),
 })
 
-const projectOptions = computed(() => cockpit.value.projectOptions || [])
+const viewOptions = [
+  { label: '系统总览', value: 'overview' },
+  { label: '项目详情', value: 'project' },
+]
+const projectOptions = computed(() => overview.value.projectOptions || [])
 const leaderOptions = computed(() => {
   const map = new Map()
   projectOptions.value.forEach((item) => {
@@ -37,11 +43,10 @@ const leaderOptions = computed(() => {
   })
   return Array.from(map.entries()).map(([id, label]) => ({ id, label }))
 })
-const summary = computed(() => cockpit.value.summary || {})
-const selectedProject = computed(() => cockpit.value.selectedProject || {})
-const projectDashboard = computed(() => selectedProject.value || {})
+const summary = computed(() => overview.value.summary || {})
+const projectDashboard = computed(() => projectCockpit.value || {})
 const selectedProjectDetail = computed(() => projectDashboard.value.project || {})
-const rankings = computed(() => cockpit.value.rankings || {})
+const rankings = computed(() => overview.value.rankings || {})
 const selectedTaskSummary = computed(() => projectDashboard.value.summary?.taskSummary || {})
 const selectedTicketSummary = computed(() => projectDashboard.value.summary?.ticketSummary || {})
 const selectedRiskSummary = computed(() => projectDashboard.value.summary?.riskSummary || {})
@@ -49,7 +54,7 @@ const selectedMilestoneSummary = computed(() => projectDashboard.value.summary?.
 const selectedHealthSummary = computed(() => projectDashboard.value.summary?.healthSummary || {})
 const selectedKnowledgeSummary = computed(() => projectDashboard.value.summary?.knowledgeSummary || {})
 const selectedAlerts = computed(() => projectDashboard.value.focus?.alerts || [])
-const selectedTrend = computed(() => cockpit.value.selectedTrend || {})
+const selectedTrend = computed(() => projectDashboard.value.trend || {})
 const healthDistributionData = computed(() => summary.value.distributions?.health || [])
 const progressDistributionData = computed(() => summary.value.distributions?.progress || [])
 const knowledgeDistributionData = computed(() => summary.value.distributions?.knowledge || [])
@@ -57,6 +62,26 @@ const alertDistributionData = computed(() => summary.value.distributions?.alert 
 const riskLevelDistributionData = computed(() => summary.value.distributions?.riskLevel || [])
 const qualityLevelDistributionData = computed(() => summary.value.distributions?.qualityLevel || [])
 const reportSummaryText = computed(() => {
+  if (activeView.value === 'project') {
+    const lines = ['项目详情驾驶舱汇报摘要']
+    if (!selectedProjectDetail.value?.name) {
+      lines.push('当前未选择项目')
+      return lines.join('\n')
+    }
+
+    lines.push(`当前项目：${selectedProjectDetail.value.name}`)
+    lines.push(`项目健康度：${selectedHealthSummary.value.totalScore || 0}（${selectedHealthSummary.value.levelLabel || '基本健康'}）`)
+    lines.push(`任务完成率：${selectedTaskSummary.value.completionRate || 0}% ，未解决工单：${selectedTicketSummary.value.open || 0}，高风险事项：${selectedRiskSummary.value.high || 0}`)
+    lines.push(`里程碑完成率：${selectedMilestoneSummary.value.completionRate || 0}% ，知识最近更新：${selectedKnowledgeSummary.value.recentUpdatedCount || 0}`)
+    if (selectedAlerts.value?.length) {
+      lines.push('当前项目重点提醒：')
+      selectedAlerts.value.slice(0, 5).forEach((item) => {
+        lines.push(`- ${item.title}（${item.value}）：${item.desc}`)
+      })
+    }
+    return lines.join('\n')
+  }
+
   const lines = [
     '项目驾驶舱汇报摘要',
     `筛选条件：负责人${filterState.value.leaderId ? `=${leaderOptions.value.find((item) => item.id === filterState.value.leaderId)?.label || '-'}` : '=全部'}，状态${filterState.value.status ? `=${statusMap.value[filterState.value.status] || '-'}` : '=全部'}，优先级${filterState.value.priority ? `=${priorityMap.value[filterState.value.priority] || '-'}` : '=全部'}，分类${filterState.value.category || '全部'}，风险${filterState.value.riskLevel || '全部'}，质量${filterState.value.qualityLevel || '全部'}，健康度${filterState.value.healthLevel || '全部'}`,
@@ -65,19 +90,6 @@ const reportSummaryText = computed(() => {
     `平均进度：${summary.value.averageProgress || 0}% ，平均健康度：${summary.value.averageHealthScore || 0}，累计工时：${summary.value.spentHoursTotal || 0}`,
     `需关注项目：${summary.value.attentionProjects || 0}，知识活跃项目：${summary.value.knowledgeActiveProjects || 0}`,
   ]
-
-  if (selectedProjectDetail.value?.name) {
-    lines.push(`当前项目：${selectedProjectDetail.value.name}`)
-    lines.push(`当前项目健康度：${selectedHealthSummary.value.totalScore || 0}（${selectedHealthSummary.value.levelLabel || '基本健康'}）`)
-  }
-
-  if (selectedAlerts.value?.length) {
-    lines.push('当前项目重点提醒：')
-    selectedAlerts.value.slice(0, 5).forEach((item) => {
-      lines.push(`- ${item.title}（${item.value}）：${item.desc}`)
-    })
-  }
-
   return lines.join('\n')
 })
 
@@ -116,53 +128,55 @@ async function loadCockpit() {
   loading.value = true
   try {
     const [statusRes, priorityRes, cockpitRes] = await Promise.all([
-        getStatus(),
-        getPriority(),
-        getCockpit({
-          pageNum: 1,
-          pageSize: 200,
-          projectId: projectId.value || undefined,
-          leaderId: filterState.value.leaderId || undefined,
-          status: filterState.value.status || undefined,
-          priority: filterState.value.priority || undefined,
-          category: filterState.value.category || undefined,
-          riskLevel: filterState.value.riskLevel || undefined,
-          qualityLevel: filterState.value.qualityLevel || undefined,
-          healthLevel: filterState.value.healthLevel || undefined,
-        }),
-      ])
+      getStatus(),
+      getPriority(),
+      getCockpitOverview({
+        pageNum: 1,
+        pageSize: 200,
+        leaderId: filterState.value.leaderId || undefined,
+        status: filterState.value.status || undefined,
+        priority: filterState.value.priority || undefined,
+        category: filterState.value.category || undefined,
+        riskLevel: filterState.value.riskLevel || undefined,
+        qualityLevel: filterState.value.qualityLevel || undefined,
+        healthLevel: filterState.value.healthLevel || undefined,
+      }),
+    ])
     statusMap.value = statusRes.data || {}
     priorityMap.value = priorityRes.data || {}
-    cockpit.value = cockpitRes.data || {}
-    const availableProjectIds = new Set((cockpit.value.projectOptions || []).map((item) => String(item.id)))
+    overview.value = cockpitRes.data || {}
+    const availableProjectIds = new Set((overview.value.projectOptions || []).map((item) => String(item.id)))
     if (projectId.value && !availableProjectIds.has(String(projectId.value))) {
-      projectId.value = String(cockpit.value.selectedProjectId || '')
+      projectId.value = ''
+      activeView.value = 'overview'
       router.replace({
         path: route.path,
         query: {
           ...route.query,
-          projectId: projectId.value || undefined,
+          view: activeView.value,
+          projectId: undefined,
         },
       })
-    } else if (!projectId.value && cockpit.value.selectedProjectId) {
-      projectId.value = String(cockpit.value.selectedProjectId)
+    }
+
+    if (activeView.value === 'project' && projectId.value) {
+      const projectRes = await getProjectCockpit(projectId.value)
+      projectCockpit.value = projectRes.data || {}
+    } else {
+      projectCockpit.value = {}
     }
   } finally {
     loading.value = false
   }
 }
 
-function handleProjectChange(value) {
-  projectId.value = String(value || '')
-  router.replace({ path: route.path, query: { ...route.query, projectId: projectId.value || undefined } })
-}
-
-function handleFilterChange() {
+function syncRouteQuery() {
   router.replace({
     path: route.path,
     query: {
       ...route.query,
-      projectId: projectId.value || undefined,
+      view: activeView.value,
+      projectId: activeView.value === 'project' ? projectId.value || undefined : undefined,
       leaderId: filterState.value.leaderId || undefined,
       status: filterState.value.status || undefined,
       priority: filterState.value.priority || undefined,
@@ -172,6 +186,24 @@ function handleFilterChange() {
       healthLevel: filterState.value.healthLevel || undefined,
     },
   })
+}
+
+function handleViewChange(value) {
+  activeView.value = value
+  if (value === 'overview') {
+    projectCockpit.value = {}
+  }
+  syncRouteQuery()
+}
+
+function handleProjectChange(value) {
+  projectId.value = String(value || '')
+  activeView.value = projectId.value ? 'project' : 'overview'
+  syncRouteQuery()
+}
+
+function handleFilterChange() {
+  syncRouteQuery()
 }
 
 function resetFilters() {
@@ -194,7 +226,9 @@ function goToProjectDetail() {
 
 function goToProject(row) {
   if (!row?.id) return
-  router.push({ path: '/projectManage/detail', query: { id: String(row.id) } })
+  projectId.value = String(row.id)
+  activeView.value = 'project'
+  syncRouteQuery()
 }
 
 function exportCockpitReport() {
@@ -239,17 +273,19 @@ onMounted(() => {
 })
 
 watch(
-  () => [route.query.projectId, route.query.leaderId, route.query.status, route.query.priority, route.query.category, route.query.riskLevel, route.query.qualityLevel, route.query.healthLevel],
+  () => [route.query.view, route.query.projectId, route.query.leaderId, route.query.status, route.query.priority, route.query.category, route.query.riskLevel, route.query.qualityLevel, route.query.healthLevel],
   (value, oldValue) => {
-    projectId.value = String(value[0] || '')
+    const nextView = String(value[0] || '')
+    projectId.value = String(value[1] || '')
+    activeView.value = nextView === 'project' || projectId.value ? 'project' : 'overview'
     filterState.value = {
-      leaderId: String(value[1] || ''),
-      status: String(value[2] || ''),
-      priority: String(value[3] || ''),
-      category: String(value[4] || ''),
-      riskLevel: String(value[5] || ''),
-      qualityLevel: String(value[6] || ''),
-      healthLevel: String(value[7] || ''),
+      leaderId: String(value[2] || ''),
+      status: String(value[3] || ''),
+      priority: String(value[4] || ''),
+      category: String(value[5] || ''),
+      riskLevel: String(value[6] || ''),
+      qualityLevel: String(value[7] || ''),
+      healthLevel: String(value[8] || ''),
     }
     if (JSON.stringify(value) === JSON.stringify(oldValue)) return
     loadCockpit()
@@ -264,92 +300,238 @@ watch(
         <div class="cockpit-header-text">聚合查看项目整体健康度、交付风险和执行焦点</div>
       </template>
       <template #extra>
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 260px" @change="handleProjectChange" clearable>
-          <el-option v-for="item in projectOptions" :key="item.id" :label="item.name" :value="String(item.id)" />
-        </el-select>
-        <el-button @click="copyReportSummary">复制汇报摘要</el-button>
-        <el-button @click="exportCockpitReport">导出筛选结果</el-button>
-        <el-button type="primary" :disabled="!projectId" @click="goToProjectDetail">项目详情</el-button>
+        <el-tabs v-model="activeView" class="cockpit-view-tabs" @tab-change="handleViewChange">
+          <el-tab-pane v-for="item in viewOptions" :key="item.value" :label="item.label" :name="item.value" />
+        </el-tabs>
+        <div v-if="activeView === 'project'" class="cockpit-project-actions">
+          <el-select v-model="projectId" placeholder="选择项目" style="width: 260px" @change="handleProjectChange" clearable>
+            <el-option v-for="item in projectOptions" :key="item.id" :label="item.name" :value="String(item.id)" />
+          </el-select>
+          <el-button @click="copyReportSummary">复制汇报摘要</el-button>
+          <el-button @click="exportCockpitReport">导出筛选结果</el-button>
+          <el-button type="primary" :disabled="!projectId" @click="goToProjectDetail">项目详情</el-button>
+        </div>
       </template>
     </el-page-header>
 
-    <el-card shadow="hover" class="report-card">
-      <template #header>汇报摘要</template>
-      <pre class="report-card__content">{{ reportSummaryText }}</pre>
-    </el-card>
-
-    <el-card shadow="hover" class="filter-card">
-      <div class="filter-card__grid">
-        <el-select v-model="filterState.leaderId" placeholder="负责人" clearable @change="handleFilterChange">
-          <el-option v-for="item in leaderOptions" :key="item.id" :label="item.label" :value="item.id" />
-        </el-select>
-        <el-select v-model="filterState.status" placeholder="项目状态" clearable @change="handleFilterChange">
-          <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="String(key)" />
-        </el-select>
-        <el-select v-model="filterState.priority" placeholder="优先级" clearable @change="handleFilterChange">
-          <el-option v-for="(label, key) in priorityMap" :key="key" :label="label" :value="String(key)" />
-        </el-select>
-        <el-input v-model="filterState.category" placeholder="项目分类" clearable @change="handleFilterChange" />
-        <el-select v-model="filterState.riskLevel" placeholder="风险等级" clearable @change="handleFilterChange">
-          <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
-        </el-select>
-        <el-select v-model="filterState.qualityLevel" placeholder="质量等级" clearable @change="handleFilterChange">
-          <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
-        </el-select>
-        <el-select v-model="filterState.healthLevel" placeholder="健康度区间" clearable @change="handleFilterChange">
-          <el-option label="健康" value="healthy" />
-          <el-option label="基本健康" value="stable" />
-          <el-option label="需关注" value="attention" />
-          <el-option label="高风险" value="critical" />
-        </el-select>
-        <div class="filter-card__actions">
-          <el-button @click="resetFilters">重置筛选</el-button>
-        </div>
+    <div v-if="activeView === 'overview'" class="cockpit-overview">
+      <div class="cockpit-summary-grid mt20">
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-card__label">项目总数</div>
+          <div class="summary-card__value">{{ summary.totalProjects || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--active">
+          <div class="summary-card__label">进行中项目</div>
+          <div class="summary-card__value">{{ summary.activeProjects || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--success">
+          <div class="summary-card__label">已完成项目</div>
+          <div class="summary-card__value">{{ summary.completedProjects || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--alert">
+          <div class="summary-card__label">逾期项目</div>
+          <div class="summary-card__value">{{ summary.overdueProjects || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-card__label">总预算</div>
+          <div class="summary-card__value">{{ summary.budgetTotal || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-card__label">总实际成本</div>
+          <div class="summary-card__value">{{ summary.actualCostTotal || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-card__label">累计工时</div>
+          <div class="summary-card__value">{{ summary.spentHoursTotal || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--health">
+          <div class="summary-card__label">平均健康度</div>
+          <div class="summary-card__value">{{ summary.averageHealthScore || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--warning">
+          <div class="summary-card__label">需关注项目</div>
+          <div class="summary-card__value">{{ summary.attentionProjects || 0 }}</div>
+        </el-card>
+        <el-card shadow="hover" class="summary-card summary-card--knowledge">
+          <div class="summary-card__label">知识活跃项目</div>
+          <div class="summary-card__value">{{ summary.knowledgeActiveProjects || 0 }}</div>
+        </el-card>
       </div>
-    </el-card>
 
-    <div class="cockpit-summary-grid mt20">
-      <el-card shadow="hover" class="summary-card">
-        <div class="summary-card__label">项目总数</div>
-        <div class="summary-card__value">{{ summary.totalProjects || 0 }}</div>
+      <div class="cockpit-board-grid mt20">
+        <el-card shadow="hover" class="board-card">
+          <template #header>健康度分布</template>
+          <ChartPie v-if="healthDistributionData.length" :series="healthDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无健康度分布数据" />
       </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--active">
-        <div class="summary-card__label">进行中项目</div>
-        <div class="summary-card__value">{{ summary.activeProjects || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--success">
-        <div class="summary-card__label">已完成项目</div>
-        <div class="summary-card__value">{{ summary.completedProjects || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--alert">
-        <div class="summary-card__label">逾期项目</div>
-        <div class="summary-card__value">{{ summary.overdueProjects || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card">
-        <div class="summary-card__label">总预算</div>
-        <div class="summary-card__value">{{ summary.budgetTotal || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card">
-        <div class="summary-card__label">总实际成本</div>
-        <div class="summary-card__value">{{ summary.actualCostTotal || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card">
-        <div class="summary-card__label">累计工时</div>
-        <div class="summary-card__value">{{ summary.spentHoursTotal || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--health">
-        <div class="summary-card__label">平均健康度</div>
-        <div class="summary-card__value">{{ summary.averageHealthScore || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--warning">
-        <div class="summary-card__label">需关注项目</div>
-        <div class="summary-card__value">{{ summary.attentionProjects || 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="summary-card summary-card--knowledge">
-        <div class="summary-card__label">知识活跃项目</div>
-        <div class="summary-card__value">{{ summary.knowledgeActiveProjects || 0 }}</div>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>进度分布</template>
+        <ChartPie v-if="progressDistributionData.length" :series="progressDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无进度分布数据" />
       </el-card>
     </div>
+
+    <div class="cockpit-board-grid mt20">
+      <el-card shadow="hover" class="board-card">
+        <template #header>知识活跃度分布</template>
+        <ChartPie v-if="knowledgeDistributionData.length" :series="knowledgeDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无知识活跃度分布数据" />
+      </el-card>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>异常类型分布</template>
+        <ChartPie v-if="alertDistributionData.length" :series="alertDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无异常类型分布数据" />
+      </el-card>
+    </div>
+
+    <div class="cockpit-board-grid mt20">
+      <el-card shadow="hover" class="board-card">
+        <template #header>项目风险等级分布</template>
+        <ChartPie v-if="riskLevelDistributionData.length" :series="riskLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无项目风险等级数据" />
+      </el-card>
+
+      <el-card shadow="hover" class="board-card">
+        <template #header>项目质量等级分布</template>
+        <ChartPie v-if="qualityLevelDistributionData.length" :series="qualityLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
+        <el-empty v-else description="暂无项目质量等级数据" />
+      </el-card>
+      </div>
+
+      <div class="cockpit-board-grid mt20">
+        <el-card v-for="section in rankingSections" :key="section.key" shadow="hover" class="board-card">
+          <template #header>
+            <div class="focus-card__header">
+              <span>{{ section.title }}</span>
+              <span>{{ section.items.length }}</span>
+            </div>
+          </template>
+          <div v-if="section.items.length" class="focus-list">
+            <div v-for="item in section.items" :key="item.id" class="focus-list__item focus-list__item--clickable" @click="goToProject(item)">
+              <div class="focus-list__title">{{ item.name }}</div>
+              <div class="focus-list__meta">
+                <span>进度 {{ item.progress || 0 }}%</span>
+                <span v-if="item.endDate">/ 截止 {{ item.endDate }}</span>
+                <span v-if="Number(item.actualCost || 0) > Number(item.budget || 0)">/ 偏差 {{ Number(item.actualCost || 0) - Number(item.budget || 0) }}</span>
+                <span v-if="item.healthScore != null">/ 健康度 {{ item.healthScore }}</span>
+                <span v-if="item.recentKnowledgeUpdates != null">/ 最近更新 {{ item.recentKnowledgeUpdates }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="focus-list__empty">{{ section.empty }}</div>
+        </el-card>
+      </div>
+
+      <el-card shadow="hover" class="board-card mt20">
+        <template #header>项目总览表</template>
+        <el-table :data="projectOptions" stripe>
+          <el-table-column prop="name" label="项目名称" min-width="220">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="goToProject(row)">{{ row.name }}</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="负责人" min-width="140">
+            <template #default="{ row }">{{ row.leader?.nickname || row.leader?.name || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag :type="row.status === '6' ? 'success' : row.status === '7' ? 'danger' : 'primary'">{{ statusMap[row.status] || '-' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="优先级" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.priority === '3' ? 'danger' : row.priority === '2' ? 'warning' : 'info'">{{ priorityMap[row.priority] || '-' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="进度" width="160">
+            <template #default="{ row }">
+              <el-progress :percentage="Number(row.progress || 0)" :stroke-width="8" />
+            </template>
+          </el-table-column>
+          <el-table-column label="阶段" width="100">
+            <template #default="{ row }">
+              {{ phaseMap[row.phase] || row.phase || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="业务线" prop="businessLine" width="120" />
+          <el-table-column label="来源" prop="projectSource" width="120" />
+        </el-table>
+      </el-card>
+
+      <el-card shadow="hover" class="report-card overview-bottom-card">
+        <template #header>汇报摘要</template>
+        <pre class="report-card__content">{{ reportSummaryText }}</pre>
+      </el-card>
+
+      <el-card shadow="hover" class="filter-card overview-bottom-card">
+        <template #header>筛选条件</template>
+        <div class="filter-card__grid">
+          <el-select v-model="filterState.leaderId" placeholder="负责人" clearable @change="handleFilterChange">
+            <el-option v-for="item in leaderOptions" :key="item.id" :label="item.label" :value="item.id" />
+          </el-select>
+          <el-select v-model="filterState.status" placeholder="项目状态" clearable @change="handleFilterChange">
+            <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="String(key)" />
+          </el-select>
+          <el-select v-model="filterState.priority" placeholder="优先级" clearable @change="handleFilterChange">
+            <el-option v-for="(label, key) in priorityMap" :key="key" :label="label" :value="String(key)" />
+          </el-select>
+          <el-input v-model="filterState.category" placeholder="项目分类" clearable @change="handleFilterChange" />
+          <el-select v-model="filterState.riskLevel" placeholder="风险等级" clearable @change="handleFilterChange">
+            <el-option v-for="(label, key) in riskLevelMap" :key="key" :label="label" :value="key" />
+          </el-select>
+          <el-select v-model="filterState.qualityLevel" placeholder="质量等级" clearable @change="handleFilterChange">
+            <el-option v-for="(label, key) in qualityLevelMap" :key="key" :label="label" :value="key" />
+          </el-select>
+          <el-select v-model="filterState.healthLevel" placeholder="健康度区间" clearable @change="handleFilterChange">
+            <el-option label="健康" value="healthy" />
+            <el-option label="基本健康" value="stable" />
+            <el-option label="需关注" value="attention" />
+            <el-option label="高风险" value="critical" />
+          </el-select>
+          <div class="filter-card__actions">
+            <el-button @click="resetFilters">重置筛选</el-button>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <div v-if="activeView === 'project' && projectId" class="cockpit-main mt20">
+      <el-card shadow="hover" class="report-card">
+        <template #header>汇报摘要</template>
+        <pre class="report-card__content">{{ reportSummaryText }}</pre>
+      </el-card>
+
+      <el-card shadow="hover" class="project-hero-card">
+        <div class="project-hero-card__header">
+          <div>
+            <div class="project-hero-card__title">{{ selectedProjectDetail.name || '未选择项目' }}</div>
+            <div class="project-hero-card__meta">
+              <el-tag :type="selectedProjectDetail.status === '6' ? 'success' : 'primary'">{{ statusMap[selectedProjectDetail.status] || '-' }}</el-tag>
+              <el-tag :type="selectedProjectDetail.priority === '3' ? 'danger' : selectedProjectDetail.priority === '2' ? 'warning' : 'info'">{{ priorityMap[selectedProjectDetail.priority] || '-' }}</el-tag>
+              <el-tag v-if="selectedProjectDetail.riskLevel" type="danger">风险 {{ riskLevelMap[selectedProjectDetail.riskLevel] || selectedProjectDetail.riskLevel }}</el-tag>
+              <el-tag v-if="selectedProjectDetail.qualityLevel" type="success">质量 {{ qualityLevelMap[selectedProjectDetail.qualityLevel] || selectedProjectDetail.qualityLevel }}</el-tag>
+              <span>进度 {{ selectedProjectDetail.progress || 0 }}%</span>
+            </div>
+          </div>
+          <div class="project-hero-card__owner">
+            <div class="project-hero-card__owner-label">项目负责人</div>
+            <ViewUser :user="selectedProjectDetail.leader" />
+          </div>
+        </div>
+        <div class="project-hero-card__facts">
+          <span>分类：{{ selectedProjectDetail.category || '-' }}</span>
+          <span>阶段：{{ phaseMap[selectedProjectDetail.phase] || selectedProjectDetail.phase || '-' }}</span>
+          <span>业务线：{{ selectedProjectDetail.businessLine || '-' }}</span>
+          <span>行业：{{ selectedProjectDetail.industry || '-' }}</span>
+          <span>来源：{{ selectedProjectDetail.projectSource || '-' }}</span>
+          <span>币种：{{ selectedProjectDetail.currency || '-' }}</span>
+          <span>累计工时：{{ selectedProjectDetail.spentHours || 0 }}</span>
+        </div>
+        <ViewRichText v-if="selectedProjectDetail.description" :html="selectedProjectDetail.description" class="project-hero-card__content" />
+        <div v-else class="project-hero-card__empty">暂无项目说明</div>
+      </el-card>
 
       <div class="cockpit-board-grid mt20">
         <el-card shadow="hover" class="board-card">
@@ -402,79 +584,6 @@ watch(
           <el-empty v-else description="暂无成本偏差趋势数据" />
         </el-card>
       </div>
-
-      <div class="cockpit-board-grid mt20">
-        <el-card shadow="hover" class="board-card">
-          <template #header>健康度分布</template>
-          <ChartPie v-if="healthDistributionData.length" :series="healthDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无健康度分布数据" />
-      </el-card>
-
-      <el-card shadow="hover" class="board-card">
-        <template #header>进度分布</template>
-        <ChartPie v-if="progressDistributionData.length" :series="progressDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无进度分布数据" />
-      </el-card>
-    </div>
-
-    <div class="cockpit-board-grid mt20">
-      <el-card shadow="hover" class="board-card">
-        <template #header>知识活跃度分布</template>
-        <ChartPie v-if="knowledgeDistributionData.length" :series="knowledgeDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无知识活跃度分布数据" />
-      </el-card>
-
-      <el-card shadow="hover" class="board-card">
-        <template #header>异常类型分布</template>
-        <ChartPie v-if="alertDistributionData.length" :series="alertDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无异常类型分布数据" />
-      </el-card>
-    </div>
-
-    <div class="cockpit-board-grid mt20">
-      <el-card shadow="hover" class="board-card">
-        <template #header>项目风险等级分布</template>
-        <ChartPie v-if="riskLevelDistributionData.length" :series="riskLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无项目风险等级数据" />
-      </el-card>
-
-      <el-card shadow="hover" class="board-card">
-        <template #header>项目质量等级分布</template>
-        <ChartPie v-if="qualityLevelDistributionData.length" :series="qualityLevelDistributionData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" />
-        <el-empty v-else description="暂无项目质量等级数据" />
-      </el-card>
-    </div>
-
-    <div v-if="projectId" class="cockpit-main mt20">
-      <el-card shadow="hover" class="project-hero-card">
-        <div class="project-hero-card__header">
-          <div>
-            <div class="project-hero-card__title">{{ selectedProjectDetail.name || '未选择项目' }}</div>
-            <div class="project-hero-card__meta">
-              <el-tag :type="selectedProjectDetail.status === '6' ? 'success' : 'primary'">{{ statusMap[selectedProjectDetail.status] || '-' }}</el-tag>
-              <el-tag :type="selectedProjectDetail.priority === '3' ? 'danger' : selectedProjectDetail.priority === '2' ? 'warning' : 'info'">{{ priorityMap[selectedProjectDetail.priority] || '-' }}</el-tag>
-              <el-tag v-if="selectedProjectDetail.riskLevel" type="danger">风险 {{ riskLevelMap[selectedProjectDetail.riskLevel] || selectedProjectDetail.riskLevel }}</el-tag>
-              <el-tag v-if="selectedProjectDetail.qualityLevel" type="success">质量 {{ qualityLevelMap[selectedProjectDetail.qualityLevel] || selectedProjectDetail.qualityLevel }}</el-tag>
-              <span>进度 {{ selectedProjectDetail.progress || 0 }}%</span>
-            </div>
-          </div>
-          <div class="project-hero-card__owner">
-            <div class="project-hero-card__owner-label">项目负责人</div>
-            <ViewUser :user="selectedProjectDetail.leader" />
-          </div>
-        </div>
-        <div class="project-hero-card__facts">
-          <span>分类：{{ selectedProjectDetail.category || '-' }}</span>
-          <span>阶段：{{ phaseMap[selectedProjectDetail.phase] || selectedProjectDetail.phase || '-' }}</span>
-          <span>业务线：{{ selectedProjectDetail.businessLine || '-' }}</span>
-          <span>行业：{{ selectedProjectDetail.industry || '-' }}</span>
-          <span>来源：{{ selectedProjectDetail.projectSource || '-' }}</span>
-          <span>币种：{{ selectedProjectDetail.currency || '-' }}</span>
-          <span>累计工时：{{ selectedProjectDetail.spentHours || 0 }}</span>
-        </div>
-        <ViewRichText v-if="selectedProjectDetail.description" :html="selectedProjectDetail.description" class="project-hero-card__content" />
-        <div v-else class="project-hero-card__empty">暂无项目说明</div>
-      </el-card>
 
       <div class="cockpit-board-grid mt20">
         <el-card shadow="hover" class="board-card">
@@ -548,67 +657,8 @@ watch(
         </el-card>
       </div>
 
-      <div class="cockpit-board-grid mt20">
-        <el-card v-for="section in rankingSections" :key="section.key" shadow="hover" class="board-card">
-          <template #header>
-            <div class="focus-card__header">
-              <span>{{ section.title }}</span>
-              <span>{{ section.items.length }}</span>
-            </div>
-          </template>
-          <div v-if="section.items.length" class="focus-list">
-            <div v-for="item in section.items" :key="item.id" class="focus-list__item focus-list__item--clickable" @click="goToProject(item)">
-              <div class="focus-list__title">{{ item.name }}</div>
-              <div class="focus-list__meta">
-                <span>进度 {{ item.progress || 0 }}%</span>
-                <span v-if="item.endDate">/ 截止 {{ item.endDate }}</span>
-                <span v-if="Number(item.actualCost || 0) > Number(item.budget || 0)">/ 偏差 {{ Number(item.actualCost || 0) - Number(item.budget || 0) }}</span>
-                <span v-if="item.healthScore != null">/ 健康度 {{ item.healthScore }}</span>
-                <span v-if="item.recentKnowledgeUpdates != null">/ 最近更新 {{ item.recentKnowledgeUpdates }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-else class="focus-list__empty">{{ section.empty }}</div>
-        </el-card>
-      </div>
-
-      <el-card shadow="hover" class="board-card mt20">
-        <template #header>项目总览表</template>
-        <el-table :data="projectOptions" stripe>
-          <el-table-column prop="name" label="项目名称" min-width="220">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="goToProject(row)">{{ row.name }}</el-button>
-            </template>
-          </el-table-column>
-          <el-table-column label="负责人" min-width="140">
-            <template #default="{ row }">{{ row.leader?.nickname || row.leader?.name || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.status === '6' ? 'success' : row.status === '7' ? 'danger' : 'primary'">{{ statusMap[row.status] || '-' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="优先级" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.priority === '3' ? 'danger' : row.priority === '2' ? 'warning' : 'info'">{{ priorityMap[row.priority] || '-' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="进度" width="160">
-            <template #default="{ row }">
-              <el-progress :percentage="Number(row.progress || 0)" :stroke-width="8" />
-            </template>
-          </el-table-column>
-          <el-table-column label="阶段" width="100">
-            <template #default="{ row }">
-              {{ phaseMap[row.phase] || row.phase || '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="业务线" prop="businessLine" width="120" />
-          <el-table-column label="来源" prop="projectSource" width="120" />
-        </el-table>
-      </el-card>
     </div>
-    <el-empty v-else class="mt20" description="暂无可展示项目，请先创建项目或选择目标项目" />
+    <el-empty v-else-if="activeView === 'project'" class="mt20" description="请选择一个项目查看项目详情驾驶舱" />
   </div>
 </template>
 
@@ -622,6 +672,35 @@ watch(
 .cockpit-header-text {
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+
+.cockpit-view-tabs {
+  flex-shrink: 0;
+  min-width: 180px;
+}
+
+.cockpit-view-tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.cockpit-view-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.cockpit-project-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cockpit-overview {
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-bottom-card {
+  margin-top: 20px;
 }
 
 .filter-card {

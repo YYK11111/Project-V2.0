@@ -24,6 +24,14 @@ export function getCockpit(params) {
   return request({ url: `${baseUrl}/cockpit`, method: 'get', params })
 }
 
+export function getCockpitOverview(params) {
+  return request({ url: `${baseUrl}/cockpit/overview`, method: 'get', params })
+}
+
+export function getProjectCockpit(id) {
+  return request({ url: `${baseUrl}/cockpit/project/${id}`, method: 'get' })
+}
+
 export function save(data) {
   return request({ url: `${baseUrl}/save`, method: 'post', data })
 }

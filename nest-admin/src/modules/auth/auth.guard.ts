@@ -346,6 +346,16 @@ export class AuthGuard implements CanActivate {
       ],
       ["GET", /^business\/projects\/cockpit$/, "business/projects/dashboard"],
       [
+        "GET",
+        /^business\/projects\/cockpit\/overview$/,
+        "business/projects/dashboard",
+      ],
+      [
+        "GET",
+        /^business\/projects\/cockpit\/project\/[^/]+$/,
+        "business/projects/dashboard",
+      ],
+      [
         "POST",
         /^business\/projects\/[^/]+\/sync-alerts$/,
         "business/projects/update",

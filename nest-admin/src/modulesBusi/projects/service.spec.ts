@@ -341,6 +341,77 @@ describe("ProjectsService closure guards", () => {
     expect(result.selectedProjectId).toBe("p1");
   });
 
+  it("驾驶舱系统总览不应默认混入具体项目详情", async () => {
+    const { service } = createService();
+    jest.spyOn(service, "list").mockResolvedValue({
+      list: [
+        {
+          id: "p1",
+          name: "项目A",
+          leader: { id: "u1", name: "admin" },
+          status: "2",
+          priority: "1",
+          progress: 60,
+          category: "交付",
+          riskLevel: "low",
+          qualityLevel: "high",
+          currency: "CNY",
+          spentHours: 12,
+          budget: 100,
+          actualCost: 80,
+        },
+      ],
+      total: 1,
+    } as any);
+    const getDashboardSpy = jest.spyOn(service, "getDashboard");
+    getDashboardSpy.mockResolvedValue({
+      summary: {
+        healthSummary: { totalScore: 88, level: "healthy", levelLabel: "健康" },
+        knowledgeSummary: { recentUpdatedCount: 1 },
+      },
+      focus: { alerts: [] },
+    } as any);
+
+    const result = await service.getCockpitOverview({
+      pageNum: 1,
+      pageSize: 20,
+    } as any);
+
+    expect(result.projectOptions).toEqual([
+      expect.objectContaining({ id: "p1", name: "项目A" }),
+    ]);
+    expect(result).not.toHaveProperty("selectedProject");
+    expect(result).not.toHaveProperty("selectedTrend");
+    expect(result).not.toHaveProperty("selectedProjectId");
+    expect(getDashboardSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("单项目驾驶舱只返回指定项目的详情与趋势", async () => {
+    const { service } = createService();
+    jest.spyOn(service, "getDashboard").mockResolvedValue({
+      project: { id: "p1", name: "项目A" },
+      summary: { taskSummary: { total: 3 } },
+      focus: { alerts: [] },
+    } as any);
+    jest.spyOn(service as any, "getProjectTrend").mockResolvedValue({
+      dates: ["2026-05-14"],
+      healthScores: [90],
+      riskCounts: [1],
+      knowledgeUpdateCounts: [2],
+      costVariances: [0],
+    });
+
+    const result = await service.getProjectCockpit("p1");
+
+    expect(result.project).toEqual({ id: "p1", name: "项目A" });
+    expect(result.trend).toEqual(
+      expect.objectContaining({
+        dates: ["2026-05-14"],
+        healthScores: [90],
+      }),
+    );
+  });
+
   it("自动生成里程碑缺少负责人时应默认回填项目负责人和操作人", async () => {
     const { service } = createService();
     const milestoneRepository = {
