@@ -33,6 +33,13 @@ export const selectLatestPublishedWorkflowDefinitions = (list: any[] = []) => {
   })
 }
 
+export const selectWorkflowDefinitionVersions = (list: any[] = [], code = '') => {
+  if (!code) return []
+  return list
+    .filter((item) => item?.code === code)
+    .sort(compareWorkflowDefinitionVersion)
+}
+
 // 工作流定义 API
 export function getWorkflowDefinitions() {
   return request({
@@ -44,6 +51,19 @@ export function getWorkflowDefinitions() {
 export function getWorkflowDefinitionList() {
   return getWorkflowDefinitions().then((res: any) => {
     const list = selectLatestPublishedWorkflowDefinitions(res.list || [])
+    return {
+      ...res,
+      list,
+      data: list,
+      rows: list,
+      total: list.length,
+    }
+  })
+}
+
+export function getWorkflowDefinitionVersions(code: string) {
+  return getWorkflowDefinitions().then((res: any) => {
+    const list = selectWorkflowDefinitionVersions(res.list || [], code)
     return {
       ...res,
       list,
@@ -118,6 +138,13 @@ export function startWorkflow(data: any) {
 export function getWorkflowInstance(id: string) {
   return request({
     url: `/workflow/instances/${id}`,
+    method: 'get',
+  })
+}
+
+export function getWorkflowInstanceDefinition(id: string) {
+  return request({
+    url: `/workflow/instances/${id}/definition`,
     method: 'get',
   })
 }

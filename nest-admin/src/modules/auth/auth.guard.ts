@@ -16,6 +16,7 @@ import {
   normalizePermissionKey,
   normalizePermissionKeys,
 } from "src/common/utils/permission-key";
+import { hasPermissionOrAccess } from "src/common/utils/business-list-permission";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -488,6 +489,11 @@ export class AuthGuard implements CanActivate {
         /^business\/stories\/[^/]+\/children$/,
         "business/stories/children",
       ],
+      [
+        "GET",
+        /^business\/stories\/[^/]+\/task-draft$/,
+        "business/stories/getOne",
+      ],
       ["PUT", /^business\/stories\/[^/]+\/status$/, "business/stories/update"],
       [
         "POST",
@@ -592,6 +598,17 @@ export class AuthGuard implements CanActivate {
       ],
 
       ["GET", /^business\/articles\/list$/, "business/articles/list"],
+      ["GET", /^business\/articles\/home$/, "business/articles/home"],
+      [
+        "GET",
+        /^business\/articles\/hot-keywords$/,
+        "business/articles/hot-keywords",
+      ],
+      [
+        "GET",
+        /^business\/articles\/retrieveForAi$/,
+        "business/articles/retrieveForAi",
+      ],
       [
         "GET",
         /^business\/articles\/getOne\/[^/]+$/,
@@ -609,6 +626,11 @@ export class AuthGuard implements CanActivate {
         "DELETE",
         /^business\/articles\/del\/[^/]+$/,
         "business/articles/delete",
+      ],
+      [
+        "GET",
+        /^business\/articleCatalogs\/getTrees$/,
+        "business/articleCatalogs/list",
       ],
       ["GET", /^business\/article-tags\/list$/, "business/articleTags/list"],
       [
@@ -788,6 +810,21 @@ export class AuthGuard implements CanActivate {
         /^business\/project-members\/project-overview$/,
         "business/projectMembers/list",
       ],
+      [
+        "GET",
+        /^business\/project-members\/user\/[^/]+\/projects$/,
+        "business/projectMembers/list",
+      ],
+      [
+        "GET",
+        /^business\/project-members\/check\/[^/]+\/[^/]+$/,
+        "business/projectMembers/list",
+      ],
+      [
+        "GET",
+        /^business\/project-members\/check-manager\/[^/]+\/[^/]+$/,
+        "business/projectMembers/list",
+      ],
       ["POST", /^business\/project-members$/, "business/projectMembers/add"],
       [
         "PUT",
@@ -832,6 +869,11 @@ export class AuthGuard implements CanActivate {
         "GET",
         /^business\/crm\/customers\/detail\/[^/]+$/,
         "business/crm/customers/getOne",
+      ],
+      [
+        "GET",
+        /^business\/crm\/customers\/stats$/,
+        "business/crm/customers/list",
       ],
       ["POST", /^business\/crm\/customers\/add$/, "business/crm/customers/add"],
       [
@@ -884,6 +926,11 @@ export class AuthGuard implements CanActivate {
         "business/crm/opportunities/getOne",
       ],
       [
+        "GET",
+        /^business\/crm\/opportunities\/stats$/,
+        "business/crm/opportunities/list",
+      ],
+      [
         "POST",
         /^business\/crm\/opportunities\/add$/,
         "business/crm/opportunities/add",
@@ -916,6 +963,11 @@ export class AuthGuard implements CanActivate {
         "GET",
         /^business\/crm\/contracts\/getOne\/[^/]+$/,
         "business/crm/contracts/getOne",
+      ],
+      [
+        "GET",
+        /^business\/crm\/contracts\/stats$/,
+        "business/crm/contracts/list",
       ],
       ["POST", /^business\/crm\/contracts\/add$/, "business/crm/contracts/add"],
       [
@@ -1027,6 +1079,11 @@ export class AuthGuard implements CanActivate {
         "business/workflow/instances/getOne",
       ],
       [
+        "GET",
+        /^workflow\/instances\/[^/]+\/definition$/,
+        "business/workflow/instances/getOne",
+      ],
+      [
         "POST",
         /^workflow\/instances\/[^/]+\/withdraw$/,
         "business/workflow/instances/withdraw",
@@ -1052,6 +1109,11 @@ export class AuthGuard implements CanActivate {
         "business/workflow/closeReturned",
       ],
       ["GET", /^workflow\/tasks\/my$/, "business/workflow/tasks/list"],
+      [
+        "GET",
+        /^workflow\/history\/my-handled$/,
+        "business/workflow/tasks/list",
+      ],
       [
         "POST",
         /^workflow\/tasks\/[^/]+\/complete$/,
@@ -1130,12 +1192,7 @@ export class AuthGuard implements CanActivate {
   }
 
   private hasPermission(permissions: string[], key: string) {
-    const normalizedPermissions = normalizePermissionKeys(permissions);
-    const normalizedKey = normalizePermissionKey(key);
-    return (
-      normalizedPermissions.includes("*") ||
-      normalizedPermissions.includes(normalizedKey)
-    );
+    return hasPermissionOrAccess(permissions, key);
   }
 
   private isAuthenticatedSelfServiceRoute(request: Request): boolean {
@@ -1185,6 +1242,7 @@ export class AuthGuard implements CanActivate {
       /^business\/milestones\/getStatus$/,
       /^business\/risks\/get(Status|Level|Category)$/,
       /^business\/changes\/get(Status|Type|Impact)$/,
+      /^business\/articles\/get(Status|KnowledgeTypes|VisibilityTypes)$/,
       /^business\/project-members\/getRoles$/,
       /^business\/acceptance-records\/getResults$/,
       /^business\/go-live-records\/getStatuses$/,

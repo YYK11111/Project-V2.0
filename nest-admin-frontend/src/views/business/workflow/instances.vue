@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // @ts-nocheck
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as api from './api'
+import WorkflowProgressView from '@/components/workflow/WorkflowProgressView.vue'
+import WorkflowHistoryView from '@/components/workflow/WorkflowHistoryView.vue'
 import { useUserStore } from '@/stores/user'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
@@ -28,9 +30,10 @@ const getButtons = (row: any) => [
 ].filter(Boolean)
 
 const detailVisible = ref(false)
-const detailTab = ref('info')
+const detailTab = ref('flow')
 const currentInstance = ref<any>(null)
 const historyList = ref<any[]>([])
+const instanceTaskList = ref<any[]>([])
 
 const cancelVisible = ref(false)
 const currentCancelInstance = ref<any>(null)
@@ -48,32 +51,23 @@ const viewDetail = async (row: any) => {
   if (!canWorkflowInstanceGetOne.value) {
     return $sdk.msgWarning('当前操作没有权限')
   }
-  const res = await api.getWorkflowInstance(row.id)
-  currentInstance.value = res.data
-  detailTab.value = 'info'
+  await loadInstanceDetail(row.id)
   detailVisible.value = true
-  const historyRes = await api.getWorkflowHistory(row.id)
+}
+
+const loadInstanceDetail = async (instanceId: string) => {
+  const res = await api.getWorkflowInstance(instanceId)
+  const instance = res.data
+  currentInstance.value = instance
+  detailTab.value = 'flow'
+
+  const [historyRes, tasksRes] = await Promise.all([
+    api.getWorkflowHistory(instance.id),
+    api.getWorkflowInstanceTasks(instance.id),
+  ])
+
   historyList.value = historyRes.data || []
-}
-
-const getHistoryItemType = (action: string) => {
-  const types: Record<string, string> = { '1': 'success', '2': 'danger', '3': 'warning', '4': 'info', '5': 'primary', '6': 'danger' }
-  return types[action] || 'info'
-}
-
-const getActionText = (action: string) => {
-  const texts: Record<string, string> = { '1': '同意', '2': '驳回', '3': '撤回', '4': '转交', '5': '加签', '6': '终止', 'execute': '执行' }
-  return texts[action] || action
-}
-
-const getHistoryActionText = (item: any) => {
-  if (item?.action === 'execute' && String(item?.comment || '').includes('发起人重新提交审批')) {
-    return '发起人重新提交'
-  }
-  if (item?.action === '2' && currentInstance.value?.variables?._lastRejectTarget === 'start') {
-    return '驳回（退回发起人）'
-  }
-  return getActionText(item?.action)
+  instanceTaskList.value = tasksRes.data || []
 }
 
 const getBusinessTypeLabel = (type: string) => {
@@ -120,14 +114,7 @@ const formatDuration = (value: string | number) => {
   return `${seconds}秒`
 }
 
-const getHistoryOperatorText = (item: any) => {
-  const name = item?.operatorName || item?.operatorId || '-'
-  return item?.operatorId && item?.operatorName ? `${item.operatorName}（${item.operatorId}）` : name
-}
-
-const getHistoryCommentText = (item: any) => {
-  return item?.comment || '无审批意见'
-}
+const currentTask = computed(() => instanceTaskList.value.find((task) => task.status === '1') || null)
 
 const handleCancel = (row: any) => { currentCancelInstance.value = row; cancelForm.reason = ''; cancelVisible.value = true }
 const submitCancel = () => api.cancelWorkflowInstance(currentCancelInstance.value.id, { reason: cancelForm.reason }).then(() => { ElMessage.success('流程已终止'); cancelVisible.value = false; rctRef.value.getList() })
@@ -142,12 +129,8 @@ onMounted(async () => {
   const highlightId = route.query.highlight
   if (!highlightId) return
   try {
-    const res = await api.getWorkflowInstance(String(highlightId))
-    currentInstance.value = res.data
-    detailTab.value = 'info'
+    await loadInstanceDetail(String(highlightId))
     detailVisible.value = true
-    const historyRes = await api.getWorkflowHistory(String(highlightId))
-    historyList.value = historyRes.data || []
   } catch (error) {
     console.warn('打开流程实例详情失败', error)
   }
@@ -225,6 +208,9 @@ onMounted(async () => {
 
     <BaDialog v-model="detailVisible" title="流程实例详情" width="80%">
       <el-tabs v-model="detailTab">
+        <el-tab-pane label="流程进度" name="flow">
+          <WorkflowProgressView :instance-info="currentInstance" :tasks="instanceTaskList" :current-task-id="currentTask?.id || ''" :node-name="currentTask?.nodeName || ''" />
+        </el-tab-pane>
         <el-tab-pane label="基本信息" name="info">
           <template v-if="currentInstance">
             <el-descriptions :column="2" border>
@@ -277,23 +263,8 @@ onMounted(async () => {
             </el-collapse>
           </template>
         </el-tab-pane>
-        <el-tab-pane label="审批历史" name="history">
-          <el-timeline v-if="historyList.length > 0">
-            <el-timeline-item v-for="(item, index) in historyList" :key="index" :timestamp="item.createTime" :type="getHistoryItemType(item.action)" placement="top">
-              <el-card class="history-card">
-                <div class="history-card__header">
-                  <div class="history-card__title">{{ item.nodeName || '流程节点' }}</div>
-                  <el-tag :type="getHistoryItemType(item.action)" size="small">{{ getHistoryActionText(item) }}</el-tag>
-                </div>
-                <div class="history-card__meta">
-                  <span>操作人：{{ getHistoryOperatorText(item) }}</span>
-                  <span>时间：{{ item.createTime || '-' }}</span>
-                </div>
-                <div class="history-card__comment">审批意见：{{ getHistoryCommentText(item) }}</div>
-              </el-card>
-            </el-timeline-item>
-          </el-timeline>
-          <el-empty v-else description="暂无审批历史" />
+        <el-tab-pane label="历史记录" name="history">
+          <WorkflowHistoryView :history-list="historyList" :tasks="instanceTaskList" :instance-info="currentInstance" />
         </el-tab-pane>
       </el-tabs>
     </BaDialog>
@@ -321,18 +292,8 @@ onMounted(async () => {
 .workflow-instance-index-panel :deep(.el-table__body-wrapper) { scroll-behavior: auto; }
 .code-block { background-color: var(--el-fill-color-extra-light); padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
 .variables-collapse { margin-top: 16px; }
-.history-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
-.history-card__title { font-weight: 600; color: var(--el-text-color-primary); }
-.history-card__meta { display: flex; flex-wrap: wrap; gap: 12px; color: var(--el-text-color-secondary); font-size: 13px; margin-bottom: 8px; }
-.history-card__comment { line-height: 1.6; color: var(--el-text-color-regular); }
 .instance-title-cell { display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
 .instance-title-cell__title { color: var(--el-text-color-primary); }
 .instance-title-cell__code { font-size: 12px; color: var(--el-text-color-secondary); }
 .instance-meta-id { color: var(--el-text-color-secondary); }
-
-@media (max-width: 768px) {
-  .workflow-instance-index-panel { padding-top: 18px; }
-  .workflow-instance-index-operation,
-  .workflow-instance-index-operation__left { align-items: stretch; }
-}
 </style>

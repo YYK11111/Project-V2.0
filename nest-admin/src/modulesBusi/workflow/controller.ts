@@ -115,6 +115,15 @@ export class WorkflowController {
     );
   }
 
+  @Get("instances/:id/definition")
+  async getInstanceDefinition(@Param("id") id: string, @Req() req) {
+    return this.workflowService.getInstanceDefinition(
+      id,
+      this.getCurrentUserId(req),
+      this.getCurrentPermissions(req),
+    );
+  }
+
   @Get("instances")
   async listInstances(
     @Query("status") status?: string,

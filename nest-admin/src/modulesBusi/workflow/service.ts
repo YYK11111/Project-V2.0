@@ -387,12 +387,6 @@ export class WorkflowService {
       );
     }
 
-    if (definitions.length > 1) {
-      throw new BadRequestException(
-        `业务对象 ${businessType} 场景 ${businessScene} 存在多条已发布流程，请先清理重复配置`,
-      );
-    }
-
     return this.normalizeDefinition(definitions[0]);
   }
 
@@ -1522,6 +1516,7 @@ export class WorkflowService {
         ...task,
         nodeId: task.nodeId,
         nodeName: task.nodeName,
+        operatorId: userId,
       },
       dto.action === "approve" ? TaskAction.APPROVE : TaskAction.REJECT,
     );
@@ -1996,6 +1991,22 @@ export class WorkflowService {
   }
 
   /**
+   * 获取实例关联的流程定义详情
+   */
+  async getInstanceDefinition(
+    id: string,
+    userId?: string,
+    permissions: string[] = [],
+  ): Promise<WorkflowDefinition> {
+    const instance = await this.assertInstanceAccessible(
+      id,
+      userId,
+      permissions,
+    );
+    return this.getDefinition(instance.definitionId);
+  }
+
+  /**
    * 获取流程实例列表（支持筛选）
    */
   async listInstances(
@@ -2006,26 +2017,6 @@ export class WorkflowService {
     let instances: WorkflowInstance[] = [];
 
     if (mode === "participant" && userId) {
-      const taskQb = this.taskRepo
-        .createQueryBuilder("task")
-        .select("task.instanceId", "instanceId")
-        .addSelect("MAX(task.createTime)", "latestTaskTime")
-        .where("task.assigneeId = :userId", { userId })
-        .groupBy("task.instanceId")
-        .orderBy("latestTaskTime", "DESC")
-        .limit(100);
-
-      const taskRows = await taskQb.getRawMany<{
-        instanceId: string;
-        latestTaskTime?: string;
-      }>();
-      const instanceIds = taskRows
-        .map((item) => item.instanceId)
-        .filter(Boolean);
-      if (!instanceIds.length) {
-        return [];
-      }
-      const placeholders = instanceIds.map(() => "?").join(", ");
       const sql = `
         SELECT
           id,
@@ -2045,25 +2036,28 @@ export class WorkflowService {
           duration
         FROM wf_instance
         WHERE is_delete IS NULL
-          AND id IN (${placeholders})
+          AND (
+            starter_id = ?
+            OR id IN (
+              SELECT DISTINCT instance_id
+              FROM wf_task
+              WHERE assignee_id = ?
+            )
+            OR id IN (
+              SELECT DISTINCT instance_id
+              FROM wf_history
+              WHERE operator_id = ?
+            )
+          )
           ${status ? "AND status = ?" : ""}
+        ORDER BY start_time DESC
+        LIMIT 100
       `;
       const rawInstances = await this.instanceRepo.query(
         sql,
-        status ? [...instanceIds, status] : instanceIds,
+        status ? [userId, userId, userId, status] : [userId, userId, userId],
       );
-      const rankMap = new Map(
-        instanceIds.map((id, index) => [String(id), index]),
-      );
-      instances = rawInstances
-        .map((item) => new WorkflowInstance(item))
-        .sort((left, right) => {
-          const leftRank =
-            rankMap.get(String(left.id)) ?? Number.MAX_SAFE_INTEGER;
-          const rightRank =
-            rankMap.get(String(right.id)) ?? Number.MAX_SAFE_INTEGER;
-          return leftRank - rightRank;
-        });
+      instances = rawInstances.map((item) => new WorkflowInstance(item));
     } else {
       const instanceQb = this.instanceRepo.createQueryBuilder("instance");
 

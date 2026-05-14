@@ -131,6 +131,118 @@ describe("AuthGuard", () => {
     );
   });
 
+  it("业务模块全量权限可访问同模块列表和按钮接口", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/tasks/manageAll"],
+        "business/tasks/list",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/tasks/manageAll"],
+        "business/tasks/update",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/tasks/manageAll"],
+        "business/tickets/list",
+      ),
+    ).toBe(false);
+  });
+
+  it("业务基础访问权限只放行同模块只读接口", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/articles/access"],
+        "business/articles/list",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/articles/access"],
+        "business/articles/update",
+      ),
+    ).toBe(false);
+    expect(
+      (guard as any).hasPermission(
+        ["business/tasks/access"],
+        "business/tasks/dependency/list",
+      ),
+    ).toBe(true);
+  });
+
+  it("工作流任务 access 可以处理本人待办但不包含流程定义详情", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/workflow/tasks/list",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/workflow/tasks/complete",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/workflow/tasks/transfer",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/workflow/tasks/addSign",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/workflow/definitions/getOne",
+      ),
+    ).toBe(false);
+  });
+
+  it("实例作用域的流程定义详情接口使用实例详情权限", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).resolvePermissionByRequest({
+        method: "GET",
+        path: "/api/workflow/instances/wf-1/definition",
+      }),
+    ).toBe("business/workflow/instances/getOne");
+  });
+
   it("角色菜单解析出的星号权限可以访问用户管理重置密码接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -610,7 +722,7 @@ describe("AuthGuard", () => {
     jwtService.verifyAsync.mockResolvedValue({
       permissions: [],
       id: "admin_1",
-      name: "NestAdmin",
+      name: "admin",
       roles: [{ permissionKey: "admin" }],
     });
     rolesService.getUserMenus.mockResolvedValue([
@@ -663,7 +775,7 @@ describe("AuthGuard", () => {
     const baseUser = {
       permissions: [],
       id: "admin_1",
-      name: "NestAdmin",
+      name: "admin",
       roles: [{ permissionKey: "admin" }],
     };
     const requests = [
@@ -805,6 +917,57 @@ describe("AuthGuard", () => {
     });
     rolesService.getUserMenus.mockResolvedValue([]);
     redisService.getPermissions.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("登录后访问文章知识类型字典接口不要求菜单按钮权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articles/getKnowledgeTypes",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+    redisService.getPermissions.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("具备知识分类基础访问权限时放行知识分类树接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articleCatalogs/getTrees",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/articleCatalogs/access" },
+    ]);
 
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });

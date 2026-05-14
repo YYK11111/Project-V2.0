@@ -1,5 +1,9 @@
 import { WorkflowService } from "./service";
-import { NodeType, ConditionOperator } from "./interface/node-type.enum";
+import {
+  NodeType,
+  ConditionOperator,
+  TaskAction,
+} from "./interface/node-type.enum";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { WorkflowDataLoaderService } from "./workflow-data-loader.service";
 
@@ -22,6 +26,9 @@ describe("WorkflowService 条件路由", () => {
   };
 
   const createAccessService = () => {
+    const definitionRepo = {
+      findOne: jest.fn(),
+    };
     const instanceRepo = {
       findOne: jest.fn(),
     };
@@ -32,7 +39,7 @@ describe("WorkflowService 条件路由", () => {
       findOne: jest.fn(),
     };
     const service = new WorkflowService(
-      {} as any,
+      definitionRepo as any,
       instanceRepo as any,
       taskRepo as any,
       historyRepo as any,
@@ -48,7 +55,7 @@ describe("WorkflowService 条件路由", () => {
     jest
       .spyOn(service as any, "attachBusinessSummaryToInstance")
       .mockResolvedValue({ id: "wf-1" });
-    return { service, instanceRepo, taskRepo, historyRepo };
+    return { service, definitionRepo, instanceRepo, taskRepo, historyRepo };
   };
 
   it("按 conditionId + 连线命中目标节点", async () => {
@@ -413,6 +420,35 @@ describe("WorkflowService 条件路由", () => {
       ]),
     ).resolves.toEqual({ id: "wf-1" });
   });
+
+  it("实例作用域流程定义详情先校验实例可见性", async () => {
+    const { service, definitionRepo, instanceRepo, taskRepo, historyRepo } =
+      createAccessService();
+    instanceRepo.findOne.mockResolvedValue({
+      id: "wf-1",
+      definitionId: "def-1",
+      starterId: "starter-1",
+    });
+    taskRepo.findOne.mockResolvedValue({ id: "task-1" });
+    historyRepo.findOne.mockResolvedValue(null);
+    definitionRepo.findOne.mockResolvedValue({
+      id: "def-1",
+      nodes: [{ id: "start", name: "开始", type: NodeType.START }],
+    });
+
+    await expect(
+      service.getInstanceDefinition("wf-1", "participant-1", []),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: "def-1",
+        nodes: [expect.objectContaining({ id: "start" })],
+      }),
+    );
+
+    expect(definitionRepo.findOne).toHaveBeenCalledWith({
+      where: { id: "def-1" },
+    });
+  });
 });
 
 describe("WorkflowService listInstances", () => {
@@ -460,24 +496,27 @@ describe("WorkflowService listInstances", () => {
     return { service, taskQb, instanceQb };
   };
 
-  it("participant 模式按最近任务去重实例后查询", async () => {
-    const { service, taskQb, instanceQb } = createService();
-    taskQb.getRawMany.mockResolvedValue([
-      { instanceId: "ins_2", latestTaskTime: "2026-04-16 10:00:00" },
-      { instanceId: "ins_1", latestTaskTime: "2026-04-16 09:00:00" },
-    ]);
+  it("participant 模式查询自己发起、参与和审批过的实例", async () => {
+    const { service, instanceQb } = createService();
     ((service as any).instanceRepo.query as jest.Mock).mockResolvedValue([
-      { id: "ins_1", startTime: "2026-04-16 09:00:00" },
       { id: "ins_2", startTime: "2026-04-16 10:00:00" },
+      { id: "ins_1", startTime: "2026-04-16 09:00:00" },
     ]);
 
     const result = await service.listInstances("user_1", "1", "participant");
 
-    expect(taskQb.where).toHaveBeenCalledWith("task.assigneeId = :userId", {
-      userId: "user_1",
-    });
-    expect(taskQb.groupBy).toHaveBeenCalledWith("task.instanceId");
-    expect((service as any).instanceRepo.query).toHaveBeenCalled();
+    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
+      expect.stringContaining("starter_id = ?"),
+      ["user_1", "user_1", "user_1", "1"],
+    );
+    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
+      expect.stringContaining("wf_task"),
+      expect.any(Array),
+    );
+    expect((service as any).instanceRepo.query).toHaveBeenCalledWith(
+      expect.stringContaining("wf_history"),
+      expect.any(Array),
+    );
     expect(instanceQb.orderBy).not.toHaveBeenCalled();
     expect(result).toEqual([
       { id: "ins_2", startTime: "2026-04-16 10:00:00" },
@@ -624,6 +663,33 @@ describe("WorkflowService 会签状态机", () => {
     expect(
       workflowIntegrationService.handleWorkflowCallback,
     ).not.toHaveBeenCalled();
+  });
+
+  it("完成审批任务时审批历史记录当前审批人为操作人", async () => {
+    const { service, historyRepo } = createApprovalService({
+      id: "task-1",
+      instanceId: "wf-1",
+      nodeId: "approval-1",
+      nodeName: "审批",
+      nodeType: NodeType.APPROVAL,
+      assigneeId: "u1",
+      status: "1",
+      inputData: {
+        multiInstanceType: "all",
+        candidateIds: ["u1"],
+      },
+    });
+
+    await service.completeTask("task-1", "u1", { action: "approve" });
+
+    expect(historyRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task-1",
+        nodeId: "approval-1",
+        action: TaskAction.APPROVE,
+        operatorId: "u1",
+      }),
+    );
   });
 
   it("并行任一通过后取消同节点其他待办并推进流程", async () => {
@@ -1106,6 +1172,47 @@ describe("WorkflowService 定义草稿与发布版本", () => {
     expect(definitionRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({ id: "def-draft", isActive: "1" }),
     );
+  });
+
+  it("按业务对象和场景发起时多条已发布流程取最高版本", async () => {
+    const latestPublishedDefinition = {
+      id: "def-v3",
+      code: "WF_PROJECT_APPROVAL",
+      version: 3,
+      businessType: "project",
+      businessScene: "approval",
+      isActive: "1",
+      nodes: [],
+      flows: [],
+    };
+    const definitionRepo = {
+      find: jest.fn().mockResolvedValue([
+        latestPublishedDefinition,
+        {
+          id: "def-v2",
+          code: "WF_PROJECT_APPROVAL",
+          version: 2,
+          businessType: "project",
+          businessScene: "approval",
+          isActive: "1",
+          nodes: [],
+          flows: [],
+        },
+      ]),
+    };
+    const service = createDefinitionVersionService(definitionRepo);
+
+    await expect(
+      service.getDefinitionByScene("project", "approval"),
+    ).resolves.toEqual(expect.objectContaining({ id: "def-v3", version: 3 }));
+    expect(definitionRepo.find).toHaveBeenCalledWith({
+      where: {
+        businessType: "project",
+        businessScene: "approval",
+        isActive: "1",
+      },
+      order: { version: "DESC" },
+    });
   });
 });
 

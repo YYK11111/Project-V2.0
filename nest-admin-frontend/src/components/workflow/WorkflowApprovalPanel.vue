@@ -2,8 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheckFilled } from '@element-plus/icons-vue'
-import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance, getWorkflowDefinition } from '@/views/business/workflow/api'
+import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance } from '@/views/business/workflow/api'
 import UserSelect from '@/components/UserSelect.vue'
+import WorkflowProgressView from '@/components/workflow/WorkflowProgressView.vue'
+import WorkflowHistoryView from '@/components/workflow/WorkflowHistoryView.vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -50,14 +52,20 @@ const nodeTypeLabelMap: Record<string, string> = {
   form: '表单',
 }
 
-const getActionText = (action: string) => {
-  const texts: Record<string, string> = { '1': '同意', '2': '驳回', '3': '撤回', '4': '转交', '5': '加签', '6': '终止', execute: '执行' }
-  return texts[action] || action
-}
-
-const getHistoryItemType = (action: string): '' | 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
-  const types: Record<string, '' | 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { '1': 'success', '2': 'danger', '3': 'warning', '4': 'info', '5': 'primary', '6': 'danger', execute: 'info' }
-  return types[action] || 'info'
+const buildRejectableNodes = (historyItems: any[] = [], task: any = null) => {
+  const seenNodeIds = new Set<string>()
+  const nodes: any[] = []
+  historyItems.forEach((item) => {
+    const nodeId = String(item?.nodeId || '')
+    if (!nodeId || seenNodeIds.has(nodeId) || nodeId === String(task?.nodeId || '')) return
+    seenNodeIds.add(nodeId)
+    nodes.push({
+      id: nodeId,
+      name: item?.nodeName || '流程节点',
+      type: nodes.length === 0 ? 'start' : 'approval',
+    })
+  })
+  return nodes
 }
 
 const loadWorkflowContext = async () => {
@@ -70,15 +78,7 @@ const loadWorkflowContext = async () => {
   historyList.value = historyRes.data || []
   instanceTasks.value = tasksRes.data || []
   instanceInfo.value = instanceRes.data || null
-
-  if (instanceInfo.value?.definitionId) {
-    const definitionRes = await getWorkflowDefinition(instanceInfo.value.definitionId)
-    const definition = definitionRes.data || {}
-    const executedNodeIds = new Set(historyList.value.map((item) => item.nodeId).filter(Boolean))
-    rejectableNodes.value = (definition.nodes || []).filter((node: any) => {
-      return executedNodeIds.has(node.id) && node.type !== 'end' && String(node.id) !== String(currentTask.value?.nodeId || '')
-    })
-  }
+  rejectableNodes.value = buildRejectableNodes(historyList.value, currentTask.value)
 }
 
 onMounted(() => {
@@ -112,28 +112,6 @@ const actionDisabledText = computed(() => {
   if (!isCurrentPendingTask.value) return '当前审批任务已处理'
   if (!isCurrentAssignee.value) return `当前待办办理人为 ${currentTask.value.assigneeName || currentTask.value.assigneeId}`
   return ''
-})
-
-const workflowStatusText = computed(() => {
-  if (instanceInfo.value?.status === '1') return '进行中'
-  if (instanceInfo.value?.status === '2') return '已完成'
-  return '已取消'
-})
-
-const workflowStatusType = computed(() => {
-  if (instanceInfo.value?.status === '1') return 'warning'
-  if (instanceInfo.value?.status === '2') return 'success'
-  return 'info'
-})
-
-const progressTaskCards = computed(() => {
-  return (instanceTasks.value || []).map((task: any, index: number) => ({
-    ...task,
-    stepNumber: index + 1,
-    isActive: String(task.id) === String(currentTask.value?.id || ''),
-    statusText: task.status === '1' ? '待处理' : task.status === '2' ? '已完成' : '已取消',
-    statusType: task.status === '1' ? 'warning' : task.status === '2' ? 'success' : 'info',
-  }))
 })
 
 const clearAutoBackTimer = () => {
@@ -277,55 +255,11 @@ const openInstanceDetail = () => {
       </el-tab-pane>
 
       <el-tab-pane label="流程进度" name="progress">
-        <div class="progress-overview">
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="业务标题">{{ instanceInfo?.businessTitle || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="业务编号">{{ instanceInfo?.businessCode || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="发起人">{{ instanceInfo?.starterName || instanceInfo?.starterId || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="实例状态">
-              <el-tag :type="workflowStatusType">{{ workflowStatusText }}</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="当前节点">{{ nodeName || currentTask?.nodeName || '-' }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-
-        <div class="progress-task-list">
-          <div
-            v-for="task in progressTaskCards"
-            :key="task.id"
-            class="progress-task-card"
-            :class="{ 'progress-task-card--active': task.id === currentTask?.id }"
-          >
-            <div class="progress-task-card__head">
-              <span class="progress-task-card__step">步骤 {{ task.stepNumber }}</span>
-              <el-tag :type="task.statusType" size="small">{{ task.statusText }}</el-tag>
-            </div>
-            <div class="progress-task-card__title">{{ task.nodeName || '流程节点' }}</div>
-            <div class="progress-task-card__meta">办理人：{{ task.assigneeName || task.assigneeId || '-' }}</div>
-            <div class="progress-task-card__meta">创建时间：{{ task.startTime || task.createTime || '-' }}</div>
-            <div class="progress-task-card__meta">完成时间：{{ task.completeTime || '-' }}</div>
-          </div>
-          <el-empty v-if="!progressTaskCards.length" description="暂无流程进度" />
-        </div>
+        <WorkflowProgressView :instance-info="instanceInfo" :tasks="instanceTasks" :current-task-id="currentTask?.id || ''" :node-name="nodeName || currentTask?.nodeName || ''" />
       </el-tab-pane>
 
       <el-tab-pane label="历史记录" name="history">
-        <el-timeline v-if="historyList.length > 0">
-          <el-timeline-item
-            v-for="(item, index) in historyList"
-            :key="index"
-            :timestamp="item.createTime"
-            :type="getHistoryItemType(item.action)"
-            placement="top"
-          >
-            <el-card class="history-card">
-              <div class="history-title">{{ getActionText(item.action) }} - {{ item.nodeName || '流程节点' }}</div>
-              <div v-if="item.operatorId" class="history-meta">操作人：{{ item.operatorName || item.operatorId }}</div>
-              <div v-if="item.comment" class="history-comment">审批意见：{{ item.comment }}</div>
-            </el-card>
-          </el-timeline-item>
-        </el-timeline>
-        <el-empty v-else description="暂无审批历史" />
+        <WorkflowHistoryView :history-list="historyList" :tasks="instanceTasks" :instance-info="instanceInfo" />
       </el-tab-pane>
     </el-tabs>
 
@@ -422,86 +356,6 @@ const openInstanceDetail = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.progress-overview {
-  margin-bottom: 16px;
-}
-
-.progress-task-list {
-  display: grid;
-  gap: 12px;
-}
-
-.progress-task-card {
-  padding: 14px 16px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  background: var(--el-fill-color-blank);
-}
-
-.progress-task-card--active {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-color-primary-light-9);
-  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.12);
-}
-
-.progress-task-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.progress-task-card__step {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-}
-
-.progress-task-card__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  margin-bottom: 8px;
-}
-
-.progress-task-card__meta {
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-text-color-regular);
-}
-
-.history-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.history-card {
-  border-radius: 12px;
-}
-
-.history-meta {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.history-comment {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--el-border-color-lighter);
-  color: var(--el-text-color-regular);
-  line-height: 1.7;
-  word-break: break-word;
-}
-
-.history-text {
-  color: #606266;
-  line-height: 1.6;
-  word-break: break-word;
 }
 
 .panel-scroll {
