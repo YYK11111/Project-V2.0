@@ -135,7 +135,7 @@ const getButtons = (row: any) => [
 
 <template>
   <div class="task-report-index-page">
-    <RequestChartTable ref="rctRef" class="task-report-index-panel" :params="params" :request="getList" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="task-report-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">

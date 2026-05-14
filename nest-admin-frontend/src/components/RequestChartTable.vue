@@ -86,7 +86,7 @@ export default defineComponent({
     },
     tableOprateWidth: {
       type: String,
-      default: '220',
+      default: '',
     },
     isSelection: {
       type: Boolean,
@@ -123,6 +123,7 @@ export default defineComponent({
 
       selectedIds: [], // 多选数据
       hasDeactivated: false,
+      operationColumnWidth: '',
     }
   },
   computed: {},
@@ -140,8 +141,63 @@ export default defineComponent({
   deactivated() {
     this.hasDeactivated = true
   },
-  mounted() {},
+  mounted() {
+    this.scheduleOperationColumnWidthUpdate()
+  },
   methods: {
+    scheduleOperationColumnWidthUpdate() {
+      this.$nextTick(() => {
+        requestAnimationFrame(() => {
+          this.updateOperationColumnWidth()
+        })
+      })
+    },
+    getDetachedNodeWidth(node) {
+      if (!node?.cloneNode || typeof document === 'undefined') {
+        return 0
+      }
+
+      const clone = node.cloneNode(true)
+      clone.style.position = 'fixed'
+      clone.style.left = '-10000px'
+      clone.style.top = '-10000px'
+      clone.style.width = 'max-content'
+      clone.style.maxWidth = 'none'
+      clone.style.visibility = 'hidden'
+      clone.style.pointerEvents = 'none'
+      document.body.appendChild(clone)
+      const width = Math.ceil(clone.scrollWidth || clone.getBoundingClientRect().width || 0)
+      clone.remove()
+      return width
+    },
+    updateOperationColumnWidth() {
+      if (this.tableOprateWidth) {
+        this.operationColumnWidth = ''
+        this.$nextTick(() => this.$refs.table?.doLayout?.())
+        return
+      }
+
+      const operationNodes = this.$el?.querySelectorAll?.('.business-list-operation-cell .table-operation')
+      if (!operationNodes?.length) {
+        this.operationColumnWidth = ''
+        this.$nextTick(() => this.$refs.table?.doLayout?.())
+        return
+      }
+
+      const maxContentWidth = Array.from(operationNodes).reduce((max, node) => {
+        const detachedWidth = node.classList?.contains('table-operation') ? this.getDetachedNodeWidth(node) : 0
+        const width = Math.ceil(detachedWidth || node.scrollWidth || node.getBoundingClientRect().width || 0)
+        return Math.max(max, width)
+      }, 0)
+
+      const nextWidth = maxContentWidth ? `${Math.max(88, maxContentWidth + 24)}` : ''
+      if (this.operationColumnWidth === nextWidth) {
+        this.$refs.table?.doLayout?.()
+        return
+      }
+      this.operationColumnWidth = nextWidth
+      this.$nextTick(() => this.$refs.table?.doLayout?.())
+    },
     getList(page) {
       if (typeof this.request !== 'function') {
         console.error('[RequestChartTable] invalid request prop', {
@@ -182,6 +238,7 @@ export default defineComponent({
             this.response = resp
             this.data = res
             this.total = +total
+            this.scheduleOperationColumnWidthUpdate()
           } else {
             // 自定义echarts图表数据处理
             // this.data = data
@@ -226,7 +283,7 @@ export default defineComponent({
             const failedCount = Number(res?.failedCount ?? 0)
             const failed = Array.isArray(res?.failed) ? res.failed : []
             if (failedCount > 0 && successCount > 0) {
-              $sdk.msgWarning(`部分删除成功：成功 ${successCount} 条，失败 ${failedCount} 条`) 
+              $sdk.msgWarning(`部分删除成功：成功 ${successCount} 条，失败 ${failedCount} 条`)
               console.warn('[批量删除失败明细]', failed)
             } else if (failedCount > 0 && successCount === 0) {
               const firstReason = failed?.[0]?.reason || '当前操作没有权限'
@@ -416,7 +473,12 @@ export default defineComponent({
               {{ row.updateTime || row.createTime || '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" fixed="right" :width="tableOprateWidth">
+          <el-table-column
+            label="操作"
+            fixed="right"
+            :width="tableOprateWidth || operationColumnWidth || undefined"
+            header-class-name="business-list-operation-header"
+            class-name="business-list-operation-cell">
             <template #default="scope">
               <slot name="tableOperation" v-bind="scope"></slot>
             </template>

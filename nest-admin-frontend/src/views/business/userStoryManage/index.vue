@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getList, del, getStatus, getType, getChildren } from './api'
+import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
 const router = useRouter()
@@ -124,13 +125,19 @@ function getTypeTag(type) {
   }
   return types[type] || 'info'
 }
+
+const getButtons = (row) => [
+  { key: 'view', label: '详情', onClick: () => handleView(row) },
+  canStoryUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canStoryDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDelete(row) } : null,
+].filter(Boolean)
 </script>
 
 <template>
-  <div class="user-story-index-page">
+  <div class="user-story-index-page business-list-page">
     <RequestChartTable
       ref="rctRef"
-      class="user-story-index-panel"
+      class="user-story-index-panel business-list-panel"
       :params="params"
       :request="getList"
       :is-selection="true"
@@ -194,107 +201,8 @@ function getTypeTag(type) {
       </template>
 
       <template #tableOperation="{ row }">
-        <el-button link type="primary" @click="handleView(row)">详情</el-button>
-        <el-button v-if="canStoryUpdate" link type="primary" @click="handleEdit(row)">修改</el-button>
-        <el-button v-if="canStoryDelete" link type="danger" @click="handleDelete(row)">删除</el-button>
+        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.user-story-index-page {
-  min-height: 100%;
-}
-
-.user-story-index-panel {
-  padding-top: 20px;
-}
-
-.user-story-index-panel :deep(th.el-table__cell) {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.filter-container {
-  margin-bottom: 16px;
-}
-
-.query-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
-  min-width: 0;
-}
-
-.query-section {
-  min-width: 0;
-}
-
-.query-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px 20px;
-  align-items: start;
-  width: 100%;
-}
-
-.query-grid :deep(.el-form-item) {
-  display: flex;
-  width: 100%;
-  margin-bottom: 0;
-}
-
-.query-grid :deep(.el-form-item__content) {
-  flex: 1;
-  min-width: 0;
-}
-
-.query-grid :deep(.el-select),
-.query-grid :deep(.el-input) {
-  width: 100%;
-  flex: 1;
-}
-
-@media (max-width: 1200px) {
-  .query-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.user-story-index-operation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.user-story-index-operation__left {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.user-story-index-table :deep(.el-table__header-wrapper),
-.user-story-index-table :deep(.el-table__body-wrapper) {
-  scroll-behavior: auto;
-}
-
-@media (max-width: 768px) {
-  .user-story-index-panel {
-    padding-top: 18px;
-  }
-
-  .query-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .user-story-index-operation,
-  .user-story-index-operation__left {
-    align-items: stretch;
-  }
-}
-</style>

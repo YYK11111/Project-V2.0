@@ -30,7 +30,7 @@ const getButtons = (row) => [
 
 <template>
   <div class="opportunity-index-page">
-    <RequestChartTable ref="rctRef" class="opportunity-index-panel" :params="params" :request="getList" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="opportunity-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">

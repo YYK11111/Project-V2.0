@@ -59,7 +59,7 @@ const handleClick = (btn: OperationButton) => {
       {{ btn.label }}
     </el-button>
 
-    <el-dropdown v-if="overflowButtons.length" trigger="click">
+    <el-dropdown v-if="overflowButtons.length" trigger="click" teleported>
       <el-button text size="small" class="op-btn">
         更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
       </el-button>
@@ -83,14 +83,19 @@ const handleClick = (btn: OperationButton) => {
 
 <style scoped>
 .table-operation {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
 }
 
 /* 按钮 hover 主题色 */
 .op-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
   transition: color 0.15s;
 }
 

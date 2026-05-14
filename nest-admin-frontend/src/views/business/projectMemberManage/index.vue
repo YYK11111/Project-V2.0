@@ -186,6 +186,12 @@ const getButtons = (row: any) => [
   canProjectMemberDelete.value && row.isActive === '1' ? { key: 'remove', label: '移除', danger: true, onClick: () => handleRemoveMember(row) } : null,
 ].filter(Boolean)
 
+const getProjectButtons = (row: any) => [
+  { key: 'detail', label: '项目详情', onClick: () => goToProject(row) },
+]
+
+const getRowButtons = (row: any) => viewMode.value === 'member' ? getButtons(row) : getProjectButtons(row)
+
 const getRoleLabel = (role: string) => roles.value[role] || role || '-'
 
 async function loadStats() {
@@ -262,7 +268,7 @@ onMounted(() => {
       </el-radio-group>
     </div>
 
-    <RequestChartTable ref="rctRef" class="project-member-index-panel" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview" :is-selection="viewMode === 'member'">
+    <RequestChartTable ref="rctRef" class="project-member-index-panel business-list-panel" :params="params" :request="viewMode === 'member' ? getList : getProjectOverview" :is-selection="viewMode === 'member'">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">
@@ -408,16 +414,11 @@ onMounted(() => {
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="goToProject(row)">项目详情</el-button>
-            </template>
-          </el-table-column>
         </template>
       </template>
 
-      <template v-if="viewMode === 'member'" #tableOperation="{ row }">
-        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
+      <template #tableOperation="{ row }">
+        <TableOperation :buttons="getRowButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
 

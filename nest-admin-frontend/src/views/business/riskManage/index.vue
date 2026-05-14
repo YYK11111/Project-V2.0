@@ -168,7 +168,7 @@ const getButtons = (row) => [
 
 <template>
   <div class="risk-index-page">
-    <RequestChartTable ref="rctRef" class="risk-index-panel" :params="params" :request="getList" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="risk-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">

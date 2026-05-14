@@ -83,7 +83,7 @@ const getButtons = (row) => [
 
 <template>
   <div class="ticket-index-page">
-    <RequestChartTable ref="rctRef" class="ticket-index-panel" :params="params" :request="getList" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="ticket-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">

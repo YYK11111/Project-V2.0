@@ -91,8 +91,8 @@ const getButtons = (row) => [
 </script>
 
 <template>
-  <div class="project-index-page">
-    <RequestChartTable ref="rctRef" class="project-index-panel" :params="params" :request="getList" :is-selection="true">
+  <div class="project-index-page page-shell">
+    <RequestChartTable ref="rctRef" class="project-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">
@@ -158,10 +158,13 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="project-index-operation">
           <div class="project-index-operation__left">
+            <span class="project-index-operation__meta">已选 {{ selectedIds.length }} 项</span>
+          </div>
+          <div class="project-index-operation__actions">
             <el-button v-if="canProjectAdd" type="primary" @click="rctRef.goRoute(null, '/projectManage/form')">新增项目</el-button>
             <el-button v-if="canProjectUpdate" :loading="recalculatingProgress" @click="handleRecalculateAllProgress">重算全部进度</el-button>
+            <el-button v-if="canProjectDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
           </div>
-          <el-button v-if="canProjectDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 
@@ -197,14 +200,14 @@ const getButtons = (row) => [
         <el-table-column label="计划结束" prop="planEndDate" width="120" />
         <el-table-column label="状态" prop="status" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === '6' ? 'success' : row.status === '3' ? 'primary' : row.status === '2' || row.status === '5' ? 'warning' : row.status === '7' ? 'danger' : 'info'">
+            <el-tag :type="row.status === '6' ? 'success' : row.status === '2' || row.status === '3' || row.status === '5' ? 'warning' : row.status === '7' ? 'danger' : 'info'" effect="plain">
               {{ status[row.status] }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="审批状态" prop="approvalStatus" width="140">
           <template #default="{ row }">
-            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small">
+            <el-tag :type="row.approvalStatus === '2' ? 'success' : row.approvalStatus === '1' ? 'warning' : row.approvalStatus === '3' ? 'danger' : 'info'" size="small" effect="plain">
               {{ getProjectApprovalText(row) }}
             </el-tag>
           </template>
@@ -212,7 +215,7 @@ const getButtons = (row) => [
         <el-table-column label="当前节点" prop="currentNodeName" min-width="160" :show-overflow-tooltip="true" />
         <el-table-column label="优先级" prop="priority" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.priority === '3' ? 'danger' : row.priority === '2' ? 'warning' : 'info'" size="small">
+            <el-tag :type="row.priority === '3' ? 'danger' : row.priority === '2' ? 'warning' : 'info'" size="small" effect="plain">
               {{ priority[row.priority] }}
             </el-tag>
           </template>
@@ -236,7 +239,7 @@ const getButtons = (row) => [
         <el-table-column label="项目来源" prop="projectSource" width="120" />
         <el-table-column label="风险等级" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.riskLevel" :type="row.riskLevel === 'critical' ? 'danger' : row.riskLevel === 'high' ? 'warning' : 'info'" size="small">
+            <el-tag v-if="row.riskLevel" :type="row.riskLevel === 'critical' ? 'danger' : row.riskLevel === 'high' ? 'warning' : 'info'" size="small" effect="plain">
               {{ riskLevelMap[row.riskLevel] || row.riskLevel }}
             </el-tag>
             <span v-else>-</span>
@@ -244,7 +247,7 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="质量等级" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.qualityLevel" :type="row.qualityLevel === 'excellent' ? 'success' : row.qualityLevel === 'high' ? 'primary' : 'info'" size="small">
+            <el-tag v-if="row.qualityLevel" :type="row.qualityLevel === 'excellent' ? 'success' : row.qualityLevel === 'high' ? 'warning' : 'info'" size="small" effect="plain">
               {{ qualityLevelMap[row.qualityLevel] || row.qualityLevel }}
             </el-tag>
             <span v-else>-</span>
@@ -253,7 +256,7 @@ const getButtons = (row) => [
         <el-table-column label="累计工时" prop="spentHours" width="110" />
         <el-table-column label="是否归档" prop="isArchived" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.isArchived === '1' ? 'success' : 'info'" size="small">
+            <el-tag :type="row.isArchived === '1' ? 'success' : 'info'" size="small" effect="plain">
               {{ row.isArchived === '1' ? '已归档' : '未归档' }}
             </el-tag>
           </template>
@@ -292,6 +295,17 @@ const getButtons = (row) => [
   flex-wrap: wrap;
 }
 
+.project-index-operation__meta {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.project-index-operation__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .query-select-label {
   color: var(--el-text-color-regular);
   font-size: 14px;
@@ -318,6 +332,21 @@ const getButtons = (row) => [
   cursor: help;
 }
 
+.project-index-panel :deep(.el-tag--plain) {
+  border-color: var(--el-border-color-lighter);
+  background: #f7f7f7;
+}
+
+.project-index-panel :deep(th.el-table__cell) {
+  background: #f7f7f7;
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+}
+
+.project-index-panel :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f7f7f7;
+}
+
 .project-index-panel :deep(.el-table__header-wrapper),
 .project-index-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
@@ -339,7 +368,7 @@ const getButtons = (row) => [
   padding: 16px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--el-fill-color-extra-light) 72%, transparent);
+  background: #f7f7f7;
 }
 
 .query-section__header {
@@ -412,8 +441,25 @@ const getButtons = (row) => [
 }
 
 @media (max-width: 768px) {
+  .project-index-header {
+    flex-direction: column;
+  }
+
+  .project-index-header .page-header__actions {
+    width: 100%;
+  }
+
   .project-index-panel {
     padding-top: 18px;
+  }
+
+  .project-index-operation,
+  .project-index-operation__left {
+    align-items: stretch;
+  }
+
+  .project-index-operation__actions {
+    width: 100%;
   }
 
   .query-grid {
