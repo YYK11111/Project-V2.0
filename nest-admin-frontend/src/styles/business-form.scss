@@ -1,0 +1,139 @@
+.business-form-page {
+  min-height: 100%;
+}
+
+.business-form-shell,
+.business-form-page .form-page-shell__content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.business-form-header,
+.business-form-shell__top {
+  margin-bottom: 20px;
+}
+
+.business-form {
+  width: 100%;
+  max-width: none !important;
+  --FormItemContentMaxWidth: 100%;
+}
+
+.business-form .el-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.business-form-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.business-form-section {
+  min-width: 0;
+  max-width: 100%;
+  padding: 22px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+}
+
+.business-form-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.business-form-section__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.business-form-section__desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.business-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.business-form-fields--content {
+  gap: 26px;
+}
+
+.business-form-page .el-form-item,
+.business-form-fields .el-form-item,
+.business-form-section .el-form-item {
+  margin: 0 !important;
+}
+
+.business-form-page .el-form-item__label {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.business-form-footer {
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.business-form-footer .el-form-item__content,
+.business-form-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.business-form-footer .el-button,
+.business-form-footer-actions .el-button {
+  min-width: 112px;
+}
+
+.business-form-footer .el-button + .el-button,
+.business-form-footer-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.business-workflow-section {
+  margin-top: 22px;
+  padding: 22px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-bg-color);
+}
+
+.business-workflow-section__header {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+@media (max-width: 768px) {
+  .business-form-sections {
+    gap: 18px;
+  }
+
+  .business-form-section,
+  .business-workflow-section {
+    padding: 18px;
+    border-radius: 12px;
+  }
+
+  .business-form-section__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

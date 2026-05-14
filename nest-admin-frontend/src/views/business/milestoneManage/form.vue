@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import Upload from '@/components/Upload.vue'
@@ -166,13 +167,15 @@ function cancel() {
 </script>
 
 <template>
-  <div class="milestone-form-page">
-    <div class="Gcard milestone-form-shell">
-    <div class="milestone-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isView ? '里程碑详情' : isEdit ? '编辑里程碑' : '新增里程碑'" />
-    </div>
+  <FormPageShell class="milestone-form-page">
+    <template #footerMeta>
+      <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
+      <span v-if="hasMilestoneId">当前里程碑已关联任务</span>
+    </template>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+    <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? '里程碑详情' : isEdit ? '编辑里程碑' : '新增里程碑'" />
+
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
       <div class="milestone-sections">
       <section class="section-card">
         <div class="section-header">
@@ -227,7 +230,7 @@ function cancel() {
         </el-select>
       </el-form-item>
 
-      <el-form-item label="实际完成日期" v-if="isEdit.value">
+      <el-form-item label="实际完成日期" v-if="isEdit">
         <el-date-picker v-model="form.completedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
       </el-form-item>
 
@@ -350,30 +353,18 @@ function cancel() {
         </section>
       </template>
 
-      <el-form-item v-if="!isView" class="footer-actions">
-        <el-button v-if="!isView && (isEdit ? canMilestoneUpdate : canMilestoneAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">取消</el-button>
-      </el-form-item>
       </div>
     </el-form>
-    </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isView && (isEdit ? canMilestoneUpdate : canMilestoneAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">取消</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style scoped>
 .milestone-form-page {
   min-height: 100%;
-}
-
-.milestone-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.milestone-form-shell__top {
-  margin-bottom: 20px;
 }
 
 .milestone-sections {
@@ -419,20 +410,6 @@ function cancel() {
 .milestone-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 
 .input-new-tag {

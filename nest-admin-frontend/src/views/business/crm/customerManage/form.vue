@@ -13,6 +13,7 @@ import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.v
 import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -270,7 +271,7 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="customer-form-page">
+  <FormPageShell class="customer-form-page">
     <div class="Gcard customer-form-shell">
     <div class="customer-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '客户详情' : isEdit ? '编辑客户' : '新增客户'">
@@ -298,7 +299,7 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" style="max-width: 1000px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" class="business-form" style="max-width: 1000px">
       <div class="customer-sections">
       <section class="section-card">
         <div class="section-header">
@@ -470,11 +471,6 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">暂存</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-        <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd) && canSubmitApprovalAction" type="warning" @click="handleSubmitApproval">提交</el-button>
-      </el-form-item>
       </div>
     </el-form>
 
@@ -488,7 +484,12 @@ function scrollToWorkflowPanel() {
       />
     </div>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">暂存</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+      <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd) && canSubmitApprovalAction" type="warning" @click="handleSubmitApproval">提交</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

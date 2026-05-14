@@ -7,6 +7,7 @@ import Upload from '@/components/Upload.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -101,13 +102,13 @@ function cancel() {
 </script>
 
 <template>
-  <div class="interaction-form-page">
+  <FormPageShell class="interaction-form-page">
     <div class="Gcard interaction-form-shell">
     <div class="interaction-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '互动记录详情' : isEdit ? '编辑互动记录' : '新增互动记录'" />
     </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
       <div class="interaction-sections">
       <section class="section-card">
         <div class="section-header">
@@ -208,14 +209,14 @@ function cancel() {
         </div>
       </section>
 
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canInteractionUpdate : canInteractionAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-      </el-form-item>
       </div>
     </el-form>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canInteractionUpdate : canInteractionAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

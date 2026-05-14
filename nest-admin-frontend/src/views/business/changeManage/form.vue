@@ -13,6 +13,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
@@ -293,14 +294,14 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="change-form-page">
+  <FormPageShell class="change-form-page">
     <div class="Gcard change-form-shell">
     <div class="change-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
-          <el-button v-if="route.query.id && canArticleAdd" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+          <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
+          <el-button v-if="route.query.id && canArticleAdd" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
           <el-button v-if="route.query.id && !form.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('milestone')">确认里程碑已处理</el-button>
           <el-button v-if="route.query.id" type="primary" plain @click="handleApplyPlanImpact('milestone')">应用到里程碑</el-button>
           <el-button v-if="route.query.id && !form.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope('sprint')">确认 Sprint 已处理</el-button>
@@ -314,7 +315,7 @@ function scrollToWorkflowPanel() {
     </div>
 
     <el-alert
-      v-if="(isEdit.value || isView.value) && form.approvalStatus === '3'"
+      v-if="(isEdit || isView) && form.approvalStatus === '3'"
       :title="String(form.currentNodeName || '').includes('退回发起人') ? '该变更已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该变更已驳回，可调整内容后重新提交审批。'"
       type="warning"
       :closable="false"
@@ -330,7 +331,7 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
       <div class="change-sections">
       <section class="section-card">
         <div class="section-header">
@@ -566,13 +567,6 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canChangeUpdate : canChangeAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-        <el-button v-if="!isReadonly && isEdit.value && canChangeUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-        <el-button v-if="!isWorkflowReadonly && isEdit.value && canChangeUpdate && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
-        <el-button v-if="!isWorkflowReadonly && isEdit.value && canChangeUpdate && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
-      </el-form-item>
       </div>
     </el-form>
 
@@ -586,7 +580,14 @@ function scrollToWorkflowPanel() {
       />
     </div>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canChangeUpdate : canChangeAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+      <el-button v-if="!isReadonly && isEdit && canChangeUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="!isWorkflowReadonly && isEdit && canChangeUpdate && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
+      <el-button v-if="!isWorkflowReadonly && isEdit && canChangeUpdate && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

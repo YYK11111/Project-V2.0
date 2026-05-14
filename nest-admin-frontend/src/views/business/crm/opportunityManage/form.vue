@@ -7,6 +7,7 @@ import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -108,13 +109,13 @@ function cancel() {
 </script>
 
 <template>
-  <div class="opportunity-form-page">
+  <FormPageShell class="opportunity-form-page">
     <div class="Gcard opportunity-form-shell">
     <div class="opportunity-form-shell__top">
       <el-page-header @back="$router.back()" :title="isReadonly ? '销售机会详情' : isEdit ? '编辑销售机会' : '新增销售机会'" />
     </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 900px">
       <div class="opportunity-sections">
       <section class="section-card">
         <div class="section-header">
@@ -157,43 +158,6 @@ function cancel() {
         </el-col>
       </el-row>
 
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="预期金额(元)" prop="expectedAmount">
-            <ViewField v-if="isReadonly" :value="form.expectedAmount" />
-            <el-input-number v-else v-model="form.expectedAmount" :min="0" :precision="2" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="销售阶段" prop="stage">
-            <ViewTagField v-if="isReadonly" :text="stages[form.stage]" :type="form.stage === '5' ? 'success' : form.stage === '4' ? 'warning' : 'primary'" />
-            <el-select v-else v-model="form.stage" placeholder="请选择销售阶段" style="width: 100%">
-              <el-option v-for="(value, key) of stages" :key="key" :label="value" :value="key" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="成功概率(%)" prop="successRate">
-            <ViewField v-if="isReadonly" :value="form.successRate" />
-            <el-slider v-else v-model="form.successRate" :min="0" :max="100" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="预计成交时间" prop="expectedCloseDate">
-            <ViewField v-if="isReadonly" :value="form.expectedCloseDate" />
-            <el-date-picker
-              v-else
-              v-model="form.expectedCloseDate"
-              type="date"
-              placeholder="选择预计成交时间"
-              value-format="YYYY-MM-DD"
-              style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
         </div>
       </section>
 
@@ -282,14 +246,14 @@ function cancel() {
         </div>
       </section>
 
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canOpportunityUpdate : canOpportunityAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-      </el-form-item>
       </div>
     </el-form>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canOpportunityUpdate : canOpportunityAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

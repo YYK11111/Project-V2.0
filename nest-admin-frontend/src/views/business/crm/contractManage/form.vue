@@ -9,6 +9,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -115,13 +116,13 @@ function cancel() {
 </script>
 
 <template>
-  <div class="contract-form-page">
+  <FormPageShell class="contract-form-page">
     <div class="Gcard contract-form-shell">
       <div class="contract-form-shell__top">
         <el-page-header @back="$router.back()" :title="isReadonly ? '合同详情' : isEdit ? '编辑合同' : '新增合同'" />
       </div>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 900px">
         <div class="contract-sections">
           <section class="section-card">
             <div class="section-header">
@@ -285,14 +286,14 @@ function cancel() {
             </div>
           </section>
 
-          <el-form-item class="footer-actions">
-            <el-button v-if="!isReadonly && (isEdit ? canContractUpdate : canContractAdd)" type="primary" @click="submit">提交</el-button>
-            <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-          </el-form-item>
         </div>
       </el-form>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canContractUpdate : canContractAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

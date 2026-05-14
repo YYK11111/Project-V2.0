@@ -15,6 +15,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
@@ -237,20 +238,22 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="ticket-form-page">
-    <div class="Gcard ticket-form-shell">
-    <div class="ticket-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '工单详情' : isEdit ? '编辑工单' : '新增工单'">
-        <template #extra>
-          <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-          <el-button v-if="canArticleAdd && canEditCurrentTicket" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
-          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
-          <el-button v-if="route.query.id && canArticleAdd && canEditCurrentTicket" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
-          <el-button v-if="route.query.id && canEditCurrentTicket" type="warning" plain @click="handleConvertToTask">转任务</el-button>
-          <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-        </template>
-      </el-page-header>
-    </div>
+  <FormPageShell class="ticket-form-page">
+    <template #footerMeta>
+      <span>{{ isReadonly ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
+      <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
+    </template>
+
+    <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '工单详情' : isEdit ? '编辑工单' : '新增工单'">
+      <template #extra>
+        <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
+        <el-button v-if="canArticleAdd && canEditCurrentTicket" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
+        <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
+        <el-button v-if="route.query.id && canArticleAdd && canEditCurrentTicket" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+        <el-button v-if="route.query.id && canEditCurrentTicket" type="warning" plain @click="handleConvertToTask">转任务</el-button>
+        <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
+      </template>
+    </el-page-header>
 
     <el-alert
       v-if="isEdit && form.approvalStatus === '3'"
@@ -269,7 +272,7 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 900px; --FormItemContentMaxWidth: 100%;">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 900px; --FormItemContentMaxWidth: 100%;">
       <div class="ticket-sections">
       <section class="section-card">
         <div class="section-header">
@@ -479,13 +482,13 @@ function scrollToWorkflowPanel() {
         </el-form-item>
       </section>
 
-      <el-form-item class="footer-actions">
-        <el-button v-if="!isReadonly && (isEdit ? canTicketUpdate : canTicketAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-        <el-button v-if="!isReadonly && isEdit && canTicketUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      </el-form-item>
       </div>
     </el-form>
+    <template #footer>
+      <el-button v-if="!isReadonly && isEdit && canTicketUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="!isReadonly && (isEdit ? canTicketUpdate : canTicketAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+    </template>
 
     <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
       <div class="workflow-panel-section__header">审批操作区</div>
@@ -496,8 +499,7 @@ function scrollToWorkflowPanel() {
         @approved="reloadCurrent"
       />
     </div>
-    </div>
-  </div>
+    </FormPageShell>
 </template>
 
 <style lang="scss" scoped>
@@ -505,20 +507,9 @@ function scrollToWorkflowPanel() {
   min-height: 100%;
 }
 
-.ticket-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
 .ticket-form-page :deep(.el-row) {
   margin-left: 0 !important;
   margin-right: 0 !important;
-}
-
-.ticket-form-shell__top {
-  margin-bottom: 20px;
 }
 
 .ticket-sections {
@@ -589,20 +580,6 @@ function scrollToWorkflowPanel() {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 
 @media (max-width: 768px) {

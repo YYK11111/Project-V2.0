@@ -24,6 +24,7 @@ import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import ViewUserList from '@/components/view/ViewUserList.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -120,6 +121,7 @@ const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId &&
 const workflowPanelRef = ref()
 const reportSectionRef = ref()
 const commentSectionRef = ref()
+const pageStatusText = computed(() => status.value[String(form.value.status || '')] || (isReadonly.value ? '查看中' : isEdit.value ? '编辑中' : '新建中'))
 
 const isTaskFormRoute = useCurrentRouteGuard(route, '/taskManage/form')
 
@@ -692,24 +694,13 @@ watch(hasTaskId, (value) => {
 </script>
 
 <template>
-  <div class="task-form-page">
-    <div class="Gcard task-form-shell">
-      <div class="task-form-shell__top">
-        <el-page-header @back="$router.back()" :title="isReadonly ? '任务详情' : isEdit ? '编辑任务' : '新增任务'">
-          <template #extra>
-            <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
-            <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>
-            <el-button v-if="canResumeTask" type="success" plain @click="handleResumeTask">恢复任务</el-button>
-            <el-button v-if="canDelayTask" type="danger" plain @click="handleDelayTask">任务延期</el-button>
-            <el-button v-if="canSubmitCompletion" type="warning" plain @click="handleSubmitCompletionApproval">提交完成审批</el-button>
-            <el-button v-if="canCreateTimeLog" type="success" plain :icon="DocumentAdd" @click="openTimeLogDialog">新增汇报</el-button>
-            <el-button v-if="canCreateComment" type="primary" :icon="ChatDotRound" @click="openCommentDialog">发表评论</el-button>
-            <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-            <el-button v-if="canCloseReturnedInstance && canEditCurrentTask" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
-          </template>
-        </el-page-header>
-      </div>
+  <FormPageShell class="task-form-page">
+    <template #footerMeta>
+      <span>{{ pageStatusText }}</span>
+      <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
+    </template>
 
+    <div class="Gcard task-form-shell">
       <el-alert
         v-if="isEdit && form.approvalStatus === '3'"
         :title="String(form.currentNodeName || '').includes('退回发起人') ? '该任务审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该任务审批已驳回，请根据意见调整后重新提交。'"
@@ -727,7 +718,7 @@ watch(hasTaskId, (value) => {
         </template>
       </el-alert>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="business-form" style="--FormItemContentMaxWidth: 100%;">
         <div class="task-sections">
       <section class="task-section section-card section-card--basic">
         <div class="task-section__header">
@@ -753,7 +744,7 @@ watch(hasTaskId, (value) => {
 
         <el-row :gutter="20" class="task-info-row">
           <el-col :xs="24" :sm="hasTaskId ? 12 : 24">
-            <el-form-item label="任务名称" prop="name">
+            <el-form-item label="任务名称" prop="name" class="task-name-item">
               <ViewField v-if="isReadonly" :value="form.name" />
               <el-input v-else v-model="form.name" placeholder="请输入任务名称" maxlength="100" show-word-limit />
             </el-form-item>
@@ -1125,16 +1116,6 @@ watch(hasTaskId, (value) => {
 
         </div>
 
-        <el-form-item class="footer-actions">
-          <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">提交</el-button>
-          <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-          <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-          <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
-          <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>
-          <el-button v-if="canResumeTask" type="success" plain @click="handleResumeTask">恢复任务</el-button>
-          <el-button v-if="canDelayTask" type="danger" plain @click="handleDelayTask">任务延期</el-button>
-          <el-button v-if="canSubmitCompletion" type="warning" plain @click="handleSubmitCompletionApproval">提交完成审批</el-button>
-        </el-form-item>
       </el-form>
 
       <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
@@ -1147,6 +1128,17 @@ watch(hasTaskId, (value) => {
         />
       </div>
     </div>
+
+    <template #footer>
+      <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">暂存</el-button>
+      <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
+      <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
+      <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>
+      <el-button v-if="canResumeTask" type="success" plain @click="handleResumeTask">恢复任务</el-button>
+      <el-button v-if="canDelayTask" type="danger" plain @click="handleDelayTask">任务延期</el-button>
+      <el-button v-if="canSubmitCompletion" type="warning" plain @click="handleSubmitCompletionApproval">提交完成审批</el-button>
+    </template>
 
     <BaDialog v-model="reportDialogVisible" :title="timeLogForm.id ? '编辑任务汇报' : '新增任务汇报'" width="760" @confirm="submitTaskTimeLog">
       <template #form>
@@ -1183,7 +1175,7 @@ watch(hasTaskId, (value) => {
         </el-form>
       </template>
     </BaDialog>
-  </div>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>
@@ -1197,33 +1189,17 @@ watch(hasTaskId, (value) => {
   padding: 0;
 }
 
-.task-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.task-form-shell__top {
-  margin-bottom: 20px;
-}
-
 .task-sections {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
 }
 
 .task-section {
   padding: 22px;
-  border: 1px solid color-mix(in srgb, var(--Color) 8%, var(--el-border-color-lighter));
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
   background: var(--el-bg-color);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-}
-
-.section-card--basic .task-section__header {
-  margin-bottom: 22px;
 }
 
 .task-section__header {
@@ -1234,7 +1210,7 @@ watch(hasTaskId, (value) => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -1256,7 +1232,7 @@ watch(hasTaskId, (value) => {
 .task-execution-fields {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
 }
 
 .task-info-row {
@@ -1280,7 +1256,7 @@ watch(hasTaskId, (value) => {
   padding: 16px;
   border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
-  background: var(--el-fill-color-extra-light);
+  background: #f7f7f7;
 }
 
 .metric-card__title {
@@ -1495,34 +1471,14 @@ watch(hasTaskId, (value) => {
   }
 }
 
-.footer-actions {
-  margin-top: 4px;
-  padding-top: 12px;
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
-}
-
 .task-form-page :deep(.el-form-item__label) {
   font-weight: 600;
+  font-size: 14px;
   color: var(--el-text-color-primary);
 }
 
-.task-basic-fields :deep(.el-form-item),
-.task-execution-fields :deep(.el-form-item),
-.task-approval-fields :deep(.el-form-item) {
-  margin: 0 !important;
+.task-name-item :deep(.el-form-item__label) {
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {

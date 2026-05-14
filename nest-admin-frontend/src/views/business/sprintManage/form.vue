@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getOne, save, update, getStatus } from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
+import FormPageShell from '@/components/FormPageShell.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
@@ -141,13 +142,15 @@ function cancel() {
 </script>
 
 <template>
-  <div class="sprint-form-page">
-    <div class="Gcard sprint-form-shell">
-    <div class="sprint-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isView ? 'Sprint详情' : isEdit ? '编辑Sprint' : '新增Sprint'" />
-    </div>
+  <FormPageShell class="sprint-form-page">
+    <template #footerMeta>
+      <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
+      <span v-if="hasSprintId">当前 Sprint 已关联任务</span>
+    </template>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px">
+    <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? 'Sprint详情' : isEdit ? '编辑Sprint' : '新增Sprint'" />
+
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
       <div class="sprint-sections">
       <section class="section-card">
         <div class="section-header">
@@ -281,14 +284,13 @@ function cancel() {
         </div>
       </section>
 
-      <el-form-item v-if="!isView" class="footer-actions">
-        <el-button v-if="!isView && (isEdit ? canSprintUpdate : canSprintAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">取消</el-button>
-      </el-form-item>
       </div>
     </el-form>
-    </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isView && (isEdit ? canSprintUpdate : canSprintAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">取消</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style scoped>
@@ -296,20 +298,9 @@ function cancel() {
   min-height: 100%;
 }
 
-.sprint-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
 .sprint-form-page :deep(.el-row) {
   margin-left: 0 !important;
   margin-right: 0 !important;
-}
-
-.sprint-form-shell__top {
-  margin-bottom: 20px;
 }
 
 .sprint-sections {
@@ -355,20 +346,6 @@ function cancel() {
 .sprint-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 
 .sprint-impact-alert__title {

@@ -13,6 +13,7 @@ import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import FormPageShell from '@/components/FormPageShell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,19 +141,21 @@ async function handleConvertToTask() {
 </script>
 
 <template>
-  <div class="risk-form-page">
-    <div class="Gcard risk-form-shell">
-    <div class="risk-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
-        <template #extra>
-          <el-button v-if="form.value?.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.value.knowledgeArticleId } })">查看知识</el-button>
-          <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.value?.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
-          <el-button v-if="route.query.id && canEditCurrentRisk" type="warning" plain @click="handleConvertToTask">转任务</el-button>
-        </template>
-      </el-page-header>
-    </div>
+  <FormPageShell class="risk-form-page">
+    <template #footerMeta>
+      <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
+      <span v-if="form.knowledgeArticleId">已沉淀知识</span>
+    </template>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
+    <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
+      <template #extra>
+        <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
+        <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+        <el-button v-if="route.query.id && canEditCurrentRisk" type="warning" plain @click="handleConvertToTask">转任务</el-button>
+      </template>
+    </el-page-header>
+
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
       <div class="risk-sections">
       <section class="section-card">
         <div class="section-header">
@@ -208,7 +211,7 @@ async function handleConvertToTask() {
         <el-date-picker v-else v-model="form.dueDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
       </el-form-item>
 
-      <el-form-item label="实际解决日期" v-if="isEdit.value">
+      <el-form-item label="实际解决日期" v-if="isEdit">
         <el-date-picker v-model="form.resolvedDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" :disabled="isView" style="width: 100%" />
       </el-form-item>
         </div>
@@ -267,30 +270,18 @@ async function handleConvertToTask() {
         </div>
       </section>
 
-      <el-form-item v-if="!isView" class="footer-actions">
-        <el-button v-if="!isView && (isEdit ? canRiskUpdate : canRiskAdd)" type="primary" @click="submit">提交</el-button>
-        <el-button @click="cancel">取消</el-button>
-      </el-form-item>
       </div>
     </el-form>
-    </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isView && (isEdit ? canRiskUpdate : canRiskAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">取消</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>
 .risk-form-page {
   min-height: 100%;
-}
-
-.risk-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.risk-form-shell__top {
-  margin-bottom: 20px;
 }
 
 .risk-sections {
@@ -336,19 +327,5 @@ async function handleConvertToTask() {
 .risk-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 </style>

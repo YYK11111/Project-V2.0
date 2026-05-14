@@ -11,6 +11,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -171,7 +172,7 @@ async function handleCreateTaskFromStory() {
 </script>
 
 <template>
-  <div class="story-form-page">
+  <FormPageShell class="story-form-page">
     <div class="Gcard story-form-shell">
       <div class="story-form-shell__top">
         <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'">
@@ -315,13 +316,13 @@ async function handleCreateTaskFromStory() {
           </section>
         </div>
 
-        <el-form-item class="footer-actions">
-          <el-button v-if="!isView && (isEdit ? canStoryUpdate : canStoryAdd)" type="primary" @click="submit">提交</el-button>
-          <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
-        </el-form-item>
       </el-form>
     </div>
-  </div>
+    <template #footer>
+      <el-button v-if="!isView && (isEdit ? canStoryUpdate : canStoryAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button @click="cancel">{{ isView ? '返回' : '取消' }}</el-button>
+    </template>
+  </FormPageShell>
 </template>
 
 <style lang="scss" scoped>

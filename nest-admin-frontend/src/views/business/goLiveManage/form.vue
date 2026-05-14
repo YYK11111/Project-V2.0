@@ -2,6 +2,7 @@
 import { watch } from 'vue'
 import { getOne, save, update, getStatuses, submitApproval } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
+import FormPageShell from '@/components/FormPageShell.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
@@ -96,76 +97,88 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <div class="Gcard go-live-form-shell">
-    <el-page-header class="mb20" @back="$router.back()" :title="isReadonly ? '上线单详情' : isEdit ? '编辑上线单' : '新增上线单'">
+  <FormPageShell class="business-form-page">
+    <template #footerMeta>
+      <span>{{ isReadonly ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
+      <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
+    </template>
+
+    <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '上线单详情' : isEdit ? '编辑上线单' : '新增上线单'">
       <template #extra>
         <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
         <el-button v-if="form.workflowInstanceId && String(form.currentNodeName || '').includes('退回发起人')" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
       </template>
     </el-page-header>
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 840px">
-      <el-form-item label="上线标题" prop="title">
-        <ViewField v-if="isReadonly" :value="form.title" />
-        <el-input v-else v-model="form.title" placeholder="请输入上线标题" />
-      </el-form-item>
-      <el-form-item label="所属项目" prop="projectId">
-        <ViewEntity v-if="isReadonly" :title="form.project?.name" :subtitle="form.project?.code" />
-        <ProjectSelect v-else v-model="form.projectId" placeholder="请选择项目" />
-      </el-form-item>
-      <el-form-item label="负责人">
-        <ViewUser v-if="isReadonly" :user="form.owner" />
-        <UserSelect v-else v-model="form.ownerId" placeholder="请选择负责人" clearable />
-      </el-form-item>
-      <el-form-item label="计划上线日期">
-        <ViewField v-if="isReadonly" :value="form.plannedGoLiveTime" />
-        <el-date-picker v-else v-model="form.plannedGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-      </el-form-item>
-      <el-form-item label="实际上线日期">
-        <ViewField v-if="isReadonly" :value="form.actualGoLiveTime" />
-        <el-date-picker v-else v-model="form.actualGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-      </el-form-item>
-      <el-form-item label="状态">
-        <ViewField v-if="isReadonly" :value="statusMap[form.status] || '-'" />
-        <el-select v-else v-model="form.status" style="width: 100%">
-          <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="检查项摘要">
-        <ViewField v-if="isReadonly" :value="form.checklistSummary" />
-        <el-input v-else v-model="form.checklistSummary" type="textarea" :rows="3" placeholder="请输入检查项摘要" />
-      </el-form-item>
-      <el-form-item label="回退预案">
-        <ViewField v-if="isReadonly" :value="form.rollbackPlan" />
-        <el-input v-else v-model="form.rollbackPlan" type="textarea" :rows="3" placeholder="请输入回退预案" />
-      </el-form-item>
-      <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-        <div class="workflow-panel-section__header">审批操作区</div>
-        <WorkflowApprovalPanel :task-id="workflowTaskId" :instance-id="workflowInstanceId" :node-name="form.currentNodeName || '上线审批'" @approved="loadData" />
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+        <section class="business-form-section">
+          <div class="business-form-section__header">
+            <div>
+              <div class="business-form-section__title">基本信息</div>
+              <div class="business-form-section__desc">维护上线标题、所属项目、负责人、上线时间和当前状态，先明确上线动作的基础边界。</div>
+            </div>
+          </div>
+
+          <div class="business-form-fields">
+            <el-form-item label="上线标题" prop="title">
+              <ViewField v-if="isReadonly" :value="form.title" />
+              <el-input v-else v-model="form.title" placeholder="请输入上线标题" />
+            </el-form-item>
+            <el-form-item label="所属项目" prop="projectId">
+              <ViewEntity v-if="isReadonly" :title="form.project?.name" :subtitle="form.project?.code" />
+              <ProjectSelect v-else v-model="form.projectId" placeholder="请选择项目" />
+            </el-form-item>
+            <el-form-item label="负责人">
+              <ViewUser v-if="isReadonly" :user="form.owner" />
+              <UserSelect v-else v-model="form.ownerId" placeholder="请选择负责人" clearable />
+            </el-form-item>
+            <el-form-item label="计划上线日期">
+              <ViewField v-if="isReadonly" :value="form.plannedGoLiveTime" />
+              <el-date-picker v-else v-model="form.plannedGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="实际上线日期">
+              <ViewField v-if="isReadonly" :value="form.actualGoLiveTime" />
+              <el-date-picker v-else v-model="form.actualGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="状态">
+              <ViewField v-if="isReadonly" :value="statusMap[form.status] || '-'" />
+              <el-select v-else v-model="form.status" style="width: 100%">
+                <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
+              </el-select>
+            </el-form-item>
+          </div>
+        </section>
+
+        <section class="business-form-section">
+          <div class="business-form-section__header">
+            <div>
+              <div class="business-form-section__title">上线检查与回退</div>
+              <div class="business-form-section__desc">补充检查项摘要和回退预案，保证上线前后的风险控制有据可查。</div>
+            </div>
+          </div>
+
+          <div class="business-form-fields business-form-fields--content">
+            <el-form-item label="检查项摘要">
+              <ViewField v-if="isReadonly" :value="form.checklistSummary" />
+              <el-input v-else v-model="form.checklistSummary" type="textarea" :rows="3" placeholder="请输入检查项摘要" />
+            </el-form-item>
+            <el-form-item label="回退预案">
+              <ViewField v-if="isReadonly" :value="form.rollbackPlan" />
+              <el-input v-else v-model="form.rollbackPlan" type="textarea" :rows="3" placeholder="请输入回退预案" />
+            </el-form-item>
+          </div>
+        </section>
+
+        <section v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="business-workflow-section">
+          <div class="business-workflow-section__header">审批操作区</div>
+          <WorkflowApprovalPanel :task-id="workflowTaskId" :instance-id="workflowInstanceId" :node-name="form.currentNodeName || '上线审批'" @approved="loadData" />
+        </section>
       </div>
-      <el-form-item v-if="!isReadonly">
-        <el-button type="primary" @click="submit">提交</el-button>
-        <el-button v-if="isEdit" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-        <el-button @click="$router.back()">取消</el-button>
-      </el-form-item>
     </el-form>
-  </div>
+    <template #footer>
+      <el-button v-if="!isReadonly && isEdit" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button type="primary" @click="submit">提交</el-button>
+      <el-button @click="$router.back()">取消</el-button>
+    </template>
+  </FormPageShell>
 </template>
-
-<style scoped>
-.go-live-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.workflow-panel-section {
-  margin: 24px 0;
-}
-
-.workflow-panel-section__header {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-</style>
