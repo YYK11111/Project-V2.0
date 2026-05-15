@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
 } from "@nestjs/common";
 import { ProjectMembersService } from "./service";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
@@ -39,18 +40,33 @@ export class ProjectMembersController extends BaseController<
   }
 
   @Post()
-  addMember(@Body() data: ProjectMemberDto) {
-    return this.service.addMember(data);
+  addMember(@Body() data: ProjectMemberDto, @Req() req: any) {
+    return this.service.addMember({
+      ...data,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
   }
 
   @Put(":id")
-  updateMember(@Param("id") id: string, @Body() data: UpdateProjectMemberDto) {
-    return this.service.updateMember(id, data);
+  updateMember(
+    @Param("id") id: string,
+    @Body() data: UpdateProjectMemberDto,
+    @Req() req: any,
+  ) {
+    return this.service.updateMember(id, {
+      ...data,
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    } as any);
   }
 
   @Delete(":id")
-  removeMember(@Param("id") id: string) {
-    return this.service.removeMember(id);
+  removeMember(@Param("id") id: string, @Req() req: any) {
+    return this.service.removeMember(id, {
+      _operatorId: req.user?.id,
+      _operatorPermissions: req.user?.permissions || [],
+    });
   }
 
   @Get("project/:projectId")

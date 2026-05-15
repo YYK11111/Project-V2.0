@@ -66,6 +66,7 @@ export class ChangesService extends BaseService<
       operatorPermissions,
     );
     const canEdit =
+      Boolean(context?.canManageChanges) ||
       Boolean(context?.isManager) ||
       Boolean(context?.isDeliveryManager) ||
       Boolean(context?.isFunctionalLead) ||
@@ -74,6 +75,7 @@ export class ChangesService extends BaseService<
     return {
       canEdit,
       canDelete:
+        Boolean(context?.canManageChanges) ||
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(change.requesterId || "") === String(operatorId) ||
@@ -103,6 +105,7 @@ export class ChangesService extends BaseService<
       operatorPermissions,
     );
     const canEdit =
+      context.canManageChanges ||
       context.isManager ||
       context.isDeliveryManager ||
       context.isFunctionalLead ||

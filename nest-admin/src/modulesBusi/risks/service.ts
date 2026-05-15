@@ -49,6 +49,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       operatorPermissions,
     );
     const canEdit =
+      context.canManageRisks ||
       context.isManager ||
       context.isDeliveryManager ||
       context.isFunctionalLead ||
@@ -75,6 +76,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       operatorPermissions,
     );
     const canEdit =
+      Boolean(context?.canManageRisks) ||
       Boolean(context?.isManager) ||
       Boolean(context?.isDeliveryManager) ||
       Boolean(context?.isFunctionalLead) ||
@@ -83,6 +85,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     return {
       canEdit,
       canDelete:
+        Boolean(context?.canManageRisks) ||
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(risk.riskOwnerId || "") === String(operatorId) ||

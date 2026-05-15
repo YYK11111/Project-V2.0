@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
 import { ProjectsService } from "./service";
 
@@ -67,10 +67,22 @@ export class ProjectExecutionPermissionService {
       manageAllPermissionKey,
     );
     await this.projectsService.assertProjectNotArchived(projectId);
-    return this.projectsService.assertExecutionObjectPermission(
+    const context = await this.projectsService.assertExecutionObjectPermission(
       projectId,
       userId,
       scopedPermissions,
     );
+    const permissionKey = String(manageAllPermissionKey || "");
+    const canWrite = permissionKey.includes("milestones")
+      ? context.canManagePlan
+      : permissionKey.includes("go-live-records") ||
+          permissionKey.includes("acceptance-records") ||
+          permissionKey.includes("handover-records")
+        ? context.canManageDelivery
+        : context.canManageExecution;
+    if (!canWrite) {
+      throw new ForbiddenException("当前无维护项目执行对象的权限");
+    }
+    return context;
   }
 }

@@ -1262,6 +1262,17 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
           ProjectMemberRole.testLead,
         ].includes(role as any);
         const isVisitor = role === ProjectMemberRole.visitor;
+        const canManagePlan = canManageAll || isManager || isDeliveryManager;
+        const canManageDelivery =
+          canManageAll || isManager || isDeliveryManager;
+        const canManageExecution =
+          canManageAll ||
+          isManager ||
+          isDeliveryManager ||
+          isFunctionalLead ||
+          isCore;
+        const canManageQuality =
+          canManageAll || isManager || isDeliveryManager || isFunctionalLead;
         Object.assign(project, {
           permissionContext: {
             role,
@@ -1283,6 +1294,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
             canSubmitClose: canManageAll || isManager,
             canArchive: canManageAll,
             canDelete: canManageAll,
+            canManageMembers: canManageAll || isManager,
+            canManagePlan,
+            canManageExecution,
+            canManageTasks: canManageExecution,
+            canManageRisks: canManageQuality,
+            canManageChanges: canManageQuality,
+            canManageDelivery,
+            canReadExecution: !isVisitor,
           },
         });
       }
@@ -1629,6 +1648,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     ].includes(role as any);
     const isVisitor = role === ProjectMemberRole.visitor;
     const isMember = Boolean(member) || isLeader;
+    const isCore = String(member?.isCore || "0") === "1";
     const hasApprovalParticipantAccess =
       await this.businessApprovalContextService?.hasRootBusinessParticipantAccess(
         userId,
@@ -1644,6 +1664,26 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         userName,
         hasApprovalAccess,
       );
+    const canManageProject =
+      canViewPrivateProject && (canManageAll || isManager);
+    const canManagePlan =
+      canViewPrivateProject && (canManageAll || isManager || isDeliveryManager);
+    const canManageDelivery =
+      canViewPrivateProject && (canManageAll || isManager || isDeliveryManager);
+    const canManageExecution =
+      canViewPrivateProject &&
+      (canManageAll ||
+        isManager ||
+        isDeliveryManager ||
+        isFunctionalLead ||
+        isCore);
+    const canManageQuality =
+      canViewPrivateProject &&
+      (canManageAll || isManager || isDeliveryManager || isFunctionalLead);
+    const canReadExecution =
+      canViewPrivateProject &&
+      !isVisitor &&
+      (canViewAll || isMember || isDeliveryManager || hasApprovalAccess);
 
     return {
       project,
@@ -1654,16 +1694,25 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isManager,
       isDeliveryManager,
       isFunctionalLead,
+      isCore,
       isVisitor,
       isMember,
       canView:
         canViewPrivateProject &&
         (canViewAll || isMember || isDeliveryManager || hasApprovalAccess),
-      canEdit: canViewPrivateProject && (canManageAll || isManager),
-      canSubmitApproval: canViewPrivateProject && (canManageAll || isManager),
-      canSubmitClose: canViewPrivateProject && (canManageAll || isManager),
+      canEdit: canManageProject,
+      canSubmitApproval: canManageProject,
+      canSubmitClose: canManageProject,
       canArchive: canViewPrivateProject && canManageAll,
       canDelete: canViewPrivateProject && canManageAll,
+      canManageMembers: canManageProject,
+      canManagePlan,
+      canManageExecution,
+      canManageTasks: canManageExecution,
+      canManageRisks: canManageQuality,
+      canManageChanges: canManageQuality,
+      canManageDelivery,
+      canReadExecution,
     };
   }
 

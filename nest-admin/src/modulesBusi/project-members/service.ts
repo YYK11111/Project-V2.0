@@ -1,10 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ProjectMember, ProjectMemberRole } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { ProjectMemberDto, UpdateProjectMemberDto } from "./dto";
+import { ProjectsService } from "../projects/service";
 
 @Injectable()
 export class ProjectMembersService extends BaseService<
@@ -13,8 +18,34 @@ export class ProjectMembersService extends BaseService<
 > {
   constructor(
     @InjectRepository(ProjectMember) repository: Repository<ProjectMember>,
+    private readonly projectsService: ProjectsService,
   ) {
     super(ProjectMember, repository);
+  }
+
+  private async assertCanManageProjectMembers(
+    projectId: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return;
+    const context = await this.projectsService.getProjectPermissionContext(
+      projectId,
+      operatorId,
+      permissions,
+    );
+    if (!context?.canManageMembers) {
+      throw new ForbiddenException("当前无维护项目成员的权限");
+    }
+  }
+
+  private getOperatorOptions(data: Record<string, any>) {
+    return {
+      operatorId: String(data?._operatorId || ""),
+      permissions: Array.isArray(data?._operatorPermissions)
+        ? data._operatorPermissions
+        : [],
+    };
   }
 
   async list(query: QueryListDto): Promise<ResponseListDto<ProjectMember>> {
@@ -29,6 +60,8 @@ export class ProjectMembersService extends BaseService<
       isCore,
       issueType,
       projectStatus,
+      _operatorId,
+      _operatorPermissions,
     } = query as any;
 
     const qb = this.repository
@@ -121,6 +154,21 @@ export class ProjectMembersService extends BaseService<
       .skip((pageNum - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
+
+    if (_operatorId) {
+      for (const item of list as Array<
+        ProjectMember & { permissionContext?: any }
+      >) {
+        const context = await this.projectsService.getProjectPermissionContext(
+          String(item.projectId || ""),
+          String(_operatorId),
+          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        );
+        item.permissionContext = {
+          canManageMembers: context?.canManageMembers === true,
+        };
+      }
+    }
 
     return {
       list,
@@ -284,6 +332,12 @@ export class ProjectMembersService extends BaseService<
    * 添加项目成员
    */
   async addMember(data: ProjectMemberDto): Promise<ProjectMember> {
+    const { operatorId, permissions } = this.getOperatorOptions(data as any);
+    await this.assertCanManageProjectMembers(
+      data.projectId,
+      operatorId,
+      permissions,
+    );
     // 同一项目内同一用户只保留一条成员记录
     const existing = await this.repository.findOne({
       where: {
@@ -315,6 +369,19 @@ export class ProjectMembersService extends BaseService<
     id: string,
     data: UpdateProjectMemberDto,
   ): Promise<ProjectMember> {
+    const { operatorId, permissions } = this.getOperatorOptions(data as any);
+    if (operatorId) {
+      const member = await this.repository.findOne({
+        where: { id, isDelete: null as any } as any,
+        select: ["id", "projectId"] as any,
+      });
+      if (!member) throw new NotFoundException("项目成员不存在");
+      await this.assertCanManageProjectMembers(
+        member.projectId,
+        operatorId,
+        permissions,
+      );
+    }
     await this.update({ id, ...data });
     return this.getOne({ id });
   }
@@ -322,7 +389,23 @@ export class ProjectMembersService extends BaseService<
   /**
    * 移除项目成员
    */
-  async removeMember(id: string): Promise<any> {
+  async removeMember(
+    id: string,
+    options: Record<string, any> = {},
+  ): Promise<any> {
+    const { operatorId, permissions } = this.getOperatorOptions(options);
+    if (operatorId) {
+      const member = await this.repository.findOne({
+        where: { id, isDelete: null as any } as any,
+        select: ["id", "projectId"] as any,
+      });
+      if (!member) throw new NotFoundException("项目成员不存在");
+      await this.assertCanManageProjectMembers(
+        member.projectId,
+        operatorId,
+        permissions,
+      );
+    }
     return this.del([id]);
   }
 

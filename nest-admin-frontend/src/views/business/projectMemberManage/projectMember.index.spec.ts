@@ -23,4 +23,13 @@ describe('projectMemberManage 列表治理守卫', () => {
     expect(source).toContain('class="query-section query-section--advanced"')
     expect(source).toContain("showAdvanced ? '收起高级筛选' : '展开高级筛选'")
   })
+
+  it('项目成员操作按钮叠加项目内成员维护权限', () => {
+    const source = readProjectMemberView()
+
+    expect(source).toContain('function canManageProjectMember(row: any)')
+    expect(source).toContain('row.permissionContext?.canManageMembers === true')
+    expect(source).toContain('canProjectMemberUpdate.value && canManageProjectMember(row)')
+    expect(source).toContain('canProjectMemberDelete.value && canManageProjectMember(row)')
+  })
 })

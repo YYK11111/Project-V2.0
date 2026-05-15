@@ -675,6 +675,126 @@ describe("ProjectsService closure guards", () => {
     ).rejects.toThrow("当前无该项目的操作权限");
   });
 
+  it("项目角色上下文输出统一的项目内能力矩阵", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "3",
+      leaderId: "leader-1",
+    });
+
+    const cases = [
+      {
+        role: "1",
+        expected: {
+          canManageMembers: true,
+          canManagePlan: true,
+          canManageExecution: true,
+          canManageDelivery: true,
+          canManageTasks: true,
+          canManageRisks: true,
+          canManageChanges: true,
+        },
+      },
+      {
+        role: "2",
+        expected: {
+          canManageMembers: false,
+          canManagePlan: true,
+          canManageExecution: true,
+          canManageDelivery: true,
+          canManageTasks: true,
+          canManageRisks: true,
+          canManageChanges: true,
+        },
+      },
+      {
+        role: "3",
+        expected: {
+          canManageMembers: false,
+          canManagePlan: false,
+          canManageExecution: true,
+          canManageDelivery: false,
+          canManageTasks: true,
+          canManageRisks: true,
+          canManageChanges: true,
+        },
+      },
+      {
+        role: "F",
+        expected: {
+          canManageMembers: false,
+          canManagePlan: false,
+          canManageExecution: false,
+          canManageDelivery: false,
+          canManageTasks: false,
+          canManageRisks: false,
+          canManageChanges: false,
+        },
+      },
+      {
+        role: "G",
+        expected: {
+          canManageMembers: false,
+          canManagePlan: false,
+          canManageExecution: false,
+          canManageDelivery: false,
+          canManageTasks: false,
+          canManageRisks: false,
+          canManageChanges: false,
+          canReadExecution: false,
+        },
+      },
+    ];
+
+    for (const item of cases) {
+      (service as any).projectMemberRepository.findOne.mockResolvedValue({
+        id: `m-${item.role}`,
+        projectId: "p1",
+        userId: "user-1",
+        role: item.role,
+        isActive: "1",
+        isCore: "0",
+      });
+
+      const context = await service.getProjectPermissionContext(
+        "p1",
+        "user-1",
+        ["business/projects/access"],
+      );
+
+      expect(context).toMatchObject(item.expected);
+    }
+  });
+
+  it("核心成员可以管理执行任务但不能维护成员或交付单据", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "3",
+      leaderId: "leader-1",
+    });
+    (service as any).projectMemberRepository.findOne.mockResolvedValue({
+      id: "m1",
+      projectId: "p1",
+      userId: "core-1",
+      role: "F",
+      isCore: "1",
+      isActive: "1",
+    });
+
+    const context = await service.getProjectPermissionContext("p1", "core-1", [
+      "business/projects/access",
+    ]);
+
+    expect(context.canManageExecution).toBe(true);
+    expect(context.canManageTasks).toBe(true);
+    expect(context.canManageMembers).toBe(false);
+    expect(context.canManageDelivery).toBe(false);
+    expect(context.canManageRisks).toBe(false);
+    expect(context.canManageChanges).toBe(false);
+  });
+
   it("立项审批未结束时当前待办审批人可以只读查看项目详情", async () => {
     const { service, repository, businessApprovalContextService } =
       createService();

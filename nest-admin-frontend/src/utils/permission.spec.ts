@@ -101,6 +101,15 @@ describe('checkPermi', () => {
     expect(checkPermi(['business/projects/archive'])).toBe(false)
   })
 
+  it('项目 access 权限放行项目成员维护入口', () => {
+    userStoreState.permissions = ['business/projects/access']
+
+    expect(checkPermi(['business/projectMembers/list'])).toBe(true)
+    expect(checkPermi(['business/projectMembers/add'])).toBe(true)
+    expect(checkPermi(['business/projectMembers/update'])).toBe(true)
+    expect(checkPermi(['business/projectMembers/delete'])).toBe(true)
+  })
+
   it('access 权限规则：工作流待办 access 放行审批表单项目只读但不放行项目写操作', () => {
     userStoreState.permissions = ['business/workflow/tasks/access']
 

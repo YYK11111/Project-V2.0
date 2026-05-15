@@ -116,6 +116,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       operatorPermissions,
     );
     const canEdit =
+      context.canManageTasks ||
       context.isManager ||
       context.isDeliveryManager ||
       context.isFunctionalLead ||
@@ -193,6 +194,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
         )
       : null;
     const canManage =
+      Boolean(context?.canManageTasks) ||
       Boolean(context?.isManager) ||
       Boolean(context?.isDeliveryManager) ||
       Boolean(context?.isFunctionalLead) ||
@@ -729,6 +731,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
     return {
       canEdit: canManage,
       canDelete:
+        Boolean(context?.canManageTasks) ||
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(task.leaderId || "") === String(operatorId) ||

@@ -44,6 +44,12 @@ const businessAccessActionAliases: Record<string, Record<string, string[]>> = {
     fieldPermissions: ["business/workflow/tasks"],
     viewContext: ["business/workflow/tasks"],
   },
+  "business/projectMembers": {
+    list: ["business/projects"],
+    add: ["business/projects"],
+    update: ["business/projects"],
+    delete: ["business/projects"],
+  },
 };
 
 const businessAccessActionMap: Record<string, Set<string>> = {
@@ -55,6 +61,7 @@ const businessAccessActionMap: Record<string, Set<string>> = {
     "submitApproval",
     "submitClose",
   ]),
+  "business/projectMembers": new Set(["add", "update", "delete"]),
   "business/workflow/definitions": new Set(["list", "getOne"]),
   "business/workflow/instances": new Set([
     "list",

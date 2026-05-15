@@ -40,10 +40,17 @@ const businessAccessActionAliases = {
     fieldPermissions: ['business/workflow/tasks'],
     viewContext: ['business/workflow/tasks'],
   },
+  'business/projectMembers': {
+    list: ['business/projects'],
+    add: ['business/projects'],
+    update: ['business/projects'],
+    delete: ['business/projects'],
+  },
 }
 
 const businessAccessActionMap = {
   'business/projects': new Set(['getOne', 'fieldPermissions', 'viewContext', 'update', 'submitApproval', 'submitClose']),
+  'business/projectMembers': new Set(['add', 'update', 'delete']),
   'business/workflow/definitions': new Set(['list', 'getOne']),
   'business/workflow/instances': new Set(['list', 'getOne', 'history', 'tasks']),
   'business/workflow/tasks': new Set(['list', 'complete', 'transfer', 'addSign']),

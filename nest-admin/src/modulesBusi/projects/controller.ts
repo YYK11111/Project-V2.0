@@ -127,6 +127,14 @@ export class ProjectsController extends BaseController<
         canSubmitClose: permissionContext.canSubmitClose,
         canArchive: permissionContext.canArchive,
         canDelete: permissionContext.canDelete,
+        canManageMembers: permissionContext.canManageMembers,
+        canManagePlan: permissionContext.canManagePlan,
+        canManageExecution: permissionContext.canManageExecution,
+        canManageTasks: permissionContext.canManageTasks,
+        canManageRisks: permissionContext.canManageRisks,
+        canManageChanges: permissionContext.canManageChanges,
+        canManageDelivery: permissionContext.canManageDelivery,
+        canReadExecution: permissionContext.canReadExecution,
       },
     };
   }

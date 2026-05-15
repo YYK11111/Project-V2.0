@@ -48,6 +48,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       operatorPermissions,
     );
     const canEdit =
+      Boolean(context?.canManageTasks) ||
       Boolean(context?.isManager) ||
       Boolean(context?.isDeliveryManager) ||
       Boolean(context?.isFunctionalLead) ||
@@ -57,6 +58,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     return {
       canEdit,
       canDelete:
+        Boolean(context?.canManageTasks) ||
         Boolean(context?.isManager) ||
         Boolean(context?.isDeliveryManager) ||
         String(ticket.handlerId || "") === String(operatorId) ||
@@ -93,6 +95,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       operatorPermissions,
     );
     const canEdit =
+      context.canManageTasks ||
       context.isManager ||
       context.isDeliveryManager ||
       context.isFunctionalLead ||

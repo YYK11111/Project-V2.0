@@ -54,6 +54,10 @@ const canProjectMemberAdd = computed(() => checkPermi(['business/projectMembers/
 const canProjectMemberUpdate = computed(() => checkPermi(['business/projectMembers/update']))
 const canProjectMemberDelete = computed(() => checkPermi(['business/projectMembers/delete']))
 
+function canManageProjectMember(row: any) {
+  return row.permissionContext?.canManageMembers === true
+}
+
 const editDialogVisible = ref(false)
 const editLoading = ref(false)
 const editFormRef = ref()
@@ -112,6 +116,7 @@ function submitAddMember() {
 }
 
 function handleEditMember(row: any) {
+  if (!canManageProjectMember(row)) return $sdk.msgError('当前无维护项目成员的权限')
   if (!canProjectMemberUpdate.value) return $sdk.msgError('当前操作没有权限')
   editForm.id = row.id
   editForm.projectName = row.project?.name || '-'
@@ -172,6 +177,7 @@ function handleBatchRemove(selectedIds: string[]) {
 
 // 移除成员
 function handleRemoveMember(row: any) {
+  if (!canManageProjectMember(row)) return $sdk.msgError('当前无维护项目成员的权限')
   if (!canProjectMemberDelete.value) return $sdk.msgError('当前操作没有权限')
   $sdk.confirm('确定要移除该项目成员吗？').then(() => {
     removeMember(row.id).then(() => {
@@ -182,8 +188,8 @@ function handleRemoveMember(row: any) {
 }
 
 const getButtons = (row: any) => [
-  canProjectMemberUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEditMember(row) } : null,
-  canProjectMemberDelete.value && row.isActive === '1' ? { key: 'remove', label: '移除', danger: true, onClick: () => handleRemoveMember(row) } : null,
+  canProjectMemberUpdate.value && canManageProjectMember(row) ? { key: 'edit', label: '编辑', onClick: () => handleEditMember(row) } : null,
+  canProjectMemberDelete.value && canManageProjectMember(row) && row.isActive === '1' ? { key: 'remove', label: '移除', danger: true, onClick: () => handleRemoveMember(row) } : null,
 ].filter(Boolean)
 
 const getProjectButtons = (row: any) => [
@@ -652,7 +658,7 @@ onMounted(() => {
   color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1;
-  width: auto;
+  width: 80px;
   min-width: 0;
   white-space: nowrap;
   flex-shrink: 0;

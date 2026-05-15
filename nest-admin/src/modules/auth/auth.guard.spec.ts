@@ -301,6 +301,40 @@ describe("AuthGuard", () => {
     ).toBe(false);
   });
 
+  it("项目 access 可以进入项目成员维护接口并交给项目内角色二次校验", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projectMembers/list",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projectMembers/add",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projectMembers/update",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projectMembers/delete",
+      ),
+    ).toBe(true);
+  });
+
   it("实例作用域的流程定义详情接口使用实例详情权限", () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
