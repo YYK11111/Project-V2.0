@@ -161,6 +161,11 @@ const startAutoBack = (seconds = 3) => {
   }, 1000)
 }
 
+const notifyMessageCenterRefresh = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('message-center:refresh'))
+}
+
 const submitDecision = async (action: 'approve' | 'reject') => {
   if (actionDisabled.value) return ElMessage.warning(actionDisabledText.value)
   loading.value = true
@@ -168,6 +173,7 @@ const submitDecision = async (action: 'approve' | 'reject') => {
     await completeTask(props.taskId, { action, comment: form.comment })
     ElMessage.success(action === 'approve' ? '审批通过' : '已驳回')
     await loadWorkflowContext()
+    notifyMessageCenterRefresh()
     emit('approved', { action })
     startAutoBack(3)
   } catch (error: any) {
@@ -186,6 +192,7 @@ const submitRejectToNode = async () => {
     const targetNode = rejectableNodes.value.find((node: any) => String(node.id) === String(form.rejectTargetNodeId))
     ElMessage.success(targetNode?.type === 'start' ? '已退回发起人' : '已驳回到指定节点')
     await loadWorkflowContext()
+    notifyMessageCenterRefresh()
     emit('approved', { action: 'reject' })
     startAutoBack(3)
   } catch (error: any) {
@@ -204,6 +211,7 @@ const submitTransfer = async () => {
     await transferTask(props.taskId, { targetUserId: form.targetUserId, comment: form.transferComment })
     ElMessage.success('转交成功')
     await loadWorkflowContext()
+    notifyMessageCenterRefresh()
     emit('approved', { action: 'transfer' })
     startAutoBack(3)
   } catch (error: any) {
@@ -222,6 +230,7 @@ const submitAddSign = async () => {
     await addSignTask(props.taskId, { signUserId: form.signUserId, comment: form.signComment })
     ElMessage.success('加签成功')
     await loadWorkflowContext()
+    notifyMessageCenterRefresh()
     emit('approved', { action: 'addSign' })
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '加签失败')

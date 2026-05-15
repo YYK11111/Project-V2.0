@@ -11,6 +11,7 @@ const messageData = ref<{ todo: any[]; cc: any[] }>({ todo: [], cc: [] })
 const activeTab = ref('todo')
 const popoverVisible = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
+const messageCenterRefreshEvent = 'message-center:refresh'
 const projectAlertMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType === 'project_alert'))
 const otherCcMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType !== 'project_alert'))
 
@@ -42,9 +43,10 @@ const loadMessages = async () => {
     messageData.value = { todo: [], cc: [] }
     return
   }
-  const [countRes, recentRes] = await Promise.all([getUnreadCount(), getRecentMessages(10)])
-  unread.value = countRes.data || countRes
+  const recentRes = await getRecentMessages(10)
   messageData.value = recentRes.data || recentRes
+  const countRes = await getUnreadCount()
+  unread.value = countRes.data || countRes
 }
 
 const goMessage = async (row: any) => {
@@ -64,10 +66,15 @@ const goMessageCenter = () => {
   router.push('/user/messages')
 }
 
+const handleMessageCenterRefresh = () => {
+  loadMessages()
+}
+
 onMounted(() => {
   if (!userStore.name) {
     return
   }
+  window.addEventListener(messageCenterRefreshEvent, handleMessageCenterRefresh)
   loadMessages()
   timer = setInterval(() => {
     loadMessages()
@@ -76,6 +83,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  window.removeEventListener(messageCenterRefreshEvent, handleMessageCenterRefresh)
 })
 </script>
 

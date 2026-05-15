@@ -106,6 +106,11 @@ describe('WorkflowApprovalPanel contract', () => {
     expect(source).toContain('buildRejectableNodes')
   })
 
+  it('审批动作完成后通知消息角标立即刷新', () => {
+    expect(source).toContain("new CustomEvent('message-center:refresh'")
+    expect(source).toContain("window.dispatchEvent")
+  })
+
   it('只读模式默认停留在流程图并响应实例切换', () => {
     expect(source).toContain("const activeTab = ref(props.readonly ? 'progress' : 'actions')")
     expect(source).toContain('v-if="!props.readonly"')

@@ -1,8 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MessageBell from './MessageBell.vue'
+import { getUnreadCount } from '@/api/system/message'
 
 const routerPush = vi.fn()
+const mountedWrappers: ReturnType<typeof mount>[] = []
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -38,6 +40,11 @@ vi.mock('@/api/system/message', () => ({
 describe('MessageBell', () => {
   beforeEach(() => {
     routerPush.mockClear()
+    vi.mocked(getUnreadCount).mockClear()
+  })
+
+  afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
   })
 
   it('点击待办后关闭铃铛弹窗', async () => {
@@ -70,6 +77,7 @@ describe('MessageBell', () => {
         },
       },
     })
+    mountedWrappers.push(wrapper)
 
     await flushPromises()
     ;(wrapper.vm as any).popoverVisible = true
@@ -80,5 +88,46 @@ describe('MessageBell', () => {
 
     expect(routerPush).toHaveBeenCalledWith({ path: '/workflow/tasks', query: { id: 'task-1' } })
     expect((wrapper.vm as any).popoverVisible).toBe(false)
+  })
+
+  it('收到消息刷新事件后立即重新加载角标', async () => {
+    const wrapper = mount(MessageBell, {
+      global: {
+        stubs: {
+          ElPopover: {
+            props: ['visible'],
+            emits: ['update:visible', 'show'],
+            template: '<div><slot name="reference" /><slot /></div>',
+          },
+          ElBadge: {
+            template: '<div><slot /></div>',
+          },
+          ElTabs: {
+            template: '<div><slot /></div>',
+          },
+          ElTabPane: {
+            template: '<div><slot /></div>',
+          },
+          ElEmpty: {
+            template: '<div />',
+          },
+          ElButton: {
+            template: '<button type="button"><slot /></button>',
+          },
+          ElIconBell: {
+            template: '<span />',
+          },
+        },
+      },
+    })
+    mountedWrappers.push(wrapper)
+
+    await flushPromises()
+    expect(getUnreadCount).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new CustomEvent('message-center:refresh'))
+    await flushPromises()
+
+    expect(getUnreadCount).toHaveBeenCalledTimes(2)
   })
 })

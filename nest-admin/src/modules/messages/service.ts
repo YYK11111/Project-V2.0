@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Like, Repository } from "typeorm";
 import { BaseService } from "src/common/BaseService";
@@ -9,6 +9,7 @@ import { WorkflowTask } from "src/modulesBusi/workflow/entity/workflow-task.enti
 import { WorkflowInstance } from "src/modulesBusi/workflow/entity/workflow-instance.entity";
 import { QueryListDto } from "src/common/dto";
 import { SystenConfigsService } from "../configs/service";
+import { ExternalNotifyService } from "../external-notify/service";
 
 @Injectable()
 export class MessagesService extends BaseService<Message, MessageDto> {
@@ -19,12 +20,14 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     @InjectRepository(WorkflowInstance)
     private workflowInstanceRepo: Repository<WorkflowInstance>,
     private readonly systemConfigsService: SystenConfigsService,
+    @Optional()
+    private readonly externalNotifyService?: ExternalNotifyService,
   ) {
     super(Message, repository);
   }
 
   async sendMessage(data: Partial<Message>) {
-    return this.add({
+    const message = await this.add({
       title: data.title,
       content: data.content,
       messageType: data.messageType,
@@ -40,6 +43,32 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       isRead: BoolNum.No,
       isActive: BoolNum.Yes,
     } as any);
+    this.sendExternalNotification(message);
+    return message;
+  }
+
+  private sendExternalNotification(message: Message) {
+    if (!this.externalNotifyService) return;
+    if (
+      message.messageType !== MessageType.todo ||
+      message.sourceType !== "workflow_task"
+    ) {
+      return;
+    }
+    void this.externalNotifyService
+      .sendToUser(message.receiverId, {
+        messageId: message.id,
+        receiverId: message.receiverId,
+        templateKey: "workflowTodo",
+        title: message.title,
+        content: message.content,
+        linkUrl: message.linkUrl,
+        linkParams: message.linkParams,
+        sourceType: message.sourceType,
+        sourceId: message.sourceId,
+        messageType: message.messageType,
+      })
+      .catch(() => undefined);
   }
 
   async getUnreadCount(userId: string) {

@@ -9,6 +9,7 @@ export class MessagesController {
   @Get("unread-count")
   async unreadCount(@Req() req: any) {
     const userId = req.user?.id || req.user?.name;
+    await this.service.ensureWorkflowTodoMessages();
     return this.service.getUnreadCount(userId);
   }
 
