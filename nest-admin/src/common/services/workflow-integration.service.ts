@@ -659,6 +659,18 @@ export class WorkflowIntegrationService {
       initiatorId,
     );
 
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "change",
+      businessId: changeId,
+      businessScene: "approval",
+      sceneTitle: "变更审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: change.projectId,
+      projectId: change.projectId,
+    });
+
     await this.changeRepository.update(changeId, {
       status: ChangeStatus.pending,
       workflowInstanceId: instance.id,

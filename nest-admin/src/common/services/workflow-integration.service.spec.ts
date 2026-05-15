@@ -172,6 +172,34 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     );
   });
 
+  it("发起项目变更审批后创建归属项目的变更审批上下文", async () => {
+    const { service, repositories, approvalContextService, projectsService } =
+      createService();
+    repositories.change.findOne.mockResolvedValue({
+      id: "change-1",
+      projectId: "19",
+      title: "范围调整",
+    });
+
+    await service.startChangeApproval("change-1", "u1");
+
+    expect(
+      projectsService.assertExecutionObjectPermission,
+    ).toHaveBeenCalledWith("19", "u1");
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "change",
+        businessId: "change-1",
+        businessScene: "approval",
+        sceneTitle: "变更审批",
+        starterId: "u1",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+  });
+
   it("项目审批回调时同步审批上下文状态", async () => {
     const { service, repositories, approvalContextService } = createService();
     repositories.project.findOne.mockResolvedValue({
