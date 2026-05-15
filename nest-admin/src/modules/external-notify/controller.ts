@@ -1,10 +1,16 @@
-import { Body, Controller, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { Permission } from "../auth/permission.decorator";
 import { ExternalNotifyService } from "./service";
 
 @Controller("system/external-notify")
 export class ExternalNotifyController {
   constructor(private readonly service: ExternalNotifyService) {}
+
+  @Get("logs")
+  @Permission("system/externalNotifyLogs/list")
+  listLogs(@Query() query: any) {
+    return this.service.listLogs(query);
+  }
 
   @Post("feishu/test")
   @Permission("system/configs/update")
@@ -15,13 +21,13 @@ export class ExternalNotifyController {
   }
 
   @Post("feishu/sync-user/:userId")
-  @Permission("system/users/update")
+  @Permission("system/externalAccounts/update")
   syncFeishuUser(@Param("userId") userId: string) {
     return this.service.syncFeishuAccount(userId);
   }
 
   @Post("feishu/sync-users")
-  @Permission("system/users/update")
+  @Permission("system/externalAccounts/update")
   syncFeishuUsers(@Body() body: any) {
     return this.service.syncFeishuAccounts({ limit: body?.limit });
   }

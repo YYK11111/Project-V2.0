@@ -6,6 +6,12 @@ import { UserExternalAccountsService } from "./service";
 export class UserExternalAccountsController {
   constructor(private readonly service: UserExternalAccountsService) {}
 
+  @Get("list")
+  @Permission("system/externalAccounts/list")
+  list(@Query() query: any) {
+    return this.service.list(query);
+  }
+
   @Get("user/:userId")
   @Permission("system/users/getOne")
   getUserAccount(
@@ -16,7 +22,7 @@ export class UserExternalAccountsController {
   }
 
   @Post("save")
-  @Permission("system/users/update")
+  @Permission("system/externalAccounts/update")
   save(@Body() body: any) {
     return this.service.upsertManualAccount(body);
   }

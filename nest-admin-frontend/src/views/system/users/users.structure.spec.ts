@@ -50,5 +50,7 @@ describe('system users structure', () => {
     expect(source).toContain('getExternalAccount')
     expect(source).toContain('同步飞书')
     expect(source).toContain('syncCurrentFeishuAccount')
+    expect(source).toContain("checkPermi(['system/externalAccounts/update'])")
+    expect(source).toContain('@confirm="submitUser"')
   })
 })

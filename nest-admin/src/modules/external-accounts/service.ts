@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { QueryListDto } from "src/common/dto";
 import {
   ExternalAccountBindStatus,
   ExternalAccountPlatform,
@@ -27,6 +28,44 @@ export class UserExternalAccountsService {
         isDelete: null as any,
       } as any,
     });
+  }
+
+  async list(query: QueryListDto) {
+    const pageNum = Number(query.pageNum || 1);
+    const pageSize = Number(query.pageSize || 10);
+    const qb = this.repository
+      .createQueryBuilder("account")
+      .where("account.isDelete IS NULL");
+
+    if (query.platform) {
+      qb.andWhere("account.platform = :platform", {
+        platform: String(query.platform),
+      });
+    }
+    if (query.userId) {
+      qb.andWhere("account.userId = :userId", {
+        userId: String(query.userId),
+      });
+    }
+    if (query.bindStatus) {
+      qb.andWhere("account.bindStatus = :bindStatus", {
+        bindStatus: String(query.bindStatus),
+      });
+    }
+    if (query.keyword) {
+      qb.andWhere(
+        "(account.externalUserId LIKE :keyword OR account.name LIKE :keyword OR account.email LIKE :keyword OR account.mobile LIKE :keyword)",
+        { keyword: `%${String(query.keyword)}%` },
+      );
+    }
+
+    qb.orderBy("account.updateTime", "DESC").addOrderBy(
+      "account.createTime",
+      "DESC",
+    );
+    qb.skip((pageNum - 1) * pageSize).take(pageSize);
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, _flag: true };
   }
 
   async upsertManualAccount(data: Partial<UserExternalAccount>) {

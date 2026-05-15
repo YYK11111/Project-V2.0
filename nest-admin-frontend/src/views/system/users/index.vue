@@ -14,6 +14,7 @@ const canUserUpdate = computed(() => checkPermi(['system/users/update']))
 const canUserDelete = computed(() => checkPermi(['system/users/delete']))
 const canUserResetPassword = computed(() => checkPermi(['system/users/resetPassword']))
 const canManageAdminUser = computed(() => checkPermi(['system/users/manageAdmin']))
+const canExternalAccountUpdate = computed(() => checkPermi(['system/externalAccounts/update']))
 
 const canDeptAdd = computed(() => checkPermi(['system/dept/add']))
 const canDeptUpdate = computed(() => checkPermi(['system/dept/update']))
@@ -41,7 +42,7 @@ function User(params) {
   const externalAccountPlatform = 'feishu'
 
   async function loadExternalAccount(userId: string) {
-    if (!userId) return
+    if (!userId || !canExternalAccountUpdate.value) return
     try {
       const { data } = await getExternalAccount(userId, externalAccountPlatform)
       if (userDialogRef.value?.form) {
@@ -105,7 +106,7 @@ function User(params) {
       const { data } = await (isEdit ? update(payload) : add(payload))
       const userId = data?.id || form.value.id
       const feishuUserId = String(form.value.feishuUserId || '').trim()
-      if (userId) {
+      if (userId && canExternalAccountUpdate.value) {
         await saveExternalAccount({
           userId,
           platform: 'feishu',
@@ -123,6 +124,9 @@ function User(params) {
   }
 
   async function syncCurrentFeishuAccount(form) {
+    if (!canExternalAccountUpdate.value) {
+      return $sdk.msgWarning('当前操作没有权限')
+    }
     if (!form?.id) {
       return $sdk.msgWarning('请先保存用户后再同步飞书')
     }
@@ -461,7 +465,7 @@ const getButtons = (row: any) => {
         dynamicTitle="人员"
         :rules="rules"
         width="500"
-        @confirm="$refs.userDialogRef.confirm(add, () => $refs.rctRef.getList(), update)">
+        @confirm="submitUser">
         <template #form="{ form }">
           <BaInput v-model="form.name" prop="name" label="登录名" maxlength="30"></BaInput>
           <BaInput v-model="form.nickname" prop="nickname" label="姓名" maxlength="30"></BaInput>
@@ -472,14 +476,15 @@ const getButtons = (row: any) => {
             <el-option label="男" value="man"></el-option>
             <el-option label="女" value="woamn"></el-option>
           </BaSelect>
-          <div class="dialog-section-title">外部账号</div>
+          <div v-if="canExternalAccountUpdate" class="dialog-section-title">外部账号</div>
           <BaInput
+            v-if="canExternalAccountUpdate"
             v-model="form.feishuUserId"
             prop="feishuUserId"
             label="飞书用户ID"
             maxlength="100"
             placeholder="可选，绑定飞书通知账号" />
-          <el-form-item v-if="form.id" label=" ">
+          <el-form-item v-if="form.id && canExternalAccountUpdate" label=" ">
             <el-button @click="syncCurrentFeishuAccount(form)">同步飞书</el-button>
           </el-form-item>
           <el-form-item prop="avatar" label="头像">

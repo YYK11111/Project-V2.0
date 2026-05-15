@@ -40,10 +40,13 @@ export class ExternalNotifyService {
 
   async sendToUser(userId: string, message: NotifyMessage) {
     if (!userId) return;
-    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    const config =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
     await Promise.all(
       this.providers
-        .filter((provider) => provider.isEnabled(config as ExternalNotifyConfig))
+        .filter((provider) =>
+          provider.isEnabled(config as ExternalNotifyConfig),
+        )
         .map((provider) =>
           this.sendByProvider(provider, userId, message, config),
         ),
@@ -106,7 +109,8 @@ export class ExternalNotifyService {
   }
 
   async sendFeishuTestMessage(userId: string) {
-    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    const config =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
     if (!this.feishuProvider.isEnabled(config)) {
       throw new Error("飞书通知未启用或配置不完整");
     }
@@ -152,7 +156,8 @@ export class ExternalNotifyService {
     config?: ExternalNotifyConfig,
   ): Promise<UserExternalAccount | null> {
     const runtimeConfig =
-      config || (await this.systemConfigsService.getExternalNotifyRuntimeConfig());
+      config ||
+      (await this.systemConfigsService.getExternalNotifyRuntimeConfig());
     if (!this.feishuProvider.isEnabled(runtimeConfig)) return null;
     const user = await this.userRepository.findOne({
       where: { id: String(userId), isDelete: null as any } as any,
@@ -206,7 +211,8 @@ export class ExternalNotifyService {
       failed: 0,
       failures: [] as Array<{ userId: string; message: string }>,
     };
-    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    const config =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
     for (const user of users) {
       try {
         const account = await this.syncFeishuAccount(user.id, config);
@@ -224,6 +230,47 @@ export class ExternalNotifyService {
       }
     }
     return result;
+  }
+
+  async listLogs(query: {
+    pageNum?: number;
+    pageSize?: number;
+    platform?: string;
+    sendStatus?: string;
+    receiverId?: string;
+    templateKey?: string;
+  }) {
+    const pageNum = Number(query.pageNum || 1);
+    const pageSize = Number(query.pageSize || 10);
+    const qb = this.logRepository
+      .createQueryBuilder("log")
+      .where("log.isDelete IS NULL");
+
+    if (query.platform) {
+      qb.andWhere("log.platform = :platform", {
+        platform: String(query.platform),
+      });
+    }
+    if (query.sendStatus) {
+      qb.andWhere("log.sendStatus = :sendStatus", {
+        sendStatus: String(query.sendStatus),
+      });
+    }
+    if (query.receiverId) {
+      qb.andWhere("log.receiverId = :receiverId", {
+        receiverId: String(query.receiverId),
+      });
+    }
+    if (query.templateKey) {
+      qb.andWhere("log.templateKey = :templateKey", {
+        templateKey: String(query.templateKey),
+      });
+    }
+
+    qb.orderBy("log.createTime", "DESC");
+    qb.skip((pageNum - 1) * pageSize).take(pageSize);
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, _flag: true };
   }
 
   private pickMatchedFeishuUser(
