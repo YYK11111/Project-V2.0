@@ -237,6 +237,7 @@
                   <el-option label="上线单" value="goLive" />
                   <el-option label="验收单" value="acceptance" />
                   <el-option label="运维交接单" value="handover" />
+                  <el-option label="知识借阅" value="articleBorrow" />
                 </el-select>
               </el-form-item>
               <el-form-item label="业务场景">
@@ -753,6 +754,7 @@ const businessSceneOptions = {
   goLive: [{ label: '上线审批', value: 'approval' }],
   acceptance: [{ label: '验收审批', value: 'approval' }],
   handover: [{ label: '运维交接审批', value: 'approval' }],
+  articleBorrow: [{ label: '知识借阅审批', value: 'approval' }],
 }
 
 const currentBusinessSceneOptions = computed(() => businessSceneOptions[businessType.value] || [])
@@ -1151,6 +1153,7 @@ const workflowTemplates = [
   { key: 'taskApproval', name: '任务审批模板', businessType: 'task', businessScene: 'approval', workflowName: '任务审批流程' },
   { key: 'goLiveApproval', name: '上线审批模板', businessType: 'goLive', businessScene: 'approval', workflowName: '上线审批流程' },
   { key: 'acceptanceApproval', name: '验收审批模板', businessType: 'acceptance', businessScene: 'approval', workflowName: '验收审批流程' },
+  { key: 'articleBorrowApproval', name: '知识借阅审批模板', businessType: 'articleBorrow', businessScene: 'approval', workflowName: '知识借阅审批流程' },
 ]
 
 const filterPaletteNodes = (list) => {
@@ -1731,6 +1734,14 @@ const applyWorkflowTemplate = async (templateKey) => {
 
   const startNode = createTemplateNode('start', '开始', 80, 180)
   const approvalNode = createTemplateNode('approval', '审批', 300, 180)
+  if (template.businessType === 'articleBorrow') {
+    approvalNode.properties = {
+      ...approvalNode.properties,
+      assigneeType: 'business_field',
+      businessType: 'articleBorrow',
+      fieldPath: 'catalog.managerUserIds',
+    }
+  }
   const endNode = createTemplateNode('end', '结束', 520, 180)
 
   workflowName.value = template.workflowName

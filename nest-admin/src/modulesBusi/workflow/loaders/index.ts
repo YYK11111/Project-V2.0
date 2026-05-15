@@ -6,3 +6,4 @@ export * from "./change.loader";
 export * from "./go-live.loader";
 export * from "./acceptance.loader";
 export * from "./handover.loader";
+export * from "./article-borrow.loader";

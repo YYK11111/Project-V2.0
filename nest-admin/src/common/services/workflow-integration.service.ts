@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import dayjs from "dayjs";
 import { Project, ProjectStatus } from "src/modulesBusi/projects/entity";
 import { ProjectsService } from "src/modulesBusi/projects/service";
 import { Task, TaskStatus } from "src/modulesBusi/tasks/entity";
@@ -22,6 +23,11 @@ import {
 import { WorkflowService } from "src/modulesBusi/workflow/service";
 import { CustomersService } from "src/modulesBusi/crm/customers/service";
 import { BusinessApprovalContextService } from "src/modulesBusi/approval-contexts/service";
+import {
+  ArticleBorrow,
+  KnowledgeBorrowStatus,
+} from "src/modulesBusi/articleBorrows/entity";
+import { TasksService } from "../tasks/tasks.service";
 
 @Injectable()
 export class WorkflowIntegrationService {
@@ -47,6 +53,11 @@ export class WorkflowIntegrationService {
     private readonly customersService?: CustomersService,
     @Optional()
     private readonly businessApprovalContextService?: BusinessApprovalContextService,
+    @Optional()
+    @InjectRepository(ArticleBorrow)
+    private readonly articleBorrowRepository?: Repository<ArticleBorrow>,
+    @Optional()
+    private readonly tasksService?: TasksService,
   ) {}
 
   private getTodayDate() {
@@ -467,7 +478,113 @@ export class WorkflowIntegrationService {
             ? HandoverRecordStatus.confirmed
             : HandoverRecordStatus.draft,
       } as any);
+    } else if (businessKey?.startsWith("articleBorrow_")) {
+      const borrowId = businessKey.replace("articleBorrow_", "");
+      await this.handleArticleBorrowWorkflowCallback(borrowId, status);
     }
+  }
+
+  private async handleArticleBorrowWorkflowCallback(
+    borrowId: string,
+    status: string,
+  ) {
+    if (!this.articleBorrowRepository) return;
+    const row = await this.articleBorrowRepository.findOne({
+      where: { id: borrowId as any },
+    });
+    if (!row || row.status !== KnowledgeBorrowStatus.pending) return;
+
+    if (status !== "completed") {
+      await this.articleBorrowRepository.update(borrowId, {
+        status: KnowledgeBorrowStatus.rejected,
+        approvalStatus: "3",
+        approvedAt: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        currentNodeName: "借阅审批已驳回",
+        rejectReason: "审批未通过",
+      } as any);
+      return;
+    }
+
+    const now = dayjs();
+    const requestedStart = row.requestedStartTime
+      ? dayjs(row.requestedStartTime)
+      : null;
+    const shouldWait = requestedStart?.isValid() && requestedStart.isAfter(now);
+    const start = shouldWait ? requestedStart : now;
+    const end = start.add(Number(row.requestedDays || 1), "day");
+    const borrowStartTime = start.format("YYYY-MM-DD HH:mm:ss");
+    const borrowEndTime = end.format("YYYY-MM-DD HH:mm:ss");
+
+    await this.articleBorrowRepository.update(borrowId, {
+      status: shouldWait
+        ? KnowledgeBorrowStatus.waitingStart
+        : KnowledgeBorrowStatus.active,
+      approvalStatus: "2",
+      approvedAt: now.format("YYYY-MM-DD HH:mm:ss"),
+      borrowStartTime,
+      borrowEndTime,
+      currentNodeName: shouldWait
+        ? "借阅审批已通过，等待开始借阅"
+        : "借阅审批已通过，已开始借阅",
+    } as any);
+
+    if (shouldWait) {
+      this.scheduleArticleBorrowStart(borrowId, borrowStartTime, borrowEndTime);
+    } else {
+      this.scheduleArticleBorrowExpire(borrowId, borrowEndTime);
+    }
+  }
+
+  private scheduleArticleBorrowStart(
+    id: string,
+    borrowStartTime: string,
+    borrowEndTime: string,
+  ) {
+    if (!this.tasksService || !this.articleBorrowRepository) return;
+    this.tasksService.deleteTimeout(`articleBorrowStart:${id}`);
+    this.tasksService.addTimeout(
+      `articleBorrowStart:${id}`,
+      borrowStartTime,
+      async () => {
+        const row = await this.articleBorrowRepository?.findOne({
+          where: { id: id as any },
+        });
+        if (!row || row.status !== KnowledgeBorrowStatus.waitingStart) return;
+        await this.articleBorrowRepository?.update(id, {
+          status: KnowledgeBorrowStatus.active,
+          currentNodeName: "已开始借阅",
+        } as any);
+        this.scheduleArticleBorrowExpire(
+          id,
+          row.borrowEndTime || borrowEndTime,
+        );
+      },
+    );
+  }
+
+  private scheduleArticleBorrowExpire(id: string, borrowEndTime: string) {
+    if (!this.tasksService || !this.articleBorrowRepository) return;
+    this.tasksService.deleteTimeout(`articleBorrow:${id}`);
+    this.tasksService.addTimeout(
+      `articleBorrow:${id}`,
+      borrowEndTime,
+      async () => {
+        const row = await this.articleBorrowRepository?.findOne({
+          where: { id: id as any },
+        });
+        if (
+          !row ||
+          ![
+            KnowledgeBorrowStatus.active,
+            KnowledgeBorrowStatus.approved,
+          ].includes(row.status)
+        )
+          return;
+        await this.articleBorrowRepository?.update(id, {
+          status: KnowledgeBorrowStatus.expired,
+        } as any);
+      },
+    );
   }
 
   async handleReturnedToStarter(

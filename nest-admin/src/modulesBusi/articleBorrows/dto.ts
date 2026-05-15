@@ -7,6 +7,7 @@ export class ApplyBorrowDto {
   articleId: string;
   applyReason: string;
   requestedDays: number;
+  requestedStartTime?: string;
 }
 
 export class ApproveBorrowDto {

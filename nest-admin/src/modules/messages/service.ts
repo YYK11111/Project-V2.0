@@ -488,6 +488,8 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     if (businessType === "change") return "/changeManage/form";
     if (businessType === "ticket") return "/ticketManage/form";
     if (businessType === "task") return "/taskManage/form";
+    if (businessType === "articleBorrow")
+      return "/content/articleManage/borrowApproval";
     if (businessType === "customer") return "/crm/customerManage/form";
     if (businessType === "interaction") return "/crm/interactionManage/form";
     if (businessType === "opportunity") return "/crm/opportunityManage/form";

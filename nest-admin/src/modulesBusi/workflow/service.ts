@@ -2202,6 +2202,7 @@ export class WorkflowService {
       goLive: businessData?.title,
       acceptance: businessData?.title,
       handover: businessData?.title,
+      articleBorrow: businessData?.articleTitle,
     };
 
     const codeFieldMap: Record<string, string> = {
@@ -2213,6 +2214,7 @@ export class WorkflowService {
       goLive: businessData?.id,
       acceptance: businessData?.id,
       handover: businessData?.id,
+      articleBorrow: businessData?.id,
     };
 
     return {
@@ -2237,6 +2239,8 @@ export class WorkflowService {
     if (businessType === "goLive") return "/goLiveManage/form";
     if (businessType === "acceptance") return "/acceptanceManage/form";
     if (businessType === "handover") return "/handoverManage/form";
+    if (businessType === "articleBorrow")
+      return "/content/articleManage/borrowApproval";
     if (businessType === "customer") return "/crm/customerManage/form";
     if (businessType === "interaction") return "/crm/interactionManage/form";
     if (businessType === "opportunity") return "/crm/opportunityManage/form";

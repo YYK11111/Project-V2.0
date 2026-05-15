@@ -18,6 +18,8 @@ import { HandoverRecord } from "src/modulesBusi/handover-records/entity";
 import { SystenConfigsModule } from "../configs/module";
 import { CrmModule } from "src/modulesBusi/crm/module";
 import { BusinessApprovalContextsModule } from "src/modulesBusi/approval-contexts/module";
+import { ArticleBorrow } from "src/modulesBusi/articleBorrows/entity";
+import { TasksModule } from "src/common/tasks/tasks.module";
 
 @Global()
 @Module({
@@ -34,7 +36,9 @@ import { BusinessApprovalContextsModule } from "src/modulesBusi/approval-context
       GoLiveRecord,
       AcceptanceRecord,
       HandoverRecord,
+      ArticleBorrow,
     ]),
+    TasksModule,
     WorkflowModule,
     MilestonesModule,
     CrmModule,

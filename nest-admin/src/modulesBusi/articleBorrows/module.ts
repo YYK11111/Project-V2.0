@@ -7,6 +7,8 @@ import { ArticleBorrowsController } from "./controller";
 import { TasksModule } from "src/common/tasks/tasks.module";
 import { UsersModule } from "src/modules/users/users.module";
 import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
+import { WorkflowModule } from "../workflow/module";
+import { BusinessApprovalContextsModule } from "../approval-contexts/module";
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/modul
     TasksModule,
     forwardRef(() => UsersModule),
     forwardRef(() => SystemScheduledJobsModule),
+    WorkflowModule,
+    BusinessApprovalContextsModule,
   ],
   providers: [ArticleBorrowsService],
   controllers: [ArticleBorrowsController],

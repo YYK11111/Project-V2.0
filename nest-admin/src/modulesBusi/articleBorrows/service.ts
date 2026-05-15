@@ -1,6 +1,6 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import dayjs from "dayjs";
 import { ResponseListDto, QueryListDto } from "src/common/dto";
 import { ArticleBorrow, KnowledgeBorrowStatus } from "./entity";
@@ -10,6 +10,8 @@ import { TasksService } from "src/common/tasks/tasks.service";
 import { UsersService } from "src/modules/users/users.service";
 import { Cron } from "@nestjs/schedule";
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
+import { WorkflowService } from "../workflow/service";
+import { BusinessApprovalContextService } from "../approval-contexts/service";
 
 @Injectable()
 export class ArticleBorrowsService {
@@ -20,6 +22,10 @@ export class ArticleBorrowsService {
     private tasksService: TasksService,
     private usersService: UsersService,
     private readonly systemScheduledJobsService: SystemScheduledJobsService,
+    @Optional()
+    private readonly workflowService?: WorkflowService,
+    @Optional()
+    private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {}
 
   async hasActiveBorrow(articleId: string, userId: string) {
@@ -28,9 +34,16 @@ export class ArticleBorrowsService {
       .createQueryBuilder("borrow")
       .where("borrow.articleId = :articleId", { articleId })
       .andWhere("borrow.userId = :userId", { userId })
-      .andWhere("borrow.status = :status", {
-        status: KnowledgeBorrowStatus.approved,
+      .andWhere("borrow.status IN (:...statuses)", {
+        statuses: [
+          KnowledgeBorrowStatus.active,
+          KnowledgeBorrowStatus.approved,
+        ],
       })
+      .andWhere(
+        "(borrow.borrowStartTime IS NULL OR borrow.borrowStartTime <= :now)",
+        { now },
+      )
       .andWhere("borrow.borrowEndTime >= :now", { now })
       .getOne();
     return !!row;
@@ -66,30 +79,37 @@ export class ArticleBorrowsService {
       where: {
         articleId: dto.articleId as any,
         userId: String(currentUser.id) as any,
-        status: KnowledgeBorrowStatus.pending as any,
+        status: In([
+          KnowledgeBorrowStatus.pending,
+          KnowledgeBorrowStatus.waitingStart,
+        ]) as any,
       },
     });
     if (existing) {
-      throw new Error("当前知识已有待审批借阅申请");
+      throw new Error("当前知识已有待审批或待生效借阅申请");
     }
     if (
       await this.hasActiveBorrow(String(dto.articleId), String(currentUser.id))
     ) {
       throw new Error("当前知识已存在有效借阅授权");
     }
-    return this.borrowRepo.save(
+    const borrow = await this.borrowRepo.save(
       new ArticleBorrow({
         articleId: dto.articleId,
         catalogId: article.catalogId,
         userId: String(currentUser.id),
         applyReason: dto.applyReason,
         requestedDays,
+        requestedStartTime: dto.requestedStartTime || "",
         status: KnowledgeBorrowStatus.pending,
-        sourceType: "manualApply",
+        approvalStatus: "0",
+        currentNodeName: "待提交审批",
+        sourceType: "workflowApply",
         createUser: currentUser.name,
         updateUser: currentUser.name,
       }),
     );
+    return this.startBorrowWorkflow(borrow, currentUser);
   }
 
   async listMine(
@@ -113,7 +133,6 @@ export class ArticleBorrowsService {
     currentUser: Record<string, any>,
   ): Promise<ResponseListDto<ArticleBorrow>> {
     const rows = await this.borrowRepo.find({
-      where: { status: KnowledgeBorrowStatus.pending as any },
       relations: ["article", "article.catalog", "applicant"],
       order: { createTime: "DESC" as any },
     });
@@ -166,18 +185,50 @@ export class ArticleBorrowsService {
     });
     if (!row) throw new Error("借阅记录不存在");
     this.ensureCanApprove(row, currentUser);
-    const approvedDays = Number(dto.approvedDays || row.requestedDays || 1);
-    const start = dayjs();
-    const end = start.add(approvedDays, "day");
-    row.status = KnowledgeBorrowStatus.approved;
+    const saved = await this.applyApprovalResult(
+      row,
+      Number(dto.approvedDays || row.requestedDays || 1),
+      currentUser,
+      dto.remark || "",
+    );
+    return saved;
+  }
+
+  private async applyApprovalResult(
+    row: ArticleBorrow,
+    approvedDays: number,
+    currentUser: Record<string, any>,
+    remark = "",
+  ) {
+    const now = dayjs();
+    const requestedStart = row.requestedStartTime
+      ? dayjs(row.requestedStartTime)
+      : null;
+    const shouldWait = requestedStart?.isValid() && requestedStart.isAfter(now);
+    const start = shouldWait ? requestedStart : now;
+    const end = start.add(
+      approvedDays || Number(row.requestedDays || 1),
+      "day",
+    );
+    row.status = shouldWait
+      ? KnowledgeBorrowStatus.waitingStart
+      : KnowledgeBorrowStatus.active;
     row.approvedBy = String(currentUser.id);
-    row.approvedAt = start.format("YYYY-MM-DD HH:mm:ss");
+    row.approvedAt = now.format("YYYY-MM-DD HH:mm:ss");
     row.borrowStartTime = start.format("YYYY-MM-DD HH:mm:ss");
     row.borrowEndTime = end.format("YYYY-MM-DD HH:mm:ss");
+    row.approvalStatus = "2";
+    row.currentNodeName = shouldWait
+      ? "借阅审批已通过，等待开始借阅"
+      : "借阅审批已通过，已开始借阅";
     row.updateUser = currentUser.name;
-    row.rejectReason = dto.remark || "";
+    row.rejectReason = remark;
     const saved = await this.borrowRepo.save(row);
-    this.scheduleExpire(saved.id, saved.borrowEndTime);
+    if (shouldWait) {
+      this.scheduleStart(saved.id, saved.borrowStartTime, saved.borrowEndTime);
+    } else {
+      this.scheduleExpire(saved.id, saved.borrowEndTime);
+    }
     return saved;
   }
 
@@ -195,6 +246,8 @@ export class ArticleBorrowsService {
     row.status = KnowledgeBorrowStatus.rejected;
     row.approvedBy = String(currentUser.id);
     row.approvedAt = dayjs().format("YYYY-MM-DD HH:mm:ss");
+    row.approvalStatus = "3";
+    row.currentNodeName = "借阅审批已驳回";
     row.rejectReason = dto.reason || "";
     row.updateUser = currentUser.name;
     return this.borrowRepo.save(row);
@@ -210,6 +263,50 @@ export class ArticleBorrowsService {
     row.status = KnowledgeBorrowStatus.revoked;
     row.updateUser = currentUser.name;
     this.tasksService.deleteTimeout(this.getExpireTaskName(row.id));
+    this.tasksService.deleteTimeout(this.getStartTaskName(row.id));
+    return this.borrowRepo.save(row);
+  }
+
+  private async startBorrowWorkflow(
+    row: ArticleBorrow,
+    currentUser: Record<string, any>,
+  ) {
+    if (!this.workflowService) return row;
+    const instance = await this.workflowService.startBusinessWorkflow(
+      {
+        businessType: "articleBorrow",
+        businessScene: "approval",
+        businessKey: `articleBorrow_${row.id}`,
+        variables: {
+          starterId: String(currentUser.id),
+          businessType: "articleBorrow",
+          workflowScene: "articleBorrowApproval",
+          articleId: row.articleId,
+          catalogId: row.catalogId,
+        },
+      },
+      String(currentUser.id),
+    );
+
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "articleBorrow",
+      businessId: row.id,
+      businessScene: "approval",
+      sceneTitle: "知识借阅审批",
+      workflowInstance: instance,
+      starterId: String(currentUser.id),
+      starterName: currentUser.name || "",
+      rootBusinessType: "articleBorrow",
+      rootBusinessId: row.id,
+    });
+    await this.businessApprovalContextService?.syncParticipantsFromWorkflow(
+      instance.id,
+    );
+
+    row.workflowInstanceId = instance.id;
+    row.approvalStatus = "1";
+    row.currentNodeName = "借阅审批中";
+    row.updateUser = currentUser.name;
     return this.borrowRepo.save(row);
   }
 
@@ -241,15 +338,46 @@ export class ArticleBorrowsService {
       borrowEndTime,
       async () => {
         const row = await this.borrowRepo.findOne({ where: { id: id as any } });
-        if (!row || row.status !== KnowledgeBorrowStatus.approved) return;
+        if (
+          !row ||
+          ![
+            KnowledgeBorrowStatus.active,
+            KnowledgeBorrowStatus.approved,
+          ].includes(row.status)
+        )
+          return;
         row.status = KnowledgeBorrowStatus.expired;
         await this.borrowRepo.save(row);
       },
     );
   }
 
+  private scheduleStart(
+    id: string,
+    borrowStartTime: string,
+    borrowEndTime: string,
+  ) {
+    this.tasksService.deleteTimeout(this.getStartTaskName(id));
+    this.tasksService.addTimeout(
+      this.getStartTaskName(id),
+      borrowStartTime,
+      async () => {
+        const row = await this.borrowRepo.findOne({ where: { id: id as any } });
+        if (!row || row.status !== KnowledgeBorrowStatus.waitingStart) return;
+        row.status = KnowledgeBorrowStatus.active;
+        row.currentNodeName = "已开始借阅";
+        await this.borrowRepo.save(row);
+        this.scheduleExpire(row.id, row.borrowEndTime || borrowEndTime);
+      },
+    );
+  }
+
   private getExpireTaskName(id: string | number) {
     return `articleBorrow:${id}`;
+  }
+
+  private getStartTaskName(id: string | number) {
+    return `articleBorrowStart:${id}`;
   }
 
   @Cron("0 */5 * * * *")
@@ -266,10 +394,31 @@ export class ArticleBorrowsService {
       "scheduled",
       async () => {
         const now = dayjs().format("YYYY-MM-DD HH:mm:ss");
-        const rows = await this.borrowRepo
+        const waitingRows = await this.borrowRepo
           .createQueryBuilder("borrow")
           .where("borrow.status = :status", {
-            status: KnowledgeBorrowStatus.approved,
+            status: KnowledgeBorrowStatus.waitingStart,
+          })
+          .andWhere("borrow.borrowStartTime IS NOT NULL")
+          .andWhere("borrow.borrowStartTime <= :now", { now })
+          .getMany();
+
+        for (const row of waitingRows) {
+          row.status = KnowledgeBorrowStatus.active;
+          row.currentNodeName = "已开始借阅";
+          await this.borrowRepo.save(row);
+          if (row.borrowEndTime) {
+            this.scheduleExpire(row.id, row.borrowEndTime);
+          }
+        }
+
+        const rows = await this.borrowRepo
+          .createQueryBuilder("borrow")
+          .where("borrow.status IN (:...statuses)", {
+            statuses: [
+              KnowledgeBorrowStatus.active,
+              KnowledgeBorrowStatus.approved,
+            ],
           })
           .andWhere("borrow.borrowEndTime IS NOT NULL")
           .andWhere("borrow.borrowEndTime < :now", { now })
@@ -281,9 +430,9 @@ export class ArticleBorrowsService {
         }
 
         return {
-          summary: `同步 ${rows.length} 条借阅记录`,
-          processedCount: rows.length,
-          successCount: rows.length,
+          summary: `生效 ${waitingRows.length} 条，过期 ${rows.length} 条借阅记录`,
+          processedCount: waitingRows.length + rows.length,
+          successCount: waitingRows.length + rows.length,
         };
       },
     );

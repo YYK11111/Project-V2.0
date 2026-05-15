@@ -5,6 +5,8 @@ import { JoinColumn, ManyToOne } from "typeorm";
 
 export enum KnowledgeBorrowStatus {
   pending = "pending",
+  waitingStart = "waitingStart",
+  active = "active",
   approved = "approved",
   rejected = "rejected",
   expired = "expired",
@@ -13,6 +15,8 @@ export enum KnowledgeBorrowStatus {
 
 export const knowledgeBorrowStatusMap = {
   [KnowledgeBorrowStatus.pending]: "待审批",
+  [KnowledgeBorrowStatus.waitingStart]: "等待开始",
+  [KnowledgeBorrowStatus.active]: "借阅中",
   [KnowledgeBorrowStatus.approved]: "已通过",
   [KnowledgeBorrowStatus.rejected]: "已拒绝",
   [KnowledgeBorrowStatus.expired]: "已到期",
@@ -76,6 +80,26 @@ export class ArticleBorrow extends BaseEntity {
   @BaseColumn({ nullable: true, comment: "借阅结束时间" })
   borrowEndTime: string;
 
+  @BaseColumn({ nullable: true, comment: "申请开始借阅时间" })
+  requestedStartTime: string;
+
   @BaseColumn({ default: "manualApply", comment: "来源类型" })
   sourceType: string;
+
+  @BaseColumn({
+    nullable: true,
+    name: "workflowInstanceId",
+    comment: "流程实例ID",
+  })
+  workflowInstanceId: string;
+
+  @BaseColumn({ default: "0", name: "approvalStatus", comment: "审批状态" })
+  approvalStatus: string;
+
+  @BaseColumn({
+    nullable: true,
+    name: "currentNodeName",
+    comment: "当前流程节点",
+  })
+  currentNodeName: string;
 }

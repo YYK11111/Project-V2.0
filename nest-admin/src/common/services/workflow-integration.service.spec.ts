@@ -4,6 +4,7 @@ import { TaskStatus } from "src/modulesBusi/tasks/entity";
 import { GoLiveRecordStatus } from "src/modulesBusi/go-live-records/entity";
 import { AcceptanceRecordResult } from "src/modulesBusi/acceptance-records/entity";
 import { HandoverRecordStatus } from "src/modulesBusi/handover-records/entity";
+import { KnowledgeBorrowStatus } from "src/modulesBusi/articleBorrows/entity";
 
 describe("WorkflowIntegrationService 任务完成审批回调", () => {
   const createService = () => {
@@ -97,6 +98,11 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
       goLive: { findOne: jest.fn(), update: jest.fn() },
       acceptance: { findOne: jest.fn(), update: jest.fn() },
       handover: { findOne: jest.fn(), update: jest.fn() },
+      articleBorrow: { findOne: jest.fn(), update: jest.fn() },
+    };
+    const tasksService = {
+      deleteTimeout: jest.fn(),
+      addTimeout: jest.fn(),
     };
     const projectsService = {
       ensureKnowledgeSpaceWhenProjectExecuting: jest.fn(),
@@ -115,6 +121,8 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
       projectsService as any,
       undefined,
       approvalContextService as any,
+      repositories.articleBorrow as any,
+      tasksService as any,
     );
     return {
       service,
@@ -122,6 +130,7 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
       workflowService,
       projectsService,
       approvalContextService,
+      tasksService,
     };
   };
 
@@ -471,6 +480,89 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     });
 
     expect(repositories.handover.update).not.toHaveBeenCalled();
+  });
+
+  it("知识借阅审批通过且开始时间未到时进入等待生效", async () => {
+    const { service, repositories, tasksService } = createService();
+    const requestedStartTime = "2999-05-16 10:00:00";
+    repositories.articleBorrow.findOne.mockResolvedValue({
+      id: "borrow-1",
+      status: KnowledgeBorrowStatus.pending,
+      requestedDays: 3,
+      requestedStartTime,
+    });
+
+    await service.handleWorkflowCallback("wf-1", "completed", {
+      businessKey: "articleBorrow_borrow-1",
+    });
+
+    expect(repositories.articleBorrow.update).toHaveBeenCalledWith(
+      "borrow-1",
+      expect.objectContaining({
+        status: KnowledgeBorrowStatus.waitingStart,
+        approvalStatus: "2",
+        currentNodeName: "借阅审批已通过，等待开始借阅",
+        borrowStartTime: requestedStartTime,
+        borrowEndTime: "2999-05-19 10:00:00",
+      }),
+    );
+    expect(tasksService.addTimeout).toHaveBeenCalledWith(
+      "articleBorrowStart:borrow-1",
+      requestedStartTime,
+      expect.any(Function),
+    );
+  });
+
+  it("知识借阅审批通过且开始时间已过时立即生效", async () => {
+    const { service, repositories, tasksService } = createService();
+    repositories.articleBorrow.findOne.mockResolvedValue({
+      id: "borrow-2",
+      status: KnowledgeBorrowStatus.pending,
+      requestedDays: 2,
+      requestedStartTime: "2000-01-01 00:00:00",
+    });
+
+    await service.handleWorkflowCallback("wf-2", "completed", {
+      businessKey: "articleBorrow_borrow-2",
+    });
+
+    expect(repositories.articleBorrow.update).toHaveBeenCalledWith(
+      "borrow-2",
+      expect.objectContaining({
+        status: KnowledgeBorrowStatus.active,
+        approvalStatus: "2",
+        currentNodeName: "借阅审批已通过，已开始借阅",
+        borrowStartTime: expect.any(String),
+        borrowEndTime: expect.any(String),
+      }),
+    );
+    expect(tasksService.addTimeout).toHaveBeenCalledWith(
+      "articleBorrow:borrow-2",
+      expect.any(String),
+      expect.any(Function),
+    );
+  });
+
+  it("知识借阅审批拒绝时标记借阅申请为已拒绝", async () => {
+    const { service, repositories } = createService();
+    repositories.articleBorrow.findOne.mockResolvedValue({
+      id: "borrow-3",
+      status: KnowledgeBorrowStatus.pending,
+      requestedDays: 2,
+    });
+
+    await service.handleWorkflowCallback("wf-3", "rejected", {
+      businessKey: "articleBorrow_borrow-3",
+    });
+
+    expect(repositories.articleBorrow.update).toHaveBeenCalledWith(
+      "borrow-3",
+      expect.objectContaining({
+        status: KnowledgeBorrowStatus.rejected,
+        approvalStatus: "3",
+        currentNodeName: "借阅审批已驳回",
+      }),
+    );
   });
 });
 

@@ -111,6 +111,7 @@ const canEditCurrentArticle = computed(() => !route.query.id || form.value?.canE
 const borrowForm = ref({
   articleId: '',
   requestedDays: 1,
+  requestedStartTime: '',
   applyReason: '',
 })
 
@@ -354,7 +355,7 @@ function submitBorrow() {
   applyArticleBorrow(borrowForm.value)
     .then(() => {
       borrowDialogVisible.value = false
-      $sdk.msgSuccess('借阅申请已提交，请等待分类管理员审批')
+      $sdk.msgSuccess('借阅申请已提交，请等待工作流审批')
       router.push('/content/articleManage/myBorrows')
     })
     .finally(() => {
@@ -557,6 +558,9 @@ function submitBorrow() {
         <el-form :model="borrowForm" label-width="100px" v-loading="borrowLoading">
           <el-form-item label="借阅时长">
             <el-input-number v-model="borrowForm.requestedDays" :min="1" :max="30" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="开始时间">
+            <el-date-picker v-model="borrowForm.requestedStartTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="不填则审批通过后立即开始" style="width: 100%" />
           </el-form-item>
           <el-form-item label="申请理由">
             <el-input v-model="borrowForm.applyReason" type="textarea" :rows="4" placeholder="请输入借阅理由" />

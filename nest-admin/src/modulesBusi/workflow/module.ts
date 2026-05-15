@@ -19,6 +19,7 @@ import { ChangeLoader } from "./loaders/change.loader";
 import { GoLiveLoader } from "./loaders/go-live.loader";
 import { AcceptanceLoader } from "./loaders/acceptance.loader";
 import { HandoverLoader } from "./loaders/handover.loader";
+import { ArticleBorrowLoader } from "./loaders/article-borrow.loader";
 import { NodeHandlerFactory } from "./handler/node-handler.factory";
 import { StartNodeHandler } from "./handler/impl/start-node.handler";
 import { EndNodeHandler } from "./handler/impl/end-node.handler";
@@ -47,6 +48,7 @@ import { ProjectChange } from "../changes/entity";
 import { GoLiveRecord } from "../go-live-records/entity";
 import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
+import { ArticleBorrow } from "../articleBorrows/entity";
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { HandoverRecord } from "../handover-records/entity";
       GoLiveRecord,
       AcceptanceRecord,
       HandoverRecord,
+      ArticleBorrow,
     ]),
     NoticesModule,
     MessagesModule,
@@ -101,6 +104,7 @@ import { HandoverRecord } from "../handover-records/entity";
     GoLiveLoader,
     AcceptanceLoader,
     HandoverLoader,
+    ArticleBorrowLoader,
   ],
   exports: [
     WorkflowService,

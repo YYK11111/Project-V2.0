@@ -14,6 +14,8 @@ function goArticle(row: any) {
 
 const statusMap = {
   pending: '待审批',
+  waitingStart: '等待开始',
+  active: '借阅中',
   approved: '已通过',
   rejected: '已拒绝',
   expired: '已到期',
@@ -22,6 +24,8 @@ const statusMap = {
 
 const statusTypeMap = {
   pending: 'warning',
+  waitingStart: 'warning',
+  active: 'success',
   approved: 'success',
   rejected: 'danger',
   expired: 'info',

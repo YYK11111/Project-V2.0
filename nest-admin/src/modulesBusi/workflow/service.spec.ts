@@ -1316,10 +1316,12 @@ describe("WorkflowService 业务类型与自动触发", () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
       { load: jest.fn(), getFields: jest.fn(() => []) } as any,
     );
 
     expect(service.getRegisteredTypes()).toContain("handover");
+    expect(service.getRegisteredTypes()).toContain("articleBorrow");
   });
 
   it("发起业务流程时拒绝同业务已有运行中实例", async () => {
