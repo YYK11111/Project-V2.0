@@ -105,4 +105,11 @@ describe('WorkflowApprovalPanel contract', () => {
     expect(source).toContain('instanceDefinition')
     expect(source).toContain('buildRejectableNodes')
   })
+
+  it('只读模式默认停留在流程图并响应实例切换', () => {
+    expect(source).toContain("const activeTab = ref(props.readonly ? 'progress' : 'actions')")
+    expect(source).toContain('v-if="!props.readonly"')
+    expect(source).toContain('() => [props.instanceId, props.taskId]')
+    expect(source).toContain("activeTab.value = 'progress'")
+  })
 })

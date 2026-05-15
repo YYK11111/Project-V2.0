@@ -14,6 +14,7 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
+import { phaseMap, qualityLevelMap, riskLevelMap } from './fieldMaps'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,6 +69,8 @@ const canEditProject = computed(() => canProjectUpdate.value && String(project.v
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
 const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
 const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
+const showWorkflowPanel = computed(() => Boolean(workflowInstanceId.value))
+const isWorkflowReadonly = computed(() => !(fromWorkflow.value && workflowTaskId.value))
 
 function getProjectApprovalText(project) {
   if (project?.approvalStatus === '3' && String(project?.currentNodeName || '').includes('退回发起人')) return '已退回发起人'
@@ -83,6 +86,23 @@ function getApprovalType(status) {
 
 function canViewGroup(groupCode) {
   return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
+}
+
+function getRiskLevelType(level) {
+  if (level === 'critical') return 'danger'
+  if (level === 'high') return 'warning'
+  return 'info'
+}
+
+function getQualityLevelType(level) {
+  if (level === 'excellent') return 'success'
+  if (level === 'high') return 'warning'
+  return 'info'
+}
+
+function getDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return '-'
+  return `${startDate || '-'} 至 ${endDate || '-'}`
 }
 
 async function reloadCurrent() {
@@ -371,6 +391,19 @@ watch(
 
         <el-row :gutter="20" class="basic-info-row">
           <el-col :xs="24" :sm="12">
+            <el-form-item label="项目阶段">
+              <ViewField :value="phaseMap[project.phase] || project.phase || '-'" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="阶段起止">
+              <ViewField :value="getDateRange(project.phaseStartDate, project.phaseEndDate)" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="项目发起人">
               <ViewUser :user="project.creator" />
             </el-form-item>
@@ -378,6 +411,45 @@ watch(
           <el-col :xs="24" :sm="12">
             <el-form-item label="项目标签">
               <ViewField :value="(project.tags || []).join('、')" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="业务线">
+              <ViewField :value="project.businessLine || '-'" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="行业">
+              <ViewField :value="project.industry || '-'" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="项目来源">
+              <ViewField :value="project.projectSource || '-'" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="实际成本">
+              <ViewField :value="project.actualCost" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="basic-info-row">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="风险等级">
+              <ViewTagField :text="riskLevelMap[project.riskLevel] || project.riskLevel || '-'" :type="getRiskLevelType(project.riskLevel)" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="质量等级">
+              <ViewTagField :text="qualityLevelMap[project.qualityLevel] || project.qualityLevel || '-'" :type="getQualityLevelType(project.qualityLevel)" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -532,17 +604,18 @@ watch(
         </el-form-item>
       </section>
 
-      <section v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="section-card section-card--approval">
+      <section v-if="showWorkflowPanel" ref="workflowPanelRef" class="section-card section-card--approval">
         <div class="section-header section-header--stack">
           <div>
-            <div class="section-title">审批处理</div>
-            <div class="section-desc">请在核对项目立项材料后完成审批、驳回、转交或加签操作。</div>
+            <div class="section-title">{{ isWorkflowReadonly ? '流程图与审批历史' : '审批处理' }}</div>
+            <div class="section-desc">{{ isWorkflowReadonly ? '仅展示当前立项流程的流转图和审批历史记录。' : '请在核对项目立项材料后完成审批、驳回、转交或加签操作。' }}</div>
           </div>
         </div>
         <WorkflowApprovalPanel
           :task-id="workflowTaskId"
           :instance-id="workflowInstanceId"
           :node-name="project.currentNodeName"
+          :readonly="isWorkflowReadonly"
           @approved="reloadCurrent" />
       </section>
     </div>

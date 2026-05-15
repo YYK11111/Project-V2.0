@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheckFilled } from '@element-plus/icons-vue'
 import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance, getWorkflowInstanceDefinition } from '@/views/business/workflow/api'
@@ -13,6 +13,7 @@ const props = defineProps({
   taskId: { type: String, default: '' },
   instanceId: { type: String, default: '' },
   nodeName: { type: String, default: '' },
+  readonly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['approved'])
@@ -39,7 +40,7 @@ const instanceDefinition = ref<any>(null)
 const rejectableNodes = ref<any[]>([])
 const autoBackVisible = ref(false)
 const autoBackSeconds = ref(3)
-const activeTab = ref('actions')
+const activeTab = ref(props.readonly ? 'progress' : 'actions')
 let autoBackTimer: ReturnType<typeof setInterval> | null = null
 
 const nodeTypeLabelMap: Record<string, string> = {
@@ -87,6 +88,20 @@ const loadWorkflowContext = async () => {
 onMounted(() => {
   loadWorkflowContext()
 })
+
+watch(
+  () => [props.instanceId, props.taskId],
+  () => {
+    loadWorkflowContext()
+  },
+)
+
+watch(
+  () => props.readonly,
+  (readonly) => {
+    if (readonly) activeTab.value = 'progress'
+  },
+)
 
 onBeforeUnmount(() => {
   clearAutoBackTimer()
@@ -232,7 +247,7 @@ const openInstanceDetail = () => {
     </template>
 
     <el-tabs v-model="activeTab" class="workflow-approval-tabs">
-      <el-tab-pane label="审批操作" name="actions">
+      <el-tab-pane v-if="!props.readonly" label="审批操作" name="actions">
         <el-form label-width="90px">
           <el-form-item label="当前节点">
             <span>{{ nodeName || currentTask?.nodeName || '-' }}</span>
