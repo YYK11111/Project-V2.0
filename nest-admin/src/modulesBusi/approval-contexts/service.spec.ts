@@ -13,11 +13,25 @@ describe("BusinessApprovalContextService", () => {
       create: jest.fn((payload) => payload),
       save: jest.fn(async (payload) => ({ id: "participant-1", ...payload })),
     };
+    const workflowInstanceRepository = {
+      find: jest.fn(),
+    };
+    const changeRepository = {
+      find: jest.fn(),
+    };
     const service = new BusinessApprovalContextService(
       contextRepository as any,
       participantRepository as any,
+      workflowInstanceRepository as any,
+      changeRepository as any,
     );
-    return { service, contextRepository, participantRepository };
+    return {
+      service,
+      contextRepository,
+      participantRepository,
+      workflowInstanceRepository,
+      changeRepository,
+    };
   };
 
   it("创建审批上下文时将同业务同场景旧记录置为非当前", async () => {
@@ -136,5 +150,96 @@ describe("BusinessApprovalContextService", () => {
         currentNodeName: "结束",
       },
     );
+  });
+
+  it("项目审批上下文查询会自动回填历史立项结项和变更流程实例", async () => {
+    const {
+      service,
+      contextRepository,
+      workflowInstanceRepository,
+      changeRepository,
+    } = createService();
+    contextRepository.find
+      .mockResolvedValueOnce([
+        {
+          id: "ctx-existing",
+          workflowInstanceId: "wf-project",
+        },
+      ])
+      .mockResolvedValueOnce([
+        { id: "ctx-existing", workflowInstanceId: "wf-project" },
+        { id: "ctx-close", workflowInstanceId: "wf-close" },
+        { id: "ctx-change", workflowInstanceId: "wf-change" },
+      ]);
+    changeRepository.find.mockResolvedValue([{ id: "change-1" }]);
+    workflowInstanceRepository.find.mockResolvedValue([
+      {
+        id: "wf-project",
+        businessKey: "project_19",
+        definitionId: "def-1",
+        definitionCode: "project-init",
+        status: "2",
+        currentNodeId: "end",
+        starterId: "u1",
+        startTime: "2026-05-15 10:00:00",
+      },
+      {
+        id: "wf-close",
+        businessKey: "project_close_19",
+        definitionId: "def-2",
+        definitionCode: "project-close",
+        status: "1",
+        currentNodeId: "node-close",
+        starterId: "u2",
+        startTime: "2026-05-15 11:00:00",
+      },
+      {
+        id: "wf-change",
+        businessKey: "change_change-1",
+        definitionId: "def-3",
+        definitionCode: "change-approval",
+        status: "1",
+        currentNodeId: "node-change",
+        starterId: "u3",
+        startTime: "2026-05-15 12:00:00",
+      },
+    ]);
+
+    const result = await service.findProjectApprovalContexts("19");
+
+    expect(changeRepository.find).toHaveBeenCalledWith({
+      where: { projectId: "19" },
+      select: ["id"],
+    });
+    expect(workflowInstanceRepository.find).toHaveBeenCalled();
+    expect(contextRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "project",
+        businessId: "19",
+        businessScene: "closure",
+        sceneTitle: "结项审批",
+        workflowInstanceId: "wf-close",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+    expect(contextRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "change",
+        businessId: "change-1",
+        businessScene: "approval",
+        sceneTitle: "变更审批",
+        workflowInstanceId: "wf-change",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+    expect(result).toEqual([
+      { id: "ctx-existing", workflowInstanceId: "wf-project" },
+      { id: "ctx-close", workflowInstanceId: "wf-close" },
+      { id: "ctx-change", workflowInstanceId: "wf-change" },
+    ]);
   });
 });

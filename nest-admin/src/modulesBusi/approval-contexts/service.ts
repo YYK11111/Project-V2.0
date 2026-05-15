@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { BusinessApprovalContext } from "./entity/business-approval-context.entity";
 import { BusinessApprovalParticipant } from "./entity/business-approval-participant.entity";
 import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
+import { ProjectChange } from "../changes/entity";
 
 export interface CreateBusinessApprovalContextOptions {
   businessType: string;
@@ -40,6 +41,12 @@ export class BusinessApprovalContextService {
     private readonly contextRepository: Repository<BusinessApprovalContext>,
     @InjectRepository(BusinessApprovalParticipant)
     private readonly participantRepository: Repository<BusinessApprovalParticipant>,
+    @Optional()
+    @InjectRepository(WorkflowInstance)
+    private readonly workflowInstanceRepository?: Repository<WorkflowInstance>,
+    @Optional()
+    @InjectRepository(ProjectChange)
+    private readonly changeRepository?: Repository<ProjectChange>,
   ) {}
 
   async createFromWorkflowStart(options: CreateBusinessApprovalContextOptions) {
@@ -102,6 +109,12 @@ export class BusinessApprovalContextService {
     });
   }
 
+  async findProjectApprovalContexts(projectId: string) {
+    const contexts = await this.findByRootBusiness("project", projectId);
+    await this.backfillProjectApprovalContexts(projectId, contexts);
+    return this.findByRootBusiness("project", projectId);
+  }
+
   findByBusiness(businessType: string, businessId: string) {
     return this.contextRepository.find({
       where: {
@@ -132,5 +145,82 @@ export class BusinessApprovalContextService {
         currentNodeName: options.currentNodeName,
       },
     );
+  }
+
+  private async backfillProjectApprovalContexts(
+    projectId: string,
+    existingContexts: BusinessApprovalContext[],
+  ) {
+    if (!this.workflowInstanceRepository || !this.changeRepository) return;
+
+    const changes = await this.changeRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
+    const businessKeys = [
+      `project_${projectId}`,
+      `project_close_${projectId}`,
+      ...changes.map((change) => `change_${change.id}`),
+    ];
+    const workflowInstances = await this.workflowInstanceRepository.find({
+      where: { businessKey: In(businessKeys) },
+      order: { startTime: "ASC", createTime: "ASC" },
+    });
+    const existingWorkflowInstanceIds = new Set(
+      (existingContexts || []).map((context) =>
+        String(context.workflowInstanceId || ""),
+      ),
+    );
+    for (const instance of workflowInstances) {
+      if (existingWorkflowInstanceIds.has(String(instance.id))) continue;
+      const options = this.buildProjectBackfillContextOptions(
+        projectId,
+        instance,
+      );
+      if (!options) continue;
+      await this.createFromWorkflowStart(options);
+    }
+  }
+
+  private buildProjectBackfillContextOptions(
+    projectId: string,
+    instance: WorkflowInstance,
+  ): CreateBusinessApprovalContextOptions | null {
+    const businessKey = String(instance.businessKey || "");
+    const commonOptions = {
+      workflowInstance: instance,
+      starterId: instance.starterId,
+      rootBusinessType: "project",
+      rootBusinessId: projectId,
+      projectId,
+    };
+    if (businessKey === `project_${projectId}`) {
+      return {
+        ...commonOptions,
+        businessType: "project",
+        businessId: projectId,
+        businessScene: "initiation",
+        sceneTitle: "立项审批",
+      };
+    }
+    if (businessKey === `project_close_${projectId}`) {
+      return {
+        ...commonOptions,
+        businessType: "project",
+        businessId: projectId,
+        businessScene: "closure",
+        sceneTitle: "结项审批",
+      };
+    }
+    if (businessKey.startsWith("change_")) {
+      return {
+        ...commonOptions,
+        businessType: "change",
+        businessId: businessKey.replace("change_", ""),
+        businessScene: "approval",
+        sceneTitle: "变更审批",
+      };
+    }
+    return null;
   }
 }

@@ -928,7 +928,9 @@ describe("ProjectsService closure guards", () => {
       getProjectFieldPermissions: jest.fn().mockReturnValue(fieldPermissions),
     };
     (service as any).businessApprovalContextService = {
-      findByRootBusiness: jest.fn().mockResolvedValue(approvalContexts),
+      findProjectApprovalContexts: jest
+        .fn()
+        .mockResolvedValue(approvalContexts),
     };
 
     const result = await service.getProjectViewContext("19", {
@@ -970,7 +972,9 @@ describe("ProjectsService closure guards", () => {
       getProjectFieldPermissions: jest.fn().mockReturnValue({}),
     };
     (service as any).businessApprovalContextService = {
-      findByRootBusiness: jest.fn().mockResolvedValue(approvalContexts),
+      findProjectApprovalContexts: jest
+        .fn()
+        .mockResolvedValue(approvalContexts),
     };
 
     const result = await service.getProjectViewContext("19", {

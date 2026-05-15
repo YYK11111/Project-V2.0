@@ -1857,8 +1857,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         canVisit: true,
       });
     const approvalContexts =
-      (await this.businessApprovalContextService?.findByRootBusiness(
-        "project",
+      (await this.businessApprovalContextService?.findProjectApprovalContexts(
         projectId,
       )) || [];
     const currentApprovalContext =
