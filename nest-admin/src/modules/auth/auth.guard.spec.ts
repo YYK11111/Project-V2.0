@@ -1054,6 +1054,18 @@ describe("AuthGuard", () => {
         }),
       ),
     ).resolves.toBe(true);
+
+    await expect(
+      guard.canActivate(
+        createContext({
+          headers: {
+            cookie: "admin_session=header.payload.signature",
+          },
+          path: "/api/business/projects/19/view-context",
+          method: "GET",
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 
   it("登录后访问文章知识类型字典接口不要求菜单按钮权限", async () => {

@@ -40,7 +40,7 @@ const businessAccessModuleAliases: Record<string, string[]> = {
 };
 
 const businessAccessActionMap: Record<string, Set<string>> = {
-  "business/projects": new Set(["getOne", "fieldPermissions"]),
+  "business/projects": new Set(["getOne", "fieldPermissions", "viewContext"]),
   "business/workflow/definitions": new Set(["list", "getOne"]),
   "business/workflow/instances": new Set([
     "list",

@@ -65,6 +65,12 @@ describe("business-list-permission", () => {
     expect(
       hasPermissionOrAccess(
         ["business/projects/access"],
+        "business/projects/viewContext",
+      ),
+    ).toBe(true);
+    expect(
+      hasPermissionOrAccess(
+        ["business/projects/access"],
         "business/projects/update",
       ),
     ).toBe(false);
