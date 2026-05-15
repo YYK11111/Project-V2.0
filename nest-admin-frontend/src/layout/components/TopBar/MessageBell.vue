@@ -9,6 +9,7 @@ const userStore = useUserStore()
 const unread = ref({ total: 0, todo: 0, cc: 0 })
 const messageData = ref<{ todo: any[]; cc: any[] }>({ todo: [], cc: [] })
 const activeTab = ref('todo')
+const popoverVisible = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
 const projectAlertMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType === 'project_alert'))
 const otherCcMessages = computed(() => messageData.value.cc.filter((item) => item.sourceType !== 'project_alert'))
@@ -52,9 +53,15 @@ const goMessage = async (row: any) => {
   }
   const target = getMessageRoute(row)
   if (target) {
-    router.push(target)
+    popoverVisible.value = false
+    await router.push(target)
   }
   await loadMessages()
+}
+
+const goMessageCenter = () => {
+  popoverVisible.value = false
+  router.push('/user/messages')
 }
 
 onMounted(() => {
@@ -73,7 +80,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-popover placement="bottom-end" :width="420" trigger="click" @show="loadMessages">
+  <el-popover v-model:visible="popoverVisible" placement="bottom-end" :width="420" trigger="click" @show="loadMessages">
     <template #reference>
       <el-badge :value="unread.total" :hidden="!unread.total" class="menuItem message-bell topbar-icon-button">
         <el-icon-bell class="right-icon message-bell__icon" />
@@ -121,7 +128,7 @@ onUnmounted(() => {
         </el-tab-pane>
       </el-tabs>
       <div class="message-footer">
-        <el-button link type="primary" @click="router.push('/user/messages')">查看全部消息</el-button>
+        <el-button link type="primary" @click="goMessageCenter">查看全部消息</el-button>
       </div>
     </div>
   </el-popover>

@@ -12,6 +12,14 @@ SET @project_list_menu_id = COALESCE(
   (SELECT id FROM sys_menu WHERE permissionKey = 'business/projectManage/index' AND is_delete IS NULL ORDER BY id LIMIT 1)
 );
 SET @task_menu_id = (SELECT id FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @task_list_menu_id = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskInfo' AND parent_id = @task_menu_id AND is_delete IS NULL ORDER BY id LIMIT 1),
+  @task_menu_id
+);
+SET @task_report_menu_id = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskReportManage' AND parent_id = @task_menu_id AND is_delete IS NULL ORDER BY id LIMIT 1),
+  @task_menu_id
+);
 SET @ticket_menu_id = (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @milestone_menu_id = (SELECT id FROM sys_menu WHERE path = 'milestoneManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
 SET @risk_menu_id = (SELECT id FROM sys_menu WHERE path = 'riskManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
@@ -115,47 +123,47 @@ WHERE @project_list_menu_id IS NOT NULL
 
 -- Tasks
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务列表', '任务列表查询权限', @task_menu_id, '321', 'task-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/list'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/list' AND is_delete IS NULL);
+SELECT '任务列表', '任务列表查询权限', @task_list_menu_id, '321', 'task-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/list'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务全量管理', '任务管理全部数据权限', @task_menu_id, '339', 'task-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/manageAll'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/manageAll' AND is_delete IS NULL);
+SELECT '任务全量管理', '任务管理全部数据权限', @task_list_menu_id, '339', 'task-manage-all', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/manageAll'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/manageAll' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务详情', '任务详情查看权限', @task_menu_id, '322', 'task-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/getOne'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/getOne' AND is_delete IS NULL);
+SELECT '任务详情', '任务详情查看权限', @task_list_menu_id, '322', 'task-getOne', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/getOne'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/getOne' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '新增任务', '新增任务权限', @task_menu_id, '323', 'task-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/add'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/add' AND is_delete IS NULL);
+SELECT '新增任务', '新增任务权限', @task_list_menu_id, '323', 'task-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/add'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '修改任务', '修改任务权限', @task_menu_id, '324', 'task-update', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/update'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/update' AND is_delete IS NULL);
+SELECT '修改任务', '修改任务权限', @task_list_menu_id, '324', 'task-update', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/update'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/update' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '删除任务', '删除任务权限', @task_menu_id, '325', 'task-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/delete'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/delete' AND is_delete IS NULL);
+SELECT '删除任务', '删除任务权限', @task_list_menu_id, '325', 'task-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/delete'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/delete' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '更新任务进度', '更新任务进度权限', @task_menu_id, '326', 'task-updateProgress', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/updateProgress'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/updateProgress' AND is_delete IS NULL);
+SELECT '更新任务进度', '更新任务进度权限', @task_list_menu_id, '326', 'task-updateProgress', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/updateProgress'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/updateProgress' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务看板', '任务看板查看权限', @task_menu_id, '327', 'task-kanban', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/kanban'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/kanban' AND is_delete IS NULL);
+SELECT '任务看板', '任务看板查看权限', @task_list_menu_id, '327', 'task-kanban', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/kanban'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/kanban' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务依赖列表', '任务依赖列表权限', @task_menu_id, '328', 'task-dependency-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/list'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/list' AND is_delete IS NULL);
+SELECT '任务依赖列表', '任务依赖列表权限', @task_list_menu_id, '328', 'task-dependency-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/list'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务依赖新增', '任务依赖新增权限', @task_menu_id, '329', 'task-dependency-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/add'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/add' AND is_delete IS NULL);
+SELECT '任务依赖新增', '任务依赖新增权限', @task_list_menu_id, '329', 'task-dependency-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/add'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务依赖删除', '任务依赖删除权限', @task_menu_id, '330', 'task-dependency-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/delete'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/delete' AND is_delete IS NULL);
+SELECT '任务依赖删除', '任务依赖删除权限', @task_list_menu_id, '330', 'task-dependency-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/dependency/delete'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/dependency/delete' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '工时记录列表', '工时记录列表权限', @task_menu_id, '331', 'task-timelog-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/list'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/list' AND is_delete IS NULL);
+SELECT '工时记录列表', '工时记录列表权限', @task_report_menu_id, '331', 'task-timelog-list', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/list'
+WHERE @task_report_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/list' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '工时记录新增', '工时记录新增权限', @task_menu_id, '332', 'task-timelog-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/add'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/add' AND is_delete IS NULL);
+SELECT '工时记录新增', '工时记录新增权限', @task_report_menu_id, '332', 'task-timelog-add', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/add'
+WHERE @task_report_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/add' AND is_delete IS NULL);
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '工时记录删除', '工时记录删除权限', @task_menu_id, '333', 'task-timelog-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/delete'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/delete' AND is_delete IS NULL);
+SELECT '工时记录删除', '工时记录删除权限', @task_report_menu_id, '333', 'task-timelog-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/delete'
+WHERE @task_report_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/timelog/delete' AND is_delete IS NULL);
 
 -- Tickets
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)

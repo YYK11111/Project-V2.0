@@ -9,6 +9,10 @@ SET @project_list_menu_id = COALESCE(
   @project_menu_id
 );
 SET @task_menu_id = (SELECT id FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL ORDER BY id LIMIT 1);
+SET @task_list_menu_id = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskInfo' AND parent_id = @task_menu_id AND is_delete IS NULL ORDER BY id LIMIT 1),
+  @task_menu_id
+);
 SET @task_report_menu_id = COALESCE(
   (SELECT id FROM sys_menu WHERE path = 'taskReportManage' AND is_delete IS NULL ORDER BY id LIMIT 1),
   @task_menu_id
@@ -39,8 +43,8 @@ SELECT '项目基础访问', '项目基础访问权限：允许查看本人可�
 WHERE @project_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/projects/access' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
-SELECT '任务基础访问', '任务基础访问权限：允许查看本人可见范围内的任务列表、详情、看板、任务依赖及页面只读基础数据', @task_menu_id, '320', 'task-access', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/access'
-WHERE @task_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/access' AND is_delete IS NULL);
+SELECT '任务基础访问', '任务基础访问权限：允许查看本人可见范围内的任务列表、详情、看板、任务依赖及页面只读基础数据', @task_list_menu_id, '320', 'task-access', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/access'
+WHERE @task_list_menu_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE permissionKey = 'business/tasks/access' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '任务汇报基础访问', '任务汇报基础访问权限：允许查看本人可见范围内的任务汇报列表和详情', @task_report_menu_id, '520', 'task-timelog-access', '', 'button', '', '1', '1', 'system', 'system', 'business/tasks/timelog/access'

@@ -6,6 +6,10 @@ SET @projectListId := COALESCE(
   @projectId
 );
 SET @taskId := (SELECT id FROM sys_menu WHERE path = 'taskManage' AND is_delete IS NULL LIMIT 1);
+SET @taskListId := COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskInfo' AND parent_id = @taskId AND is_delete IS NULL LIMIT 1),
+  @taskId
+);
 SET @ticketId := (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND is_delete IS NULL LIMIT 1);
 SET @documentId := (SELECT id FROM sys_menu WHERE path = 'documentManage' AND is_delete IS NULL LIMIT 1);
 SET @sprintId := (SELECT id FROM sys_menu WHERE path = 'sprintManage' AND is_delete IS NULL LIMIT 1);
@@ -27,8 +31,8 @@ SELECT '项目详情', 'detail', 'business/projectManage/detail', 'menu', @proje
 WHERE @projectListId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @projectListId AND component = 'business/projectManage/detail' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
-SELECT '任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
-WHERE @taskId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @taskId AND component = 'business/taskManage/form' AND is_delete IS NULL);
+SELECT '任务表单', '/taskManage/form', 'business/taskManage/form', 'menu', @taskListId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'
+WHERE @taskListId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @taskListId AND component = 'business/taskManage/form' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user, update_user)
 SELECT '工单表单', 'form', 'business/ticketManage/form', 'menu', @ticketId, '90', '', '1', '1', NULL, NULL, NOW(), 'system', 'system'

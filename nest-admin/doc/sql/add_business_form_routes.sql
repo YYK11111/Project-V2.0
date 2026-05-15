@@ -12,6 +12,10 @@ SET @projectListId = COALESCE(
   @projectId
 );
 SET @taskId = (SELECT id FROM sys_menu WHERE path = 'taskManage' AND parent_id = @businessId);
+SET @taskListId = COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskInfo' AND parent_id = @taskId LIMIT 1),
+  @taskId
+);
 SET @ticketId = (SELECT id FROM sys_menu WHERE path = 'ticketManage' AND parent_id = @businessId);
 SET @documentId = (SELECT id FROM sys_menu WHERE path = 'documentManage' AND parent_id = @businessId);
 
@@ -26,7 +30,7 @@ ON DUPLICATE KEY UPDATE update_time = NOW();
 -- 任务管理 - 表单路由
 -- =====================================================
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '99', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system')
+VALUES ('任务表单', '/taskManage/form', 'business/taskManage/form', 'menu', @taskListId, '99', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system')
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- =====================================================

@@ -45,8 +45,13 @@ DELETE FROM sys_menu WHERE path = '/taskManage/form' AND parent_id = @taskId;
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
 VALUES ('任务列表', 'index', 'business/taskManage/index', 'menu', @taskId, '1', 'list', '0', '1', NULL, 'business/taskInfo', NOW(), 'system');
 
+SET @taskListId = COALESCE(
+  (SELECT id FROM sys_menu WHERE parent_id = @taskId AND component = 'business/taskManage/index' AND is_delete IS NULL ORDER BY id LIMIT 1),
+  @taskId
+);
+
 INSERT INTO sys_menu (name, path, component, type, parent_id, `order`, icon, is_hidden, is_active, is_delete, permissionKey, create_time, create_user) 
-VALUES ('任务表单', 'form', 'business/taskManage/form', 'menu', @taskId, '2', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system');
+VALUES ('任务表单', '/taskManage/form', 'business/taskManage/form', 'menu', @taskListId, '2', '', '1', '1', NULL, 'business/tasks/update', NOW(), 'system');
 
 -- =====================================================
 -- 3. 工单管理

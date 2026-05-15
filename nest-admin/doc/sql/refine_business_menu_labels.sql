@@ -27,7 +27,16 @@ SET parent_id = @taskRoot,
 WHERE path = 'taskCommentManage' AND is_delete IS NULL;
 
 -- 任务表单和评论顺序微调，保证列表在前，表单隐藏在后
-UPDATE sys_menu SET `order` = '90' WHERE parent_id = @taskRoot AND path = 'form' AND component = 'business/taskManage/form' AND is_delete IS NULL;
+SET @taskList := COALESCE(
+  (SELECT id FROM sys_menu WHERE path = 'taskInfo' AND parent_id = @taskRoot AND is_delete IS NULL LIMIT 1),
+  @taskRoot
+);
+UPDATE sys_menu
+SET parent_id = @taskList,
+    path = '/taskManage/form',
+    `order` = '90'
+WHERE component = 'business/taskManage/form'
+  AND is_delete IS NULL;
 
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT 1, id FROM sys_menu WHERE is_delete IS NULL;
