@@ -9,14 +9,54 @@ const rules = { title: [$sdk.ruleRequiredBlur], permissionKey: [$sdk.ruleRequire
 
 const rctRef = ref<any>(null)
 const dialogRef = ref<any>(null)
+const dialogMode = ref<'add' | 'edit' | 'view'>('add')
+const isViewMode = computed(() => dialogMode.value === 'view')
+const dialogTitle = computed(() => {
+  return {
+    add: '新增系统公告',
+    edit: '编辑系统公告',
+    view: '查看系统公告',
+  }[dialogMode.value]
+})
 const canNoticeAdd = computed(() => checkPermi(['system/notices/add']))
 const canNoticeUpdate = computed(() => checkPermi(['system/notices/update']))
 const canNoticeDelete = computed(() => checkPermi(['system/notices/delete']))
 
 const getButtons = (row: any) => [
-  canNoticeUpdate.value ? { key: 'edit', label: '编辑', onClick: () => dialogRef.value.action(row) } : null,
+  { key: 'view', label: '查看', onClick: () => handleView(row) },
+  canNoticeUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   canNoticeDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
+
+function handleAdd() {
+  if (!canNoticeAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  dialogMode.value = 'add'
+  dialogRef.value?.action({ isActive: KEY_YES })
+}
+
+async function handleEdit(row: any) {
+  if (!canNoticeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  dialogMode.value = 'edit'
+  dialogRef.value?.action(JSON.parse(JSON.stringify(row)))
+}
+
+async function handleView(row: any) {
+  dialogMode.value = 'view'
+  dialogRef.value?.action(JSON.parse(JSON.stringify(row)))
+}
+
+function submitNotice(data: any) {
+  if (isViewMode.value) {
+    data.loading.value = false
+    return
+  }
+  const isEdit = !!data.form.value?.id
+  if ((isEdit && !canNoticeUpdate.value) || (!isEdit && !canNoticeAdd.value)) {
+    data.loading.value = false
+    return $sdk.msgWarning('当前操作没有权限')
+  }
+  dialogRef.value?.confirm(save, () => rctRef.value?.getList(1))
+}
 </script>
 
 <template>
@@ -38,7 +78,7 @@ const getButtons = (row: any) => [
         <template #operation="{ selectedIds }">
           <div class="notice-index-operation">
             <div class="notice-index-operation__left">
-           <el-button v-if="canNoticeAdd" type="primary" @click="dialogRef?.action({ isActive: KEY_YES })">新增公告</el-button>
+           <el-button v-if="canNoticeAdd" type="primary" @click="handleAdd">新增公告</el-button>
             </div>
            <el-button v-if="canNoticeDelete" :disabled="!selectedIds.length" @click="rctRef?.del(del)" type="danger">批量删除</el-button>
           </div>
@@ -62,21 +102,22 @@ const getButtons = (row: any) => [
     <!--  dialog -->
       <BaDialog
         ref="dialogRef"
-        dynamicTitle="系统公告"
+        :title="dialogTitle"
         :rules="rules"
         width="500"
-        @confirm="(data) => { const isEdit = !!data.form.value?.id; if ((isEdit && !canNoticeUpdate) || (!isEdit && !canNoticeAdd)) return $sdk.msgWarning('当前操作没有权限'); dialogRef?.confirm(save, () => rctRef?.getList(1)) }">
+        :show-footer="!isViewMode"
+        @confirm="submitNotice">
       <template #form="{ form }">
-        <BaInput v-model="form.title" prop="title" label="公告标题" maxlength="30"></BaInput>
-        <BaInput v-model="form.content" type="textarea" prop="content" label="公告内容" maxlength="200"></BaInput>
+        <BaInput v-model="form.title" prop="title" label="公告标题" maxlength="30" :disabled="isViewMode"></BaInput>
+        <BaInput v-model="form.content" type="textarea" prop="content" label="公告内容" maxlength="200" :disabled="isViewMode"></BaInput>
         <!-- <BaInput v-model="form.order" prop="order" type="number" label="角色顺序" maxlength="11"></BaInput> -->
         <el-form-item prop="isActive" label="是否激活">
-          <el-radio-group v-model="form.isActive">
+          <el-radio-group v-model="form.isActive" :disabled="isViewMode">
             <el-radio v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <BaInput v-model="form.remark" type="textarea" prop="remark" label="备注" maxlength="200"></BaInput>
+        <BaInput v-model="form.remark" type="textarea" prop="remark" label="备注" maxlength="200" :disabled="isViewMode"></BaInput>
       </template>
     </BaDialog>
   </div>

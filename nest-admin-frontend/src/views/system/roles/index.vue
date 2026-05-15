@@ -27,6 +27,20 @@ const menuOptions = ref<any[]>([])
 const menuExpand = ref(false)
 const menuNodeAll = ref(false)
 const menuKeyword = ref('')
+const dialogMode = ref<'add' | 'edit' | 'view'>('add')
+const isViewMode = computed(() => dialogMode.value === 'view')
+const dialogTitle = computed(() => {
+  return {
+    add: '新增角色',
+    edit: '编辑角色',
+    view: '查看角色',
+  }[dialogMode.value]
+})
+const menuTreeProps = computed(() => ({
+  label: 'name',
+  children: 'children',
+  disabled: () => isViewMode.value,
+}))
 
 const yesOrNo = {
   1: '正常',
@@ -56,6 +70,11 @@ function getList(query: any) {
 function getButtons(row: any) {
   const protectedRole = row.permissionKey === 'admin'
   return [
+    {
+      key: 'view',
+      label: '查看',
+      onClick: () => handleView(row),
+    },
     canRoleUpdate.value && (!protectedRole || canManageAdminRole.value)
       ? {
           key: 'edit',
@@ -138,6 +157,7 @@ async function loadMenuTree() {
 
 async function handleAdd() {
   if (!canRoleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  dialogMode.value = 'add'
   resetForm()
   await loadMenuTree()
   dialogRef.value.visible = true
@@ -146,6 +166,16 @@ async function handleAdd() {
 async function handleEdit(row: any) {
   if (!canRoleUpdate.value) return $sdk.msgWarning('当前操作没有权限')
   if (row.permissionKey === 'admin' && !canManageAdminRole.value) return $sdk.msgWarning('当前操作没有权限')
+  dialogMode.value = 'edit'
+  await openRoleDialog(row)
+}
+
+async function handleView(row: any) {
+  dialogMode.value = 'view'
+  await openRoleDialog(row)
+}
+
+async function openRoleDialog(row: any) {
   resetForm()
   const roleId = row.id
   const [role, menuData] = await Promise.all([getOne(roleId), getRoleMenuTree(roleId)])
@@ -167,6 +197,10 @@ async function handleEdit(row: any) {
 }
 
 function submit({ form, visible, loading }: any) {
+  if (isViewMode.value) {
+    loading.value = false
+    return
+  }
   form.value.menuIds = getMenuAllCheckedKeys()
   form.value.order = String(form.value.order)
   const request = save
@@ -229,14 +263,14 @@ function submit({ form, visible, loading }: any) {
       </template>
     </RequestChartTable>
 
-    <BaDialog ref="dialogRef" dynamicTitle="角色" width="600" :rules="rules" @confirm="submit">
+    <BaDialog ref="dialogRef" :title="dialogTitle" width="600" :rules="rules" :show-footer="!isViewMode" @confirm="submit">
       <template #form="{ form }">
-        <BaInput v-model="form.name" prop="name" label="角色名称"></BaInput>
-        <BaInput v-model="form.permissionKey" prop="permissionKey" label="权限字符"></BaInput>
-        <BaInput v-model="form.order" prop="order" type="number" label="角色顺序"></BaInput>
+        <BaInput v-model="form.name" prop="name" label="角色名称" :disabled="isViewMode"></BaInput>
+        <BaInput v-model="form.permissionKey" prop="permissionKey" label="权限字符" :disabled="isViewMode"></BaInput>
+        <BaInput v-model="form.order" prop="order" type="number" label="角色顺序" :disabled="isViewMode"></BaInput>
 
         <el-form-item prop="isActive" label="状态">
-          <el-radio-group v-model="form.isActive">
+          <el-radio-group v-model="form.isActive" :disabled="isViewMode">
             <el-radio label="1">正常</el-radio>
             <el-radio label="0">停用</el-radio>
           </el-radio-group>
@@ -244,7 +278,7 @@ function submit({ form, visible, loading }: any) {
 
         <el-form-item label="菜单权限">
           <div class="width100">
-            <div class="mb10">
+            <div v-if="!isViewMode" class="mb10">
               <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand">展开/折叠</el-checkbox>
               <el-checkbox class="ml-10" v-model="menuNodeAll" @change="handleCheckedTreeNodeAll">全选/全不选</el-checkbox>
             </div>
@@ -264,7 +298,7 @@ function submit({ form, visible, loading }: any) {
               :check-strictly="false"
               empty-text="加载中，请稍候"
               :filter-node-method="filterMenuNode"
-              :props="{ label: 'name', children: 'children' }"
+              :props="menuTreeProps"
             >
               <template #default="{ data }">
                 <el-tooltip placement="top-start" effect="light" :show-after="300">
@@ -293,7 +327,7 @@ function submit({ form, visible, loading }: any) {
           </div>
         </el-form-item>
 
-        <BaInput v-model="form.remark" type="textarea" prop="remark" label="备注"></BaInput>
+        <BaInput v-model="form.remark" type="textarea" prop="remark" label="备注" :disabled="isViewMode"></BaInput>
       </template>
     </BaDialog>
   </div>

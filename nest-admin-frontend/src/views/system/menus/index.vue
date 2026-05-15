@@ -17,6 +17,16 @@ const currentMenuId = ref('')
 const treeKeyword = ref('')
 const treeExpanded = ref(true)
 const treeRef = ref()
+const dialogRef = ref()
+const menuDialogMode = ref('add')
+const isMenuDialogView = computed(() => menuDialogMode.value === 'view')
+const menuDialogTitle = computed(() => {
+  return {
+    add: '新增菜单',
+    edit: '编辑菜单',
+    view: '查看菜单',
+  }[menuDialogMode.value] || '菜单'
+})
 
 function isAdmin(row) {
   return row.permissionKey === 'admin'
@@ -91,6 +101,11 @@ function toggleTreeExpanded() {
   setTreeExpanded(filteredMenuTreeData.value, treeExpanded.value)
 }
 
+function openMenuDialog(mode, data = {}) {
+  menuDialogMode.value = mode
+  dialogRef.value?.action(JSON.parse(JSON.stringify(data)))
+}
+
 const menuTypes = ref([])
 getTypes().then(({ data }) => (menuTypes.value = data))
 
@@ -114,7 +129,7 @@ getTreesFun()
                 <div class="panel-title">菜单结构</div>
                 <div class="panel-description">按树形关系维护菜单层级，先选节点，再在右侧查看详情或执行操作。</div>
               </div>
-              <el-button v-if="canMenuAdd" type="primary" @click="$refs.dialogRef.action(formDefault)">新建</el-button>
+              <el-button v-if="canMenuAdd" type="primary" @click="openMenuDialog('add', formDefault)">新建</el-button>
             </div>
 
             <div class="menu-tree-toolbar">
@@ -152,8 +167,8 @@ getTreesFun()
                     </div>
                   </div>
                   <div class="menu-tree-node__actions">
-                    <el-icon-plus v-if="canMenuAdd" class="hoverColor" title="新增" @click.stop="$refs.dialogRef.action({ parentId: data.id, ...formDefault })"></el-icon-plus>
-                    <el-icon-edit-pen v-if="canMenuUpdate" class="hoverColor" title="编辑" @click.stop="canOperateProtectedMenu(data) ? $refs.dialogRef.action(data) : $sdk.msgWarning('当前操作没有权限')"></el-icon-edit-pen>
+                    <el-icon-plus v-if="canMenuAdd" class="hoverColor" title="新增" @click.stop="openMenuDialog('add', { parentId: data.id, ...formDefault })"></el-icon-plus>
+                    <el-icon-edit-pen v-if="canMenuUpdate" class="hoverColor" title="编辑" @click.stop="canOperateProtectedMenu(data) ? openMenuDialog('edit', data) : $sdk.msgWarning('当前操作没有权限')"></el-icon-edit-pen>
                   </div>
                 </div>
               </template>
@@ -167,8 +182,8 @@ getTreesFun()
                 <div class="panel-description">查看当前菜单的路由、组件、权限和风险信息，减少在宽表里来回横向滚动。</div>
               </div>
               <div class="menu-detail-actions" v-if="currentMenu">
-                <el-button v-if="canMenuAdd" plain @click="$refs.dialogRef.action({ parentId: currentMenu.id, ...formDefault })">新增子菜单</el-button>
-                <el-button v-if="canMenuUpdate" type="primary" @click="canOperateProtectedMenu(currentMenu) ? $refs.dialogRef.action(currentMenu) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
+                <el-button v-if="canMenuAdd" plain @click="openMenuDialog('add', { parentId: currentMenu.id, ...formDefault })">新增子菜单</el-button>
+                <el-button v-if="canMenuUpdate" type="primary" @click="canOperateProtectedMenu(currentMenu) ? openMenuDialog('edit', currentMenu) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
                 <el-button v-if="canMenuDelete" type="danger" plain :disabled="isAdmin(currentMenu) && !canManageProtectedMenu" @click="canOperateProtectedMenu(currentMenu) ? $refs.rctRef.del(del, currentMenu.id) : $sdk.msgWarning('当前操作没有权限')">删除</el-button>
               </div>
             </div>
@@ -219,7 +234,7 @@ getTreesFun()
           <template #operation>
             <div class="menu-index-operation">
               <div class="menu-index-operation__left">
-                <el-button v-if="canMenuAdd" type="primary" @click="$refs.dialogRef.action(formDefault)">新建</el-button>
+                <el-button v-if="canMenuAdd" type="primary" @click="openMenuDialog('add', formDefault)">新建</el-button>
               </div>
             </div>
           </template>
@@ -255,8 +270,9 @@ getTreesFun()
             </el-table-column>
             <el-table-column label="操作">
               <template #default="{ row }">
-                <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? $refs.dialogRef.action(row) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
-                <el-button v-if="canMenuAdd" text @click="$refs.dialogRef.action({ parentId: row.id, ...formDefault })">新增</el-button>
+                <el-button text @click="openMenuDialog('view', row)">查看</el-button>
+                <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? openMenuDialog('edit', row) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
+                <el-button v-if="canMenuAdd" text @click="openMenuDialog('add', { parentId: row.id, ...formDefault })">新增</el-button>
                 <el-button v-if="canMenuDelete" text @click="canOperateProtectedMenu(row) ? $refs.rctRef.del(del, row.id) : $sdk.msgWarning('当前操作没有权限')" :disabled="isAdmin(row) && !canManageProtectedMenu">删除</el-button>
               </template>
             </el-table-column>
@@ -268,10 +284,11 @@ getTreesFun()
     <!-- 添加或修改菜单对话框 -->
     <BaDialog
       ref="dialogRef"
-      dynamicTitle="菜单"
+      :title="menuDialogTitle"
       :rules="rules"
       width="800"
-        @confirm="(data) => { const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) return $sdk.msgWarning('当前操作没有权限'); if (isAdmin(form) && !canManageProtectedMenu) return $sdk.msgWarning('当前操作没有权限'); $refs.dialogRef.confirm(save, () => { $refs.rctRef.getList(1); getTreesFun() }) }">
+      :show-footer="!isMenuDialogView"
+        @confirm="(data) => { if (isMenuDialogView) { data.loading.value = false; return }; const form = data.form.value; const isEdit = !!form.id; if ((isEdit && !canMenuUpdate) || (!isEdit && !canMenuAdd)) { data.loading.value = false; return $sdk.msgWarning('当前操作没有权限') }; if (isAdmin(form) && !canManageProtectedMenu) { data.loading.value = false; return $sdk.msgWarning('当前操作没有权限') }; $refs.dialogRef.confirm(save, () => { $refs.rctRef?.getList?.(1); getTreesFun() }) }">
       <template #form="{ form }">
         <el-form-item class="width100" label="上级菜单">
           <el-tree-select
@@ -281,18 +298,19 @@ getTreesFun()
             show-checkbox
             check-strictly="true"
             :props="{ label: 'name' }"
+            :disabled="isMenuDialogView"
             placeholder="选择上级菜单" />
         </el-form-item>
-        <BaInput v-model="form.name" label="菜单名称" prop="name" />
-        <BaInput v-model="form.desc" label="菜单描述" prop="desc" />
-        <BaRadioGroup v-model="form.type" label="菜单类型" prop="type">
+        <BaInput v-model="form.name" label="菜单名称" prop="name" :disabled="isMenuDialogView" />
+        <BaInput v-model="form.desc" label="菜单描述" prop="desc" :disabled="isMenuDialogView" />
+        <BaRadioGroup v-model="form.type" label="菜单类型" prop="type" :disabled="isMenuDialogView">
           <el-radio v-for="(value, key) in menuTypes" :key="key" :label="value" :value="key" />
         </BaRadioGroup>
         <el-form-item v-if="form.type != 'button'" label="菜单图标">
           <el-popover placement="bottom-start" width="460" trigger="click" @show="$refs['iconSelect'].reset()">
             <IconSelect ref="iconSelect" @selected="(name) => (form.icon = name)" />
             <template #reference>
-              <el-select v-model="form.icon" remote placeholder="点击选择图标" @clear="form.icon = '#'">
+              <el-select v-model="form.icon" remote placeholder="点击选择图标" :disabled="isMenuDialogView" @clear="form.icon = '#'">
                 <template #prefix>
                   <svg-icon
                     v-if="form.icon"
@@ -307,19 +325,19 @@ getTreesFun()
         </el-form-item>
 
         <el-form-item label="显示排序" prop="order">
-          <el-input-number v-model="form.order" :precision="0" :step="1" :min="0" />
+          <el-input-number v-model="form.order" :precision="0" :step="1" :min="0" :disabled="isMenuDialogView" />
         </el-form-item>
         <!-- <BaRadioGroup v-model="form.isFrame" v-if="form.type != 'button'" label="是否外链">
 					<el-radio label="0">否</el-radio>
 					<el-radio label="1">是</el-radio>
 				</BaRadioGroup> -->
-        <BaInput v-model="form.path" v-if="form.type != 'button'" label="路由地址" prop="path" required />
-        <BaInput v-model="form.component" v-if="form.type == 'menu'" label="组件路径" prop="component" />
-        <BaInput v-model="form.permissionKey" v-if="form.type != 'catalog'" label="权限标识" maxlength="50" />
-        <BaRadioGroup v-model="form.isHidden" v-if="form.type != 'button'" label="是否隐藏">
+        <BaInput v-model="form.path" v-if="form.type != 'button'" label="路由地址" prop="path" required :disabled="isMenuDialogView" />
+        <BaInput v-model="form.component" v-if="form.type == 'menu'" label="组件路径" prop="component" :disabled="isMenuDialogView" />
+        <BaInput v-model="form.permissionKey" v-if="form.type != 'catalog'" label="权限标识" maxlength="50" :disabled="isMenuDialogView" />
+        <BaRadioGroup v-model="form.isHidden" v-if="form.type != 'button'" label="是否隐藏" :disabled="isMenuDialogView">
           <el-radio v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-radio>
         </BaRadioGroup>
-        <BaRadioGroup v-model="form.isActive" v-if="form.type != 'button'" label="是否启用">
+        <BaRadioGroup v-model="form.isActive" v-if="form.type != 'button'" label="是否启用" :disabled="isMenuDialogView">
           <el-radio v-for="(value, key) of yesOrNO" :key="key" :label="value" :value="key"></el-radio>
           <!-- <el-radio
             v-for="(key, data) of Object.keys(isActive).sort((a, b) => b - a)"

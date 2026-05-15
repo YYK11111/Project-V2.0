@@ -38,6 +38,7 @@ const form = ref<any>({
 })
 const rules = {}
 const canConfigUpdate = computed(() => checkPermi(['system/configs/update']))
+const isConfigReadonly = computed(() => !canConfigUpdate.value)
 
 function getDefaultReminderStrategy() {
   return {
@@ -261,22 +262,22 @@ function testFeishu() {
 
     <el-tabs v-model="activeTab" class="system-config-tabs">
       <el-tab-pane label="基础配置" name="basic">
-        <el-form ref="formRef" label-position="right" :model="form" :rules="rules" label-width="100px" class="system-config-form">
-          <BaInput v-model="form.systemName" label="系统名称" prop="systemName"></BaInput>
-          <BaInput v-model="form.browserTitle" label="标签页名称" prop="browserTitle"></BaInput>
-          <BaInput v-model="form.systemVersion" label="系统版本" prop="systemVersion"></BaInput>
-          <BaInput v-model="form.defaultUserPassword" label="默认用户密码" prop="defaultUserPassword" maxlength="30"></BaInput>
-          <BaInput v-model="form.sessionExpireMinutes" label="有效时间" prop="sessionExpireMinutes" type="number">
+        <el-form ref="formRef" label-position="right" :model="form" :rules="rules" label-width="100px" class="system-config-form" :disabled="isConfigReadonly">
+          <BaInput v-model="form.systemName" label="系统名称" prop="systemName" :disabled="isConfigReadonly"></BaInput>
+          <BaInput v-model="form.browserTitle" label="标签页名称" prop="browserTitle" :disabled="isConfigReadonly"></BaInput>
+          <BaInput v-model="form.systemVersion" label="系统版本" prop="systemVersion" :disabled="isConfigReadonly"></BaInput>
+          <BaInput v-model="form.defaultUserPassword" label="默认用户密码" prop="defaultUserPassword" maxlength="30" :disabled="isConfigReadonly"></BaInput>
+          <BaInput v-model="form.sessionExpireMinutes" label="有效时间" prop="sessionExpireMinutes" type="number" :disabled="isConfigReadonly">
             <template #append>分钟</template>
           </BaInput>
 
           <el-form-item label="系统logo" prop="systemLogo">
-            <upload v-model:fileUrl="form.systemLogo" type="image"></upload>
+            <upload v-model:fileUrl="form.systemLogo" type="image" :disabled="isConfigReadonly"></upload>
             <div class="Gtip">仅支持大小 2M 以内，png/jpg/svg 等图片类型</div>
           </el-form-item>
 
           <el-form-item label="标签页图标" prop="browserIcon">
-            <upload v-model:fileUrl="form.browserIcon" type="image"></upload>
+            <upload v-model:fileUrl="form.browserIcon" type="image" :disabled="isConfigReadonly"></upload>
             <div class="Gtip">建议使用正方形图标，支持 png/jpg/svg/ico</div>
           </el-form-item>
         </el-form>
@@ -292,7 +293,7 @@ function testFeishu() {
                   <div class="reminder-switch-item__title">启用项目提醒</div>
                   <div class="reminder-switch-item__desc">关闭后，项目提醒既不会显示在消息中心，也不会继续同步更新。</div>
                 </div>
-                <el-switch v-model="form.projectReminderStrategy.enabled" />
+                <el-switch v-model="form.projectReminderStrategy.enabled" :disabled="isConfigReadonly" />
               </div>
 
               <div class="reminder-switch-item">
@@ -300,7 +301,7 @@ function testFeishu() {
                   <div class="reminder-switch-item__title">启用消息中心渠道</div>
                   <div class="reminder-switch-item__desc">开启后，项目异常提醒会同步到消息中心，作为待阅消息触达对应角色。</div>
                 </div>
-                <el-switch v-model="form.projectReminderStrategy.delivery.messageCenter" />
+                <el-switch v-model="form.projectReminderStrategy.delivery.messageCenter" :disabled="isConfigReadonly" />
               </div>
             </div>
           </el-card>
@@ -308,9 +309,9 @@ function testFeishu() {
           <el-card shadow="hover" class="reminder-card mt16">
             <template #header>接收角色</template>
             <div class="reminder-grid reminder-grid--roles">
-              <el-checkbox v-model="form.projectReminderStrategy.roles.projectManager">项目经理</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.roles.deliveryManager">交付经理</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.roles.coreMember">核心成员</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.roles.projectManager" :disabled="isConfigReadonly">项目经理</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.roles.deliveryManager" :disabled="isConfigReadonly">交付经理</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.roles.coreMember" :disabled="isConfigReadonly">核心成员</el-checkbox>
             </div>
           </el-card>
 
@@ -318,26 +319,26 @@ function testFeishu() {
             <template #header>频率与规则</template>
             <div class="reminder-frequency-row">
               <el-form-item label="提醒频率" label-width="90px">
-                <el-radio-group v-model="form.projectReminderStrategy.frequency.mode">
+                <el-radio-group v-model="form.projectReminderStrategy.frequency.mode" :disabled="isConfigReadonly">
                   <el-radio label="realtime">实时同步</el-radio>
                   <el-radio label="interval">间隔提醒</el-radio>
                 </el-radio-group>
               </el-form-item>
               <el-form-item v-if="form.projectReminderStrategy.frequency.mode === 'interval'" label="间隔时长" label-width="90px">
-                <el-input-number v-model="form.projectReminderStrategy.frequency.hours" :min="1" :max="168" />
+                <el-input-number v-model="form.projectReminderStrategy.frequency.hours" :min="1" :max="168" :disabled="isConfigReadonly || form.projectReminderStrategy.frequency.mode !== 'interval'" />
                 <span class="reminder-inline-tip">小时</span>
               </el-form-item>
             </div>
 
             <div class="reminder-rule-grid">
-              <el-checkbox v-model="form.projectReminderStrategy.rules.taskOverdue">任务已逾期</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.taskDueSoon">临近到期任务</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.milestoneDelayed">里程碑延期/超期</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.sprintDelayed">Sprint 节奏偏慢</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.highRisk">高风险事项未关闭</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.changePending">变更待审批</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.unplannedTask">任务未纳入执行计划</el-checkbox>
-              <el-checkbox v-model="form.projectReminderStrategy.rules.closureIncomplete">结项资料待完善</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.taskOverdue" :disabled="isConfigReadonly">任务已逾期</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.taskDueSoon" :disabled="isConfigReadonly">临近到期任务</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.milestoneDelayed" :disabled="isConfigReadonly">里程碑延期/超期</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.sprintDelayed" :disabled="isConfigReadonly">Sprint 节奏偏慢</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.highRisk" :disabled="isConfigReadonly">高风险事项未关闭</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.changePending" :disabled="isConfigReadonly">变更待审批</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.unplannedTask" :disabled="isConfigReadonly">任务未纳入执行计划</el-checkbox>
+              <el-checkbox v-model="form.projectReminderStrategy.rules.closureIncomplete" :disabled="isConfigReadonly">结项资料待完善</el-checkbox>
             </div>
           </el-card>
 
@@ -349,24 +350,24 @@ function testFeishu() {
                   <div class="reminder-switch-item__title">启用趋势异常识别</div>
                   <div class="reminder-switch-item__desc">基于驾驶舱历史快照识别连续下滑、持续上升等趋势异常，并进入统一提醒与消息中心。</div>
                 </div>
-                <el-switch v-model="form.projectReminderStrategy.trendThresholds.enabled" />
+                <el-switch v-model="form.projectReminderStrategy.trendThresholds.enabled" :disabled="isConfigReadonly" />
               </div>
             </div>
             <div class="reminder-rule-grid mt16">
               <el-form-item label="观察窗口">
-                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.windowSize" :min="3" :max="7" />
+                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.windowSize" :min="3" :max="7" :disabled="isConfigReadonly" />
                 <span class="reminder-inline-tip">连续快照周期数</span>
               </el-form-item>
               <el-form-item label="健康度下滑阈值">
-                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.healthDeclineStep" :min="1" :max="30" />
+                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.healthDeclineStep" :min="1" :max="30" :disabled="isConfigReadonly" />
                 <span class="reminder-inline-tip">每周期最低下降分值</span>
               </el-form-item>
               <el-form-item label="风险上升阈值">
-                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.riskIncreaseStep" :min="1" :max="10" />
+                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.riskIncreaseStep" :min="1" :max="10" :disabled="isConfigReadonly" />
                 <span class="reminder-inline-tip">每周期最低增加数量</span>
               </el-form-item>
               <el-form-item label="成本恶化阈值">
-                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.costVarianceIncreaseStep" :min="0" :step="1000" />
+                <el-input-number v-model="form.projectReminderStrategy.trendThresholds.costVarianceIncreaseStep" :min="0" :step="1000" :disabled="isConfigReadonly" />
                 <span class="reminder-inline-tip">每周期最低增加金额</span>
               </el-form-item>
             </div>
@@ -383,13 +384,14 @@ function testFeishu() {
                 <div class="reminder-switch-item__title">启用外部通知</div>
                 <div class="reminder-switch-item__desc">关闭后，工作流待办不会同步发送到飞书或钉钉。</div>
               </div>
-              <el-switch v-model="form.externalNotifyConfig.enabled" />
+              <el-switch v-model="form.externalNotifyConfig.enabled" :disabled="isConfigReadonly" />
             </div>
             <BaInput
               v-model="form.externalNotifyConfig.siteUrl"
               class="mt16"
               label="系统访问地址"
               prop="externalNotifyConfig.siteUrl"
+              :disabled="isConfigReadonly"
               placeholder="例如：https://admin.example.com" />
           </el-card>
 
@@ -401,16 +403,16 @@ function testFeishu() {
                   <div class="reminder-switch-item__title">启用飞书通知</div>
                   <div class="reminder-switch-item__desc">启用后，工作流待办会发送到飞书用户。</div>
                 </div>
-                <el-switch v-model="form.externalNotifyConfig.feishu.enabled" />
+                <el-switch v-model="form.externalNotifyConfig.feishu.enabled" :disabled="isConfigReadonly" />
               </div>
 
-              <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" />
-              <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" />
-              <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" />
+              <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" :disabled="isConfigReadonly" />
+              <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" :disabled="isConfigReadonly" />
+              <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" :disabled="isConfigReadonly" />
               <div class="external-notify-test-row">
                 <div class="external-notify-test-row__field">
                   <div class="external-notify-test-row__label">测试用户</div>
-                  <UserSelect v-model="testUserId" placeholder="默认当前登录用户，可选其他用户" clearable />
+                  <UserSelect v-model="testUserId" placeholder="默认当前登录用户，可选其他用户" clearable :disabled="isConfigReadonly" />
                 </div>
                 <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
               </div>
@@ -450,7 +452,7 @@ function testFeishu() {
               <el-table-column prop="roleLabel" label="项目角色" width="150" fixed="left" />
               <el-table-column v-for="group in fieldGroups" :key="group.code" :label="group.label" min-width="160">
                 <template #default="{ row }">
-                  <el-select v-model="form.projectFieldPermissionMatrix.project[row.roleKey][group.code]" style="width: 100%">
+                  <el-select v-model="form.projectFieldPermissionMatrix.project[row.roleKey][group.code]" style="width: 100%" :disabled="isConfigReadonly">
                     <el-option label="不可见" value="hidden" />
                     <el-option label="只读" value="readonly" />
                     <el-option label="可编辑" value="editable" />

@@ -60,4 +60,14 @@ describe('system configs structure', () => {
     expect(source).toContain('userId: testUserId.value || undefined')
     expect(source).toContain('testFeishuNotify')
   })
+
+  it('系统配置无更新权限时以只读查看态展示', () => {
+    const source = readSource()
+
+    expect(source).toContain('const isConfigReadonly = computed(() => !canConfigUpdate.value)')
+    expect(source).toContain(':disabled="isConfigReadonly"')
+    expect(source).toContain(':disabled="isConfigReadonly || form.projectReminderStrategy.frequency.mode !==')
+    expect(source).toContain('v-if="canConfigUpdate" type="primary"')
+    expect(source).not.toContain('readonly="false"')
+  })
 })

@@ -29,7 +29,7 @@ const operationTypeMap = {
 }
 
 const getButtons = (row: any) => [
-  { key: 'detail', label: '详情', type: 'primary', onClick: () => openDetail(row) },
+  { key: 'view', label: '查看', type: 'primary', onClick: () => openDetail(row) },
 ]
 
 function getCurrentList(data: any) {
