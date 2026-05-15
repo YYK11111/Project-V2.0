@@ -188,14 +188,14 @@ function loginByFeishu() {
 }
 
 .external-login-button {
-  width: 164px;
+  width: 64px;
   height: 46px;
-  padding: 0 18px;
+  padding: 0;
 }
 
 .external-login-logo {
   display: block;
-  width: 118px;
-  height: auto;
+  width: 32px;
+  height: 32px;
 }
 </style>
