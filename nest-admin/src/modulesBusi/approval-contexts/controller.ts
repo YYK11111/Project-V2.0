@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { BusinessApprovalContextService } from "./service";
 
 @Controller("business/approval-contexts")
@@ -19,5 +19,14 @@ export class BusinessApprovalContextController {
   @Get("by-instance/:instanceId")
   getByInstance(@Param("instanceId") instanceId: string) {
     return this.service.findByWorkflowInstance(instanceId);
+  }
+
+  @Post("backfill-participants")
+  backfillParticipants(@Query() query: any) {
+    return this.service.backfillParticipants({
+      rootBusinessType: query.rootBusinessType,
+      businessType: query.businessType,
+      limit: Number(query.limit || 200),
+    });
   }
 }

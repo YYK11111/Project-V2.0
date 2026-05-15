@@ -1177,6 +1177,35 @@ describe("AuthGuard", () => {
     );
   });
 
+  it("具备审批上下文回填权限时放行参与人索引回填接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/approval-contexts/backfill-participants",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/approval-contexts/backfillParticipants" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/approval-contexts/backfillParticipants",
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("具备定时任务立即执行权限时放行运行接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

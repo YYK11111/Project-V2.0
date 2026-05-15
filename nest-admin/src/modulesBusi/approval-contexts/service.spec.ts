@@ -311,6 +311,43 @@ describe("BusinessApprovalContextService", () => {
     expect(result).toBe(true);
   });
 
+  it("批量回填历史审批参与人索引", async () => {
+    const { service, contextRepository } = createService();
+    contextRepository.find.mockResolvedValue([
+      { id: "ctx-1", workflowInstanceId: "wf-1" },
+      { id: "ctx-2", workflowInstanceId: "" },
+      { id: "ctx-3", workflowInstanceId: "wf-3" },
+    ]);
+    const syncParticipantsSpy = jest
+      .spyOn(service, "syncParticipantsFromWorkflow")
+      .mockResolvedValue(undefined);
+
+    const result = await service.backfillParticipants({
+      rootBusinessType: "project",
+      limit: 50,
+    });
+
+    expect(contextRepository.find).toHaveBeenCalledWith({
+      where: {
+        isActive: "1",
+        rootBusinessType: "project",
+      },
+      select: ["id", "workflowInstanceId"] as any,
+      order: { createTime: "ASC" },
+      take: 50,
+    });
+    expect(syncParticipantsSpy).toHaveBeenCalledTimes(2);
+    expect(syncParticipantsSpy).toHaveBeenNthCalledWith(1, "wf-1");
+    expect(syncParticipantsSpy).toHaveBeenNthCalledWith(2, "wf-3");
+    expect(result).toEqual({
+      total: 3,
+      processed: 2,
+      skipped: 1,
+      failed: 0,
+      failures: [],
+    });
+  });
+
   it("项目审批上下文查询会自动回填历史立项结项和变更流程实例", async () => {
     const {
       service,

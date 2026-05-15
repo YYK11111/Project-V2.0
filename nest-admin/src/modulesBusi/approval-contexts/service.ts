@@ -41,6 +41,12 @@ export interface SyncBusinessApprovalStatusOptions {
   currentNodeName?: string;
 }
 
+export interface BackfillApprovalParticipantsOptions {
+  businessType?: string;
+  rootBusinessType?: string;
+  limit?: number;
+}
+
 @Injectable()
 export class BusinessApprovalContextService {
   constructor(
@@ -275,6 +281,54 @@ export class BusinessApprovalContextService {
       select: ["id"] as any,
     });
     return Boolean(participant);
+  }
+
+  async backfillParticipants(
+    options: BackfillApprovalParticipantsOptions = {},
+  ) {
+    const limit = Math.min(Math.max(Number(options.limit || 200), 1), 1000);
+    const where: Record<string, any> = { isActive: "1" };
+    if (options.businessType) {
+      where.businessType = String(options.businessType);
+    }
+    if (options.rootBusinessType) {
+      where.rootBusinessType = String(options.rootBusinessType);
+    }
+    const contexts = await this.contextRepository.find({
+      where,
+      select: ["id", "workflowInstanceId"] as any,
+      order: { createTime: "ASC" },
+      take: limit,
+    });
+    const failures: Array<{ contextId: string; workflowInstanceId: string }> =
+      [];
+    let processed = 0;
+    let skipped = 0;
+
+    for (const context of contexts) {
+      const workflowInstanceId = String(context.workflowInstanceId || "");
+      if (!workflowInstanceId) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        await this.syncParticipantsFromWorkflow(workflowInstanceId);
+        processed += 1;
+      } catch {
+        failures.push({
+          contextId: String(context.id || ""),
+          workflowInstanceId,
+        });
+      }
+    }
+
+    return {
+      total: contexts.length,
+      processed,
+      skipped,
+      failed: failures.length,
+      failures,
+    };
   }
 
   private async backfillProjectApprovalContexts(

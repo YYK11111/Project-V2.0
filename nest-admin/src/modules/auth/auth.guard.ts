@@ -272,6 +272,11 @@ export class AuthGuard implements CanActivate {
         /^system\/messages\/rebuild-todo$/,
         "system/messages/rebuildTodo",
       ],
+      [
+        "POST",
+        /^business\/approval-contexts\/backfill-participants$/,
+        "business/approval-contexts/backfillParticipants",
+      ],
 
       ["GET", /^system\/scheduled-jobs\/list$/, "system/scheduledJobs/list"],
       ["GET", /^system\/scheduled-jobs\/logs$/, "system/scheduledJobs/logs"],
