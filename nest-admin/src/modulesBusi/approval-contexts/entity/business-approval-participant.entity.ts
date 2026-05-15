@@ -10,8 +10,10 @@ export type BusinessApprovalParticipantRole =
 @MyEntity("business_approval_participant")
 @Index("idx_bap_user_role", ["userId", "roleType", "createTime"])
 @Index("idx_bap_user_root", ["userId", "rootBusinessType", "rootBusinessId"])
+@Index("idx_bap_user_business", ["userId", "businessType", "businessId"])
 @Index("idx_bap_context", ["approvalContextId"])
 @Index("idx_bap_workflow_instance", ["workflowInstanceId"])
+@Index("idx_bap_workflow_role", ["workflowInstanceId", "roleType"])
 export class BusinessApprovalParticipant extends BaseEntity {
   constructor(obj = {}) {
     super();
