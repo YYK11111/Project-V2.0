@@ -10,6 +10,7 @@ describe('system users structure', () => {
   it('用户管理区分登录名和姓名，并展示基础联系方式与性别', () => {
     const source = readSource()
 
+    expect(source).toContain('class="user-index-panel business-list-panel"')
     expect(source).toContain('v-model="query.name" label="登录名" prop="name"')
     expect(source).toContain('v-model="query.nickname" label="姓名" prop="nickname"')
     expect(source).toContain('v-model="query.email" label="邮箱" prop="email"')
@@ -52,5 +53,41 @@ describe('system users structure', () => {
     expect(source).toContain('syncCurrentFeishuAccount')
     expect(source).toContain("checkPermi(['system/externalAccounts/update'])")
     expect(source).toContain('@confirm="submitUser"')
+  })
+
+  it('人员和部门弹窗依赖全局标签列宽，避免局部重复配置', () => {
+    const source = readSource()
+
+    expect(source).toContain('ref="deptDialogRef"')
+    expect(source).toContain('ref="userDialogRef"')
+    expect(source).toContain('label="飞书用户ID"')
+    expect(source).not.toContain('label-width="104px"')
+  })
+
+  it('用户管理提供查看操作并复用人员弹窗只读展示', () => {
+    const source = readSource()
+
+    expect(source).toContain("key: 'view'")
+    expect(source).toContain("label: '查看'")
+    expect(source).toContain("action('view', row)")
+    expect(source).toContain("const userDialogMode = ref('edit')")
+    expect(source).toContain("const isUserDialogView = computed(() => userDialogMode.value === 'view')")
+    expect(source).toContain("case 'view':")
+    expect(source).toContain(":disabled=\"isUserDialogView\"")
+    expect(source).toContain("查看人员")
+    expect(source).toContain(':show-footer="!isUserDialogView"')
+    expect(source).not.toContain('userDialogRef.visible = false">关闭')
+  })
+
+  it('组织树提供查看操作并复用部门弹窗只读展示', () => {
+    const source = readSource()
+
+    expect(source).toContain("dept.action('view', data)")
+    expect(source).toContain("case 'view':")
+    expect(source).toContain('isView = false')
+    expect(source).toContain('this.isView = true')
+    expect(source).toContain(':title="dept.dialogTitle"')
+    expect(source).toContain(':show-footer="!dept.isView"')
+    expect(source).toContain(':disabled="dept.isView"')
   })
 })

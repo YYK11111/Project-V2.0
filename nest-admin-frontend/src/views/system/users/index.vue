@@ -38,6 +38,15 @@ import { getList as getRoleListApi } from '../roles/api'
 function User(params) {
   const roleList = ref([])
   const userDialogRef = ref()
+  const userDialogMode = ref('edit')
+  const isUserDialogView = computed(() => userDialogMode.value === 'view')
+  const userDialogTitle = computed(() => {
+    return {
+      add: '新增人员',
+      edit: '编辑人员',
+      view: '查看人员',
+    }[userDialogMode.value] || '人员'
+  })
   const resetPasswordDialogRef = ref()
   const externalAccountPlatform = 'feishu'
 
@@ -59,6 +68,7 @@ function User(params) {
     switch (type) {
       case 'add':
         if (!canUserAdd.value) return $sdk.msgWarning('当前操作没有权限')
+        userDialogMode.value = 'add'
         userDialogRef.value.visible = true
         userDialogRef.value.form = {
           deptId: params.value.deptId,
@@ -68,6 +78,17 @@ function User(params) {
       case 'edit':
         if (!canUserUpdate.value) return $sdk.msgWarning('当前操作没有权限')
         if (isAdmin(data) && !canManageAdminUser.value) return $sdk.msgWarning('当前操作没有权限')
+        userDialogMode.value = 'edit'
+        userDialogRef.value.visible = true
+        data.roleIds = (data.roles || []).map((e) => e.id ?? e.roleId)
+        userDialogRef.value.form = {
+          ...JSON.parse(JSON.stringify(data)),
+          feishuUserId: '',
+        }
+        await loadExternalAccount(data.id)
+        break
+      case 'view':
+        userDialogMode.value = 'view'
         userDialogRef.value.visible = true
         data.roleIds = (data.roles || []).map((e) => e.id ?? e.roleId)
         userDialogRef.value.form = {
@@ -144,12 +165,23 @@ function User(params) {
     action,
     roleList,
     userDialogRef,
+    isUserDialogView,
+    userDialogTitle,
     resetPasswordDialogRef,
     submitUser,
     syncCurrentFeishuAccount,
   }
 }
-let { action, roleList, userDialogRef, resetPasswordDialogRef, submitUser, syncCurrentFeishuAccount } = User(params)
+let {
+  action,
+  roleList,
+  userDialogRef,
+  isUserDialogView,
+  userDialogTitle,
+  resetPasswordDialogRef,
+  submitUser,
+  syncCurrentFeishuAccount,
+} = User(params)
 /** -- 人员 模块 -- */
 
 /** -- 部门 模块 -- */
@@ -185,12 +217,16 @@ class Dept {
   loading = false
   treeData = []
   isEdit = false
+  isView = false
   // rctRef = ref()
   constructor(
     private rctRef,
     private deptDialogRef,
     private params,
   ) {}
+  get dialogTitle() {
+    return this.isView ? '查看部门' : this.isEdit ? '编辑部门' : '新增部门'
+  }
   getTrees() {
     this.loading = true
     apiDept
@@ -210,6 +246,7 @@ class Dept {
       case 'add':
         if (!canDeptAdd.value) return $sdk.msgWarning('当前操作没有权限')
         this.isEdit = false
+        this.isView = false
         this.deptDialogRef.visible = true
         this.deptDialogRef.form = { parentId: data.id }
         break
@@ -217,6 +254,13 @@ class Dept {
         if (!canDeptUpdate.value) return $sdk.msgWarning('当前操作没有权限')
         if (isProtectedDept(data) && !canManageProtectedDept.value) return $sdk.msgWarning('当前操作没有权限')
         this.isEdit = true
+        this.isView = false
+        this.deptDialogRef.form = JSON.parse(JSON.stringify(data))
+        this.deptDialogRef.visible = true
+        break
+      case 'view':
+        this.isEdit = false
+        this.isView = true
         this.deptDialogRef.form = JSON.parse(JSON.stringify(data))
         this.deptDialogRef.visible = true
         break
@@ -276,6 +320,11 @@ function canOperateTargetUser(targetIsAdmin: boolean) {
 const getButtons = (row: any) => {
   const targetIsAdmin = isAdmin(row)
   return [
+    {
+      key: 'view',
+      label: '查看',
+      onClick: () => action('view', row),
+    },
     canUserUpdate.value && canOperateTargetUser(targetIsAdmin)
       ? {
           key: 'edit',
@@ -328,6 +377,7 @@ const getButtons = (row: any) => {
               {{ node.label }}
             </div>
             <div>
+              <el-icon-View class="hoverColor" @click.stop="dept.action('view', data)" title="查看"></el-icon-View>
               <el-icon-plus v-if="canDeptAdd" class="hoverColor" @click.stop="dept.action('add', data)" title="新增"></el-icon-plus>
               <el-icon-EditPen
                 v-if="canDeptUpdate"
@@ -356,7 +406,13 @@ const getButtons = (row: any) => {
       </el-tree>
 
       <!-- 部门 dialog -->
-      <BaDialog ref="deptDialogRef" :dynamicTitle="dept.isEdit ? '编辑部门' : '新增部门'" width="500" :rules="rules" @confirm="(v) => dept.submit(v)">
+      <BaDialog
+        ref="deptDialogRef"
+        :title="dept.dialogTitle"
+        width="500"
+        :rules="rules"
+        :show-footer="!dept.isView"
+        @confirm="(v) => dept.submit(v)">
         <template #form="{ form }">
           <el-form-item prop="parentId" class="width100" label="上级">
             <el-tree-select
@@ -366,9 +422,10 @@ const getButtons = (row: any) => {
               show-checkbox
               check-strictly="true"
               :props="{ label: 'name' }"
+              :disabled="dept.isView"
               placeholder="选择上级" />
           </el-form-item>
-          <BaInput v-model="form.name" prop="name" label="名称"></BaInput>
+          <BaInput v-model="form.name" prop="name" label="名称" :disabled="dept.isView"></BaInput>
           <el-form-item prop="leaderId" label="负责人">
             <el-select
               v-model="form.leaderId"
@@ -376,6 +433,7 @@ const getButtons = (row: any) => {
               clearable
               filterable
               :filter-method="filterUser"
+              :disabled="dept.isView"
               @visible-change="(v) => v && filterUser('')"
             >
               <el-option
@@ -394,7 +452,7 @@ const getButtons = (row: any) => {
     </div>
 
     <div class="GleftRightR">
-      <RequestChartTable ref="rctRef" class="user-index-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
+      <RequestChartTable ref="rctRef" class="user-index-panel business-list-panel" :isCreateRequest="false" :params="params" :request="getList" :is-selection="true">
         <template #query="{ query }">
           <div class="query-sections">
             <div class="query-section query-section--primary">
@@ -462,17 +520,18 @@ const getButtons = (row: any) => {
       <BaDialog
         key="userDialogRef"
         ref="userDialogRef"
-        dynamicTitle="人员"
+        :title="userDialogTitle"
         :rules="rules"
         width="500"
+        :show-footer="!isUserDialogView"
         @confirm="submitUser">
         <template #form="{ form }">
-          <BaInput v-model="form.name" prop="name" label="登录名" maxlength="30"></BaInput>
-          <BaInput v-model="form.nickname" prop="nickname" label="姓名" maxlength="30"></BaInput>
+          <BaInput v-model="form.name" prop="name" label="登录名" maxlength="30" :disabled="isUserDialogView"></BaInput>
+          <BaInput v-model="form.nickname" prop="nickname" label="姓名" maxlength="30" :disabled="isUserDialogView"></BaInput>
           <BaInput v-if="!form.id" v-model="form.password" prop="password" label="密码" maxlength="30" show-password></BaInput>
-          <BaInput v-model="form.phone" prop="phone" label="手机" maxlength="11"></BaInput>
-          <BaInput v-model="form.email" prop="email" label="邮箱" maxlength="255"></BaInput>
-          <BaSelect v-model="form.gender" prop="gender" label="性别">
+          <BaInput v-model="form.phone" prop="phone" label="手机" maxlength="11" :disabled="isUserDialogView"></BaInput>
+          <BaInput v-model="form.email" prop="email" label="邮箱" maxlength="255" :disabled="isUserDialogView"></BaInput>
+          <BaSelect v-model="form.gender" prop="gender" label="性别" :disabled="isUserDialogView">
             <el-option label="男" value="man"></el-option>
             <el-option label="女" value="woamn"></el-option>
           </BaSelect>
@@ -483,12 +542,13 @@ const getButtons = (row: any) => {
             prop="feishuUserId"
             label="飞书用户ID"
             maxlength="100"
+            :disabled="isUserDialogView"
             placeholder="可选，绑定飞书通知账号" />
-          <el-form-item v-if="form.id && canExternalAccountUpdate" label=" ">
+          <el-form-item v-if="form.id && canExternalAccountUpdate && !isUserDialogView" label=" ">
             <el-button @click="syncCurrentFeishuAccount(form)">同步飞书</el-button>
           </el-form-item>
           <el-form-item prop="avatar" label="头像">
-            <Upload v-model:fileUrl="form.avatar" :params="{ module: 'avatar' }"></Upload>
+            <Upload v-model:fileUrl="form.avatar" :params="{ module: 'avatar' }" :disabled="isUserDialogView"></Upload>
           </el-form-item>
           <el-form-item prop="deptId" label="部门">
             <el-tree-select
@@ -498,9 +558,10 @@ const getButtons = (row: any) => {
               show-checkbox
               check-strictly="true"
               :props="{ label: 'name' }"
+              :disabled="isUserDialogView"
               placeholder="选择部门" />
           </el-form-item>
-          <BaSelect v-model="form.roleIds" multiple prop="roleIds" label="角色">
+          <BaSelect v-model="form.roleIds" multiple prop="roleIds" label="角色" :disabled="isUserDialogView">
             <el-option v-for="(data, index) in roleList" :key="data.id" :label="data.name" :value="data.id"></el-option>
           </BaSelect>
         </template>

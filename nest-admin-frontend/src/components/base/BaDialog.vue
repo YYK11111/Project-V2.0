@@ -15,6 +15,7 @@ const props = defineProps({
   dynamicTitle: { type: String, default: '' },
   rules: { type: Object, default: () => ({}) },
   idKey: { type: String, default: 'id' },
+  showFooter: { type: Boolean, default: true },
 })
 
 const visible = ref(false)
@@ -78,7 +79,7 @@ defineExpose({
         v-if="$slots.form"
         ref="formRef"
         class="dialogForm"
-        label-width="80px"
+        label-width="104px"
         v-bind="formProps"
         :model="form"
         :rules="rules">
@@ -86,7 +87,7 @@ defineExpose({
       </el-form>
     </div>
 
-    <template #footer>
+    <template v-if="showFooter" #footer>
       <slot name="footer">
         <el-button @click="($emit('cancel'), (visible = false))">取消</el-button>
         <el-button type="primary" :disabled="loading" v-loading="loading" @click="submit">确定</el-button>

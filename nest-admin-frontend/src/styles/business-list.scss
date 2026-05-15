@@ -47,7 +47,7 @@
 
 .business-list-panel .query-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, calc((100% - 60px) / 4)));
   gap: 12px 20px;
   align-items: start;
   width: 100%;
@@ -65,9 +65,13 @@
 }
 
 .business-list-panel .query-grid .el-select,
-.business-list-panel .query-grid .el-input {
+.business-list-panel .query-grid .el-input,
+.business-list-panel .query-grid .el-date-editor,
+.business-list-panel .query-grid .project-select,
+.business-list-panel .query-grid .user-select {
   width: 100%;
   flex: 1;
+  min-width: 0;
 }
 
 .business-list-panel .query-select-item {
@@ -215,12 +219,6 @@
 .business-list-panel .el-tag--plain {
   border-color: var(--el-border-color-lighter);
   background: #f7f7f7;
-}
-
-@media (max-width: 1200px) {
-  .business-list-panel .query-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 768px) {
