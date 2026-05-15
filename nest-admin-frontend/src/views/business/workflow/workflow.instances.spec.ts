@@ -8,17 +8,18 @@ function readInstancesSource() {
 }
 
 describe('workflow 实例详情可视化守卫', () => {
-  it('详情默认展示审批组件同款流程进度并加载历史和任务数据', () => {
+  it('详情默认展示审批组件同款流程图并加载历史和任务数据', () => {
     const source = readInstancesSource()
 
     expect(source).toContain("detailTab.value = 'flow'")
     expect(source).toContain('api.getWorkflowInstanceTasks(instance.id)')
     expect(source).toContain('WorkflowProgressView')
-    expect(source).toContain('<el-tab-pane label="流程进度" name="flow">')
+    expect(source).toContain('<el-tab-pane label="流程图" name="flow">')
+    expect(source).not.toContain('<el-tab-pane label="流程进度" name="flow">')
     expect(source).not.toContain('api.getWorkflowDefinition(instance.definitionId)')
   })
 
-  it('流程进度使用审批组件的进度卡片，不再展示实例流转图画布', () => {
+  it('流程图使用审批组件的完整流转图，不再展示实例流转图画布', () => {
     const source = readInstancesSource()
 
     expect(source).toContain(':instance-info="currentInstance"')

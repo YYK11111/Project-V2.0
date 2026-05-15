@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheckFilled } from '@element-plus/icons-vue'
-import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance } from '@/views/business/workflow/api'
+import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance, getWorkflowInstanceDefinition } from '@/views/business/workflow/api'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowProgressView from '@/components/workflow/WorkflowProgressView.vue'
 import WorkflowHistoryView from '@/components/workflow/WorkflowHistoryView.vue'
@@ -35,6 +35,7 @@ const loading = ref(false)
 const historyList = ref<any[]>([])
 const instanceTasks = ref<any[]>([])
 const instanceInfo = ref<any>(null)
+const instanceDefinition = ref<any>(null)
 const rejectableNodes = ref<any[]>([])
 const autoBackVisible = ref(false)
 const autoBackSeconds = ref(3)
@@ -70,14 +71,16 @@ const buildRejectableNodes = (historyItems: any[] = [], task: any = null) => {
 
 const loadWorkflowContext = async () => {
   if (!props.instanceId) return
-  const [historyRes, tasksRes, instanceRes] = await Promise.all([
+  const [historyRes, tasksRes, instanceRes, definitionRes] = await Promise.all([
     getWorkflowHistory(props.instanceId),
     getWorkflowInstanceTasks(props.instanceId),
     getWorkflowInstance(props.instanceId),
+    getWorkflowInstanceDefinition(props.instanceId),
   ])
   historyList.value = historyRes.data || []
   instanceTasks.value = tasksRes.data || []
   instanceInfo.value = instanceRes.data || null
+  instanceDefinition.value = definitionRes.data || null
   rejectableNodes.value = buildRejectableNodes(historyList.value, currentTask.value)
 }
 
@@ -254,8 +257,15 @@ const openInstanceDetail = () => {
         </el-form>
       </el-tab-pane>
 
-      <el-tab-pane label="流程进度" name="progress">
-        <WorkflowProgressView :instance-info="instanceInfo" :tasks="instanceTasks" :current-task-id="currentTask?.id || ''" :node-name="nodeName || currentTask?.nodeName || ''" />
+      <el-tab-pane label="流程图" name="progress">
+        <WorkflowProgressView
+          :instance-info="instanceInfo"
+          :definition="instanceDefinition"
+          :tasks="instanceTasks"
+          :history-list="historyList"
+          :current-task-id="currentTask?.id || ''"
+          :node-name="nodeName || currentTask?.nodeName || ''"
+        />
       </el-tab-pane>
 
       <el-tab-pane label="历史记录" name="history">

@@ -32,6 +32,7 @@ const getButtons = (row: any) => [
 const detailVisible = ref(false)
 const detailTab = ref('flow')
 const currentInstance = ref<any>(null)
+const currentDefinition = ref<any>(null)
 const historyList = ref<any[]>([])
 const instanceTaskList = ref<any[]>([])
 
@@ -61,13 +62,15 @@ const loadInstanceDetail = async (instanceId: string) => {
   currentInstance.value = instance
   detailTab.value = 'flow'
 
-  const [historyRes, tasksRes] = await Promise.all([
+  const [historyRes, tasksRes, definitionRes] = await Promise.all([
     api.getWorkflowHistory(instance.id),
     api.getWorkflowInstanceTasks(instance.id),
+    api.getWorkflowInstanceDefinition(instance.id),
   ])
 
   historyList.value = historyRes.data || []
   instanceTaskList.value = tasksRes.data || []
+  currentDefinition.value = definitionRes.data || null
 }
 
 const getBusinessTypeLabel = (type: string) => {
@@ -208,8 +211,15 @@ onMounted(async () => {
 
     <BaDialog v-model="detailVisible" title="流程实例详情" width="80%">
       <el-tabs v-model="detailTab">
-        <el-tab-pane label="流程进度" name="flow">
-          <WorkflowProgressView :instance-info="currentInstance" :tasks="instanceTaskList" :current-task-id="currentTask?.id || ''" :node-name="currentTask?.nodeName || ''" />
+        <el-tab-pane label="流程图" name="flow">
+          <WorkflowProgressView
+            :instance-info="currentInstance"
+            :definition="currentDefinition"
+            :tasks="instanceTaskList"
+            :history-list="historyList"
+            :current-task-id="currentTask?.id || ''"
+            :node-name="currentTask?.nodeName || ''"
+          />
         </el-tab-pane>
         <el-tab-pane label="基本信息" name="info">
           <template v-if="currentInstance">
