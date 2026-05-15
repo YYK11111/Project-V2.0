@@ -198,11 +198,15 @@ describe("GoLiveRecord 时间字段", () => {
         item.propertyName === "plannedGoLiveTime",
     );
 
-    expect(actualColumn?.options.transformer?.["from"](
-      new Date("2026-05-15T10:20:30"),
-    )).toBe("2026-05-15 10:20:30");
-    expect(plannedColumn?.options.transformer?.["from"](
-      new Date("2026-05-15T10:20:30"),
-    )).toBe("2026-05-15");
+    expect(
+      actualColumn?.options.transformer?.["from"](
+        new Date("2026-05-15T10:20:30"),
+      ),
+    ).toBe("2026-05-15 10:20:30");
+    expect(
+      plannedColumn?.options.transformer?.["from"](
+        new Date("2026-05-15T10:20:30"),
+      ),
+    ).toBe("2026-05-15");
   });
 });
