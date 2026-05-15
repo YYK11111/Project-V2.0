@@ -23,9 +23,7 @@ const params = ref({
 const rctRef = ref()
 
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
-const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
 const canChangeDelete = computed(() => checkPermi(['business/changes/delete']))
-const canChangeSubmitApproval = computed(() => checkPermi(['business/changes/approve']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
 const columns = [
@@ -48,7 +46,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   router.push(`${getFormPath()}?id=${row.id}`)
 }
 
@@ -57,7 +55,7 @@ const handleView = (row) => {
 }
 
 const handleDel = async (row) => {
-  if (!canChangeDelete.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canDelete !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定要删除该变更吗？')
   await del(row.id)
   $sdk.msgSuccess('删除成功')
@@ -65,7 +63,7 @@ const handleDel = async (row) => {
 }
 
 const handleSubmitApproval = async (row) => {
-  if (!canChangeSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定提交该变更审批吗？')
   await submitApproval(row.id)
   $sdk.msgSuccess('提交审批成功')
@@ -116,9 +114,9 @@ const getButtons = (row) => [
   row.knowledgeArticleId && canArticleAdd.value
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
-  canChangeSubmitApproval.value && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canChangeUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
-  canChangeDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  row.canEdit === true && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 
 const getStatusType = (status) => {

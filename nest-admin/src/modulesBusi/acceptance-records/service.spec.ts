@@ -35,4 +35,42 @@ describe("AcceptanceRecordsService 状态机", () => {
     ).rejects.toThrow("验收单当前结果不允许变更为整改中");
     expect(repository.save).not.toHaveBeenCalled();
   });
+
+  it("全量管理权限在列表行上返回可操作权限", async () => {
+    const { service, projectExecutionPermissionService } = createService({
+      id: "acc-1",
+    });
+    jest.spyOn(service as any, "listBy").mockResolvedValue({
+      data: [{ id: "acc-1", projectId: "p1" }],
+      total: 1,
+    });
+    projectExecutionPermissionService.getVisibleProjectIds.mockResolvedValue(
+      null,
+    );
+    projectExecutionPermissionService.assertWritableProject = jest
+      .fn()
+      .mockResolvedValue({});
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/acceptance-records/manageAll"],
+    } as any);
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+      }),
+    );
+    expect(
+      projectExecutionPermissionService.assertWritableProject,
+    ).toHaveBeenCalledWith(
+      "p1",
+      "admin-1",
+      expect.arrayContaining(["business/acceptance-records/manageAll"]),
+      "business/acceptance-records/manageAll",
+    );
+  });
 });

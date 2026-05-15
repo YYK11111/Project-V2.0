@@ -116,4 +116,44 @@ describe("MilestonesService project scope guards", () => {
       projectExecutionPermissionService.assertReadableProject,
     ).not.toHaveBeenCalled();
   });
+
+  it("全量管理权限在列表行上返回可操作权限", async () => {
+    const repository = {};
+    const taskRepository = { find: jest.fn().mockResolvedValue([]) };
+    const projectExecutionPermissionService = {
+      getVisibleProjectIds: jest.fn().mockResolvedValue(null),
+      assertWritableProject: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MilestonesService(
+      repository as any,
+      taskRepository as any,
+      projectExecutionPermissionService as any,
+    );
+    jest.spyOn(service as any, "listBy").mockResolvedValue({
+      data: [{ id: "m1", projectId: "p1" }],
+      total: 1,
+    });
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/milestones/manageAll"],
+    } as any);
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+      }),
+    );
+    expect(
+      projectExecutionPermissionService.assertWritableProject,
+    ).toHaveBeenCalledWith(
+      "p1",
+      "admin-1",
+      expect.arrayContaining(["business/milestones/manageAll"]),
+      "business/milestones/manageAll",
+    );
+  });
 });

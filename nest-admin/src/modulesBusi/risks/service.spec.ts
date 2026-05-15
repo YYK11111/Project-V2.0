@@ -18,7 +18,7 @@ describe("RisksService convert to task", () => {
       {} as any,
     );
     jest.spyOn(service as any, "listBy").mockResolvedValue({
-      list: [
+      data: [
         {
           id: "risk-1",
           projectId: "project-1",
@@ -99,7 +99,7 @@ describe("RisksService convert to task", () => {
       {} as any,
     );
     jest.spyOn(service as any, "listBy").mockResolvedValue({
-      list: [
+      data: [
         {
           id: "risk-1",
           projectId: "project-1",
@@ -117,7 +117,7 @@ describe("RisksService convert to task", () => {
       _operatorPermissions: ["business/risks/manageAll"],
     } as any);
 
-    expect(result.list[0]).toEqual(
+    expect(result.data[0]).toEqual(
       expect.objectContaining({
         canEdit: true,
         canDelete: true,

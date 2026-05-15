@@ -23,7 +23,7 @@ describe("ChangesService apply impact", () => {
       projectsService as any,
     );
     jest.spyOn(service as any, "listBy").mockResolvedValue({
-      list: [
+      data: [
         {
           id: "change-1",
           projectId: "project-1",
@@ -111,7 +111,7 @@ describe("ChangesService apply impact", () => {
       projectsService as any,
     );
     jest.spyOn(service as any, "listBy").mockResolvedValue({
-      list: [
+      data: [
         {
           id: "change-1",
           projectId: "project-1",
@@ -129,7 +129,7 @@ describe("ChangesService apply impact", () => {
       _operatorPermissions: ["business/changes/manageAll"],
     } as any);
 
-    expect(result.list[0]).toEqual(
+    expect(result.data[0]).toEqual(
       expect.objectContaining({
         canEdit: true,
         canDelete: true,

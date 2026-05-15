@@ -1,10 +1,13 @@
 <script setup>
 import { getList, del, getResults } from './api'
 import TableOperation from '@/components/TableOperation.vue'
+import { checkPermi } from '@/utils/permission'
 
 const rctRef = ref()
 const params = ref({})
 const resultMap = ref({})
+const canAcceptanceAdd = computed(() => checkPermi(['business/acceptance-records/add']))
+const canAcceptanceDelete = computed(() => checkPermi(['business/acceptance-records/delete']))
 
 getResults().then(({ data }) => {
   resultMap.value = data || {}
@@ -12,9 +15,9 @@ getResults().then(({ data }) => {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/acceptanceManage/form') },
-  { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/acceptanceManage/form') },
-  { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) },
-]
+  row.canEdit === true ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/acceptanceManage/form') } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
@@ -37,9 +40,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="acceptance-index-operation">
           <div class="acceptance-index-operation__left">
-            <el-button type="primary" @click="rctRef.goRoute(null, '/acceptanceManage/form')">新增验收单</el-button>
+            <el-button v-if="canAcceptanceAdd" type="primary" @click="rctRef.goRoute(null, '/acceptanceManage/form')">新增验收单</el-button>
           </div>
-          <el-button :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canAcceptanceDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

@@ -65,6 +65,44 @@ describe("GoLiveRecordsService 状态机", () => {
     expect(result).toEqual(expect.objectContaining({ id: "go-1" }));
   });
 
+  it("全量管理权限在列表行上返回可操作权限", async () => {
+    const { service, projectExecutionPermissionService } = createService({
+      id: "go-1",
+    });
+    jest.spyOn(service as any, "listBy").mockResolvedValue({
+      data: [{ id: "go-1", projectId: "p1" }],
+      total: 1,
+    });
+    projectExecutionPermissionService.getVisibleProjectIds.mockResolvedValue(
+      null,
+    );
+    projectExecutionPermissionService.assertWritableProject = jest
+      .fn()
+      .mockResolvedValue({});
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "admin-1",
+      _operatorPermissions: ["business/go-live-records/manageAll"],
+    } as any);
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+      }),
+    );
+    expect(
+      projectExecutionPermissionService.assertWritableProject,
+    ).toHaveBeenCalledWith(
+      "p1",
+      "admin-1",
+      expect.arrayContaining(["business/go-live-records/manageAll"]),
+      "business/go-live-records/manageAll",
+    );
+  });
+
   it("用户不能通过状态字段把已成功上线单回退为草稿", async () => {
     const { service, repository } = createService({
       id: "go-1",

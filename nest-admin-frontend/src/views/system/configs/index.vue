@@ -11,21 +11,6 @@ const appStore = useAppStore()
 const testUserId = ref('')
 const diagnoseLoading = ref(false)
 const diagnoseResult = ref<any>(null)
-const fieldGroups = [
-  { code: 'projectBasic', label: '基础组', desc: '项目名称、类型、优先级、负责人、发起人、描述等基础字段' },
-  { code: 'projectMember', label: '成员组', desc: '项目成员集合权限，控制成员表格的显示与编辑' },
-  { code: 'projectPlan', label: '计划组', desc: '起止时间、基线计划、里程碑、计划时间等字段' },
-  { code: 'projectBusiness', label: '经营组', desc: '客户、预算、币种、业务线、行业、来源等经营字段' },
-  { code: 'projectClosure', label: '结项组', desc: '验收日期、验收说明、交付清单、遗留问题、项目复盘' },
-  { code: 'projectKnowledge', label: '知识组', desc: '控制知识页签和知识动作入口，不对应项目实体普通字段' },
-]
-const matrixRows = [
-  { roleKey: 'projectManager', roleLabel: '项目经理' },
-  { roleKey: 'deliveryManager', roleLabel: '交付经理' },
-  { roleKey: 'ownerRole', roleLabel: '负责人类角色' },
-  { roleKey: 'member', roleLabel: '普通成员' },
-  { roleKey: 'visitor', roleLabel: '访客' },
-]
 const form = ref<any>({
   systemName: '',
   browserTitle: '',
@@ -35,7 +20,6 @@ const form = ref<any>({
   systemLogo: '',
   browserIcon: '',
   projectReminderStrategy: getDefaultReminderStrategy(),
-  projectFieldPermissionMatrix: getDefaultProjectFieldPermissionMatrix(),
   externalNotifyConfig: getDefaultExternalNotifyConfig(),
 })
 const rules = {}
@@ -73,53 +57,6 @@ function getDefaultReminderStrategy() {
       changePending: true,
       unplannedTask: true,
       closureIncomplete: true,
-    },
-  }
-}
-
-function getDefaultProjectFieldPermissionMatrix() {
-  return {
-    project: {
-      projectManager: {
-        projectBasic: 'editable',
-        projectMember: 'editable',
-        projectPlan: 'editable',
-        projectBusiness: 'editable',
-        projectClosure: 'editable',
-        projectKnowledge: 'editable',
-      },
-      deliveryManager: {
-        projectBasic: 'readonly',
-        projectMember: 'editable',
-        projectPlan: 'editable',
-        projectBusiness: 'readonly',
-        projectClosure: 'editable',
-        projectKnowledge: 'editable',
-      },
-      ownerRole: {
-        projectBasic: 'readonly',
-        projectMember: 'readonly',
-        projectPlan: 'readonly',
-        projectBusiness: 'hidden',
-        projectClosure: 'readonly',
-        projectKnowledge: 'editable',
-      },
-      member: {
-        projectBasic: 'readonly',
-        projectMember: 'readonly',
-        projectPlan: 'readonly',
-        projectBusiness: 'hidden',
-        projectClosure: 'hidden',
-        projectKnowledge: 'readonly',
-      },
-      visitor: {
-        projectBasic: 'readonly',
-        projectMember: 'hidden',
-        projectPlan: 'hidden',
-        projectBusiness: 'hidden',
-        projectClosure: 'hidden',
-        projectKnowledge: 'readonly',
-      },
     },
   }
 }
@@ -171,38 +108,6 @@ function mergeReminderStrategy(strategy) {
   }
 }
 
-function mergeProjectFieldPermissionMatrix(matrix) {
-  const defaults = getDefaultProjectFieldPermissionMatrix()
-  return {
-    ...defaults,
-    ...(matrix || {}),
-    project: {
-      ...defaults.project,
-      ...(matrix?.project || {}),
-      projectManager: {
-        ...defaults.project.projectManager,
-        ...(matrix?.project?.projectManager || {}),
-      },
-      deliveryManager: {
-        ...defaults.project.deliveryManager,
-        ...(matrix?.project?.deliveryManager || {}),
-      },
-      ownerRole: {
-        ...defaults.project.ownerRole,
-        ...(matrix?.project?.ownerRole || {}),
-      },
-      member: {
-        ...defaults.project.member,
-        ...(matrix?.project?.member || {}),
-      },
-      visitor: {
-        ...defaults.project.visitor,
-        ...(matrix?.project?.visitor || {}),
-      },
-    },
-  }
-}
-
 function mergeExternalNotifyConfig(config) {
   const defaults = getDefaultExternalNotifyConfig()
   return {
@@ -225,7 +130,6 @@ function getListFun() {
     form.value = {
       ...(data || {}),
       projectReminderStrategy: mergeReminderStrategy(data?.projectReminderStrategy),
-      projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(data?.projectFieldPermissionMatrix),
       externalNotifyConfig: mergeExternalNotifyConfig(data?.externalNotifyConfig),
     }
   })
@@ -238,7 +142,6 @@ function submit() {
   save({
     ...form.value,
     projectReminderStrategy: mergeReminderStrategy(form.value?.projectReminderStrategy),
-    projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(form.value?.projectFieldPermissionMatrix),
     externalNotifyConfig: mergeExternalNotifyConfig(form.value?.externalNotifyConfig),
   }).then(() => {
     $sdk.msgSuccess()
@@ -481,48 +384,6 @@ function formatDiagnoseData(data) {
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="字段组权限" name="fieldPermission">
-        <div class="field-permission-page">
-          <el-card shadow="hover" class="field-permission-card">
-            <template #header>适用范围</template>
-            <div class="field-permission-scope-row">
-              <el-form-item label="业务对象" label-width="90px">
-                <el-select model-value="project" disabled style="width: 220px">
-                  <el-option label="项目" value="project" />
-                </el-select>
-              </el-form-item>
-            </div>
-            <div class="field-permission-tip">第一版仅支持项目对象。配置结果将用于项目表单、详情页、审批页的显示与编辑态控制；创建态字段仍以页面内建规则为主，后端状态冻结规则优先生效。</div>
-          </el-card>
-
-          <el-card shadow="hover" class="field-permission-card mt16">
-            <template #header>权限矩阵</template>
-            <el-table :data="matrixRows" border class="field-permission-matrix">
-              <el-table-column prop="roleLabel" label="项目角色" width="150" fixed="left" />
-              <el-table-column v-for="group in fieldGroups" :key="group.code" :label="group.label" min-width="160">
-                <template #default="{ row }">
-                  <el-select v-model="form.projectFieldPermissionMatrix.project[row.roleKey][group.code]" style="width: 100%" :disabled="isConfigReadonly">
-                    <el-option label="不可见" value="hidden" />
-                    <el-option label="只读" value="readonly" />
-                    <el-option label="可编辑" value="editable" />
-                  </el-select>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-
-          <el-card shadow="hover" class="field-permission-card mt16">
-            <template #header>规则说明</template>
-            <div class="field-permission-rule-list">
-              <div>1. 成员组用于控制成员集合的显示与编辑，不再混入基础组。</div>
-              <div>2. 计划组覆盖起止时间、基线计划与里程碑；项目立项后会进入只读冻结。</div>
-              <div>3. 审批中或已立项项目会额外收紧基础组、计划组、经营组和成员组为只读。</div>
-              <div>4. 已结项或已归档项目默认按只读处理。</div>
-              <div>5. 知识组只控制知识页签和知识动作入口，仍需叠加知识权限体系。</div>
-            </div>
-          </el-card>
-        </div>
-      </el-tab-pane>
     </el-tabs>
 
     <div class="system-config-page__footer">
@@ -546,33 +407,6 @@ function formatDiagnoseData(data) {
 
 .reminder-page {
   max-width: 960px;
-}
-
-.field-permission-page {
-  max-width: 1100px;
-}
-
-.field-permission-card {
-  border-radius: 14px;
-}
-
-.field-permission-scope-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.field-permission-tip {
-  color: var(--el-text-color-regular);
-  margin-top: 8px;
-  line-height: 1.8;
-}
-
-.field-permission-rule-list {
-  display: grid;
-  gap: 10px;
-  color: var(--el-text-color-regular);
-  line-height: 1.8;
 }
 
 .reminder-card {

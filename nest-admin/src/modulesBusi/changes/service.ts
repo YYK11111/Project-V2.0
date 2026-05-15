@@ -27,6 +27,7 @@ import { Task } from "../tasks/entity";
 import { Milestone } from "../milestones/entity";
 import { Sprint } from "../sprints/entity";
 import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
+import { getListRows } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class ChangesService extends BaseService<
@@ -246,7 +247,7 @@ export class ChangesService extends BaseService<
       order: { sort: "ASC", createTime: "DESC" },
     };
     const res = await this.listBy(queryOrm, query);
-    for (const row of res.list || []) {
+    for (const row of getListRows(res)) {
       if (_operatorId) {
         Object.assign(
           row,

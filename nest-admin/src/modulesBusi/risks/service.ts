@@ -14,6 +14,7 @@ import { ProjectsService } from "../projects/service";
 import { TasksService } from "../tasks/service";
 import { Task } from "../tasks/entity";
 import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
+import { getListRows } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class RisksService extends BaseService<Risk, CreateRiskDto> {
@@ -374,7 +375,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       order: { sort: "ASC", createTime: "DESC" },
     };
     const res = await this.listBy(queryOrm, query);
-    for (const row of res.list || []) {
+    for (const row of getListRows(res)) {
       if (_operatorId) {
         Object.assign(
           row,

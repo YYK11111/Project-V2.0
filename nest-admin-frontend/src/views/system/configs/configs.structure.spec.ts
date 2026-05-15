@@ -69,6 +69,15 @@ describe('system configs structure', () => {
     expect(source).toContain('callbackUrl')
   })
 
+  it('系统配置暂时不提供字段组权限配置功能', () => {
+    const source = readSource()
+
+    expect(source).not.toContain('label="字段组权限"')
+    expect(source).not.toContain("name=\"fieldPermission\"")
+    expect(source).not.toContain('projectFieldPermissionMatrix')
+    expect(source).not.toContain('field-permission-page')
+  })
+
   it('系统配置无更新权限时以只读查看态展示', () => {
     const source = readSource()
 

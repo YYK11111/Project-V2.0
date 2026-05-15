@@ -19,25 +19,22 @@ getPriority().then(({ data }) => (priority.value = data))
 const rctRef = ref()
 const showAdvanced = ref(false)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
-const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
 const canTaskDelete = computed(() => checkPermi(['business/tasks/delete']))
 const canTaskUpdateProgress = computed(() => checkPermi(['business/tasks/updateProgress']))
-const canTaskSubmitApproval = computed(() => checkPermi(['business/tasks/update']))
-const canTaskExecute = computed(() => checkPermi(['business/tasks/update']))
 const statusMap = computed(() => ({
   ...status.value,
   6: status.value?.['6'] || '待完成审批',
 }))
 
 function handleProgressChange(row) {
-  if (!canTaskUpdateProgress.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canTaskUpdateProgress.value || (row.canEdit !== true && row.canExecute !== true)) return $sdk.msgWarning('当前操作没有权限')
   updateProgress(row.id, row.progress).then(() => {
     $sdk.msgSuccess('进度更新成功')
   })
 }
 
 async function handleSubmitApproval(row) {
-  if (!canTaskSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定提交该任务审批吗？')
   await submitApproval(row.id)
   $sdk.msgSuccess('提交审批成功')
@@ -45,28 +42,28 @@ async function handleSubmitApproval(row) {
 }
 
 async function handleStartTask(row) {
-  if (!canTaskExecute.value || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canExecute !== true) return $sdk.msgWarning('当前操作没有权限')
   await startTask(row.id)
   $sdk.msgSuccess('任务已开始')
   rctRef.value?.getList()
 }
 
 async function handlePauseTask(row) {
-  if (!canTaskUpdate.value || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canManage !== true) return $sdk.msgWarning('当前操作没有权限')
   await pauseTask(row.id)
   $sdk.msgSuccess('任务已暂缓')
   rctRef.value?.getList()
 }
 
 async function handleResumeTask(row) {
-  if (!canTaskUpdate.value || row.canManage === false) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canManage !== true) return $sdk.msgWarning('当前操作没有权限')
   await resumeTask(row.id)
   $sdk.msgSuccess('任务已恢复')
   rctRef.value?.getList()
 }
 
 async function handleSubmitCompletionApproval(row) {
-  if (!canTaskExecute.value || row.canExecute === false) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canExecute !== true) return $sdk.msgWarning('当前操作没有权限')
   await submitCompletionApproval(row.id)
   $sdk.msgSuccess('完成审批已提交')
   rctRef.value?.getList()
@@ -86,22 +83,22 @@ function isRowAttentionNeeded(row) {
 }
 
 const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
-const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.canExecute !== false
-const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.canManage !== false
-const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.canManage !== false
-const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.canExecute !== false && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.canExecute === true
+const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.canManage === true
+const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.canManage === true
+const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.canExecute === true && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
   { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
   { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
-  canTaskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
-  canTaskExecute.value && canStartCurrentTask(row) ? { key: 'startTask', label: '开始任务', type: 'success', onClick: () => handleStartTask(row) } : null,
-  canTaskUpdate.value && canPauseCurrentTask(row) ? { key: 'pauseTask', label: '暂缓任务', type: 'warning', onClick: () => handlePauseTask(row) } : null,
-  canTaskUpdate.value && canResumeCurrentTask(row) ? { key: 'resumeTask', label: '恢复任务', type: 'success', onClick: () => handleResumeTask(row) } : null,
-  canTaskExecute.value && canSubmitCompletionCurrentTask(row) ? { key: 'submitCompletionApproval', label: '提交完成审批', type: 'warning', onClick: () => handleSubmitCompletionApproval(row) } : null,
-  canTaskSubmitApproval.value && canSubmitTaskApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canTaskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
+  canStartCurrentTask(row) ? { key: 'startTask', label: '开始任务', type: 'success', onClick: () => handleStartTask(row) } : null,
+  canPauseCurrentTask(row) ? { key: 'pauseTask', label: '暂缓任务', type: 'warning', onClick: () => handlePauseTask(row) } : null,
+  canResumeCurrentTask(row) ? { key: 'resumeTask', label: '恢复任务', type: 'success', onClick: () => handleResumeTask(row) } : null,
+  canSubmitCompletionCurrentTask(row) ? { key: 'submitCompletionApproval', label: '提交完成审批', type: 'warning', onClick: () => handleSubmitCompletionApproval(row) } : null,
+  row.canEdit === true && canSubmitTaskApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
@@ -238,7 +235,7 @@ const getButtons = (row) => [
               v-model="row.progress"
               :max="100"
               :step="5"
-              :disabled="!canTaskUpdateProgress"
+              :disabled="!canTaskUpdateProgress || (row.canEdit !== true && row.canExecute !== true)"
               style="width: 150px"
               @change="handleProgressChange(row)" />
           </template>

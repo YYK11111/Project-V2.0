@@ -11,6 +11,7 @@ import {
   goLiveRecordStatusMap,
 } from "./entity";
 import { ProjectExecutionPermissionService } from "../projects/project-execution-permission.service";
+import { appendProjectOperationPermissions } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class GoLiveRecordsService extends BaseService<
@@ -161,7 +162,17 @@ export class GoLiveRecordsService extends BaseService<
       relations: ["project", "owner"],
       order: { createTime: "DESC" },
     };
-    return this.listBy(queryOrm, query);
+    const result = await this.listBy(queryOrm, query);
+    if (_operatorId) {
+      await appendProjectOperationPermissions(
+        result,
+        this.projectExecutionPermissionService,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/go-live-records/manageAll",
+      );
+    }
+    return result;
   }
 
   getStatuses() {

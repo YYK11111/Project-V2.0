@@ -29,7 +29,6 @@ const params = ref({
 const rctRef = ref()
 
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
-const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
 const canRiskDelete = computed(() => checkPermi(['business/risks/delete']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
@@ -58,7 +57,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  if (!canRiskUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   router.push(`${getFormPath()}?id=${row.id}`)
 }
 
@@ -67,7 +66,7 @@ const handleView = (row) => {
 }
 
 const handleDel = async (row) => {
-  if (!canRiskDelete.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canDelete !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定要删除该风险吗？')
   await del(row.id)
   $sdk.msgSuccess('删除成功')
@@ -75,6 +74,7 @@ const handleDel = async (row) => {
 }
 
 const handleResolve = async (row) => {
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定要标记为已解决吗？')
   await resolve(row.id)
   $sdk.msgSuccess('操作成功')
@@ -152,7 +152,7 @@ watch(
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canRiskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
     : canArticleAdd.value
@@ -161,8 +161,8 @@ const getButtons = (row) => [
   row.knowledgeArticleId && canArticleAdd.value
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
-  canRiskUpdate.value && row.status !== '4' && row.status !== '5' ? { key: 'resolve', label: '解决', type: 'primary', onClick: () => handleResolve(row) } : null,
-  canRiskDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  row.canEdit === true && row.status !== '4' && row.status !== '5' ? { key: 'resolve', label: '解决', type: 'primary', onClick: () => handleResolve(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>
 

@@ -1,10 +1,13 @@
 <script setup>
 import { getList, del, getStatuses } from './api'
 import TableOperation from '@/components/TableOperation.vue'
+import { checkPermi } from '@/utils/permission'
 
 const rctRef = ref()
 const params = ref({})
 const statusMap = ref({})
+const canHandoverAdd = computed(() => checkPermi(['business/handover-records/add']))
+const canHandoverDelete = computed(() => checkPermi(['business/handover-records/delete']))
 
 getStatuses().then(({ data }) => {
   statusMap.value = data || {}
@@ -12,9 +15,9 @@ getStatuses().then(({ data }) => {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/handoverManage/form') },
-  { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/handoverManage/form') },
-  { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) },
-]
+  row.canEdit === true ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/handoverManage/form') } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+].filter(Boolean)
 </script>
 
 <template>
@@ -37,9 +40,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="handover-index-operation">
           <div class="handover-index-operation__left">
-            <el-button type="primary" @click="rctRef.goRoute(null, '/handoverManage/form')">新增运维交接单</el-button>
+            <el-button v-if="canHandoverAdd" type="primary" @click="rctRef.goRoute(null, '/handoverManage/form')">新增运维交接单</el-button>
           </div>
-          <el-button :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canHandoverDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

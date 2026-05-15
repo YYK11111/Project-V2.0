@@ -19,6 +19,7 @@ import { ArticleCatalog } from "../articleCatalogs/entity";
 import { KnowledgeType, VisibilityType } from "../articles/constants";
 import { Task } from "../tasks/entity";
 import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
+import { getListRows } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class TicketsService extends BaseService<Ticket, TicketDto> {
@@ -253,7 +254,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       relations: ["submitter", "handler", "project", "task"],
     };
     const res = await this.listBy(queryOrm, query);
-    for (const row of res.list || []) {
+    for (const row of getListRows(res)) {
       if (_operatorId) {
         Object.assign(
           row,

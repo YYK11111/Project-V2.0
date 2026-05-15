@@ -33,7 +33,6 @@ const columns = [
 ]
 
 const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
-const canMilestoneUpdate = computed(() => checkPermi(['business/milestones/update']))
 const canMilestoneDelete = computed(() => checkPermi(['business/milestones/delete']))
 
 function getFormPath() {
@@ -46,7 +45,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
-  if (!canMilestoneUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   router.push(`${getFormPath()}?id=${row.id}`)
 }
 
@@ -55,7 +54,7 @@ const handleView = (row) => {
 }
 
 const handleDel = async (row) => {
-  if (!canMilestoneDelete.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canDelete !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定要删除该里程碑吗？')
   await del(row.id)
   $sdk.msgSuccess('删除成功')
@@ -111,8 +110,8 @@ function exportMilestoneList() {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canMilestoneUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
-  canMilestoneDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>
 

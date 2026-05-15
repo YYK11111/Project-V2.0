@@ -9,6 +9,7 @@ import { CreateMilestoneDto } from "./dto";
 import { User } from "src/modules/users/entities/user.entity";
 import { Task, TaskStatus } from "../tasks/entity";
 import { ProjectExecutionPermissionService } from "../projects/project-execution-permission.service";
+import { appendProjectOperationPermissions } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class MilestonesService extends BaseService<
@@ -230,7 +231,17 @@ export class MilestonesService extends BaseService<
       relations: ["project", "creator", "owner"],
       order: { sort: "ASC", createTime: "DESC" },
     };
-    return this.listBy(queryOrm, query);
+    const result = await this.listBy(queryOrm, query);
+    if (_operatorId) {
+      await appendProjectOperationPermissions(
+        result,
+        this.projectExecutionPermissionService,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/milestones/manageAll",
+      );
+    }
+    return result;
   }
 
   async updateStatus(

@@ -18,13 +18,11 @@ getStatus().then(({ data }) => (status.value = data))
 
 const rctRef = ref()
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
-const canTicketUpdate = computed(() => checkPermi(['business/tickets/update']))
 const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
-const canTicketSubmitApproval = computed(() => checkPermi(['business/tickets/update']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 
 async function handleSubmitApproval(row) {
-  if (!canTicketSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定提交该工单审批吗？')
   await submitApproval(row.id)
   $sdk.msgSuccess('提交审批成功')
@@ -67,7 +65,7 @@ const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].inclu
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
-  canTicketUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
     : canArticleAdd.value
@@ -76,8 +74,8 @@ const getButtons = (row) => [
   row.knowledgeArticleId && canArticleAdd.value
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
-  canTicketSubmitApproval.value && canSubmitTicketApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canTicketDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
+  row.canEdit === true && canSubmitTicketApproval(row) ? { key: 'submitApproval', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>
 
