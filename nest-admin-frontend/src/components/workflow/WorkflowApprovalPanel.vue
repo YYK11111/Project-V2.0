@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { CircleCheckFilled } from '@element-plus/icons-vue'
 import { addSignTask, completeTask, transferTask, getWorkflowHistory, getWorkflowInstanceTasks, getWorkflowInstance, getWorkflowInstanceDefinition } from '@/views/business/workflow/api'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowProgressView from '@/components/workflow/WorkflowProgressView.vue'
@@ -38,10 +37,7 @@ const instanceTasks = ref<any[]>([])
 const instanceInfo = ref<any>(null)
 const instanceDefinition = ref<any>(null)
 const rejectableNodes = ref<any[]>([])
-const autoBackVisible = ref(false)
-const autoBackSeconds = ref(3)
 const activeTab = ref(props.readonly ? 'progress' : 'actions')
-let autoBackTimer: ReturnType<typeof setInterval> | null = null
 
 const nodeTypeLabelMap: Record<string, string> = {
   start: '开始',
@@ -103,10 +99,6 @@ watch(
   },
 )
 
-onBeforeUnmount(() => {
-  clearAutoBackTimer()
-})
-
 const rejectableNodeOptions = computed(() => {
   return rejectableNodes.value.map((node: any, index: number) => ({
     value: node.id,
@@ -132,35 +124,6 @@ const actionDisabledText = computed(() => {
   return ''
 })
 
-const clearAutoBackTimer = () => {
-  if (autoBackTimer) {
-    clearInterval(autoBackTimer)
-    autoBackTimer = null
-  }
-}
-
-const goBackAfterApproval = () => {
-  clearAutoBackTimer()
-  autoBackVisible.value = false
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/workflow/tasks')
-}
-
-const startAutoBack = (seconds = 3) => {
-  clearAutoBackTimer()
-  autoBackSeconds.value = seconds
-  autoBackVisible.value = true
-  autoBackTimer = setInterval(() => {
-    autoBackSeconds.value -= 1
-    if (autoBackSeconds.value <= 0) {
-      goBackAfterApproval()
-    }
-  }, 1000)
-}
-
 const notifyMessageCenterRefresh = () => {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent('message-center:refresh'))
@@ -175,7 +138,6 @@ const submitDecision = async (action: 'approve' | 'reject') => {
     await loadWorkflowContext()
     notifyMessageCenterRefresh()
     emit('approved', { action })
-    startAutoBack(3)
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '审批失败')
   } finally {
@@ -194,7 +156,6 @@ const submitRejectToNode = async () => {
     await loadWorkflowContext()
     notifyMessageCenterRefresh()
     emit('approved', { action: 'reject' })
-    startAutoBack(3)
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '驳回失败')
   } finally {
@@ -213,7 +174,6 @@ const submitTransfer = async () => {
     await loadWorkflowContext()
     notifyMessageCenterRefresh()
     emit('approved', { action: 'transfer' })
-    startAutoBack(3)
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '转交失败')
   } finally {
@@ -344,24 +304,6 @@ const openInstanceDetail = () => {
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="autoBackVisible"
-      title="操作完成"
-      width="420px"
-      append-to-body
-      :close-on-click-modal="false"
-      :close-on-press-escape="false"
-      :show-close="false"
-      destroy-on-close
-    >
-      <div class="auto-back-dialog__content">
-        <el-icon class="auto-back-dialog__icon"><CircleCheckFilled /></el-icon>
-        <div class="auto-back-dialog__text">{{ autoBackSeconds }} 秒后自动返回上一页</div>
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="goBackAfterApproval">立即返回</el-button>
-      </template>
-    </el-dialog>
   </el-card>
 </template>
 
@@ -395,25 +337,6 @@ const openInstanceDetail = () => {
 .panel-scroll {
   max-width: 100%;
   overflow-x: auto;
-}
-
-.auto-back-dialog__content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 12px 0 4px;
-}
-
-.auto-back-dialog__icon {
-  font-size: 40px;
-  color: var(--el-color-success);
-}
-
-.auto-back-dialog__text {
-  font-size: 15px;
-  color: var(--el-text-color-primary);
 }
 
 :deep(.el-form-item__content) {

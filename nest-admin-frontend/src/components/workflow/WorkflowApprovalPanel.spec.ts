@@ -111,6 +111,16 @@ describe('WorkflowApprovalPanel contract', () => {
     expect(source).toContain("window.dispatchEvent")
   })
 
+  it('审批动作完成后不再弹窗倒计时返回上一页', () => {
+    expect(source).not.toContain('autoBackVisible')
+    expect(source).not.toContain('autoBackSeconds')
+    expect(source).not.toContain('autoBackTimer')
+    expect(source).not.toContain('startAutoBack')
+    expect(source).not.toContain('goBackAfterApproval')
+    expect(source).not.toContain('秒后自动返回上一页')
+    expect(source).not.toContain('立即返回')
+  })
+
   it('只读模式默认停留在流程图并响应实例切换', () => {
     expect(source).toContain("const activeTab = ref(props.readonly ? 'progress' : 'actions')")
     expect(source).toContain('v-if="!props.readonly"')
