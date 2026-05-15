@@ -51,5 +51,7 @@ describe('system configs structure', () => {
     expect(source).toContain('v-model="form.externalNotifyConfig.feishu.enabled"')
     expect(source).toContain('v-model="form.externalNotifyConfig.feishu.appId"')
     expect(source).toContain('v-model="form.externalNotifyConfig.feishu.appSecret"')
+    expect(source).toContain('发送测试消息')
+    expect(source).toContain('testFeishuNotify')
   })
 })

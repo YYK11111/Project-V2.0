@@ -20,5 +20,6 @@ describe('system users api structure', () => {
     expect(source).toContain("const externalAccountServe = window.sysConfig.serves.system + '/external-accounts'")
     expect(source).toContain('export const getExternalAccount = (userId, platform = \'feishu\') =>')
     expect(source).toContain('export const saveExternalAccount = (data) => post(`${externalAccountServe}/save`, data)')
+    expect(source).toContain('export const syncFeishuAccount = (userId) => post(`${externalNotifyServe}/feishu/sync-user/${userId}`)')
   })
 })

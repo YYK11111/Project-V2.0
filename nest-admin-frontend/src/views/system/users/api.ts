@@ -7,6 +7,7 @@ const { get, post, put } = request
 // 用户 接口
 const serve = window.sysConfig.serves.system + '/users'
 const externalAccountServe = window.sysConfig.serves.system + '/external-accounts'
+const externalNotifyServe = window.sysConfig.serves.system + '/external-notify'
 const auth = '/auth'
 export const { getList, getOne, del, save, add, update } = baseApi(serve)
 
@@ -42,3 +43,5 @@ export const getOptions = (data) => get(`${serve}/options`, data)
 export const getExternalAccount = (userId, platform = 'feishu') => get(`${externalAccountServe}/user/${userId}`, { platform })
 
 export const saveExternalAccount = (data) => post(`${externalAccountServe}/save`, data)
+
+export const syncFeishuAccount = (userId) => post(`${externalNotifyServe}/feishu/sync-user/${userId}`)

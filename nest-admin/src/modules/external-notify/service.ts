@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { User } from "../users/entities/user.entity";
 import {
+  ExternalAccountBindStatus,
   ExternalAccountPlatform,
   UserExternalAccount,
 } from "../external-accounts/entity";
@@ -28,7 +30,9 @@ export class ExternalNotifyService {
     private readonly systemConfigsService: SystenConfigsService,
     @InjectRepository(ExternalMessageLog)
     private readonly logRepository: Repository<ExternalMessageLog>,
-    feishuProvider: FeishuNotifyProvider,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly feishuProvider: FeishuNotifyProvider,
     dingtalkProvider: DingTalkNotifyProvider,
   ) {
     this.providers = [feishuProvider, dingtalkProvider];
@@ -52,10 +56,13 @@ export class ExternalNotifyService {
     message: NotifyMessage,
     config: ExternalNotifyConfig,
   ) {
-    const account = await this.externalAccountsService.getActiveAccount(
+    let account = await this.externalAccountsService.getActiveAccount(
       userId,
       provider.platform as ExternalAccountPlatform,
     );
+    if (!account?.externalUserId && provider.platform === "feishu") {
+      account = await this.syncFeishuAccount(userId, config);
+    }
     if (!account?.externalUserId) {
       await this.saveLog(provider.platform, null, message, {
         sendStatus: ExternalMessageSendStatus.skipped,
@@ -96,5 +103,146 @@ export class ExternalNotifyService {
       },
       ...result,
     } as any);
+  }
+
+  async sendFeishuTestMessage(userId: string) {
+    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    if (!this.feishuProvider.isEnabled(config)) {
+      throw new Error("飞书通知未启用或配置不完整");
+    }
+    const message = {
+      receiverId: userId,
+      templateKey: "feishuTest",
+      title: "飞书通知测试",
+      content: "如果你收到这条消息，说明系统飞书通知配置可用。",
+      sourceType: "system_config",
+      sourceId: "feishu_test",
+      messageType: "test",
+    };
+    const account =
+      (await this.externalAccountsService.getActiveAccount(
+        userId,
+        ExternalAccountPlatform.feishu,
+      )) || (await this.syncFeishuAccount(userId, config));
+    if (!account?.externalUserId) {
+      throw new Error("当前用户未绑定或未匹配到飞书账号");
+    }
+    try {
+      const response = await this.feishuProvider.sendText(
+        account,
+        message,
+        config,
+      );
+      await this.saveLog("feishu", account, message, {
+        sendStatus: ExternalMessageSendStatus.succeeded,
+        responsePayload: response,
+      });
+      return { success: true, externalUserId: account.externalUserId };
+    } catch (error) {
+      await this.saveLog("feishu", account, message, {
+        sendStatus: ExternalMessageSendStatus.failed,
+        errorMessage: error?.message || "飞书测试消息发送失败",
+      });
+      throw error;
+    }
+  }
+
+  async syncFeishuAccount(
+    userId: string,
+    config?: ExternalNotifyConfig,
+  ): Promise<UserExternalAccount | null> {
+    const runtimeConfig =
+      config || (await this.systemConfigsService.getExternalNotifyRuntimeConfig());
+    if (!this.feishuProvider.isEnabled(runtimeConfig)) return null;
+    const user = await this.userRepository.findOne({
+      where: { id: String(userId), isDelete: null as any } as any,
+    });
+    if (!user) return null;
+    const email = String(user.email || "").trim();
+    const mobile = String(user.phone || "").trim();
+    if (!email && !mobile) return null;
+
+    const matchedUsers = await this.feishuProvider.batchGetUserId(
+      {
+        emails: email ? [email] : [],
+        mobiles: mobile ? [mobile] : [],
+      },
+      runtimeConfig,
+    );
+    const matchedUser = this.pickMatchedFeishuUser(matchedUsers, {
+      email,
+      mobile,
+    });
+    if (!matchedUser?.user_id) return null;
+
+    return this.externalAccountsService.upsertManualAccount({
+      userId: user.id,
+      platform: ExternalAccountPlatform.feishu,
+      externalUserId: matchedUser.user_id,
+      openId: matchedUser.open_id || "",
+      unionId: matchedUser.union_id || "",
+      name: matchedUser.name || matchedUser.en_name || "",
+      email: matchedUser.email || email,
+      mobile: matchedUser.mobile || mobile,
+      bindStatus: ExternalAccountBindStatus.bound,
+      bindSource: "sync",
+      lastSyncTime: new Date().toISOString(),
+      extraData: matchedUser,
+    });
+  }
+
+  async syncFeishuAccounts(options: { limit?: number } = {}) {
+    const limit = Math.min(Number(options.limit || 200), 1000);
+    const users = await this.userRepository.find({
+      where: { isDelete: null as any } as any,
+      select: ["id", "email", "phone"] as any,
+      take: limit,
+      order: { createTime: "DESC" as any },
+    });
+    const result = {
+      total: users.length,
+      synced: 0,
+      skipped: 0,
+      failed: 0,
+      failures: [] as Array<{ userId: string; message: string }>,
+    };
+    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    for (const user of users) {
+      try {
+        const account = await this.syncFeishuAccount(user.id, config);
+        if (account?.externalUserId) {
+          result.synced += 1;
+        } else {
+          result.skipped += 1;
+        }
+      } catch (error) {
+        result.failed += 1;
+        result.failures.push({
+          userId: user.id,
+          message: error?.message || "同步失败",
+        });
+      }
+    }
+    return result;
+  }
+
+  private pickMatchedFeishuUser(
+    users: any[],
+    query: { email?: string; mobile?: string },
+  ) {
+    const normalizedEmail = String(query.email || "").toLowerCase();
+    const normalizedMobile = String(query.mobile || "");
+    return (
+      users.find(
+        (user) =>
+          normalizedEmail &&
+          String(user.email || "").toLowerCase() === normalizedEmail,
+      ) ||
+      users.find(
+        (user) =>
+          normalizedMobile && String(user.mobile || "") === normalizedMobile,
+      ) ||
+      users[0]
+    );
   }
 }

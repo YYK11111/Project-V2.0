@@ -30,6 +30,7 @@ import {
   resetPassword,
   getExternalAccount,
   saveExternalAccount,
+  syncFeishuAccount,
 } from './api'
 import { getList as getRoleListApi } from '../roles/api'
 
@@ -120,6 +121,19 @@ function User(params) {
       loading.value = false
     }
   }
+
+  async function syncCurrentFeishuAccount(form) {
+    if (!form?.id) {
+      return $sdk.msgWarning('请先保存用户后再同步飞书')
+    }
+    const { data } = await syncFeishuAccount(form.id)
+    form.feishuUserId = data?.externalUserId || ''
+    if (form.feishuUserId) {
+      $sdk.msgSuccess('飞书账号已同步')
+    } else {
+      $sdk.msgWarning('未匹配到飞书账号')
+    }
+  }
   getRoleList()
 
   return {
@@ -128,9 +142,10 @@ function User(params) {
     userDialogRef,
     resetPasswordDialogRef,
     submitUser,
+    syncCurrentFeishuAccount,
   }
 }
-let { action, roleList, userDialogRef, resetPasswordDialogRef, submitUser } = User(params)
+let { action, roleList, userDialogRef, resetPasswordDialogRef, submitUser, syncCurrentFeishuAccount } = User(params)
 /** -- 人员 模块 -- */
 
 /** -- 部门 模块 -- */
@@ -464,6 +479,9 @@ const getButtons = (row: any) => {
             label="飞书用户ID"
             maxlength="100"
             placeholder="可选，绑定飞书通知账号" />
+          <el-form-item v-if="form.id" label=" ">
+            <el-button @click="syncCurrentFeishuAccount(form)">同步飞书</el-button>
+          </el-form-item>
           <el-form-item prop="avatar" label="头像">
             <Upload v-model:fileUrl="form.avatar" :params="{ module: 'avatar' }"></Upload>
           </el-form-item>

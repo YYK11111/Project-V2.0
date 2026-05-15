@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // @ts-nocheck
 import { computed, ref } from 'vue'
-import { getList, save } from './api'
+import { getList, save, testFeishuNotify } from './api'
 import { checkPermi } from '@/utils/permission'
 import { useAppStore } from '@/stores/app'
 
@@ -241,6 +241,13 @@ function submit() {
     getListFun()
   })
 }
+
+function testFeishu() {
+  if (!canConfigUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  testFeishuNotify().then(() => {
+    $sdk.msgSuccess('测试消息已发送')
+  })
+}
 </script>
 
 <template>
@@ -389,6 +396,9 @@ function submit() {
               <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" />
               <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" />
               <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" />
+              <div class="external-notify-actions">
+                <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
+              </div>
             </div>
           </el-card>
 
@@ -554,6 +564,11 @@ function submit() {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px 20px;
   margin-top: 16px;
+}
+
+.external-notify-actions {
+  display: flex;
+  align-items: center;
 }
 
 .system-config-page__footer {

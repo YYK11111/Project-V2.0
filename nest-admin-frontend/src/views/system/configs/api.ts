@@ -1,9 +1,12 @@
 // @ts-nocheck
 import { baseApi } from '@/api/common'
+import request from '@/utils/request'
 
 // 用户角色 接口
 const serve = window.sysConfig.serves.system + '/configs'
+const externalNotifyServe = window.sysConfig.serves.system + '/external-notify'
 const { getList: rawGetList, save } = baseApi(serve)
+const { post } = request
 
 function normalizeConfigList(res) {
   const payload = res?.data?.data ?? res?.data ?? res?.list ?? []
@@ -22,3 +25,5 @@ export const getList = async (params) => {
 }
 
 export { save }
+
+export const testFeishuNotify = (data = {}) => post(`${externalNotifyServe}/feishu/test`, data)

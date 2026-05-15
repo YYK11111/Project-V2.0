@@ -113,4 +113,28 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
     }
     return data;
   }
+
+  async batchGetUserId(
+    query: { emails?: string[]; mobiles?: string[] },
+    config?: ExternalNotifyConfig,
+  ) {
+    const token = await this.getTenantAccessToken(config);
+    const response = await firstValueFrom(
+      await this.httpService.post(
+        `${this.getBaseUrl(config)}/open-apis/contact/v3/users/batch_get_id`,
+        {
+          emails: query.emails?.filter(Boolean) || [],
+          mobiles: query.mobiles?.filter(Boolean) || [],
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      ),
+    );
+    const data = response?.data || {};
+    if (data.code !== 0) {
+      throw new Error(data.msg || "获取飞书用户ID失败");
+    }
+    return data?.data?.user_list || data?.data?.users || [];
+  }
 }

@@ -74,4 +74,49 @@ describe("FeishuNotifyProvider", () => {
       }),
     );
   });
+
+  it("通过邮箱和手机号批量获取飞书用户ID", async () => {
+    const httpService = {
+      post: jest
+        .fn()
+        .mockResolvedValueOnce(
+          of({
+            data: {
+              code: 0,
+              tenant_access_token: "tenant-token",
+              expire: 7200,
+            },
+          }),
+        )
+        .mockResolvedValueOnce(
+          of({
+            data: {
+              code: 0,
+              data: {
+                user_list: [{ user_id: "ou_1", email: "u1@example.com" }],
+              },
+            },
+          }),
+        ),
+    };
+    const provider = new FeishuNotifyProvider(httpService as any);
+
+    await expect(
+      provider.batchGetUserId({
+        emails: ["u1@example.com"],
+        mobiles: ["13800138000"],
+      }),
+    ).resolves.toEqual([{ user_id: "ou_1", email: "u1@example.com" }]);
+    expect(httpService.post).toHaveBeenNthCalledWith(
+      2,
+      "https://open.feishu.test/open-apis/contact/v3/users/batch_get_id",
+      {
+        emails: ["u1@example.com"],
+        mobiles: ["13800138000"],
+      },
+      {
+        headers: { Authorization: "Bearer tenant-token" },
+      },
+    );
+  });
 });
