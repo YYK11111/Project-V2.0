@@ -2,11 +2,16 @@ import { Injectable } from "@nestjs/common";
 import { firstValueFrom } from "rxjs";
 import { HttpService } from "src/common/http/service";
 import { UserExternalAccount } from "src/modules/external-accounts/entity";
-import { ExternalNotifyProvider, NotifyMessage } from "../provider.interface";
+import {
+  ExternalNotifyConfig,
+  ExternalNotifyProvider,
+  NotifyMessage,
+} from "../provider.interface";
 
 type FeishuTenantTokenCache = {
   token: string;
   expiresAt: number;
+  cacheKey: string;
 };
 
 @Injectable()
@@ -16,29 +21,51 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
 
   constructor(private readonly httpService: HttpService) {}
 
-  isEnabled() {
+  isEnabled(config?: ExternalNotifyConfig) {
+    const feishuConfig = this.resolveFeishuConfig(config);
     return (
-      process.env.FEISHU_ENABLED === "true" &&
-      Boolean(process.env.FEISHU_APP_ID) &&
-      Boolean(process.env.FEISHU_APP_SECRET)
+      Boolean(config?.enabled ?? process.env.FEISHU_ENABLED === "true") &&
+      feishuConfig.enabled &&
+      Boolean(feishuConfig.appId) &&
+      Boolean(feishuConfig.appSecret)
     );
   }
 
-  private getBaseUrl() {
-    return process.env.FEISHU_BASE_URL || "https://open.feishu.cn";
+  private resolveFeishuConfig(config?: ExternalNotifyConfig) {
+    return config?.feishu || {
+      enabled: process.env.FEISHU_ENABLED === "true",
+      appId: process.env.FEISHU_APP_ID || "",
+      appSecret: process.env.FEISHU_APP_SECRET || "",
+      baseUrl: process.env.FEISHU_BASE_URL || "https://open.feishu.cn",
+    };
   }
 
-  async getTenantAccessToken() {
+  private getBaseUrl(config?: ExternalNotifyConfig) {
+    return this.resolveFeishuConfig(config).baseUrl || "https://open.feishu.cn";
+  }
+
+  private getCacheKey(config?: ExternalNotifyConfig) {
+    const feishuConfig = this.resolveFeishuConfig(config);
+    return [feishuConfig.appId, feishuConfig.baseUrl].join("|");
+  }
+
+  async getTenantAccessToken(config?: ExternalNotifyConfig) {
+    const feishuConfig = this.resolveFeishuConfig(config);
+    const cacheKey = this.getCacheKey(config);
     const now = Date.now();
-    if (this.tokenCache && this.tokenCache.expiresAt > now + 60_000) {
+    if (
+      this.tokenCache &&
+      this.tokenCache.cacheKey === cacheKey &&
+      this.tokenCache.expiresAt > now + 60_000
+    ) {
       return this.tokenCache.token;
     }
     const response = await firstValueFrom(
       await this.httpService.post(
-        `${this.getBaseUrl()}/open-apis/auth/v3/tenant_access_token/internal`,
+        `${this.getBaseUrl(config)}/open-apis/auth/v3/tenant_access_token/internal`,
         {
-          app_id: process.env.FEISHU_APP_ID,
-          app_secret: process.env.FEISHU_APP_SECRET,
+          app_id: feishuConfig.appId,
+          app_secret: feishuConfig.appSecret,
         },
       ),
     );
@@ -49,21 +76,26 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
     this.tokenCache = {
       token: data.tenant_access_token,
       expiresAt: now + Number(data.expire || 7200) * 1000,
+      cacheKey,
     };
     return this.tokenCache.token;
   }
 
-  async sendText(account: UserExternalAccount, message: NotifyMessage) {
+  async sendText(
+    account: UserExternalAccount,
+    message: NotifyMessage,
+    config?: ExternalNotifyConfig,
+  ) {
     if (!account.externalUserId) {
       throw new Error("飞书用户ID为空");
     }
-    const token = await this.getTenantAccessToken();
+    const token = await this.getTenantAccessToken(config);
     const text = [message.title, message.content, message.linkUrl || ""]
       .filter(Boolean)
       .join("\n");
     const response = await firstValueFrom(
       await this.httpService.post(
-        `${this.getBaseUrl()}/open-apis/im/v1/messages`,
+        `${this.getBaseUrl(config)}/open-apis/im/v1/messages`,
         {
           receive_id: account.externalUserId,
           msg_type: "text",

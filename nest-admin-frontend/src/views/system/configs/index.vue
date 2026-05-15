@@ -32,6 +32,7 @@ const form = ref<any>({
   browserIcon: '',
   projectReminderStrategy: getDefaultReminderStrategy(),
   projectFieldPermissionMatrix: getDefaultProjectFieldPermissionMatrix(),
+  externalNotifyConfig: getDefaultExternalNotifyConfig(),
 })
 const rules = {}
 const canConfigUpdate = computed(() => checkPermi(['system/configs/update']))
@@ -118,6 +119,24 @@ function getDefaultProjectFieldPermissionMatrix() {
   }
 }
 
+function getDefaultExternalNotifyConfig() {
+  return {
+    enabled: false,
+    feishu: {
+      enabled: false,
+      appId: '',
+      appSecret: '',
+      baseUrl: 'https://open.feishu.cn',
+    },
+    dingtalk: {
+      enabled: false,
+      appKey: '',
+      appSecret: '',
+      baseUrl: 'https://oapi.dingtalk.com',
+    },
+  }
+}
+
 function mergeReminderStrategy(strategy) {
   const defaults = getDefaultReminderStrategy()
   return {
@@ -178,6 +197,22 @@ function mergeProjectFieldPermissionMatrix(matrix) {
   }
 }
 
+function mergeExternalNotifyConfig(config) {
+  const defaults = getDefaultExternalNotifyConfig()
+  return {
+    ...defaults,
+    ...(config || {}),
+    feishu: {
+      ...defaults.feishu,
+      ...(config?.feishu || {}),
+    },
+    dingtalk: {
+      ...defaults.dingtalk,
+      ...(config?.dingtalk || {}),
+    },
+  }
+}
+
 function getListFun() {
   getList().then((res) => {
     const data = res?.list?.[0] || {}
@@ -185,6 +220,7 @@ function getListFun() {
       ...(data || {}),
       projectReminderStrategy: mergeReminderStrategy(data?.projectReminderStrategy),
       projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(data?.projectFieldPermissionMatrix),
+      externalNotifyConfig: mergeExternalNotifyConfig(data?.externalNotifyConfig),
     }
   })
 }
@@ -197,6 +233,7 @@ function submit() {
     ...form.value,
     projectReminderStrategy: mergeReminderStrategy(form.value?.projectReminderStrategy),
     projectFieldPermissionMatrix: mergeProjectFieldPermissionMatrix(form.value?.projectFieldPermissionMatrix),
+    externalNotifyConfig: mergeExternalNotifyConfig(form.value?.externalNotifyConfig),
   }).then(() => {
     $sdk.msgSuccess()
     appStore.sysConfig = null
@@ -320,6 +357,49 @@ function submit() {
                 <el-input-number v-model="form.projectReminderStrategy.trendThresholds.costVarianceIncreaseStep" :min="0" :step="1000" />
                 <span class="reminder-inline-tip">每周期最低增加金额</span>
               </el-form-item>
+            </div>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="外部通知" name="externalNotify">
+        <div class="reminder-page">
+          <el-card shadow="hover" class="reminder-card">
+            <template #header>总开关</template>
+            <div class="reminder-switch-item">
+              <div>
+                <div class="reminder-switch-item__title">启用外部通知</div>
+                <div class="reminder-switch-item__desc">关闭后，工作流待办不会同步发送到飞书或钉钉。</div>
+              </div>
+              <el-switch v-model="form.externalNotifyConfig.enabled" />
+            </div>
+          </el-card>
+
+          <el-card shadow="hover" class="reminder-card mt16">
+            <template #header>飞书配置</template>
+            <div class="reminder-grid">
+              <div class="reminder-switch-item">
+                <div>
+                  <div class="reminder-switch-item__title">启用飞书通知</div>
+                  <div class="reminder-switch-item__desc">启用后，工作流待办会发送到飞书用户。</div>
+                </div>
+                <el-switch v-model="form.externalNotifyConfig.feishu.enabled" />
+              </div>
+
+              <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" />
+              <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" />
+              <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" />
+            </div>
+          </el-card>
+
+          <el-card shadow="hover" class="reminder-card mt16">
+            <template #header>钉钉配置</template>
+            <div class="reminder-switch-item">
+              <div>
+                <div class="reminder-switch-item__title">预留钉钉接入</div>
+                <div class="reminder-switch-item__desc">后续接入钉钉时可直接复用这组配置字段。</div>
+              </div>
+              <el-switch v-model="form.externalNotifyConfig.dingtalk.enabled" disabled />
             </div>
           </el-card>
         </div>

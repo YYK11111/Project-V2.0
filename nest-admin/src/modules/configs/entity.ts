@@ -55,4 +55,12 @@ export class SystenConfig extends BaseEntity {
     comment: "项目字段组权限矩阵配置",
   })
   projectFieldPermissionMatrix: Record<string, any>;
+
+  @BaseColumn({
+    type: "json",
+    nullable: true,
+    name: "external_notify_config",
+    comment: "外部通知配置",
+  })
+  externalNotifyConfig: Record<string, any>;
 }

@@ -3,15 +3,32 @@ import { ExternalMessageSendStatus } from "./entity/external-message-log.entity"
 
 describe("ExternalNotifyService", () => {
   const createService = (options: any = {}) => {
+    const externalNotifyConfig = options.externalNotifyConfig || {
+      enabled: true,
+      feishu: {
+        enabled: options.feishuEnabled ?? true,
+        appId: "app_1",
+        appSecret: "secret_1",
+        baseUrl: "https://open.feishu.cn",
+      },
+      dingtalk: { enabled: false },
+    };
     const externalAccountsService = {
       getActiveAccount: jest.fn().mockResolvedValue(options.account || null),
+    };
+    const systemConfigsService = {
+      getExternalNotifyRuntimeConfig: jest
+        .fn()
+        .mockResolvedValue(externalNotifyConfig),
     };
     const logRepository = {
       save: jest.fn(async (data) => data),
     };
     const feishuProvider = {
       platform: "feishu",
-      isEnabled: jest.fn(() => options.feishuEnabled ?? true),
+      isEnabled: jest.fn(
+        (config) => config.enabled && config.feishu?.enabled,
+      ),
       sendText: jest.fn().mockResolvedValue({ code: 0 }),
     };
     const dingtalkProvider = {
@@ -21,6 +38,7 @@ describe("ExternalNotifyService", () => {
     };
     const service = new ExternalNotifyService(
       externalAccountsService as any,
+      systemConfigsService as any,
       logRepository as any,
       feishuProvider as any,
       dingtalkProvider as any,
@@ -28,6 +46,7 @@ describe("ExternalNotifyService", () => {
     return {
       service,
       externalAccountsService,
+      systemConfigsService,
       logRepository,
       feishuProvider,
       dingtalkProvider,
@@ -50,6 +69,10 @@ describe("ExternalNotifyService", () => {
     expect(feishuProvider.sendText).toHaveBeenCalledWith(
       expect.objectContaining({ externalUserId: "ou_1" }),
       expect.objectContaining({ title: "审批待办" }),
+      expect.objectContaining({
+        enabled: true,
+        feishu: expect.objectContaining({ enabled: true }),
+      }),
     );
     expect(logRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -99,5 +122,28 @@ describe("ExternalNotifyService", () => {
         errorMessage: "飞书限流",
       }),
     );
+  });
+
+  it("系统配置关闭外部通知时不查询账号也不发送", async () => {
+    const { service, externalAccountsService, feishuProvider, logRepository } =
+      createService({
+        externalNotifyConfig: {
+          enabled: false,
+          feishu: { enabled: true, appId: "app_1", appSecret: "secret_1" },
+        },
+      });
+
+    await service.sendToUser("1", {
+      receiverId: "1",
+      title: "审批待办",
+      content: "您有一个新的审批任务",
+    });
+
+    expect(feishuProvider.isEnabled).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+    expect(externalAccountsService.getActiveAccount).not.toHaveBeenCalled();
+    expect(feishuProvider.sendText).not.toHaveBeenCalled();
+    expect(logRepository.save).not.toHaveBeenCalled();
   });
 });

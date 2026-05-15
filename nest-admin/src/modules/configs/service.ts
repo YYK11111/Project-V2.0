@@ -133,6 +133,24 @@ export class SystenConfigsService extends BaseService<
     };
   }
 
+  getDefaultExternalNotifyConfig() {
+    return {
+      enabled: false,
+      feishu: {
+        enabled: false,
+        appId: "",
+        appSecret: "",
+        baseUrl: "https://open.feishu.cn",
+      },
+      dingtalk: {
+        enabled: false,
+        appKey: "",
+        appSecret: "",
+        baseUrl: "https://oapi.dingtalk.com",
+      },
+    };
+  }
+
   mergeProjectFieldPermissionMatrix(matrix?: Record<string, any>) {
     const defaults = this.getDefaultProjectFieldPermissionMatrix();
     return {
@@ -163,6 +181,49 @@ export class SystenConfigsService extends BaseService<
         },
       },
     };
+  }
+
+  mergeExternalNotifyConfig(config?: Record<string, any>) {
+    const defaults = this.getDefaultExternalNotifyConfig();
+    return {
+      ...defaults,
+      ...(config || {}),
+      feishu: {
+        ...defaults.feishu,
+        ...(config?.feishu || {}),
+      },
+      dingtalk: {
+        ...defaults.dingtalk,
+        ...(config?.dingtalk || {}),
+      },
+    };
+  }
+
+  mergeExternalNotifyRuntimeConfig(config?: Record<string, any>) {
+    const defaults = this.getDefaultExternalNotifyConfig();
+    if (!config) {
+      return {
+        ...defaults,
+        enabled:
+          process.env.FEISHU_ENABLED === "true" ||
+          process.env.DINGTALK_ENABLED === "true",
+        feishu: {
+          ...defaults.feishu,
+          enabled: process.env.FEISHU_ENABLED === "true",
+          appId: process.env.FEISHU_APP_ID || "",
+          appSecret: process.env.FEISHU_APP_SECRET || "",
+          baseUrl: process.env.FEISHU_BASE_URL || defaults.feishu.baseUrl,
+        },
+        dingtalk: {
+          ...defaults.dingtalk,
+          enabled: process.env.DINGTALK_ENABLED === "true",
+          appKey: process.env.DINGTALK_APP_KEY || "",
+          appSecret: process.env.DINGTALK_APP_SECRET || "",
+          baseUrl: process.env.DINGTALK_BASE_URL || defaults.dingtalk.baseUrl,
+        },
+      };
+    }
+    return this.mergeExternalNotifyConfig(config);
   }
 
   async getLatestConfig() {
@@ -258,5 +319,15 @@ export class SystenConfigsService extends BaseService<
     return this.mergeProjectFieldPermissionMatrix(
       config?.projectFieldPermissionMatrix,
     );
+  }
+
+  async getExternalNotifyConfig() {
+    const config = await this.getLatestConfig();
+    return this.mergeExternalNotifyConfig(config?.externalNotifyConfig);
+  }
+
+  async getExternalNotifyRuntimeConfig() {
+    const config = await this.getLatestConfig();
+    return this.mergeExternalNotifyRuntimeConfig(config?.externalNotifyConfig);
   }
 }

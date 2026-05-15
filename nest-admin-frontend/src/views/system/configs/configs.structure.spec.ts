@@ -42,4 +42,14 @@ describe('system configs structure', () => {
     expect(source).toContain('appStore.sysConfig = null')
     expect(source).toContain('appStore.getConfig()')
   })
+
+  it('系统配置支持维护外部通知配置', () => {
+    const source = readSource()
+
+    expect(source).toContain('label="外部通知"')
+    expect(source).toContain("externalNotifyConfig: getDefaultExternalNotifyConfig()")
+    expect(source).toContain('v-model="form.externalNotifyConfig.feishu.enabled"')
+    expect(source).toContain('v-model="form.externalNotifyConfig.feishu.appId"')
+    expect(source).toContain('v-model="form.externalNotifyConfig.feishu.appSecret"')
+  })
 })

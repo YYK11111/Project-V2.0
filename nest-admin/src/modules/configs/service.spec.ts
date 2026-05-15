@@ -288,6 +288,40 @@ describe("SystenConfigsService", () => {
       "branding/legacy.ico",
     );
   });
+
+  it("外部通知配置应合并默认飞书与钉钉结构", async () => {
+    const repository = createRepository();
+    const service = new SystenConfigsService(
+      repository as never,
+      createSysFileService() as never,
+    );
+    repository.findOne.mockResolvedValueOnce({
+      id: "config-1",
+      externalNotifyConfig: {
+        enabled: true,
+        feishu: {
+          enabled: true,
+          appId: "app_1",
+        },
+      },
+    });
+
+    await expect(service.getExternalNotifyConfig()).resolves.toEqual(
+      expect.objectContaining({
+        enabled: true,
+        feishu: expect.objectContaining({
+          enabled: true,
+          appId: "app_1",
+          appSecret: "",
+          baseUrl: "https://open.feishu.cn",
+        }),
+        dingtalk: expect.objectContaining({
+          enabled: false,
+          baseUrl: "https://oapi.dingtalk.com",
+        }),
+      }),
+    );
+  });
 });
 
 describe("SystenConfig entity", () => {

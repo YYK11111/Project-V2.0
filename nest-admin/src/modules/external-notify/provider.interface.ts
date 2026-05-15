@@ -1,5 +1,25 @@
 import { UserExternalAccount } from "../external-accounts/entity";
 
+export interface FeishuNotifyConfig {
+  enabled?: boolean;
+  appId?: string;
+  appSecret?: string;
+  baseUrl?: string;
+}
+
+export interface DingTalkNotifyConfig {
+  enabled?: boolean;
+  appKey?: string;
+  appSecret?: string;
+  baseUrl?: string;
+}
+
+export interface ExternalNotifyConfig {
+  enabled?: boolean;
+  feishu?: FeishuNotifyConfig;
+  dingtalk?: DingTalkNotifyConfig;
+}
+
 export interface NotifyMessage {
   messageId?: string;
   receiverId: string;
@@ -15,6 +35,10 @@ export interface NotifyMessage {
 
 export interface ExternalNotifyProvider {
   readonly platform: string;
-  isEnabled(): boolean;
-  sendText(account: UserExternalAccount, message: NotifyMessage): Promise<any>;
+  isEnabled(config: ExternalNotifyConfig): boolean;
+  sendText(
+    account: UserExternalAccount,
+    message: NotifyMessage,
+    config: ExternalNotifyConfig,
+  ): Promise<any>;
 }

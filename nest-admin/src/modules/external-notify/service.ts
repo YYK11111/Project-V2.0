@@ -6,11 +6,16 @@ import {
   UserExternalAccount,
 } from "../external-accounts/entity";
 import { UserExternalAccountsService } from "../external-accounts/service";
+import { SystenConfigsService } from "../configs/service";
 import {
   ExternalMessageLog,
   ExternalMessageSendStatus,
 } from "./entity/external-message-log.entity";
-import { ExternalNotifyProvider, NotifyMessage } from "./provider.interface";
+import {
+  ExternalNotifyConfig,
+  ExternalNotifyProvider,
+  NotifyMessage,
+} from "./provider.interface";
 import { FeishuNotifyProvider } from "./providers/feishu.provider";
 import { DingTalkNotifyProvider } from "./providers/dingtalk.provider";
 
@@ -20,6 +25,7 @@ export class ExternalNotifyService {
 
   constructor(
     private readonly externalAccountsService: UserExternalAccountsService,
+    private readonly systemConfigsService: SystenConfigsService,
     @InjectRepository(ExternalMessageLog)
     private readonly logRepository: Repository<ExternalMessageLog>,
     feishuProvider: FeishuNotifyProvider,
@@ -30,10 +36,13 @@ export class ExternalNotifyService {
 
   async sendToUser(userId: string, message: NotifyMessage) {
     if (!userId) return;
+    const config = await this.systemConfigsService.getExternalNotifyRuntimeConfig();
     await Promise.all(
       this.providers
-        .filter((provider) => provider.isEnabled())
-        .map((provider) => this.sendByProvider(provider, userId, message)),
+        .filter((provider) => provider.isEnabled(config as ExternalNotifyConfig))
+        .map((provider) =>
+          this.sendByProvider(provider, userId, message, config),
+        ),
     );
   }
 
@@ -41,6 +50,7 @@ export class ExternalNotifyService {
     provider: ExternalNotifyProvider,
     userId: string,
     message: NotifyMessage,
+    config: ExternalNotifyConfig,
   ) {
     const account = await this.externalAccountsService.getActiveAccount(
       userId,
@@ -54,7 +64,7 @@ export class ExternalNotifyService {
       return;
     }
     try {
-      const response = await provider.sendText(account, message);
+      const response = await provider.sendText(account, message, config);
       await this.saveLog(provider.platform, account, message, {
         sendStatus: ExternalMessageSendStatus.succeeded,
         responsePayload: response,
