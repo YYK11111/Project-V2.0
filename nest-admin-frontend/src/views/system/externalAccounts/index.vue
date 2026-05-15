@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue'
 import { checkPermi } from '@/utils/permission'
 import { getList, save, syncFeishuAccount, syncFeishuAccounts } from './api'
+import TableOperation from '@/components/TableOperation.vue'
 
 const rctRef = ref<any>(null)
 const dialogRef = ref<any>(null)
@@ -22,6 +23,13 @@ const bindStatusMap = {
   2: { label: '冲突', type: 'warning' },
   3: { label: '失效', type: 'danger' },
 }
+
+const getButtons = (row: any) => [
+  canUpdate.value ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => openEdit(row) } : null,
+  canUpdate.value && row.platform === 'feishu'
+    ? { key: 'sync', label: '同步飞书', onClick: () => syncOne(row) }
+    : null,
+].filter(Boolean)
 
 function getPlatformLabel(platform: string) {
   return platformOptions.find((item) => item.value === platform)?.label || platform || '-'
@@ -62,8 +70,8 @@ async function syncAll() {
 </script>
 
 <template>
-  <div class="external-account-page">
-    <RequestChartTable v-if="canList" ref="rctRef" class="external-account-panel" :request="getList" :is-selection="false">
+  <div class="external-account-page business-list-page">
+    <RequestChartTable v-if="canList" ref="rctRef" class="external-account-panel business-list-panel" :request="getList" :is-selection="false">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">
@@ -99,17 +107,15 @@ async function syncAll() {
         <el-table-column prop="mobile" label="手机号" width="130" />
         <el-table-column prop="bindStatus" label="绑定状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="bindStatusMap[row.bindStatus]?.type || 'info'" size="small">{{ bindStatusMap[row.bindStatus]?.label || '-' }}</el-tag>
+            <el-tag :type="bindStatusMap[row.bindStatus]?.type || 'info'" size="small" effect="plain">{{ bindStatusMap[row.bindStatus]?.label || '-' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="bindSource" label="来源" width="100" />
         <el-table-column prop="lastSyncTime" label="同步时间" width="170" />
-        <el-table-column label="操作" width="170" fixed="right">
-          <template #default="{ row }">
-            <el-button v-if="canUpdate" link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="canUpdate && row.platform === 'feishu'" link type="primary" @click="syncOne(row)">同步飞书</el-button>
-          </template>
-        </el-table-column>
+      </template>
+
+      <template #tableOperation="{ row }">
+        <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
 
@@ -134,10 +140,6 @@ async function syncAll() {
 </template>
 
 <style scoped lang="scss">
-.external-account-panel {
-  padding-top: 20px;
-}
-
 .external-account-operation {
   display: flex;
   justify-content: flex-end;

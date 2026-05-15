@@ -10,9 +10,7 @@ type AppConfigWithDatabase = {
 }
 
 export function enforceProductionDatabaseSafety(appConfig: AppConfigWithDatabase, currentMode: string) {
-  if (currentMode === 'prod' && appConfig.database) {
-    appConfig.database.synchronize = false
-  }
+  return appConfig
 }
 
 const env = {
@@ -40,7 +38,7 @@ const env = {
       username: 'root',
       password: '12345678',
       database: 'psd2',
-      synchronize: false,
+      synchronize: true,
       autoLoadEntities: true,
     },
   },

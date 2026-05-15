@@ -11,6 +11,9 @@ describe('external accounts page structure', () => {
     const source = readSource()
 
     expect(source).toContain("checkPermi(['system/externalAccounts/list'])")
+    expect(source).toContain('business-list-page')
+    expect(source).toContain('business-list-panel')
+    expect(source).toContain('TableOperation')
     expect(source).toContain('批量同步飞书')
     expect(source).toContain('同步飞书')
     expect(source).toContain('外部用户ID')

@@ -1,6 +1,6 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Like, Repository } from "typeorm";
+import { In, LessThan, Like, Repository } from "typeorm";
 import { BaseService } from "src/common/BaseService";
 import { Message, MessageType } from "./entity";
 import { MessageDto } from "./dto";
@@ -10,6 +10,7 @@ import { WorkflowInstance } from "src/modulesBusi/workflow/entity/workflow-insta
 import { QueryListDto } from "src/common/dto";
 import { SystenConfigsService } from "../configs/service";
 import { ExternalNotifyService } from "../external-notify/service";
+import { WorkflowTodoCardStatusOptions } from "../external-notify/provider.interface";
 
 @Injectable()
 export class MessagesService extends BaseService<Message, MessageDto> {
@@ -27,7 +28,9 @@ export class MessagesService extends BaseService<Message, MessageDto> {
   }
 
   async sendMessage(data: Partial<Message>) {
+    const notificationId = data.notificationId || this.generateNotificationId();
     const message = await this.add({
+      notificationId,
       title: data.title,
       content: data.content,
       messageType: data.messageType,
@@ -43,8 +46,20 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       isRead: BoolNum.No,
       isActive: BoolNum.Yes,
     } as any);
+    this.saveSystemMessageLog(message);
     this.sendExternalNotification(message);
     return message;
+  }
+
+  private generateNotificationId() {
+    return `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private saveSystemMessageLog(message: Message) {
+    if (!this.externalNotifyService) return;
+    void this.externalNotifyService
+      .saveSystemMessageLog(message)
+      .catch(() => undefined);
   }
 
   private sendExternalNotification(message: Message) {
@@ -58,12 +73,14 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     void this.externalNotifyService
       .sendToUser(message.receiverId, {
         messageId: message.id,
+        notificationId: message.notificationId,
         receiverId: message.receiverId,
         templateKey: "workflowTodo",
         title: message.title,
         content: message.content,
         linkUrl: message.linkUrl,
         linkParams: message.linkParams,
+        extraData: message.extraData || {},
         sourceType: message.sourceType,
         sourceId: message.sourceId,
         messageType: message.messageType,
@@ -212,11 +229,24 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     );
   }
 
-  async deactivateWorkflowTaskMessages(taskIds: string[] | string) {
+  async deactivateWorkflowTaskMessages(
+    taskIds: string[] | string,
+    statusOptions?: WorkflowTodoCardStatusOptions,
+  ) {
     const ids = (Array.isArray(taskIds) ? taskIds : [taskIds])
       .filter(Boolean)
       .map((id) => String(id));
     if (!ids.length) return;
+    const activeMessages = this.externalNotifyService
+      ? await this.repository.find({
+          where: {
+            sourceType: "workflow_task",
+            sourceId: In(ids) as any,
+            isActive: BoolNum.Yes,
+            isDelete: null as any,
+          } as any,
+        })
+      : [];
     await this.repository.update(
       {
         sourceType: "workflow_task",
@@ -229,6 +259,48 @@ export class MessagesService extends BaseService<Message, MessageDto> {
         readTime: new Date().toISOString(),
       } as any,
     );
+    if (this.externalNotifyService && activeMessages.length) {
+      void this.externalNotifyService
+        .updateWorkflowTodoCardStatus({
+          messages: activeMessages.map((message) => ({
+            ...(message as any),
+            messageId: message.id,
+          })),
+          ...(statusOptions || { status: "cancelled", statusText: "已失效" }),
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  async cleanupExpiredMessages(
+    options: { retentionDays?: number; limit?: number } = {},
+  ) {
+    const retentionDays = Math.max(Number(options.retentionDays || 180), 1);
+    const expiredBefore = new Date(
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const result = await this.repository.update(
+      [
+        {
+          messageType: MessageType.cc,
+          isRead: BoolNum.Yes,
+          isDelete: null,
+          createTime: LessThan(expiredBefore),
+        } as any,
+        {
+          messageType: MessageType.todo,
+          isActive: BoolNum.No,
+          isDelete: null,
+          createTime: LessThan(expiredBefore),
+        } as any,
+      ],
+      { isDelete: BoolNum.Yes as any },
+    );
+    return {
+      processedCount: Number(result?.affected || 0),
+      successCount: Number(result?.affected || 0),
+      failedCount: 0,
+    };
   }
 
   async deactivateWorkflowInstanceCcMessages(

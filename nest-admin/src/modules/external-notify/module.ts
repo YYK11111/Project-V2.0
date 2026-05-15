@@ -18,7 +18,11 @@ import { DingTalkNotifyProvider } from "./providers/dingtalk.provider";
     UserExternalAccountsModule,
   ],
   controllers: [ExternalNotifyController],
-  providers: [ExternalNotifyService, FeishuNotifyProvider, DingTalkNotifyProvider],
+  providers: [
+    ExternalNotifyService,
+    FeishuNotifyProvider,
+    DingTalkNotifyProvider,
+  ],
   exports: [ExternalNotifyService],
 })
 export class ExternalNotifyModule {}

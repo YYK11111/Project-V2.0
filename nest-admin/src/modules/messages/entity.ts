@@ -26,6 +26,9 @@ export class Message extends BaseEntity {
   @BaseColumn({ length: 100, comment: "消息标题" })
   title: string;
 
+  @BaseColumn({ length: 50, nullable: true, name: "notification_id" })
+  notificationId: string;
+
   @BaseColumn({ type: "text", comment: "消息内容" })
   content: string;
 

@@ -17,6 +17,10 @@ export class HttpService {
     return this.httpService.put(url, data, options);
   }
 
+  async patch(url: string, data?: any, options?: any) {
+    return this.httpService.patch(url, data, options);
+  }
+
   async delete(url: string, params?, options?: any) {
     return this.httpService.delete(url, { params, ...options });
   }

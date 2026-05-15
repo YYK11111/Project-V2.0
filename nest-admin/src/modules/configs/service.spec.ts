@@ -315,6 +315,7 @@ describe("SystenConfigsService", () => {
           appSecret: "",
           baseUrl: "https://open.feishu.cn",
         }),
+        siteUrl: "",
         dingtalk: expect.objectContaining({
           enabled: false,
           baseUrl: "https://oapi.dingtalk.com",

@@ -1396,6 +1396,11 @@ export class WorkflowService {
     );
     await this.messagesService.deactivateWorkflowTaskMessages(
       peerTasks.map((item) => item.id),
+      {
+        status: "cancelled",
+        statusText:
+          comment === "并行会签已由其他审批人处理" ? "已由他人处理" : "已失效",
+      },
     );
   }
 
@@ -1509,7 +1514,10 @@ export class WorkflowService {
     task.comment = dto.comment;
     task.completeTime = new Date().toISOString();
     await this.taskRepo.save(task);
-    await this.messagesService.deactivateWorkflowTaskMessages(task.id);
+    await this.messagesService.deactivateWorkflowTaskMessages(task.id, {
+      status: dto.action === "approve" ? "approved" : "rejected",
+      statusText: dto.action === "approve" ? "已同意" : "已驳回",
+    });
 
     await this.recordHistory(
       instance,
@@ -1582,6 +1590,7 @@ export class WorkflowService {
           );
           await this.messagesService.deactivateWorkflowTaskMessages(
             pendingTasks.map((item) => item.id),
+            { status: "cancelled", statusText: "已失效" },
           );
           if (targetNode.type === NodeType.START) {
             instance.status = InstanceStatus.RUNNING;
@@ -1667,6 +1676,7 @@ export class WorkflowService {
     );
     await this.messagesService.deactivateWorkflowTaskMessages(
       activeTaskIds.map((item) => item.id),
+      { status: "cancelled", statusText: "已失效" },
     );
 
     instance.status = InstanceStatus.CANCELLED;
@@ -1813,7 +1823,10 @@ export class WorkflowService {
 
     task.assigneeId = dto.targetUserId;
     const savedTask = await this.taskRepo.save(task);
-    await this.messagesService.deactivateWorkflowTaskMessages(task.id);
+    await this.messagesService.deactivateWorkflowTaskMessages(task.id, {
+      status: "cancelled",
+      statusText: "已转交",
+    });
     const instance = await this.instanceRepo.findOne({
       where: { id: task.instanceId },
     });
@@ -2494,6 +2507,7 @@ export class WorkflowService {
     );
     await this.messagesService.deactivateWorkflowTaskMessages(
       pendingTasks.map((item) => item.id),
+      { status: "cancelled", statusText: "已撤回" },
     );
 
     // 记录撤回历史
@@ -2549,6 +2563,7 @@ export class WorkflowService {
     );
     await this.messagesService.deactivateWorkflowTaskMessages(
       pendingTasks.map((item) => item.id),
+      { status: "cancelled", statusText: "已终止" },
     );
 
     // 记录终止历史

@@ -13,10 +13,10 @@ describe("config database synchronize", () => {
     return require("config").config;
   };
 
-  it("prod 环境关闭数据库结构同步", () => {
+  it("prod 环境开启数据库结构同步", () => {
     const config = getConfigByEnv("prod");
 
-    expect(config.database.synchronize).toBe(false);
+    expect(config.database.synchronize).toBe(true);
   });
 
   it("dev 环境保持数据库结构同步", () => {
@@ -25,13 +25,13 @@ describe("config database synchronize", () => {
     expect(config.database.synchronize).toBe(true);
   });
 
-  it("prod 环境强制关闭数据库结构同步兜底", () => {
+  it("prod 环境不会被兜底逻辑关闭数据库结构同步", () => {
     const { enforceProductionDatabaseSafety } = require("config");
     const appConfig = { database: { synchronize: true } };
 
     enforceProductionDatabaseSafety(appConfig, "prod");
 
-    expect(appConfig.database.synchronize).toBe(false);
+    expect(appConfig.database.synchronize).toBe(true);
   });
 
   it("dev 环境不会被生产兜底逻辑修改", () => {

@@ -15,9 +15,12 @@ describe("scheduled job registry", () => {
         "projects.dailyCockpitSnapshots",
         "sysFile.orphanCleanup",
         "articleBorrows.syncExpired",
+        "notifications.retryPendingDelivery",
+        "notifications.cleanupMessages",
+        "notifications.cleanupDeliveryLogs",
       ]),
     );
-    expect(scheduledJobRegistry).toHaveLength(6);
+    expect(scheduledJobRegistry).toHaveLength(9);
     expect(scheduledJobRegistry).toContainEqual(
       expect.objectContaining({
         jobKey: "tasks.dueSoonReminder",

@@ -4,9 +4,11 @@ import { computed, ref } from 'vue'
 import { getList, save, testFeishuNotify } from './api'
 import { checkPermi } from '@/utils/permission'
 import { useAppStore } from '@/stores/app'
+import UserSelect from '@/components/UserSelect.vue'
 
 const activeTab = ref('basic')
 const appStore = useAppStore()
+const testUserId = ref('')
 const fieldGroups = [
   { code: 'projectBasic', label: '基础组', desc: '项目名称、类型、优先级、负责人、发起人、描述等基础字段' },
   { code: 'projectMember', label: '成员组', desc: '项目成员集合权限，控制成员表格的显示与编辑' },
@@ -122,6 +124,7 @@ function getDefaultProjectFieldPermissionMatrix() {
 function getDefaultExternalNotifyConfig() {
   return {
     enabled: false,
+    siteUrl: '',
     feishu: {
       enabled: false,
       appId: '',
@@ -244,7 +247,9 @@ function submit() {
 
 function testFeishu() {
   if (!canConfigUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  testFeishuNotify().then(() => {
+  testFeishuNotify({
+    userId: testUserId.value || undefined,
+  }).then(() => {
     $sdk.msgSuccess('测试消息已发送')
   })
 }
@@ -380,6 +385,12 @@ function testFeishu() {
               </div>
               <el-switch v-model="form.externalNotifyConfig.enabled" />
             </div>
+            <BaInput
+              v-model="form.externalNotifyConfig.siteUrl"
+              class="mt16"
+              label="系统访问地址"
+              prop="externalNotifyConfig.siteUrl"
+              placeholder="例如：https://admin.example.com" />
           </el-card>
 
           <el-card shadow="hover" class="reminder-card mt16">
@@ -396,7 +407,11 @@ function testFeishu() {
               <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" />
               <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" />
               <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" />
-              <div class="external-notify-actions">
+              <div class="external-notify-test-row">
+                <div class="external-notify-test-row__field">
+                  <div class="external-notify-test-row__label">测试用户</div>
+                  <UserSelect v-model="testUserId" placeholder="默认当前登录用户，可选其他用户" clearable />
+                </div>
                 <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
               </div>
             </div>
@@ -566,9 +581,23 @@ function testFeishu() {
   margin-top: 16px;
 }
 
-.external-notify-actions {
+.external-notify-test-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.external-notify-test-row__field {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.external-notify-test-row__label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
 }
 
 .system-config-page__footer {

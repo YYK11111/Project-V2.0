@@ -6,6 +6,7 @@ import {
   ExternalNotifyConfig,
   ExternalNotifyProvider,
   NotifyMessage,
+  WorkflowTodoCardStatusOptions,
 } from "../provider.interface";
 
 type FeishuTenantTokenCache = {
@@ -32,12 +33,14 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
   }
 
   private resolveFeishuConfig(config?: ExternalNotifyConfig) {
-    return config?.feishu || {
-      enabled: process.env.FEISHU_ENABLED === "true",
-      appId: process.env.FEISHU_APP_ID || "",
-      appSecret: process.env.FEISHU_APP_SECRET || "",
-      baseUrl: process.env.FEISHU_BASE_URL || "https://open.feishu.cn",
-    };
+    return (
+      config?.feishu || {
+        enabled: process.env.FEISHU_ENABLED === "true",
+        appId: process.env.FEISHU_APP_ID || "",
+        appSecret: process.env.FEISHU_APP_SECRET || "",
+        baseUrl: process.env.FEISHU_BASE_URL || "https://open.feishu.cn",
+      }
+    );
   }
 
   private getBaseUrl(config?: ExternalNotifyConfig) {
@@ -47,6 +50,24 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
   private getCacheKey(config?: ExternalNotifyConfig) {
     const feishuConfig = this.resolveFeishuConfig(config);
     return [feishuConfig.appId, feishuConfig.baseUrl].join("|");
+  }
+
+  private formatFeishuError(error: any, fallback: string) {
+    const data = error?.response?.data || {};
+    const message =
+      data.msg ||
+      data.message ||
+      data.error?.message ||
+      error?.message ||
+      fallback;
+    const details = [
+      data.code !== undefined ? `code: ${data.code}` : "",
+      error?.response?.status ? `status: ${error.response.status}` : "",
+    ].filter(Boolean);
+    if (!details.length) {
+      return `${fallback}：${message}`;
+    }
+    return `${fallback}：${message}（${details.join("，")}）`;
   }
 
   async getTenantAccessToken(config?: ExternalNotifyConfig) {
@@ -60,18 +81,30 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
     ) {
       return this.tokenCache.token;
     }
-    const response = await firstValueFrom(
-      await this.httpService.post(
-        `${this.getBaseUrl(config)}/open-apis/auth/v3/tenant_access_token/internal`,
-        {
-          app_id: feishuConfig.appId,
-          app_secret: feishuConfig.appSecret,
-        },
-      ),
-    );
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.post(
+          `${this.getBaseUrl(config)}/open-apis/auth/v3/tenant_access_token/internal`,
+          {
+            app_id: feishuConfig.appId,
+            app_secret: feishuConfig.appSecret,
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(
+        this.formatFeishuError(error, "获取飞书 tenant_access_token 失败"),
+      );
+    }
     const data = response?.data || {};
     if (data.code !== 0 || !data.tenant_access_token) {
-      throw new Error(data.msg || "获取飞书 tenant_access_token 失败");
+      throw new Error(
+        this.formatFeishuError(
+          { response: { data } },
+          "获取飞书 tenant_access_token 失败",
+        ),
+      );
     }
     this.tokenCache = {
       token: data.tenant_access_token,
@@ -90,26 +123,170 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
       throw new Error("飞书用户ID为空");
     }
     const token = await this.getTenantAccessToken(config);
+    const payload = this.buildMessagePayload(account.externalUserId, message);
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.post(
+          `${this.getBaseUrl(config)}/open-apis/im/v1/messages`,
+          payload,
+          {
+            params: { receive_id_type: "user_id" },
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(this.formatFeishuError(error, "发送飞书消息失败"));
+    }
+    const data = response?.data || {};
+    if (data.code !== 0) {
+      throw new Error(
+        this.formatFeishuError({ response: { data } }, "发送飞书消息失败"),
+      );
+    }
+    return data;
+  }
+
+  private buildMessagePayload(receiveId: string, message: NotifyMessage) {
+    if (message.templateKey === "workflowTodo" && message.linkUrl) {
+      return {
+        receive_id: receiveId,
+        msg_type: "interactive",
+        content: JSON.stringify(this.buildWorkflowTodoCard(message)),
+      };
+    }
+
     const text = [message.title, message.content, message.linkUrl || ""]
       .filter(Boolean)
       .join("\n");
-    const response = await firstValueFrom(
-      await this.httpService.post(
-        `${this.getBaseUrl(config)}/open-apis/im/v1/messages`,
-        {
-          receive_id: account.externalUserId,
-          msg_type: "text",
-          content: JSON.stringify({ text }),
+    return {
+      receive_id: receiveId,
+      msg_type: "text",
+      content: JSON.stringify({ text }),
+    };
+  }
+
+  private buildWorkflowTodoCard(
+    message: NotifyMessage,
+    status?: WorkflowTodoCardStatusOptions,
+  ) {
+    const extraData = message.extraData || {};
+    const fields = [
+      ["业务对象", extraData.businessLabel],
+      ["流程节点", extraData.nodeName],
+      ["发起人", extraData.starterName],
+      ["任务说明", message.content],
+    ].filter(([, value]) => Boolean(value));
+    const statusMeta = this.resolveWorkflowTodoStatus(status);
+    const hasStatus = Boolean(statusMeta);
+
+    return {
+      config: { wide_screen_mode: true, update_multi: true },
+      header: {
+        template: statusMeta?.template || "blue",
+        title: {
+          tag: "plain_text",
+          content: message.title || "审批待办",
         },
+      },
+      elements: [
+        ...fields.map(([label, value]) => ({
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `**${label}：**${value}`,
+          },
+        })),
+        ...(statusMeta
+          ? [
+              {
+                tag: "div",
+                text: {
+                  tag: "lark_md",
+                  content: `**审批状态：**${statusMeta.text}`,
+                },
+              },
+            ]
+          : []),
         {
-          params: { receive_id_type: "user_id" },
-          headers: { Authorization: `Bearer ${token}` },
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: {
+                tag: "plain_text",
+                content: hasStatus ? "查看详情" : "去审批",
+              },
+              type: hasStatus ? "default" : "primary",
+              url: message.linkUrl,
+            },
+          ],
         },
-      ),
+      ],
+    };
+  }
+
+  private resolveWorkflowTodoStatus(status?: WorkflowTodoCardStatusOptions) {
+    if (!status?.status) return null;
+    const textMap = {
+      approved: status.statusText || "已同意",
+      rejected: status.statusText || "已驳回",
+      cancelled: status.statusText || "已失效",
+    };
+    const templateMap = {
+      approved: "green",
+      rejected: "red",
+      cancelled: "grey",
+    };
+    return {
+      text: textMap[status.status],
+      template: templateMap[status.status],
+    };
+  }
+
+  async updateWorkflowTodoCard(
+    feishuMessageId: string,
+    message: NotifyMessage,
+    status: WorkflowTodoCardStatusOptions,
+    config?: ExternalNotifyConfig,
+  ) {
+    return this.updateMessageCard(
+      feishuMessageId,
+      this.buildWorkflowTodoCard(message, status),
+      config,
     );
+  }
+
+  async updateMessageCard(
+    feishuMessageId: string,
+    card: Record<string, any>,
+    config?: ExternalNotifyConfig,
+  ) {
+    const token = await this.getTenantAccessToken(config);
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.patch(
+          `${this.getBaseUrl(config)}/open-apis/im/v1/messages/${encodeURIComponent(
+            feishuMessageId,
+          )}`,
+          {
+            content: JSON.stringify(card),
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(this.formatFeishuError(error, "更新飞书消息失败"));
+    }
     const data = response?.data || {};
     if (data.code !== 0) {
-      throw new Error(data.msg || "发送飞书消息失败");
+      throw new Error(
+        this.formatFeishuError({ response: { data } }, "更新飞书消息失败"),
+      );
     }
     return data;
   }
@@ -119,21 +296,29 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
     config?: ExternalNotifyConfig,
   ) {
     const token = await this.getTenantAccessToken(config);
-    const response = await firstValueFrom(
-      await this.httpService.post(
-        `${this.getBaseUrl(config)}/open-apis/contact/v3/users/batch_get_id`,
-        {
-          emails: query.emails?.filter(Boolean) || [],
-          mobiles: query.mobiles?.filter(Boolean) || [],
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      ),
-    );
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.post(
+          `${this.getBaseUrl(config)}/open-apis/contact/v3/users/batch_get_id`,
+          {
+            emails: query.emails?.filter(Boolean) || [],
+            mobiles: query.mobiles?.filter(Boolean) || [],
+          },
+          {
+            params: { user_id_type: "user_id" },
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(this.formatFeishuError(error, "获取飞书用户ID失败"));
+    }
     const data = response?.data || {};
     if (data.code !== 0) {
-      throw new Error(data.msg || "获取飞书用户ID失败");
+      throw new Error(
+        this.formatFeishuError({ response: { data } }, "获取飞书用户ID失败"),
+      );
     }
     return data?.data?.user_list || data?.data?.users || [];
   }

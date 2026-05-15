@@ -5,6 +5,7 @@ export enum ExternalMessageSendStatus {
   failed = "0",
   succeeded = "1",
   skipped = "2",
+  pending = "3",
 }
 
 @MyEntity("sys_external_message_log")
@@ -19,8 +20,17 @@ export class ExternalMessageLog extends BaseEntity {
   @BaseColumn({ length: 30, comment: "外部平台" })
   platform: string;
 
+  @BaseColumn({ length: 50, nullable: true, name: "notification_id" })
+  notificationId: string;
+
+  @BaseColumn({ length: 50, nullable: true, name: "operation_type" })
+  operationType: string;
+
   @BaseColumn({ length: 50, nullable: true, name: "message_id" })
   messageId: string;
+
+  @BaseColumn({ length: 100, nullable: true, name: "external_message_id" })
+  externalMessageId: string;
 
   @BaseColumn({ length: 50, nullable: true, name: "receiver_id" })
   receiverId: string;
@@ -39,9 +49,31 @@ export class ExternalMessageLog extends BaseEntity {
     length: 1,
     default: ExternalMessageSendStatus.failed,
     name: "send_status",
-    comment: "0失败，1成功，2跳过",
+    comment: "0失败，1成功，2跳过，3待处理",
   })
   sendStatus: ExternalMessageSendStatus;
+
+  @BaseColumn({
+    type: "int",
+    default: 0,
+    name: "retry_count",
+    comment: "重试次数",
+  })
+  retryCount: number;
+
+  @BaseColumn({
+    type: "datetime",
+    nullable: true,
+    name: "next_retry_time",
+  })
+  nextRetryTime: string;
+
+  @BaseColumn({
+    type: "datetime",
+    nullable: true,
+    name: "last_retry_time",
+  })
+  lastRetryTime: string;
 
   @BaseColumn({
     type: "text",

@@ -4,6 +4,7 @@ import { TasksService } from "src/modulesBusi/tasks/service";
 import { ProjectsService } from "src/modulesBusi/projects/service";
 import { SysFileService } from "src/modules/sys/file/service";
 import { ArticleBorrowsService } from "src/modulesBusi/articleBorrows/service";
+import { NotificationScheduledJobsService } from "./notification-jobs.service";
 
 @Controller("system/scheduled-jobs")
 export class SystemScheduledJobsController {
@@ -13,6 +14,7 @@ export class SystemScheduledJobsController {
     private readonly projectsService: ProjectsService,
     private readonly sysFileService: SysFileService,
     private readonly articleBorrowsService: ArticleBorrowsService,
+    private readonly notificationScheduledJobsService: NotificationScheduledJobsService,
   ) {}
 
   @Get("list")
@@ -95,6 +97,30 @@ export class SystemScheduledJobsController {
       "articleBorrows.syncExpired": async () => {
         await this.articleBorrowsService.syncExpiredBorrows();
         return { summary: "手工执行借阅过期同步", failedCount: 0 };
+      },
+      "notifications.retryPendingDelivery": async () => {
+        const result =
+          await this.notificationScheduledJobsService.runRetryPendingDelivery();
+        return {
+          ...result,
+          summary: `补偿 ${Number(result?.processedCount || 0)} 条通知投递`,
+        };
+      },
+      "notifications.cleanupMessages": async () => {
+        const result =
+          await this.notificationScheduledJobsService.runCleanupMessages();
+        return {
+          ...result,
+          summary: `清理 ${Number(result?.processedCount || 0)} 条系统消息`,
+        };
+      },
+      "notifications.cleanupDeliveryLogs": async () => {
+        const result =
+          await this.notificationScheduledJobsService.runCleanupDeliveryLogs();
+        return {
+          ...result,
+          summary: `清理 ${Number(result?.processedCount || 0)} 条通知投递日志`,
+        };
       },
     };
 

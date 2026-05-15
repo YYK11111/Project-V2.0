@@ -16,11 +16,20 @@ export interface DingTalkNotifyConfig {
 
 export interface ExternalNotifyConfig {
   enabled?: boolean;
+  siteUrl?: string;
   feishu?: FeishuNotifyConfig;
   dingtalk?: DingTalkNotifyConfig;
 }
 
+export type WorkflowTodoCardStatus = "approved" | "rejected" | "cancelled";
+
+export interface WorkflowTodoCardStatusOptions {
+  status: WorkflowTodoCardStatus;
+  statusText?: string;
+}
+
 export interface NotifyMessage {
+  notificationId?: string;
   messageId?: string;
   receiverId: string;
   templateKey?: string;
@@ -28,6 +37,7 @@ export interface NotifyMessage {
   content: string;
   linkUrl?: string;
   linkParams?: Record<string, any>;
+  extraData?: Record<string, any>;
   sourceType?: string;
   sourceId?: string;
   messageType?: string;
@@ -39,6 +49,12 @@ export interface ExternalNotifyProvider {
   sendText(
     account: UserExternalAccount,
     message: NotifyMessage,
+    config: ExternalNotifyConfig,
+  ): Promise<any>;
+  updateWorkflowTodoCard?(
+    feishuMessageId: string,
+    message: NotifyMessage,
+    status: WorkflowTodoCardStatusOptions,
     config: ExternalNotifyConfig,
   ): Promise<any>;
 }

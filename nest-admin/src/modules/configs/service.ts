@@ -136,6 +136,7 @@ export class SystenConfigsService extends BaseService<
   getDefaultExternalNotifyConfig() {
     return {
       enabled: false,
+      siteUrl: "",
       feishu: {
         enabled: false,
         appId: "",
