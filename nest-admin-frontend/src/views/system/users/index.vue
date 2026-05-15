@@ -19,29 +19,60 @@ const canDeptAdd = computed(() => checkPermi(['system/dept/add']))
 const canDeptUpdate = computed(() => checkPermi(['system/dept/update']))
 const canDeptDelete = computed(() => checkPermi(['system/dept/delete']))
 const canManageProtectedDept = computed(() => checkPermi(['system/dept/manageProtected']))
+const rctRef = ref()
 
 /** -- 人员 模块 -- */
-import { getList, add, update, del, resetPassword } from './api'
+import {
+  getList,
+  add,
+  update,
+  del,
+  resetPassword,
+  getExternalAccount,
+  saveExternalAccount,
+} from './api'
 import { getList as getRoleListApi } from '../roles/api'
 
 function User(params) {
   const roleList = ref([])
   const userDialogRef = ref()
   const resetPasswordDialogRef = ref()
+  const externalAccountPlatform = 'feishu'
 
-  function action(type: string, data: any) {
+  async function loadExternalAccount(userId: string) {
+    if (!userId) return
+    try {
+      const { data } = await getExternalAccount(userId, externalAccountPlatform)
+      if (userDialogRef.value?.form) {
+        userDialogRef.value.form.feishuUserId = data?.externalUserId || ''
+      }
+    } catch {
+      if (userDialogRef.value?.form) {
+        userDialogRef.value.form.feishuUserId = ''
+      }
+    }
+  }
+
+  async function action(type: string, data: any) {
     switch (type) {
       case 'add':
         if (!canUserAdd.value) return $sdk.msgWarning('当前操作没有权限')
         userDialogRef.value.visible = true
-        userDialogRef.value.form = { deptId: params.value.deptId }
+        userDialogRef.value.form = {
+          deptId: params.value.deptId,
+          feishuUserId: '',
+        }
         break
       case 'edit':
         if (!canUserUpdate.value) return $sdk.msgWarning('当前操作没有权限')
         if (isAdmin(data) && !canManageAdminUser.value) return $sdk.msgWarning('当前操作没有权限')
         userDialogRef.value.visible = true
         data.roleIds = (data.roles || []).map((e) => e.id ?? e.roleId)
-        userDialogRef.value.form = JSON.parse(JSON.stringify(data))
+        userDialogRef.value.form = {
+          ...JSON.parse(JSON.stringify(data)),
+          feishuUserId: '',
+        }
+        await loadExternalAccount(data.id)
         break
       case 'resetPassword':
         if (!canUserResetPassword.value) return $sdk.msgWarning('当前操作没有权限')
@@ -57,6 +88,38 @@ function User(params) {
       roleList.value = data || []
     })
   }
+
+  async function submitUser({ form, visible, loading }) {
+    const isEdit = !!form.value?.id
+    if ((isEdit && !canUserUpdate.value) || (!isEdit && !canUserAdd.value)) {
+      loading.value = false
+      return $sdk.msgWarning('当前操作没有权限')
+    }
+    if (isEdit && isAdmin(form.value) && !canManageAdminUser.value) {
+      loading.value = false
+      return $sdk.msgWarning('当前操作没有权限')
+    }
+    try {
+      const payload = JSON.parse(JSON.stringify(form.value))
+      const { data } = await (isEdit ? update(payload) : add(payload))
+      const userId = data?.id || form.value.id
+      const feishuUserId = String(form.value.feishuUserId || '').trim()
+      if (userId) {
+        await saveExternalAccount({
+          userId,
+          platform: 'feishu',
+          externalUserId: feishuUserId || null,
+          bindStatus: feishuUserId ? '1' : '0',
+          bindSource: 'manual',
+        })
+      }
+      $sdk.msgSuccess()
+      visible.value = false
+      rctRef.value?.getList()
+    } finally {
+      loading.value = false
+    }
+  }
   getRoleList()
 
   return {
@@ -64,14 +127,14 @@ function User(params) {
     roleList,
     userDialogRef,
     resetPasswordDialogRef,
+    submitUser,
   }
 }
-let { action, roleList, userDialogRef, resetPasswordDialogRef } = User(params)
+let { action, roleList, userDialogRef, resetPasswordDialogRef, submitUser } = User(params)
 /** -- 人员 模块 -- */
 
 /** -- 部门 模块 -- */
 import * as apiDept from './apiDept'
-const rctRef = ref()
 const deptDialogRef = ref()
 
 /** -- 用户列表（用于部门负责人选择）-- */
@@ -394,6 +457,13 @@ const getButtons = (row: any) => {
             <el-option label="男" value="man"></el-option>
             <el-option label="女" value="woamn"></el-option>
           </BaSelect>
+          <div class="dialog-section-title">外部账号</div>
+          <BaInput
+            v-model="form.feishuUserId"
+            prop="feishuUserId"
+            label="飞书用户ID"
+            maxlength="100"
+            placeholder="可选，绑定飞书通知账号" />
           <el-form-item prop="avatar" label="头像">
             <Upload v-model:fileUrl="form.avatar" :params="{ module: 'avatar' }"></Upload>
           </el-form-item>
@@ -466,6 +536,13 @@ const getButtons = (row: any) => {
 }
 .ml-10 {
   margin-left: 10px;
+}
+
+.dialog-section-title {
+  margin: 10px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
 }
 
 @media (max-width: 768px) {

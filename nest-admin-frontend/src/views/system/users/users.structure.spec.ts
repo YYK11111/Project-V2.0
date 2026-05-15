@@ -39,4 +39,14 @@ describe('system users structure', () => {
     expect(source).toContain('v-model="form.passwordNew" prop="password" label="新密码"')
     expect(source).toContain('v-model="form.passwordNewConfirm"')
   })
+
+  it('用户管理在编辑弹窗展示飞书用户ID并在提交后同步外部账号映射', () => {
+    const source = readSource()
+
+    expect(source).toContain('外部账号')
+    expect(source).toContain('label="飞书用户ID"')
+    expect(source).toContain("platform: 'feishu'")
+    expect(source).toContain('saveExternalAccount')
+    expect(source).toContain('getExternalAccount')
+  })
 })

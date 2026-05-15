@@ -13,4 +13,12 @@ describe('system users api structure', () => {
     expect(source).toContain('export const resetPassword = (data) => put(`${serve}/resetPassword`, data)')
     expect(source).toContain('export const updatePassword = (data) => put(`${serve}/updatePassword`, data)')
   })
+
+  it('提供外部账号映射查询和保存接口', () => {
+    const source = readSource()
+
+    expect(source).toContain("const externalAccountServe = window.sysConfig.serves.system + '/external-accounts'")
+    expect(source).toContain('export const getExternalAccount = (userId, platform = \'feishu\') =>')
+    expect(source).toContain('export const saveExternalAccount = (data) => post(`${externalAccountServe}/save`, data)')
+  })
 })
