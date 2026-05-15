@@ -277,7 +277,8 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
   });
 
   it("发起上线审批前校验项目执行对象权限", async () => {
-    const { service, repositories, projectsService } = createService();
+    const { service, repositories, projectsService, approvalContextService } =
+      createService();
     repositories.goLive.findOne.mockResolvedValue({
       id: "go-1",
       projectId: "p1",
@@ -289,6 +290,17 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     expect(
       projectsService.assertExecutionObjectPermission,
     ).toHaveBeenCalledWith("p1", "u1");
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "goLive",
+        businessId: "go-1",
+        businessScene: "approval",
+        sceneTitle: "上线审批",
+        rootBusinessType: "project",
+        rootBusinessId: "p1",
+        projectId: "p1",
+      }),
+    );
   });
 
   it("仅允许草稿上线单发起审批", async () => {
@@ -307,7 +319,8 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
   });
 
   it("发起验收审批前校验项目执行对象权限", async () => {
-    const { service, repositories, projectsService } = createService();
+    const { service, repositories, projectsService, approvalContextService } =
+      createService();
     repositories.acceptance.findOne.mockResolvedValue({
       id: "acc-1",
       projectId: "p1",
@@ -319,6 +332,17 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     expect(
       projectsService.assertExecutionObjectPermission,
     ).toHaveBeenCalledWith("p1", "u1");
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "acceptance",
+        businessId: "acc-1",
+        businessScene: "approval",
+        sceneTitle: "验收审批",
+        rootBusinessType: "project",
+        rootBusinessId: "p1",
+        projectId: "p1",
+      }),
+    );
   });
 
   it("仅允许待验收或整改中验收单发起审批", async () => {
@@ -337,7 +361,8 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
   });
 
   it("发起交接审批前校验项目执行对象权限", async () => {
-    const { service, repositories, projectsService } = createService();
+    const { service, repositories, projectsService, approvalContextService } =
+      createService();
     repositories.handover.findOne.mockResolvedValue({
       id: "handover-1",
       projectId: "p1",
@@ -349,6 +374,39 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     expect(
       projectsService.assertExecutionObjectPermission,
     ).toHaveBeenCalledWith("p1", "u1");
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "handover",
+        businessId: "handover-1",
+        businessScene: "approval",
+        sceneTitle: "交接审批",
+        rootBusinessType: "project",
+        rootBusinessId: "p1",
+        projectId: "p1",
+      }),
+    );
+  });
+
+  it("发起客户审批后创建客户审批上下文", async () => {
+    const { service, repositories, approvalContextService } = createService();
+    repositories.customer.findOne.mockResolvedValue({
+      id: "customer-1",
+      salesId: "sales-1",
+      name: "客户A",
+    });
+
+    await service.startCustomerApproval("customer-1", "u1");
+
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "customer",
+        businessId: "customer-1",
+        businessScene: "approval",
+        sceneTitle: "客户审批",
+        rootBusinessType: "customer",
+        rootBusinessId: "customer-1",
+      }),
+    );
   });
 
   it("仅允许草稿交接单发起审批", async () => {

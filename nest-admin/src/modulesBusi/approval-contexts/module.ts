@@ -8,6 +8,9 @@ import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
 import { ProjectChange } from "../changes/entity";
 import { Task } from "../tasks/entity";
 import { Ticket } from "../tickets/entity";
+import { GoLiveRecord } from "../go-live-records/entity";
+import { AcceptanceRecord } from "../acceptance-records/entity";
+import { HandoverRecord } from "../handover-records/entity";
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { Ticket } from "../tickets/entity";
       ProjectChange,
       Task,
       Ticket,
+      GoLiveRecord,
+      AcceptanceRecord,
+      HandoverRecord,
     ]),
   ],
   controllers: [BusinessApprovalContextController],

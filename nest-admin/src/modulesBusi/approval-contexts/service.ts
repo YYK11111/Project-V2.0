@@ -7,6 +7,9 @@ import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
 import { ProjectChange } from "../changes/entity";
 import { Task } from "../tasks/entity";
 import { Ticket } from "../tickets/entity";
+import { GoLiveRecord } from "../go-live-records/entity";
+import { AcceptanceRecord } from "../acceptance-records/entity";
+import { HandoverRecord } from "../handover-records/entity";
 
 export interface CreateBusinessApprovalContextOptions {
   businessType: string;
@@ -55,6 +58,15 @@ export class BusinessApprovalContextService {
     @Optional()
     @InjectRepository(Ticket)
     private readonly ticketRepository?: Repository<Ticket>,
+    @Optional()
+    @InjectRepository(GoLiveRecord)
+    private readonly goLiveRecordRepository?: Repository<GoLiveRecord>,
+    @Optional()
+    @InjectRepository(AcceptanceRecord)
+    private readonly acceptanceRecordRepository?: Repository<AcceptanceRecord>,
+    @Optional()
+    @InjectRepository(HandoverRecord)
+    private readonly handoverRecordRepository?: Repository<HandoverRecord>,
   ) {}
 
   async createFromWorkflowStart(options: CreateBusinessApprovalContextOptions) {
@@ -163,7 +175,10 @@ export class BusinessApprovalContextService {
       !this.workflowInstanceRepository ||
       !this.changeRepository ||
       !this.taskRepository ||
-      !this.ticketRepository
+      !this.ticketRepository ||
+      !this.goLiveRecordRepository ||
+      !this.acceptanceRecordRepository ||
+      !this.handoverRecordRepository
     )
       return;
 
@@ -179,12 +194,27 @@ export class BusinessApprovalContextService {
       where: { projectId },
       select: ["id"],
     });
+    const goLiveRecords = await this.goLiveRecordRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
+    const acceptanceRecords = await this.acceptanceRecordRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
+    const handoverRecords = await this.handoverRecordRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
     const businessKeys = [
       `project_${projectId}`,
       `project_close_${projectId}`,
       ...changes.map((change) => `change_${change.id}`),
       ...tasks.map((task) => `task_${task.id}`),
       ...tickets.map((ticket) => `ticket_${ticket.id}`),
+      ...goLiveRecords.map((record) => `goLive_${record.id}`),
+      ...acceptanceRecords.map((record) => `acceptance_${record.id}`),
+      ...handoverRecords.map((record) => `handover_${record.id}`),
     ];
     const workflowInstances = await this.workflowInstanceRepository.find({
       where: { businessKey: In(businessKeys) },
@@ -261,6 +291,33 @@ export class BusinessApprovalContextService {
         businessId: businessKey.replace("ticket_", ""),
         businessScene: "approval",
         sceneTitle: "工单审批",
+      };
+    }
+    if (businessKey.startsWith("goLive_")) {
+      return {
+        ...commonOptions,
+        businessType: "goLive",
+        businessId: businessKey.replace("goLive_", ""),
+        businessScene: "approval",
+        sceneTitle: "上线审批",
+      };
+    }
+    if (businessKey.startsWith("acceptance_")) {
+      return {
+        ...commonOptions,
+        businessType: "acceptance",
+        businessId: businessKey.replace("acceptance_", ""),
+        businessScene: "approval",
+        sceneTitle: "验收审批",
+      };
+    }
+    if (businessKey.startsWith("handover_")) {
+      return {
+        ...commonOptions,
+        businessType: "handover",
+        businessId: businessKey.replace("handover_", ""),
+        businessScene: "approval",
+        sceneTitle: "交接审批",
       };
     }
     return null;

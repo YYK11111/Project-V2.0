@@ -182,6 +182,17 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "goLive",
+      businessId: recordId,
+      businessScene: "approval",
+      sceneTitle: "上线审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: record.projectId,
+      projectId: record.projectId,
+    });
     await this.goLiveRecordRepository.update(recordId, {
       status: GoLiveRecordStatus.pendingApproval,
     } as any);
@@ -221,6 +232,17 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "acceptance",
+      businessId: recordId,
+      businessScene: "approval",
+      sceneTitle: "验收审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: record.projectId,
+      projectId: record.projectId,
+    });
     await this.acceptanceRecordRepository.update(recordId, {
       result: AcceptanceRecordResult.pending,
     } as any);
@@ -255,6 +277,17 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "handover",
+      businessId: recordId,
+      businessScene: "approval",
+      sceneTitle: "交接审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: record.projectId,
+      projectId: record.projectId,
+    });
     await this.handoverRecordRepository.update(recordId, {
       status: HandoverRecordStatus.draft,
     } as any);
@@ -724,6 +757,17 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "customer",
+      businessId: customerId,
+      businessScene: "approval",
+      sceneTitle: "客户审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "customer",
+      rootBusinessId: customerId,
+    });
 
     await this.customerRepository.update(customerId, {
       workflowInstanceId: instance.id,
