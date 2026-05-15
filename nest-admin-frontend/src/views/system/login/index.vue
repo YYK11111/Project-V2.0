@@ -48,8 +48,10 @@
     </el-form>
 
     <el-divider><span class="" style="color: var(--FontBlack7)">其他方式登录</span></el-divider>
-    <div class="third">
-      <el-button class="feishu-login-button" round @click="loginByFeishu">飞书登录</el-button>
+    <div class="third external-login-list">
+      <el-button class="external-login-button" round aria-label="飞书登录" @click="loginByFeishu">
+        <img :src="feishuLogo" alt="飞书" class="external-login-logo" />
+      </el-button>
     </div>
   </div>
 </template>
@@ -68,6 +70,7 @@ const ispassword = ref(true)
 const loginType = ref('account')
 const redirect = ref()
 const formRef = ref()
+const feishuLogo = new URL('@/assets/image/feishu.png', import.meta.url).href
 const form = ref({
   account: '',
   password: '',
@@ -180,7 +183,19 @@ function loginByFeishu() {
   align-items: center;
 }
 
-.feishu-login-button {
-  width: 100%;
+.external-login-list {
+  gap: 10px;
+}
+
+.external-login-button {
+  width: 164px;
+  height: 46px;
+  padding: 0 18px;
+}
+
+.external-login-logo {
+  display: block;
+  width: 118px;
+  height: auto;
 }
 </style>
