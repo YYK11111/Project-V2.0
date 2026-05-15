@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Optional,
+  forwardRef,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import dayjs from "dayjs";
@@ -48,6 +54,7 @@ export class WorkflowIntegrationService {
     private readonly acceptanceRecordRepository: Repository<AcceptanceRecord>,
     @InjectRepository(HandoverRecord)
     private readonly handoverRecordRepository: Repository<HandoverRecord>,
+    @Inject(forwardRef(() => WorkflowService))
     private readonly workflowService: WorkflowService,
     private readonly projectsService: ProjectsService,
     private readonly customersService?: CustomersService,

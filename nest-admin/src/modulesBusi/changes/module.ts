@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { ChangesService } from "./service";
 import { ChangesController } from "./controller";
 import { ProjectChange } from "./entity";
@@ -22,9 +22,9 @@ import { Sprint } from "../sprints/entity";
       Milestone,
       Sprint,
     ]),
-    UsersModule,
-    ProjectsModule,
-    SysFileModule,
+    forwardRef(() => UsersModule),
+    forwardRef(() => ProjectsModule),
+    forwardRef(() => SysFileModule),
   ],
   controllers: [ChangesController],
   providers: [ChangesService],

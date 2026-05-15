@@ -16,7 +16,7 @@ import { BusinessApprovalContextsModule } from "../approval-contexts/module";
     TasksModule,
     forwardRef(() => UsersModule),
     forwardRef(() => SystemScheduledJobsModule),
-    WorkflowModule,
+    forwardRef(() => WorkflowModule),
     BusinessApprovalContextsModule,
   ],
   providers: [ArticleBorrowsService],

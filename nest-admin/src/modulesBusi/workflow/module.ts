@@ -74,7 +74,7 @@ import { ArticleBorrow } from "../articleBorrows/entity";
     ]),
     NoticesModule,
     MessagesModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
     DepstModule,
     forwardRef(() => ProjectsModule),
     CrmModule,

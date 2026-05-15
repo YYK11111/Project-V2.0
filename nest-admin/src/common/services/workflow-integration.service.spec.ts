@@ -1,3 +1,5 @@
+import { SELF_DECLARED_DEPS_METADATA } from "@nestjs/common/constants";
+import { WorkflowService } from "src/modulesBusi/workflow/service";
 import { WorkflowIntegrationService } from "./workflow-integration.service";
 import { ProjectStatus } from "src/modulesBusi/projects/entity";
 import { TaskStatus } from "src/modulesBusi/tasks/entity";
@@ -5,6 +7,20 @@ import { GoLiveRecordStatus } from "src/modulesBusi/go-live-records/entity";
 import { AcceptanceRecordResult } from "src/modulesBusi/acceptance-records/entity";
 import { HandoverRecordStatus } from "src/modulesBusi/handover-records/entity";
 import { KnowledgeBorrowStatus } from "src/modulesBusi/articleBorrows/entity";
+
+describe("WorkflowIntegrationService 循环依赖声明", () => {
+  it("通过 forwardRef 注入 WorkflowService", () => {
+    const deps =
+      Reflect.getMetadata(
+        SELF_DECLARED_DEPS_METADATA,
+        WorkflowIntegrationService,
+      ) || [];
+    const workflowServiceDep = deps.find((item) => item.index === 8)?.param;
+
+    expect(typeof workflowServiceDep?.forwardRef).toBe("function");
+    expect(workflowServiceDep.forwardRef()).toBe(WorkflowService);
+  });
+});
 
 describe("WorkflowIntegrationService 任务完成审批回调", () => {
   const createService = () => {
