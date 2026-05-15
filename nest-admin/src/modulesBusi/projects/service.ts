@@ -1154,7 +1154,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       : false;
     const workflowVisibleProjectIds = canViewAll
       ? []
-      : await this.getWorkflowVisibleProjectIdsForUser(_operatorId || "");
+      : await this.getApprovalVisibleProjectIdsForUser(_operatorId || "");
     const visibleScope = this.buildProjectVisibleScopeParams({
       operatorId: _operatorId,
       operatorName: _operatorName,
@@ -1634,15 +1634,23 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     ].includes(role as any);
     const isVisitor = role === ProjectMemberRole.visitor;
     const isMember = Boolean(member) || isLeader;
-    const hasWorkflowAccess = await this.hasWorkflowAccess(
-      project.workflowInstanceId,
-      userId,
+    const hasApprovalParticipantAccess =
+      await this.businessApprovalContextService?.hasRootBusinessParticipantAccess(
+        userId,
+        "project",
+        projectId,
+      );
+    const hasWorkflowAccess = hasApprovalParticipantAccess
+      ? false
+      : await this.hasWorkflowAccess(project.workflowInstanceId, userId);
+    const hasApprovalAccess = Boolean(
+      hasApprovalParticipantAccess || hasWorkflowAccess,
     );
     const canViewPrivateProject = this.canViewCreatorOnlyProject(
       project,
       userId,
       userName,
-      hasWorkflowAccess,
+      hasApprovalAccess,
     );
 
     return {
@@ -1658,7 +1666,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isMember,
       canView:
         canViewPrivateProject &&
-        (canViewAll || isMember || isDeliveryManager || hasWorkflowAccess),
+        (canViewAll || isMember || isDeliveryManager || hasApprovalAccess),
       canEdit: canViewPrivateProject && (canManageAll || isManager),
       canSubmitApproval: canViewPrivateProject && (canManageAll || isManager),
       canSubmitClose: canViewPrivateProject && (canManageAll || isManager),
@@ -1693,7 +1701,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     if (!userId) return [];
 
     const workflowProjectIds =
-      await this.getWorkflowVisibleProjectIdsForUser(userId);
+      await this.getApprovalVisibleProjectIdsForUser(userId);
     const visibleScope = this.buildProjectVisibleScopeParams({
       operatorId: userId,
       workflowVisibleProjectIds: workflowProjectIds,
@@ -1778,6 +1786,19 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       select: ["id"] as any,
     });
     return projects.map((item) => String(item.id)).filter(Boolean);
+  }
+
+  private async getApprovalVisibleProjectIdsForUser(userId: string) {
+    if (!userId) return [];
+    const approvalVisibleProjectIds =
+      (await this.businessApprovalContextService?.findVisibleRootBusinessIdsForUser(
+        userId,
+        "project",
+      )) || [];
+    if (approvalVisibleProjectIds.length) {
+      return approvalVisibleProjectIds;
+    }
+    return this.getWorkflowVisibleProjectIdsForUser(userId);
   }
 
   async assertProjectPermission(

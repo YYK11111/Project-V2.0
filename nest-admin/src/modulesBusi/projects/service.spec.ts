@@ -12,6 +12,11 @@ describe("ProjectsService closure guards", () => {
       createQueryBuilder: jest.fn(),
     };
 
+    const businessApprovalContextService = {
+      findVisibleRootBusinessIdsForUser: jest.fn().mockResolvedValue([]),
+      hasRootBusinessParticipantAccess: jest.fn().mockResolvedValue(false),
+      findProjectApprovalContexts: jest.fn(),
+    };
     const service = new ProjectsService(
       repository as any,
       { count: jest.fn(), find: jest.fn() } as any,
@@ -91,6 +96,9 @@ describe("ProjectsService closure guards", () => {
       { findOne: jest.fn() } as any,
       { getRepository: jest.fn(), transaction: jest.fn() } as any,
       { findOne: jest.fn() } as any,
+      { isJobEnabled: jest.fn(), runJob: jest.fn() } as any,
+      { findOne: jest.fn(), find: jest.fn() } as any,
+      businessApprovalContextService as any,
     );
 
     (service as any).projectFieldPermissionService = {
@@ -157,7 +165,7 @@ describe("ProjectsService closure guards", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
-    return { service, repository };
+    return { service, repository, businessApprovalContextService };
   };
 
   it("发起结项审批前要求至少存在一条成功上线单", async () => {
@@ -625,7 +633,8 @@ describe("ProjectsService closure guards", () => {
   });
 
   it("立项审批未结束时当前待办审批人可以只读查看项目详情", async () => {
-    const { service, repository } = createService();
+    const { service, repository, businessApprovalContextService } =
+      createService();
     repository.findOne.mockResolvedValue({
       id: "p1",
       status: "1",
@@ -633,9 +642,9 @@ describe("ProjectsService closure guards", () => {
       leaderId: "leader-1",
     });
     (service as any).projectMemberRepository.findOne.mockResolvedValue(null);
-    (service as any).workflowTaskRepository.findOne.mockResolvedValue({
-      id: "task-1",
-    });
+    businessApprovalContextService.hasRootBusinessParticipantAccess.mockResolvedValue(
+      true,
+    );
 
     const context = await service.assertProjectPermission(
       "p1",
@@ -647,6 +656,12 @@ describe("ProjectsService closure guards", () => {
     expect(context.canView).toBe(true);
     expect(context.canEdit).toBe(false);
     expect(context.canSubmitApproval).toBe(false);
+    expect(
+      businessApprovalContextService.hasRootBusinessParticipantAccess,
+    ).toHaveBeenCalledWith("approver-1", "project", "p1");
+    expect(
+      (service as any).workflowTaskRepository.findOne,
+    ).not.toHaveBeenCalled();
   });
 
   it("立项审批未结束时历史审批人可以只读查看项目详情", async () => {
@@ -701,7 +716,8 @@ describe("ProjectsService closure guards", () => {
   });
 
   it("历史审批人应能在项目列表中看到项目", async () => {
-    const { service, repository } = createService();
+    const { service, repository, businessApprovalContextService } =
+      createService();
     const queryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
@@ -726,9 +742,9 @@ describe("ProjectsService closure guards", () => {
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
     (service as any).projectMemberRepository.find.mockResolvedValue([]);
-    jest
-      .spyOn(service as any, "getWorkflowVisibleProjectIdsForUser")
-      .mockResolvedValue(["p18"]);
+    businessApprovalContextService.findVisibleRootBusinessIdsForUser.mockResolvedValue(
+      ["p18"],
+    );
 
     const result = await service.list({
       pageNum: 1,
@@ -739,6 +755,9 @@ describe("ProjectsService closure guards", () => {
 
     expect(result.list).toHaveLength(1);
     expect(result.list[0].id).toBe("p18");
+    expect(
+      businessApprovalContextService.findVisibleRootBusinessIdsForUser,
+    ).toHaveBeenCalledWith("2", "project");
     expect(queryBuilder.andWhere).toHaveBeenCalledWith(
       expect.stringContaining("project.id IN"),
       expect.objectContaining({

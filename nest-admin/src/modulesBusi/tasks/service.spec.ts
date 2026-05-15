@@ -81,6 +81,10 @@ describe("TasksService lifecycle actions", () => {
       isJobEnabled: jest.fn(),
       runJob: jest.fn(),
     };
+    const businessApprovalContextService = {
+      findVisibleBusinessIdsForUser: jest.fn().mockResolvedValue([]),
+      hasBusinessParticipantAccess: jest.fn().mockResolvedValue(false),
+    };
     const sysFileService = {
       associateFiles: jest.fn(),
       repository: { find: jest.fn() },
@@ -100,6 +104,7 @@ describe("TasksService lifecycle actions", () => {
       projectsService as any,
       messagesService as any,
       systemScheduledJobsService as any,
+      businessApprovalContextService as any,
     );
     (service as any).delayRecordRepository = delayRecordRepository;
 
@@ -115,6 +120,7 @@ describe("TasksService lifecycle actions", () => {
       messagesService,
       sysFileService,
       systemScheduledJobsService,
+      businessApprovalContextService,
     };
   };
 
@@ -1151,5 +1157,87 @@ describe("TasksService lifecycle actions", () => {
     } as any);
 
     expect(result).toEqual(expect.objectContaining({ id: "task-5" }));
+  });
+
+  it("审批上下文参与人可以直接查看任务详情", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      businessApprovalContextService,
+    } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-6",
+      code: "TSK-006",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: [],
+      status: TaskStatus.pendingApproval,
+      project: null,
+      milestone: null,
+      leader: null,
+      parent: null,
+    });
+    projectsService.assertExecutionObjectPermission.mockRejectedValue(
+      new Error("当前无访问权限"),
+    );
+    projectsService.getProjectPermissionContext.mockResolvedValue(null);
+    businessApprovalContextService.hasBusinessParticipantAccess.mockResolvedValue(
+      true,
+    );
+
+    const result = await service.getOne({
+      id: "task-6",
+      _operatorId: "approver-1",
+      _operatorPermissions: ["business/tasks/access"],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "task-6" }));
+    expect(
+      businessApprovalContextService.hasBusinessParticipantAccess,
+    ).toHaveBeenCalledWith("approver-1", "task", "task-6");
+  });
+
+  it("任务列表合并审批上下文参与任务范围", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      taskCommentRepository,
+      timeLogRepository,
+      businessApprovalContextService,
+    } = createService();
+    const queryBuilder: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[{ id: "task-6" }], 1]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue([]);
+    businessApprovalContextService.findVisibleBusinessIdsForUser.mockResolvedValue(
+      ["task-6"],
+    );
+    taskCommentRepository.query.mockResolvedValue([]);
+    timeLogRepository.query.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "approver-1",
+      _operatorPermissions: ["business/tasks/access"],
+    } as any);
+
+    expect(
+      businessApprovalContextService.findVisibleBusinessIdsForUser,
+    ).toHaveBeenCalledWith("approver-1", "task");
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(task.leader_id = :operatorId OR task.create_user = :operatorId OR JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId)) OR task.id IN (:...approvalVisibleTaskIds))",
+      { operatorId: "approver-1", approvalVisibleTaskIds: ["task-6"] },
+    );
+    expect(result.total).toBe(1);
   });
 });

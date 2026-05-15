@@ -28,6 +28,7 @@ import { MessageType } from "src/modules/messages/entity";
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 import { MessagesService } from "src/modules/messages/service";
 import { getProjectScopedPermissions } from "src/common/utils/business-list-permission";
+import { BusinessApprovalContextService } from "../approval-contexts/service";
 
 @Injectable()
 export class TasksService extends BaseService<Task, TaskDto> {
@@ -54,6 +55,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
     private readonly projectsService: ProjectsService,
     private readonly messagesService: MessagesService,
     private readonly systemScheduledJobsService: SystemScheduledJobsService,
+    private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {
     super(Task, repository);
   }
@@ -141,6 +143,13 @@ export class TasksService extends BaseService<Task, TaskDto> {
     permissions: string[] = [],
   ) {
     if (!operatorId) return;
+    const hasApprovalAccess =
+      await this.businessApprovalContextService?.hasBusinessParticipantAccess(
+        operatorId,
+        "task",
+        String(task.id || ""),
+      );
+    if (hasApprovalAccess) return;
     try {
       await this.projectsService.assertExecutionObjectPermission(
         task.projectId,
@@ -1283,6 +1292,12 @@ export class TasksService extends BaseService<Task, TaskDto> {
         String(_operatorId || ""),
         operatorPermissions,
       );
+    const approvalVisibleTaskIds = _operatorId
+      ? await this.businessApprovalContextService?.findVisibleBusinessIdsForUser(
+          String(_operatorId),
+          "task",
+        )
+      : [];
     const shouldUsePersonalTaskScope =
       Boolean(_operatorId) &&
       Array.isArray(visibleProjectIds) &&
@@ -1321,14 +1336,36 @@ export class TasksService extends BaseService<Task, TaskDto> {
       .leftJoinAndSelect("task.sprint", "sprint");
 
     if (shouldUsePersonalTaskScope) {
+      const personalConditions = [
+        "task.leader_id = :operatorId",
+        "task.create_user = :operatorId",
+        "JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId))",
+      ];
+      const personalParams: Record<string, any> = {
+        operatorId: String(_operatorId),
+      };
+      if (approvalVisibleTaskIds?.length) {
+        personalConditions.push("task.id IN (:...approvalVisibleTaskIds)");
+        personalParams.approvalVisibleTaskIds = approvalVisibleTaskIds;
+      }
       taskQuery.andWhere(
-        "(task.leader_id = :operatorId OR task.create_user = :operatorId OR JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId)))",
-        { operatorId: String(_operatorId) },
+        `(${personalConditions.join(" OR ")})`,
+        personalParams,
       );
     } else if (executionVisibleProjectIds) {
-      taskQuery.andWhere("task.project_id IN (:...visibleProjectIds)", {
-        visibleProjectIds: executionVisibleProjectIds,
-      });
+      if (approvalVisibleTaskIds?.length) {
+        taskQuery.andWhere(
+          "(task.project_id IN (:...visibleProjectIds) OR task.id IN (:...approvalVisibleTaskIds))",
+          {
+            visibleProjectIds: executionVisibleProjectIds,
+            approvalVisibleTaskIds,
+          },
+        );
+      } else {
+        taskQuery.andWhere("task.project_id IN (:...visibleProjectIds)", {
+          visibleProjectIds: executionVisibleProjectIds,
+        });
+      }
     }
 
     if (name !== undefined && name !== "") {

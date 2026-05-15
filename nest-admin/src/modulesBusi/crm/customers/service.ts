@@ -17,6 +17,7 @@ import {
 } from "./entities/customer-viewer.entity";
 import { WorkflowHistory } from "src/modulesBusi/workflow/entity/workflow-history.entity";
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
+import { BusinessApprovalContextService } from "src/modulesBusi/approval-contexts/service";
 
 @Injectable()
 export class CustomersService extends BaseService<Customer, CustomerDto> {
@@ -24,6 +25,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     @InjectRepository(Customer) repository: Repository<Customer>,
     @InjectRepository(CustomerViewer)
     private readonly viewerRepository: Repository<CustomerViewer>,
+    private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {
     super(Customer, repository);
   }
@@ -73,8 +75,18 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       select: ["customerId"] as any,
     });
+    const approvalVisibleCustomerIds =
+      (await this.businessApprovalContextService?.findVisibleBusinessIdsForUser(
+        operatorId,
+        "customer",
+      )) || [];
     return Array.from(
-      new Set(viewers.map((item) => String(item.customerId)).filter(Boolean)),
+      new Set(
+        [
+          ...viewers.map((item) => String(item.customerId)),
+          ...approvalVisibleCustomerIds,
+        ].filter(Boolean),
+      ),
     );
   }
 
@@ -212,6 +224,15 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       select: ["id"] as any,
     });
+    if (!viewer) {
+      const hasApprovalAccess =
+        await this.businessApprovalContextService?.hasBusinessParticipantAccess(
+          operatorId,
+          "customer",
+          customerId,
+        );
+      if (hasApprovalAccess) return;
+    }
     if (!viewer) throw new ForbiddenException("当前无查看该客户的权限");
   }
 

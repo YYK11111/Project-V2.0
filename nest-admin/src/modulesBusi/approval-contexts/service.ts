@@ -214,6 +214,69 @@ export class BusinessApprovalContextService {
     );
   }
 
+  async findVisibleRootBusinessIdsForUser(
+    userId: string,
+    rootBusinessType: string,
+  ) {
+    if (!userId || !rootBusinessType) return [];
+    const participants = await this.participantRepository.find({
+      where: {
+        userId: String(userId),
+        rootBusinessType: String(rootBusinessType),
+      },
+      select: ["rootBusinessId"] as any,
+    });
+    return this.getUniqueUserIds(
+      participants.map((item) => item.rootBusinessId),
+    );
+  }
+
+  async findVisibleBusinessIdsForUser(userId: string, businessType: string) {
+    if (!userId || !businessType) return [];
+    const participants = await this.participantRepository.find({
+      where: {
+        userId: String(userId),
+        businessType: String(businessType),
+      },
+      select: ["businessId"] as any,
+    });
+    return this.getUniqueUserIds(participants.map((item) => item.businessId));
+  }
+
+  async hasRootBusinessParticipantAccess(
+    userId: string,
+    rootBusinessType: string,
+    rootBusinessId: string,
+  ) {
+    if (!userId || !rootBusinessType || !rootBusinessId) return false;
+    const participant = await this.participantRepository.findOne({
+      where: {
+        userId: String(userId),
+        rootBusinessType: String(rootBusinessType),
+        rootBusinessId: String(rootBusinessId),
+      },
+      select: ["id"] as any,
+    });
+    return Boolean(participant);
+  }
+
+  async hasBusinessParticipantAccess(
+    userId: string,
+    businessType: string,
+    businessId: string,
+  ) {
+    if (!userId || !businessType || !businessId) return false;
+    const participant = await this.participantRepository.findOne({
+      where: {
+        userId: String(userId),
+        businessType: String(businessType),
+        businessId: String(businessId),
+      },
+      select: ["id"] as any,
+    });
+    return Boolean(participant);
+  }
+
   private async backfillProjectApprovalContexts(
     projectId: string,
     existingContexts: BusinessApprovalContext[],

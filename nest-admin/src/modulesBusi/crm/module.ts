@@ -15,6 +15,7 @@ import { ContractsController } from "./contracts/controller";
 import { Contract } from "./contracts/entity";
 import { UsersModule } from "../../modules/users/users.module";
 import { Project } from "../projects/entity";
+import { BusinessApprovalContextsModule } from "../approval-contexts/module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { Project } from "../projects/entity";
       Project,
     ]),
     forwardRef(() => UsersModule),
+    BusinessApprovalContextsModule,
   ],
   controllers: [
     CustomersController,

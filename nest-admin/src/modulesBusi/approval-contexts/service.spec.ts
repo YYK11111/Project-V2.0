@@ -13,6 +13,8 @@ describe("BusinessApprovalContextService", () => {
       create: jest.fn((payload) => payload),
       save: jest.fn(async (payload) => ({ id: "participant-1", ...payload })),
       delete: jest.fn(),
+      find: jest.fn(),
+      findOne: jest.fn(),
     };
     const workflowInstanceRepository = {
       find: jest.fn(),
@@ -262,6 +264,51 @@ describe("BusinessApprovalContextService", () => {
         rootBusinessId: "19",
       }),
     ]);
+  });
+
+  it("按审批参与人查询可见聚合根业务ID", async () => {
+    const { service, participantRepository } = createService();
+    participantRepository.find.mockResolvedValue([
+      { rootBusinessId: "19" },
+      { rootBusinessId: "19" },
+      { rootBusinessId: "20" },
+      { rootBusinessId: "" },
+    ]);
+
+    const result = await service.findVisibleRootBusinessIdsForUser(
+      "approver-1",
+      "project",
+    );
+
+    expect(participantRepository.find).toHaveBeenCalledWith({
+      where: {
+        userId: "approver-1",
+        rootBusinessType: "project",
+      },
+      select: ["rootBusinessId"] as any,
+    });
+    expect(result).toEqual(["19", "20"]);
+  });
+
+  it("按审批参与人判断业务对象是否可见", async () => {
+    const { service, participantRepository } = createService();
+    participantRepository.findOne.mockResolvedValue({ id: "participant-1" });
+
+    const result = await service.hasBusinessParticipantAccess(
+      "approver-1",
+      "task",
+      "task-1",
+    );
+
+    expect(participantRepository.findOne).toHaveBeenCalledWith({
+      where: {
+        userId: "approver-1",
+        businessType: "task",
+        businessId: "task-1",
+      },
+      select: ["id"] as any,
+    });
+    expect(result).toBe(true);
   });
 
   it("项目审批上下文查询会自动回填历史立项结项和变更流程实例", async () => {

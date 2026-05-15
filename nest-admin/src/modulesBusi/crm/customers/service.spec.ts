@@ -118,4 +118,74 @@ describe("CustomersService", () => {
     );
     expect(result).toEqual({ list: customerRows.slice(0, 3), total: 3 });
   });
+
+  it("客户列表优先使用审批上下文参与人索引合并可见客户", async () => {
+    const repository = createRepository();
+    const queryBuilder: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[{ id: "c5" }], 1]),
+    };
+    repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+    const viewerRepository = createViewerRepository();
+    viewerRepository.find.mockResolvedValue([
+      { customerId: "c2", userId: "u1", sourceType: "manual" },
+    ]);
+    const approvalContextService = {
+      findVisibleBusinessIdsForUser: jest.fn().mockResolvedValue(["c5"]),
+      hasBusinessParticipantAccess: jest.fn(),
+    };
+    const service = new CustomersService(
+      repository as never,
+      viewerRepository as never,
+      approvalContextService as never,
+    );
+
+    await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "u1",
+      _operatorName: "yyk",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(
+      approvalContextService.findVisibleBusinessIdsForUser,
+    ).toHaveBeenCalledWith("u1", "customer");
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(customer.createUser IN (:...creatorKeys) OR customer.id IN (:...visibleCustomerIds))",
+      { creatorKeys: ["u1", "yyk"], visibleCustomerIds: ["c2", "c5"] },
+    );
+  });
+
+  it("审批上下文参与人可以直接查看客户详情", async () => {
+    const repository = createRepository();
+    repository.findOne.mockResolvedValue({ id: "c5", createUser: "u2" });
+    const viewerRepository = createViewerRepository();
+    viewerRepository.findOne.mockResolvedValue(null);
+    const approvalContextService = {
+      findVisibleBusinessIdsForUser: jest.fn(),
+      hasBusinessParticipantAccess: jest.fn().mockResolvedValue(true),
+    };
+    const service = new CustomersService(
+      repository as never,
+      viewerRepository as never,
+      approvalContextService as never,
+    );
+
+    const result = await service.getOne({
+      id: "c5",
+      _operatorId: "u1",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "c5" }));
+    expect(
+      approvalContextService.hasBusinessParticipantAccess,
+    ).toHaveBeenCalledWith("u1", "customer", "c5");
+  });
 });

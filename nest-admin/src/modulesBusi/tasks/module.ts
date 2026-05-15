@@ -16,6 +16,7 @@ import { Ticket } from "../tickets/entity";
 import { TaskDelayRecord } from "./entities/task-delay-record.entity";
 import { MessagesModule } from "src/modules/messages/module";
 import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
+import { BusinessApprovalContextsModule } from "../approval-contexts/module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/modul
     forwardRef(() => SysFileModule),
     MessagesModule,
     forwardRef(() => SystemScheduledJobsModule),
+    BusinessApprovalContextsModule,
   ],
   controllers: [TasksController],
   providers: [TasksService],
