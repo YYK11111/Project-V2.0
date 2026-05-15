@@ -683,6 +683,7 @@ describe("WorkflowService 会签状态机", () => {
     };
     const workflowIntegrationService = {
       handleWorkflowCallback: jest.fn(),
+      syncApprovalParticipants: jest.fn(),
     };
     const service = new WorkflowService(
       definitionRepo as any,
@@ -747,19 +748,20 @@ describe("WorkflowService 会签状态机", () => {
   });
 
   it("完成审批任务时审批历史记录当前审批人为操作人", async () => {
-    const { service, historyRepo } = createApprovalService({
-      id: "task-1",
-      instanceId: "wf-1",
-      nodeId: "approval-1",
-      nodeName: "审批",
-      nodeType: NodeType.APPROVAL,
-      assigneeId: "u1",
-      status: "1",
-      inputData: {
-        multiInstanceType: "all",
-        candidateIds: ["u1"],
-      },
-    });
+    const { service, historyRepo, workflowIntegrationService } =
+      createApprovalService({
+        id: "task-1",
+        instanceId: "wf-1",
+        nodeId: "approval-1",
+        nodeName: "审批",
+        nodeType: NodeType.APPROVAL,
+        assigneeId: "u1",
+        status: "1",
+        inputData: {
+          multiInstanceType: "all",
+          candidateIds: ["u1"],
+        },
+      });
 
     await service.completeTask("task-1", "u1", { action: "approve" });
 
@@ -771,6 +773,9 @@ describe("WorkflowService 会签状态机", () => {
         operatorId: "u1",
       }),
     );
+    expect(
+      workflowIntegrationService.syncApprovalParticipants,
+    ).toHaveBeenCalledWith("wf-1");
   });
 
   it("并行任一通过后取消同节点其他待办并推进流程", async () => {
@@ -848,6 +853,9 @@ describe("WorkflowService 会签状态机", () => {
         }),
       }),
     );
+    expect(
+      workflowIntegrationService.syncApprovalParticipants,
+    ).toHaveBeenCalledWith("wf-1");
     expect(
       workflowIntegrationService.handleWorkflowCallback,
     ).not.toHaveBeenCalled();

@@ -86,6 +86,7 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     const approvalContextService = {
       createFromWorkflowStart: jest.fn(),
       syncWorkflowStatus: jest.fn(),
+      syncParticipantsFromWorkflow: jest.fn(),
     };
     const repositories = {
       project: { findOne: jest.fn(), update: jest.fn(), save: jest.fn() },
@@ -146,6 +147,9 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
         projectId: "19",
       }),
     );
+    expect(
+      approvalContextService.syncParticipantsFromWorkflow,
+    ).toHaveBeenCalledWith("wf-1");
   });
 
   it("发起项目结项审批后创建结项审批上下文", async () => {
@@ -256,7 +260,7 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     );
   });
 
-  it("项目审批回调时同步审批上下文状态", async () => {
+  it("项目审批回调时同步审批上下文状态和参与人", async () => {
     const { service, repositories, approvalContextService } = createService();
     repositories.project.findOne.mockResolvedValue({
       id: "19",
@@ -274,6 +278,9 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
         endedAt: expect.any(String),
       }),
     );
+    expect(
+      approvalContextService.syncParticipantsFromWorkflow,
+    ).toHaveBeenCalledWith("wf-1");
   });
 
   it("发起上线审批前校验项目执行对象权限", async () => {

@@ -11,6 +11,8 @@ import { Ticket } from "../tickets/entity";
 import { GoLiveRecord } from "../go-live-records/entity";
 import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
+import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
+import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { HandoverRecord } from "../handover-records/entity";
       GoLiveRecord,
       AcceptanceRecord,
       HandoverRecord,
+      WorkflowTask,
+      WorkflowHistory,
     ]),
   ],
   controllers: [BusinessApprovalContextController],

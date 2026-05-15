@@ -1528,88 +1528,97 @@ export class WorkflowService {
       await this.instanceRepo.save(instance);
     }
 
-    if (dto.action === "approve") {
-      const shouldAdvance = await this.handleApprovalTaskCompletion(
-        task,
-        instance,
-      );
-      if (!shouldAdvance) {
-        return this.instanceRepo.findOne({ where: { id: instance.id } });
-      }
-
-      const currentNode = definition.nodes.find((n) => n.id === task.nodeId);
-      if (currentNode) {
-        const nextNodeIds = await this.findNextNodes(
-          definition,
-          currentNode,
+    try {
+      if (dto.action === "approve") {
+        const shouldAdvance = await this.handleApprovalTaskCompletion(
+          task,
           instance,
         );
-        if (nextNodeIds.length > 0) {
-          for (const nextNodeId of nextNodeIds) {
-            const nextNodeIndex = definition.nodes.findIndex(
-              (n) => n.id === nextNodeId,
-            );
-            if (nextNodeIndex >= 0) {
-              await this.executeNode(instance, definition, nextNodeIndex);
+        if (!shouldAdvance) {
+          return this.instanceRepo.findOne({ where: { id: instance.id } });
+        }
+
+        const currentNode = definition.nodes.find((n) => n.id === task.nodeId);
+        if (currentNode) {
+          const nextNodeIds = await this.findNextNodes(
+            definition,
+            currentNode,
+            instance,
+          );
+          if (nextNodeIds.length > 0) {
+            for (const nextNodeId of nextNodeIds) {
+              const nextNodeIndex = definition.nodes.findIndex(
+                (n) => n.id === nextNodeId,
+              );
+              if (nextNodeIndex >= 0) {
+                await this.executeNode(instance, definition, nextNodeIndex);
+              }
             }
+          } else {
+            await this.completeInstance(instance);
           }
         } else {
           await this.completeInstance(instance);
         }
-      } else {
-        await this.completeInstance(instance);
-      }
-    } else if (dto.targetNodeId) {
-      await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
-      // 驳回到指定节点
-      const targetNodeIndex = definition.nodes.findIndex(
-        (n) => n.id === dto.targetNodeId,
-      );
-      if (targetNodeIndex >= 0) {
-        const targetNode = definition.nodes[targetNodeIndex];
-        // 取消该节点之前的所有任务，重新执行该节点
-        const pendingTasks = await this.taskRepo.find({
-          where: { instanceId: instance.id, status: TaskStatus.PENDING } as any,
-          select: ["id"],
-        });
-        await this.taskRepo.update(
-          { instanceId: instance.id, status: TaskStatus.PENDING },
-          { status: TaskStatus.CANCELLED },
+      } else if (dto.targetNodeId) {
+        await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
+        // 驳回到指定节点
+        const targetNodeIndex = definition.nodes.findIndex(
+          (n) => n.id === dto.targetNodeId,
         );
-        await this.messagesService.deactivateWorkflowTaskMessages(
-          pendingTasks.map((item) => item.id),
-        );
-        if (targetNode.type === NodeType.START) {
-          instance.status = InstanceStatus.RUNNING;
-          instance.endTime = null;
-          instance.duration = null;
-          instance.variables = {
-            ...(instance.variables || {}),
-            _lastRejectTarget: "start",
-            _lastRejectTargetName: targetNode.name || "开始",
-            _returnedToStarter: true,
-            _returnedToStarterAt: new Date().toISOString(),
-            _returnedByTaskId: task.id,
-            _returnedComment: dto.comment || "",
-          };
-          await this.instanceRepo.save(instance);
-          await this.workflowIntegrationService.handleReturnedToStarter(
-            instance.id,
-            {
-              businessKey: instance.businessKey,
-              ...(instance.variables || {}),
-            },
+        if (targetNodeIndex >= 0) {
+          const targetNode = definition.nodes[targetNodeIndex];
+          // 取消该节点之前的所有任务，重新执行该节点
+          const pendingTasks = await this.taskRepo.find({
+            where: {
+              instanceId: instance.id,
+              status: TaskStatus.PENDING,
+            } as any,
+            select: ["id"],
+          });
+          await this.taskRepo.update(
+            { instanceId: instance.id, status: TaskStatus.PENDING },
+            { status: TaskStatus.CANCELLED },
           );
-          await this.sendReturnToStarterMessage(instance, task, dto.comment);
+          await this.messagesService.deactivateWorkflowTaskMessages(
+            pendingTasks.map((item) => item.id),
+          );
+          if (targetNode.type === NodeType.START) {
+            instance.status = InstanceStatus.RUNNING;
+            instance.endTime = null;
+            instance.duration = null;
+            instance.variables = {
+              ...(instance.variables || {}),
+              _lastRejectTarget: "start",
+              _lastRejectTargetName: targetNode.name || "开始",
+              _returnedToStarter: true,
+              _returnedToStarterAt: new Date().toISOString(),
+              _returnedByTaskId: task.id,
+              _returnedComment: dto.comment || "",
+            };
+            await this.instanceRepo.save(instance);
+            await this.workflowIntegrationService.handleReturnedToStarter(
+              instance.id,
+              {
+                businessKey: instance.businessKey,
+                ...(instance.variables || {}),
+              },
+            );
+            await this.sendReturnToStarterMessage(instance, task, dto.comment);
+          } else {
+            await this.executeNode(instance, definition, targetNodeIndex);
+          }
         } else {
-          await this.executeNode(instance, definition, targetNodeIndex);
+          await this.failInstance(instance);
         }
       } else {
+        await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
         await this.failInstance(instance);
       }
-    } else {
-      await this.cancelPendingPeerTasks(task, dto.comment || "任务已驳回");
-      await this.failInstance(instance);
+    } finally {
+      await this.workflowIntegrationService.syncApprovalParticipants(
+        instance.id,
+      );
     }
 
     return this.instanceRepo.findOne({ where: { id: instance.id } });
@@ -1775,6 +1784,7 @@ export class WorkflowService {
         await this.executeNode(instance, definition, nextNodeIndex);
       }
     }
+    await this.workflowIntegrationService.syncApprovalParticipants(instance.id);
 
     return this.instanceRepo.findOne({ where: { id: instance.id } });
   }
@@ -1811,6 +1821,9 @@ export class WorkflowService {
       await this.sendApprovalNotification(savedTask, instance, {
         name: task.nodeName,
       });
+      await this.workflowIntegrationService.syncApprovalParticipants(
+        instance.id,
+      );
     }
     return savedTask;
   }
@@ -2437,6 +2450,7 @@ export class WorkflowService {
     await this.sendApprovalNotification(signTask, instance, {
       name: task.nodeName,
     });
+    await this.workflowIntegrationService.syncApprovalParticipants(instance.id);
 
     return savedTask;
   }
@@ -2495,6 +2509,7 @@ export class WorkflowService {
     instance.status = InstanceStatus.CANCELLED;
     instance.endTime = new Date().toISOString();
     await this.instanceRepo.save(instance);
+    await this.workflowIntegrationService.syncApprovalParticipants(instance.id);
 
     return instance;
   }
@@ -2549,6 +2564,7 @@ export class WorkflowService {
     instance.status = InstanceStatus.CANCELLED;
     instance.endTime = new Date().toISOString();
     await this.instanceRepo.save(instance);
+    await this.workflowIntegrationService.syncApprovalParticipants(instance.id);
 
     return instance;
   }

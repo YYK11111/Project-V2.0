@@ -12,6 +12,7 @@ describe("BusinessApprovalContextService", () => {
     const participantRepository = {
       create: jest.fn((payload) => payload),
       save: jest.fn(async (payload) => ({ id: "participant-1", ...payload })),
+      delete: jest.fn(),
     };
     const workflowInstanceRepository = {
       find: jest.fn(),
@@ -34,6 +35,12 @@ describe("BusinessApprovalContextService", () => {
     const handoverRecordRepository = {
       find: jest.fn(),
     };
+    const workflowTaskRepository = {
+      find: jest.fn(),
+    };
+    const workflowHistoryRepository = {
+      find: jest.fn(),
+    };
     const service = new BusinessApprovalContextService(
       contextRepository as any,
       participantRepository as any,
@@ -44,6 +51,8 @@ describe("BusinessApprovalContextService", () => {
       goLiveRecordRepository as any,
       acceptanceRecordRepository as any,
       handoverRecordRepository as any,
+      workflowTaskRepository as any,
+      workflowHistoryRepository as any,
     );
     return {
       service,
@@ -56,6 +65,8 @@ describe("BusinessApprovalContextService", () => {
       goLiveRecordRepository,
       acceptanceRecordRepository,
       handoverRecordRepository,
+      workflowTaskRepository,
+      workflowHistoryRepository,
     };
   };
 
@@ -175,6 +186,82 @@ describe("BusinessApprovalContextService", () => {
         currentNodeName: "结束",
       },
     );
+  });
+
+  it("同步流程参与人时重建当前审批人和历史处理人索引", async () => {
+    const {
+      service,
+      contextRepository,
+      participantRepository,
+      workflowTaskRepository,
+      workflowHistoryRepository,
+    } = createService();
+    contextRepository.findOne.mockResolvedValue({
+      id: "ctx-1",
+      workflowInstanceId: "wf-1",
+      businessType: "project",
+      businessId: "19",
+      rootBusinessType: "project",
+      rootBusinessId: "19",
+    });
+    workflowTaskRepository.find.mockResolvedValue([
+      { assigneeId: "u2", assigneeName: "审批人A" },
+      { assigneeId: "", assigneeName: "" },
+      { assigneeId: "u2", assigneeName: "审批人A" },
+    ]);
+    workflowHistoryRepository.find.mockResolvedValue([
+      { operatorId: "u3", operatorName: "历史审批人" },
+      { operatorId: "u2", operatorName: "审批人A" },
+      { operatorId: "", operatorName: "" },
+    ]);
+
+    await service.syncParticipantsFromWorkflow("wf-1");
+
+    expect(contextRepository.findOne).toHaveBeenCalledWith({
+      where: { workflowInstanceId: "wf-1", isActive: "1" },
+    });
+    expect(workflowTaskRepository.find).toHaveBeenCalledWith({
+      where: { instanceId: "wf-1", status: "1" },
+    });
+    expect(workflowHistoryRepository.find).toHaveBeenCalledWith({
+      where: { instanceId: "wf-1" },
+    });
+    expect(participantRepository.delete).toHaveBeenCalledWith({
+      workflowInstanceId: "wf-1",
+      roleType: expect.any(Object),
+    });
+    expect(participantRepository.save).toHaveBeenCalledWith([
+      expect.objectContaining({
+        approvalContextId: "ctx-1",
+        workflowInstanceId: "wf-1",
+        userId: "u2",
+        roleType: "assignee",
+        businessType: "project",
+        businessId: "19",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+      }),
+      expect.objectContaining({
+        approvalContextId: "ctx-1",
+        workflowInstanceId: "wf-1",
+        userId: "u3",
+        roleType: "history",
+        businessType: "project",
+        businessId: "19",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+      }),
+      expect.objectContaining({
+        approvalContextId: "ctx-1",
+        workflowInstanceId: "wf-1",
+        userId: "u2",
+        roleType: "history",
+        businessType: "project",
+        businessId: "19",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+      }),
+    ]);
   });
 
   it("项目审批上下文查询会自动回填历史立项结项和变更流程实例", async () => {

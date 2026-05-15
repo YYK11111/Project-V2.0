@@ -53,6 +53,12 @@ export class WorkflowIntegrationService {
     return new Date().toISOString().split("T")[0];
   }
 
+  async syncApprovalParticipants(instanceId: string): Promise<void> {
+    await this.businessApprovalContextService?.syncParticipantsFromWorkflow(
+      instanceId,
+    );
+  }
+
   async startProjectApproval(
     projectId: string,
     initiatorId: string,
@@ -93,6 +99,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: projectId,
       projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     project.workflowInstanceId = instance.id;
     project.status = ProjectStatus.approvalPending;
@@ -144,6 +151,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: projectId,
       projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     project.workflowInstanceId = instance.id;
     project.status = ProjectStatus.closeApprovalPending;
@@ -193,6 +201,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: record.projectId,
       projectId: record.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
     await this.goLiveRecordRepository.update(recordId, {
       status: GoLiveRecordStatus.pendingApproval,
     } as any);
@@ -243,6 +252,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: record.projectId,
       projectId: record.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
     await this.acceptanceRecordRepository.update(recordId, {
       result: AcceptanceRecordResult.pending,
     } as any);
@@ -288,6 +298,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: record.projectId,
       projectId: record.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
     await this.handoverRecordRepository.update(recordId, {
       status: HandoverRecordStatus.draft,
     } as any);
@@ -306,6 +317,7 @@ export class WorkflowIntegrationService {
       currentNodeId: status === "completed" ? "end" : "cancelled",
       currentNodeName: status === "completed" ? "审批完成" : "审批取消",
     });
+    await this.syncApprovalParticipants(instanceId);
 
     if (businessKey?.startsWith("project_") && !businessKey.includes("close")) {
       const projectId = businessKey.replace("project_", "");
@@ -641,6 +653,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: task.projectId,
       projectId: task.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     await this.taskRepository.update(taskId, {
       workflowInstanceId: instance.id,
@@ -684,6 +697,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: ticket.projectId,
       projectId: ticket.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     await this.ticketRepository.update(ticketId, {
       workflowInstanceId: instance.id,
@@ -727,6 +741,7 @@ export class WorkflowIntegrationService {
       rootBusinessId: change.projectId,
       projectId: change.projectId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     await this.changeRepository.update(changeId, {
       status: ChangeStatus.pending,
@@ -768,6 +783,7 @@ export class WorkflowIntegrationService {
       rootBusinessType: "customer",
       rootBusinessId: customerId,
     });
+    await this.syncApprovalParticipants(instance.id);
 
     await this.customerRepository.update(customerId, {
       workflowInstanceId: instance.id,

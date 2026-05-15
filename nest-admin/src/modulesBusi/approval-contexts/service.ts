@@ -10,6 +10,8 @@ import { Ticket } from "../tickets/entity";
 import { GoLiveRecord } from "../go-live-records/entity";
 import { AcceptanceRecord } from "../acceptance-records/entity";
 import { HandoverRecord } from "../handover-records/entity";
+import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
+import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
 
 export interface CreateBusinessApprovalContextOptions {
   businessType: string;
@@ -67,6 +69,12 @@ export class BusinessApprovalContextService {
     @Optional()
     @InjectRepository(HandoverRecord)
     private readonly handoverRecordRepository?: Repository<HandoverRecord>,
+    @Optional()
+    @InjectRepository(WorkflowTask)
+    private readonly workflowTaskRepository?: Repository<WorkflowTask>,
+    @Optional()
+    @InjectRepository(WorkflowHistory)
+    private readonly workflowHistoryRepository?: Repository<WorkflowHistory>,
   ) {}
 
   async createFromWorkflowStart(options: CreateBusinessApprovalContextOptions) {
@@ -167,6 +175,45 @@ export class BusinessApprovalContextService {
     );
   }
 
+  async syncParticipantsFromWorkflow(workflowInstanceId: string) {
+    if (!this.workflowTaskRepository || !this.workflowHistoryRepository) return;
+
+    const context = await this.findByWorkflowInstance(workflowInstanceId);
+    if (!context) return;
+
+    const [tasks, histories] = await Promise.all([
+      this.workflowTaskRepository.find({
+        where: { instanceId: workflowInstanceId, status: "1" },
+      }),
+      this.workflowHistoryRepository.find({
+        where: { instanceId: workflowInstanceId },
+      }),
+    ]);
+    const participants = [
+      ...this.buildParticipants(
+        context,
+        this.getUniqueUserIds(tasks.map((task) => task.assigneeId)),
+        "assignee",
+      ),
+      ...this.buildParticipants(
+        context,
+        this.getUniqueUserIds(histories.map((history) => history.operatorId)),
+        "history",
+      ),
+    ];
+
+    await this.participantRepository.delete({
+      workflowInstanceId,
+      roleType: In(["assignee", "history"]),
+    });
+    if (!participants.length) return;
+    await this.participantRepository.save(
+      participants.map((participant) =>
+        this.participantRepository.create(participant),
+      ),
+    );
+  }
+
   private async backfillProjectApprovalContexts(
     projectId: string,
     existingContexts: BusinessApprovalContext[],
@@ -234,6 +281,33 @@ export class BusinessApprovalContextService {
       if (!options) continue;
       await this.createFromWorkflowStart(options);
     }
+  }
+
+  private getUniqueUserIds(userIds: Array<string | null | undefined>) {
+    return Array.from(
+      new Set(
+        userIds
+          .map((userId) => String(userId || "").trim())
+          .filter((userId) => !!userId),
+      ),
+    );
+  }
+
+  private buildParticipants(
+    context: BusinessApprovalContext,
+    userIds: string[],
+    roleType: "assignee" | "history",
+  ) {
+    return userIds.map((userId) => ({
+      approvalContextId: context.id,
+      workflowInstanceId: context.workflowInstanceId,
+      userId,
+      roleType,
+      businessType: context.businessType,
+      businessId: context.businessId,
+      rootBusinessType: context.rootBusinessType,
+      rootBusinessId: context.rootBusinessId,
+    }));
   }
 
   private buildProjectBackfillContextOptions(
