@@ -68,4 +68,16 @@ describe('projectManage 立项查看页治理守卫', () => {
     expect(source).toContain('workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null')
     expect(source).not.toContain('if (!workflowInstance.value && project.value?.workflowInstanceId)')
   })
+
+  it('审批页项目字段展示不受字段组权限和工作流入口参数影响', () => {
+    const source = readProjectApprovalSource()
+    const projectContent = source.slice(
+      source.indexOf('<div class="approval-sections">'),
+      source.indexOf('<section v-if="showWorkflowPanel"'),
+    )
+
+    expect(projectContent).not.toContain('canViewGroup')
+    expect(projectContent).not.toContain('fromWorkflow')
+    expect(projectContent).not.toContain('workflowTaskId')
+  })
 })

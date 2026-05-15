@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getStatus, getPriority, getProjectType, submitApproval, getFieldPermissions } from './api'
+import { getOne, getStatus, getPriority, getProjectType, submitApproval } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
@@ -59,11 +59,9 @@ const customerList = ref([])
 const deptMap = ref({})
 const workflowPanelRef = ref()
 const workflowInstance = ref(null)
-const fieldPermissionResult = ref(null)
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
-const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
 const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
@@ -82,10 +80,6 @@ function getApprovalType(status) {
   if (status === '1') return 'warning'
   if (status === '3') return 'danger'
   return 'info'
-}
-
-function canViewGroup(groupCode) {
-  return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
 }
 
 function getRiskLevelType(level) {
@@ -107,14 +101,13 @@ function getDateRange(startDate, endDate) {
 
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, permissionRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
     getDeptTrees({}),
     getOne(projectId.value),
-    getFieldPermissions(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -137,7 +130,6 @@ async function reloadCurrent() {
     members: projectRes.data?.members || [],
     milestones: projectRes.data?.milestones || [],
   }
-  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
 
   const finalWorkflowInstanceId = String(route.query.instanceId || projectRes.data?.workflowInstanceId || '')
   const workflowInstanceRes = finalWorkflowInstanceId ? await getWorkflowInstance(finalWorkflowInstanceId) : { data: null }
@@ -339,7 +331,7 @@ watch(
         </el-row>
       </section>
 
-      <section v-if="canViewGroup('projectBasic') || canViewGroup('projectPlan') || canViewGroup('projectBusiness')" class="section-card section-card--basic">
+      <section class="section-card section-card--basic">
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">基本信息</div>
@@ -490,7 +482,7 @@ watch(
           </el-col>
         </el-row>
 
-        <el-row :gutter="20" class="basic-info-row basic-info-row--last" v-if="canViewGroup('projectPlan')">
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
           <el-col :xs="24" :sm="12">
             <el-form-item label="主要交付物">
               <ViewField :value="project.baselineDeliverables || '-'" />
@@ -503,7 +495,7 @@ watch(
           </el-col>
         </el-row>
 
-        <el-row :gutter="20" class="basic-info-row basic-info-row--last" v-if="canViewGroup('projectPlan')">
+        <el-row :gutter="20" class="basic-info-row basic-info-row--last">
           <el-col :xs="24" :sm="12">
             <el-form-item label="计划说明">
               <ViewField :value="project.baselinePlanNote || '-'" />
@@ -512,7 +504,7 @@ watch(
         </el-row>
       </section>
 
-      <section v-if="canViewGroup('projectMember')" class="section-card section-card--table">
+      <section class="section-card section-card--table">
         <div class="section-header">
           <div>
             <div class="section-title">项目成员</div>
@@ -547,7 +539,7 @@ watch(
         </div>
       </section>
 
-      <section v-if="canViewGroup('projectPlan')" class="section-card section-card--table">
+      <section class="section-card section-card--table">
         <div class="section-header">
           <div>
             <div class="section-title">里程碑计划</div>
@@ -580,7 +572,7 @@ watch(
         </div>
       </section>
 
-      <section v-if="canViewGroup('projectBasic')" class="section-card section-card--content">
+      <section class="section-card section-card--content">
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">项目附件</div>
