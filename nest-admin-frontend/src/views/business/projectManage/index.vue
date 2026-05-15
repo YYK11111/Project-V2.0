@@ -35,7 +35,6 @@ const showAdvanced = ref(false)
 const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectDelete = computed(() => checkPermi(['business/projects/delete']))
 const canProjectArchive = computed(() => checkPermi(['business/projects/archive']))
-const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
 const recalculatingProgress = ref(false)
 
 function getProjectApprovalText(row) {
@@ -50,11 +49,13 @@ function canEditProject(row) {
   return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') === '1'
 }
 
+function canViewProjectDetail(row) {
+  return row.permissionContext?.canManageAll === true
+    || row.permissionContext?.isCore === true
+}
+
 function canEnterApprovalPage(row) {
-  return canProjectSubmitApproval.value && row.permissionContext?.canSubmitApproval !== false && (
-    String(row.status || '') === '1'
-    || ['1', '3'].includes(String(row.approvalStatus || '0'))
-  )
+  return row.permissionContext?.canView !== false
 }
 
 function handleArchive(row) {
@@ -82,9 +83,9 @@ function handleRecalculateAllProgress() {
 }
 
 const getButtons = (row) => [
-  { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') },
-  canEditProject(row) ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
-  canEnterApprovalPage(row) ? { key: 'approval', label: '立项审批', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
+  canViewProjectDetail(row) ? { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') } : null,
+  canEditProject(row) ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
+  canEnterApprovalPage(row) ? { key: 'approval', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
   canProjectArchive.value && row.permissionContext?.canArchive !== false ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
   canProjectDelete.value && row.permissionContext?.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)

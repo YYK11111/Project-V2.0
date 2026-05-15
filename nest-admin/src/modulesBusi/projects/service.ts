@@ -1211,6 +1211,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         const isManager =
           canManageAll || isLeader || role === ProjectMemberRole.manager;
         const isDeliveryManager = role === ProjectMemberRole.deliveryManager;
+        const isCore = String(member?.isCore || "0") === "1";
         const isFunctionalLead = [
           ProjectMemberRole.techLead,
           ProjectMemberRole.implementationLead,
@@ -1224,6 +1225,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
             canManageAll,
             isManager,
             isDeliveryManager,
+            isCore,
             isFunctionalLead,
             isVisitor,
             canView:

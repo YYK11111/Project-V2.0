@@ -450,6 +450,55 @@ describe("ProjectsService closure guards", () => {
     );
   });
 
+  it("项目列表应返回当前用户是否为项目核心成员", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p1",
+            name: "核心成员项目",
+            creatorId: "creator-1",
+            leaderId: "leader-1",
+            status: "3",
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    (service as any).projectMemberRepository.find.mockResolvedValue([
+      {
+        id: "m1",
+        projectId: "p1",
+        userId: "operator-1",
+        role: "8",
+        isCore: "1",
+      },
+    ]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "operator-1",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result.list[0].permissionContext).toEqual(
+      expect.objectContaining({
+        isCore: true,
+        canView: true,
+      }),
+    );
+  });
+
   it("项目全量权限可以绕过项目编辑权限", async () => {
     const { service, repository } = createService();
     const assertProjectPermissionSpy = jest.spyOn(
