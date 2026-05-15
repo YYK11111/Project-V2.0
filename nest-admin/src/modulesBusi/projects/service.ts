@@ -392,6 +392,9 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     }
 
     dto.status ??= ProjectStatus.draft;
+    if (!isExistingProject && operatorId) {
+      dto.creatorId = operatorId;
+    }
 
     const previousProject = dto.id
       ? await this.repository.findOne({ where: { id: dto.id } as any })
@@ -1165,6 +1168,18 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       queryBuilder.andWhere(`(${scopeConditions.join(" OR ")})`, scopeParams);
     }
 
+    queryBuilder.andWhere(
+      "(project.status NOT IN (:...creatorOnlyStatuses) OR project.creatorId = :operatorId OR project.createUser = :operatorName)",
+      {
+        creatorOnlyStatuses: [
+          ProjectStatus.draft,
+          ProjectStatus.approvalPending,
+        ],
+        operatorId: _operatorId || "",
+        operatorName: _operatorName || "",
+      },
+    );
+
     const pageNum = Number(query.pageNum || 1);
     const pageSize = Number(query.pageSize || 10);
     const [list, total] = await queryBuilder
@@ -1250,6 +1265,13 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isError,
     );
     if (!project) return project;
+    if (
+      (_operatorId || _operatorName) &&
+      this.isCreatorOnlyProject(project) &&
+      !this.isProjectCreator(project, _operatorId, _operatorName)
+    ) {
+      throw new ForbiddenException("项目不存在或当前无访问权限");
+    }
 
     const calculatedProgress = await this.calculateProjectProgress(project.id);
     if (Number(project.progress || 0) !== calculatedProgress) {
@@ -1522,6 +1544,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     projectId: string,
     userId: string,
     permissions: string[] = [],
+    userName?: string,
   ) {
     const project = await this.repository.findOne({
       where: { id: projectId, isDelete: null as any } as any,
@@ -1541,6 +1564,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     });
 
     const isLeader = String(project.leaderId || "") === String(userId || "");
+    const isCreator = this.isProjectCreator(project, userId, userName);
+    const isCreatorOnly = this.isCreatorOnlyProject(project);
     const role = member?.role || (isLeader ? ProjectMemberRole.manager : null);
     const isManager =
       canManageAll || isLeader || role === ProjectMemberRole.manager;
@@ -1556,6 +1581,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       project.workflowInstanceId,
       userId,
     );
+    const canViewPrivateProject = isCreatorOnly ? isCreator : true;
 
     return {
       project,
@@ -1568,13 +1594,32 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       isFunctionalLead,
       isVisitor,
       isMember,
-      canView: canViewAll || isMember || isDeliveryManager || hasWorkflowAccess,
-      canEdit: canManageAll || isManager,
-      canSubmitApproval: canManageAll || isManager,
-      canSubmitClose: canManageAll || isManager,
-      canArchive: canManageAll || isManager,
-      canDelete: canManageAll || isManager,
+      canView:
+        canViewPrivateProject &&
+        (canViewAll || isMember || isDeliveryManager || hasWorkflowAccess),
+      canEdit: canViewPrivateProject && (canManageAll || isManager),
+      canSubmitApproval: canViewPrivateProject && (canManageAll || isManager),
+      canSubmitClose: canViewPrivateProject && (canManageAll || isManager),
+      canArchive: canViewPrivateProject && (canManageAll || isManager),
+      canDelete: canViewPrivateProject && (canManageAll || isManager),
     };
+  }
+
+  private isCreatorOnlyProject(project: Pick<Project, "status">) {
+    return [ProjectStatus.draft, ProjectStatus.approvalPending].includes(
+      String(project?.status || "") as ProjectStatus,
+    );
+  }
+
+  private isProjectCreator(
+    project: Pick<Project, "creatorId" | "createUser">,
+    userId?: string,
+    userName?: string,
+  ) {
+    return (
+      (!!userId && String(project?.creatorId || "") === String(userId)) ||
+      (!!userName && String(project?.createUser || "") === String(userName))
+    );
   }
 
   async getVisibleProjectIdsForUser(
@@ -1684,11 +1729,13 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       | "archive"
       | "delete",
     permissions: string[] = [],
+    userName?: string,
   ) {
     const context = await this.getProjectPermissionContext(
       projectId,
       userId,
       permissions,
+      userName,
     );
     if (!context) {
       throw new ForbiddenException("项目不存在或当前无访问权限");

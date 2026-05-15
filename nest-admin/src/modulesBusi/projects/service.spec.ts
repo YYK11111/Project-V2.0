@@ -311,6 +311,93 @@ describe("ProjectsService closure guards", () => {
     );
   });
 
+  it("草稿和立项审批中项目列表仅允许项目发起人可见", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+
+    await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "operator-1",
+      _operatorName: "zhangsan",
+      _operatorPermissions: ["business/projects/manageAll"],
+    } as any);
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(project.status NOT IN (:...creatorOnlyStatuses) OR project.creatorId = :operatorId OR project.createUser = :operatorName)",
+      {
+        creatorOnlyStatuses: ["1", "2"],
+        operatorId: "operator-1",
+        operatorName: "zhangsan",
+      },
+    );
+  });
+
+  it("草稿项目详情权限拒绝非发起人查看", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "1",
+      creatorId: "creator-1",
+      leaderId: "operator-1",
+    });
+
+    await expect(
+      service.assertProjectPermission("p1", "operator-1", "view", [
+        "business/projects/manageAll",
+      ]),
+    ).rejects.toThrow(new ForbiddenException("当前无该项目的操作权限"));
+  });
+
+  it("草稿项目详情查询拒绝非发起人直接读取", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "1",
+      creatorId: "creator-1",
+      createUser: "creator",
+    });
+
+    await expect(
+      service.getOne({
+        id: "p1",
+        _operatorId: "operator-1",
+        _operatorName: "operator",
+      }),
+    ).rejects.toThrow(new ForbiddenException("项目不存在或当前无访问权限"));
+  });
+
+  it("草稿项目详情权限允许按创建用户名识别发起人", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "1",
+      creatorId: "",
+      createUser: "zhangsan",
+      leaderId: "operator-1",
+    });
+
+    const context = await service.assertProjectPermission(
+      "p1",
+      "operator-1",
+      "view",
+      ["business/projects/manageAll"],
+      "zhangsan",
+    );
+
+    expect(context.canView).toBe(true);
+  });
+
   it("项目管理全部权限应让列表行展示编辑删除等管理操作", async () => {
     const { service, repository } = createService();
     const queryBuilder = {
@@ -409,7 +496,7 @@ describe("ProjectsService closure guards", () => {
     expect(context.canSubmitApproval).toBe(true);
   });
 
-  it("当前待办审批人可以查看项目详情", async () => {
+  it("立项审批未结束时当前待办审批人不可查看项目详情", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({
       id: "p1",
@@ -422,19 +509,12 @@ describe("ProjectsService closure guards", () => {
       id: "task-1",
     });
 
-    const context = await service.assertProjectPermission(
-      "p1",
-      "approver-1",
-      "view",
-      [],
-    );
-
-    expect(context.canView).toBe(true);
-    expect(context.canEdit).toBe(false);
-    expect(context.canSubmitApproval).toBe(false);
+    await expect(
+      service.assertProjectPermission("p1", "approver-1", "view", []),
+    ).rejects.toThrow(new ForbiddenException("当前无该项目的操作权限"));
   });
 
-  it("历史审批人可以查看项目详情", async () => {
+  it("立项审批未结束时历史审批人不可查看项目详情", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({
       id: "p1",
@@ -448,16 +528,9 @@ describe("ProjectsService closure guards", () => {
       id: "history-1",
     });
 
-    const context = await service.assertProjectPermission(
-      "p1",
-      "approver-1",
-      "view",
-      [],
-    );
-
-    expect(context.canView).toBe(true);
-    expect(context.canEdit).toBe(false);
-    expect(context.canSubmitApproval).toBe(false);
+    await expect(
+      service.assertProjectPermission("p1", "approver-1", "view", []),
+    ).rejects.toThrow(new ForbiddenException("当前无该项目的操作权限"));
   });
 
   it("历史审批人应能在项目列表中看到项目", async () => {
@@ -474,10 +547,10 @@ describe("ProjectsService closure guards", () => {
         [
           {
             id: "p18",
-            name: "审批项目",
+            name: "已立项审批项目",
             creatorId: "1",
             leaderId: "1",
-            status: "2",
+            status: "3",
             workflowInstanceId: "21",
           },
         ],

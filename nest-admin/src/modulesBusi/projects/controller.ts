@@ -60,6 +60,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "archive",
       req.user?.permissions || [],
+      req.user?.name,
     );
     return this.service.archive(id);
   }
@@ -71,6 +72,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "view",
       req.user?.permissions || [],
+      req.user?.name,
     );
     return this.service.getStatistics(id);
   }
@@ -82,6 +84,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "view",
       req.user?.permissions || [],
+      req.user?.name,
     );
     const dashboard = await this.service.getDashboard(id);
     return {
@@ -105,6 +108,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "view",
       req.user?.permissions || [],
+      req.user?.name,
     );
     const project = await this.service.getOne({ id });
     return this.projectFieldPermissionService.getProjectFieldPermissions({
@@ -139,6 +143,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "view",
       req.user?.permissions || [],
+      req.user?.name,
     );
     return this.service.getProjectCockpit(id);
   }
@@ -176,6 +181,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "submitApproval",
       req.user?.permissions || [],
+      req.user?.name,
     );
     await this.service.validateBaselinePlan(id);
     await this.service.ensureProjectApprovalReady(id);
@@ -194,6 +200,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "submitClose",
       req.user?.permissions || [],
+      req.user?.name,
     );
     await this.service.validateClosePlan(id);
     const instanceId = await this.workflowService.startProjectCloseApproval(
@@ -210,6 +217,7 @@ export class ProjectsController extends BaseController<
       req.user?.id,
       "edit",
       req.user?.permissions || [],
+      req.user?.name,
     );
     return this.service.publishCloseReviewToKnowledge(id, {
       id: req.user?.id,

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import { getOne, save, update, getStatus, getPriority, getProjectType, submitApproval, submitClose, getFieldPermissions } from './api'
@@ -7,6 +7,7 @@ import { getList as getCustomerList } from '@/views/business/crm/customerManage/
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { useUserStore } from '@/stores/user'
 import UserSelect from '@/components/UserSelect.vue'
 import Editor from '@/components/Editor/index.vue'
 import Upload from '@/components/Upload.vue'
@@ -19,6 +20,7 @@ import ViewUser from '@/components/view/ViewUser.vue'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const memberRoleOptions = {
   '1': '项目经理',
@@ -133,9 +135,23 @@ function createMilestonesByType(projectType) {
   }))
 }
 
+function getCurrentUserAsProjectCreator() {
+  return {
+    creatorId: String(userStore.id || ''),
+    creator: userStore.id
+      ? {
+          id: String(userStore.id || ''),
+          name: userStore.name || '',
+          nickname: userStore.name || '',
+        }
+      : null,
+  }
+}
+
 const formRef = ref()
 const shellRef = ref(null)
 const milestonesManuallyEdited = ref(false)
+const isLoadingProject = ref(false)
 const form = ref(createDefaultForm())
 const stickyBarStyle = ref({})
 let stickyBarResizeObserver = null
@@ -205,6 +221,7 @@ const isView = computed(() => route.query.action === 'view')
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const isCreate = computed(() => !route.query.id && !isView.value)
 const isDraftMode = computed(() => isCreate.value || String(form.value.status || '') === '1')
+const isDraftCreateLikeMode = computed(() => isCreate.value || (isEdit.value && String(form.value.status || '') === '1'))
 const isClosureMode = computed(() => !isCreate.value && String(form.value.status || '') !== '1')
 const pageStatusText = computed(() => {
   if (isView.value) {
@@ -257,14 +274,17 @@ const deptMap = computed(() => Object.fromEntries((deptList.value || []).map((it
 const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
 
 function canViewGroup(groupCode) {
+  if (isDraftCreateLikeMode.value) return true
   return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
 }
 
 function canEditGroup(groupCode) {
+  if (isDraftCreateLikeMode.value) return true
   return (groupPermissions.value[groupCode] || 'editable') === 'editable'
 }
 
 function isGroupReadonly(groupCode) {
+  if (isDraftCreateLikeMode.value) return false
   return isView.value || !canEditGroup(groupCode)
 }
 
@@ -301,7 +321,7 @@ watch(
   () => form.value.projectType,
   (projectTypeValue, oldValue) => {
     if (!projectTypeValue || projectTypeValue === oldValue) return
-    if (isEdit.value || milestonesManuallyEdited.value) return
+    if (isLoadingProject.value || !isDraftCreateLikeMode.value || milestonesManuallyEdited.value) return
     form.value.milestones = createMilestonesByType(projectTypeValue)
   },
 )
@@ -343,32 +363,43 @@ async function loadProject() {
   if (!(isEdit.value || isView.value)) {
     form.value = {
       ...createDefaultForm(),
+      ...getCurrentUserAsProjectCreator(),
       ...(hydrateFromContractQuery() || {}),
     }
     fieldPermissionResult.value = null
     return
   }
-  const { data } = await getOne(route.query.id)
-  if (isEdit.value && String(data?.status || '') !== '1') {
-    $sdk.msgWarning('项目立项后不允许直接编辑，请通过项目变更发起调整')
-    router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })
-    return
+  isLoadingProject.value = true
+  try {
+    const { data } = await getOne(route.query.id)
+    if (isEdit.value && String(data?.status || '') !== '1') {
+      $sdk.msgWarning('项目立项后不允许直接编辑，请通过项目变更发起调整')
+      router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })
+      return
+    }
+    form.value = {
+      attachments: [],
+      tags: [],
+      members: [],
+      milestones: [],
+      ...data,
+      budget: data.budget || 0,
+      actualCost: data.actualCost || 0,
+      spentHours: data.spentHours || 0,
+      progress: data.progress || 0,
+      members: (data.members || []).length ? data.members : [defaultMember(1)],
+      milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
+    }
+    if (isDraftCreateLikeMode.value) {
+      fieldPermissionResult.value = null
+      return
+    }
+    const permissionRes = await getFieldPermissions(route.query.id)
+    fieldPermissionResult.value = permissionRes?.data || permissionRes || null
+  } finally {
+    await nextTick()
+    isLoadingProject.value = false
   }
-  form.value = {
-    attachments: [],
-    tags: [],
-    members: [],
-    milestones: [],
-    ...data,
-    budget: data.budget || 0,
-    actualCost: data.actualCost || 0,
-    spentHours: data.spentHours || 0,
-    progress: data.progress || 0,
-    members: (data.members || []).length ? data.members : [defaultMember(1)],
-    milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
-  }
-  const permissionRes = await getFieldPermissions(route.query.id)
-  fieldPermissionResult.value = permissionRes?.data || permissionRes || null
 }
 
 watch(
@@ -467,7 +498,8 @@ function normalizeSubmitPayload() {
       })),
   }
 
-  if (isCreate.value) {
+  if (isDraftCreateLikeMode.value) {
+    payload.creatorId = String(userStore.id || payload.creatorId || '')
     payload.phase = 'init'
     payload.status = '1'
     payload.actualStartDate = ''
@@ -484,12 +516,14 @@ function normalizeSubmitPayload() {
     payload.closeReview = ''
     payload.acceptanceDate = ''
     payload.members = payload.members.map((item) => ({
+      ...(isEdit.value && item.id ? { id: item.id } : {}),
       userId: item.userId,
       role: item.role,
       isCore: item.isCore,
       sort: item.sort,
     }))
     payload.milestones = payload.milestones.map((item) => ({
+      ...(isEdit.value && item.id ? { id: item.id } : {}),
       name: item.name,
       dueDate: item.dueDate,
       sort: item.sort,
@@ -663,7 +697,7 @@ onBeforeUnmount(() => {
       <el-form ref="formRef" :model="form" :rules="rules" :label-position="formLabelPosition" :label-width="isCompactScreen ? 'auto' : '100px'" style="--FormItemContentMaxWidth: 100%;">
       <div class="project-sections">
         <el-alert
-          v-if="!isCreate && isClosureMode && !isView"
+          v-if="!isDraftCreateLikeMode && isClosureMode && !isView"
           type="info"
           :closable="false"
           show-icon
@@ -745,7 +779,7 @@ onBeforeUnmount(() => {
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目类型" prop="projectType">
                   <ViewField v-if="isGroupReadonly('projectBasic')" :value="projectType[form.projectType]" />
-                  <el-select v-else v-model="form.projectType" placeholder="请选择项目类型" style="width: 100%" :disabled="isEdit">
+                  <el-select v-else v-model="form.projectType" placeholder="请选择项目类型" style="width: 100%" :disabled="!isDraftCreateLikeMode && isEdit">
                     <el-option v-for="(value, key) in projectType" :key="key" :label="value" :value="key" />
                   </el-select>
                 </el-form-item>
@@ -764,7 +798,7 @@ onBeforeUnmount(() => {
               <el-col :xs="24" :sm="12">
                 <el-form-item label="项目发起人" prop="creatorId">
                   <ViewUser v-if="isGroupReadonly('projectBasic')" :user="form.creator" />
-                  <UserSelect v-else v-model="form.creatorId" placeholder="请选择项目发起人" clearable />
+                  <UserSelect v-else v-model="form.creatorId" placeholder="自动识别当前用户" :disabled="isDraftCreateLikeMode" clearable />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -786,7 +820,7 @@ onBeforeUnmount(() => {
               </el-col>
             </el-row>
 
-            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan') && !isDraftCreateLikeMode" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="计划开始" prop="planStartDate">
                   <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.planStartDate" />
@@ -801,7 +835,7 @@ onBeforeUnmount(() => {
               </el-col>
             </el-row>
 
-            <el-row v-if="canViewGroup('projectPlan') && !isCreate" :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan') && !isDraftCreateLikeMode" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="实际开始">
                   <ViewField :value="form.actualStartDate" />
@@ -894,13 +928,13 @@ onBeforeUnmount(() => {
               </el-col>
             </el-row>
 
-            <el-form-item v-if="!isCreate" label="进度(%)" class="basic-info-progress-item">
+            <el-form-item v-if="!isDraftCreateLikeMode" label="进度(%)" class="basic-info-progress-item">
               <div class="progress-readonly-field">
                 <ViewField :value="form.progress" />
                 <div class="progress-readonly-field__tip">项目进度由任务完成率自动计算</div>
               </div>
             </el-form-item>
-            <el-form-item v-if="canViewGroup('projectBusiness') && !isCreate" label="累计工时" class="basic-info-progress-item">
+            <el-form-item v-if="canViewGroup('projectBusiness') && !isDraftCreateLikeMode" label="累计工时" class="basic-info-progress-item">
               <div class="progress-readonly-field">
                 <ViewField :value="form.spentHours" />
                 <div class="progress-readonly-field__tip">项目累计工时由任务工时自动汇总</div>
@@ -1042,7 +1076,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="!isMobileScreen" class="table-wrapper table-wrapper--milestones" :class="{ 'table-wrapper--milestones-wide': !isCreate, 'table-wrapper--milestones-compact': isTabletScreen }">
+          <div v-if="!isMobileScreen" class="table-wrapper table-wrapper--milestones" :class="{ 'table-wrapper--milestones-wide': !isDraftCreateLikeMode, 'table-wrapper--milestones-compact': isTabletScreen }">
             <el-table :data="form.milestones" border class="edit-table milestones-table" @cell-click="milestonesManuallyEdited = true">
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="里程碑名称" width="180">
@@ -1061,7 +1095,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isCreate" label="责任人" width="150">
+              <el-table-column v-if="!isDraftCreateLikeMode" label="责任人" width="150">
                 <template #default="{ row }">
                   <ViewUser v-if="isView" :user="row.owner" />
                   <div v-else class="cell-editor">
@@ -1069,7 +1103,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isCreate" label="状态" width="130">
+              <el-table-column v-if="!isDraftCreateLikeMode" label="状态" width="130">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="{ '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[row.status]" />
                   <div v-else class="cell-editor">
@@ -1082,7 +1116,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isCreate" label="交付物" width="220">
+              <el-table-column v-if="!isDraftCreateLikeMode" label="交付物" width="220">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
                   <div v-else class="cell-editor">
@@ -1092,7 +1126,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isCreate" label="描述" width="180">
+              <el-table-column v-if="!isDraftCreateLikeMode" label="描述" width="180">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.description" />
                   <div v-else class="cell-editor">
@@ -1100,7 +1134,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isCreate" label="延期原因" width="180">
+              <el-table-column v-if="!isDraftCreateLikeMode" label="延期原因" width="180">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.delayReason" />
                   <div v-else class="cell-editor">
@@ -1140,11 +1174,11 @@ onBeforeUnmount(() => {
                   <ViewField v-if="isView" :value="row.dueDate" />
                   <el-date-picker v-else v-model="row.dueDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
                 </el-form-item>
-                <el-form-item v-if="!isCreate" label="责任人" class="mobile-edit-card__item">
+                <el-form-item v-if="!isDraftCreateLikeMode" label="责任人" class="mobile-edit-card__item">
                   <ViewUser v-if="isView" :user="row.owner" />
                   <UserSelect v-else v-model="row.ownerId" placeholder="请选择责任人" clearable />
                 </el-form-item>
-                <el-form-item v-if="!isCreate" label="状态" class="mobile-edit-card__item">
+                <el-form-item v-if="!isDraftCreateLikeMode" label="状态" class="mobile-edit-card__item">
                   <ViewField v-if="isView" :value="getMilestoneStatusText(row.status)" />
                   <el-select v-else v-model="row.status" style="width: 100%">
                     <el-option label="待完成" value="1" />
@@ -1157,17 +1191,17 @@ onBeforeUnmount(() => {
                   <ViewField v-if="isView" :value="row.sort" />
                   <el-input-number v-else v-model="row.sort" :min="0" style="width: 100%" />
                 </el-form-item>
-                <el-form-item v-if="!isCreate" label="交付物" class="mobile-edit-card__item mobile-edit-card__item--full">
+                <el-form-item v-if="!isDraftCreateLikeMode" label="交付物" class="mobile-edit-card__item mobile-edit-card__item--full">
                   <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
                   <el-select v-else v-model="row.deliverables" multiple filterable allow-create default-first-option collapse-tags collapse-tags-tooltip placeholder="请输入交付物" style="width: 100%">
                     <el-option v-for="item in row.deliverables || []" :key="item" :label="item" :value="item" />
                   </el-select>
                 </el-form-item>
-                <el-form-item v-if="!isCreate" label="描述" class="mobile-edit-card__item mobile-edit-card__item--full">
+                <el-form-item v-if="!isDraftCreateLikeMode" label="描述" class="mobile-edit-card__item mobile-edit-card__item--full">
                   <ViewField v-if="isView" :value="row.description" />
                   <el-input v-else v-model="row.description" type="textarea" :rows="2" placeholder="请输入说明" />
                 </el-form-item>
-                <el-form-item v-if="!isCreate" label="延期原因" class="mobile-edit-card__item mobile-edit-card__item--full">
+                <el-form-item v-if="!isDraftCreateLikeMode" label="延期原因" class="mobile-edit-card__item mobile-edit-card__item--full">
                   <ViewField v-if="isView" :value="row.delayReason" />
                   <el-input v-else v-model="row.delayReason" type="textarea" :rows="2" placeholder="请输入延期原因" />
                 </el-form-item>
@@ -1195,7 +1229,7 @@ onBeforeUnmount(() => {
           </el-form-item>
         </section>
 
-        <section v-if="!isCreate && canViewGroup('projectClosure')" class="section-card section-card--table">
+        <section v-if="!isDraftCreateLikeMode && canViewGroup('projectClosure')" class="section-card section-card--table">
           <div class="section-header km-section-header section-header--stack">
             <div>
               <div class="section-title km-section-title">结项资料与复盘</div>

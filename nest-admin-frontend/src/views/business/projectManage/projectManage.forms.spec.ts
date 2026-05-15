@@ -101,7 +101,7 @@ describe('项目链路表单结构整改守卫', () => {
   it('新增项目页里程碑表不默认写死宽度，避免新建态少列表格撑大表单', () => {
     const source = readBusinessView('projectManage/form.vue')
 
-    expect(source).toContain("'table-wrapper--milestones-wide': !isCreate")
+    expect(source).toContain("'table-wrapper--milestones-wide': !isDraftCreateLikeMode")
     expect(source).not.toMatch(/\.table-wrapper--milestones\s+:deep\(\.el-table\)\s*\{[\s\S]*width:\s*1280px;/)
   })
 
@@ -111,6 +111,33 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).toContain("isEdit.value && String(data?.status || '') !== '1'")
     expect(source).toContain("项目立项后不允许直接编辑，请通过项目变更发起调整")
     expect(source).toContain("router.replace({ path: '/projectManage/detail', query: { id: route.query.id } })")
+  })
+
+  it('新建项目自动把项目发起人识别为当前用户并随提交保持一致', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain("import { useUserStore } from '@/stores/user'")
+    expect(source).toContain('const userStore = useUserStore()')
+    expect(source).toContain('getCurrentUserAsProjectCreator')
+    expect(source).toContain('creatorId: String(userStore.id || \'\')')
+    expect(source).toContain('payload.creatorId = String(userStore.id || payload.creatorId || \'\')')
+  })
+
+  it('暂存项目编辑态应复用新建项目表单体验', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain("const isDraftCreateLikeMode = computed(() => isCreate.value || (isEdit.value && String(form.value.status || '') === '1'))")
+    expect(source).toContain('if (isDraftCreateLikeMode.value) {')
+    expect(source).toContain(':disabled="isDraftCreateLikeMode"')
+    expect(source).toContain(':disabled="!isDraftCreateLikeMode && isEdit"')
+    expect(source).toContain("if (isDraftCreateLikeMode.value) return true")
+    expect(source).toContain("if (isDraftCreateLikeMode.value) return false")
+    expect(source).toContain("if (isDraftCreateLikeMode.value) {")
+    expect(source).toContain("fieldPermissionResult.value = null")
+    expect(source).not.toContain('v-if="!isCreate" label="进度(%)"')
+    expect(source).not.toContain('v-if="!isCreate && canViewGroup(\'projectClosure\')"')
+    expect(source).not.toContain('v-if="!isCreate" label="责任人"')
+    expect(source).not.toContain('v-if="!isCreate" label="状态"')
   })
 
   it('高频业务表单外层卡片不承接横向滚动', () => {

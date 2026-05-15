@@ -103,6 +103,7 @@ export class BaseController<T, K> {
     return this.service.getOne({
       id,
       _operatorId: req?.user?.id,
+      _operatorName: req?.user?.name,
       _operatorDeptId: req?.user?.deptId || req?.user?.dept?.id,
       _operatorPermissions: req?.user?.permissions || [],
       _operatorRoles: req?.user?.roles || [],
