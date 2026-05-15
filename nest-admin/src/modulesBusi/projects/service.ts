@@ -20,7 +20,6 @@ import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { ProjectDto } from "./dto";
 import { Task, TaskStatus } from "../tasks/entity";
-import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
 import { Ticket, TicketStatus } from "../tickets/entity";
 import { SysFileService } from "src/modules/sys/file/service";
 import { FileStatus, SysFile } from "src/modules/sys/file/entity";
@@ -53,7 +52,6 @@ import { ChangeImpactConfirmHistory } from "../changes/entities/change-impact-co
 import { ProjectFieldPermissionService } from "./project-field-permission.service";
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
-import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
 import { BusinessApprovalContextService } from "../approval-contexts/service";
 
 @Injectable()
@@ -94,10 +92,6 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private readonly sysFileService: SysFileService,
     private readonly dataSource: DataSource,
     private readonly systemScheduledJobsService: SystemScheduledJobsService,
-    @InjectRepository(WorkflowTask)
-    private workflowTaskRepository: Repository<WorkflowTask>,
-    @InjectRepository(WorkflowHistory)
-    private workflowHistoryRepository: Repository<WorkflowHistory>,
     private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {
     super(Project, repository);
@@ -1323,9 +1317,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         project,
         _operatorId,
         _operatorName,
-        await this.hasWorkflowAccess(
-          project.workflowInstanceId,
+        await this.businessApprovalContextService?.hasRootBusinessParticipantAccess(
           String(_operatorId || ""),
+          "project",
+          String(project.id || ""),
         ),
       )
     ) {
@@ -1640,12 +1635,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         "project",
         projectId,
       );
-    const hasWorkflowAccess = hasApprovalParticipantAccess
-      ? false
-      : await this.hasWorkflowAccess(project.workflowInstanceId, userId);
-    const hasApprovalAccess = Boolean(
-      hasApprovalParticipantAccess || hasWorkflowAccess,
-    );
+    const hasApprovalAccess = Boolean(hasApprovalParticipantAccess);
     const canViewPrivateProject = this.canViewCreatorOnlyProject(
       project,
       userId,
@@ -1728,77 +1718,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     );
   }
 
-  private async hasWorkflowAccess(
-    workflowInstanceId?: string | null,
-    userId?: string,
-  ) {
-    if (!workflowInstanceId || !userId) return false;
-    const [pendingTask, history] = await Promise.all([
-      this.workflowTaskRepository.findOne({
-        where: {
-          instanceId: workflowInstanceId,
-          assigneeId: userId,
-          status: "1",
-        } as any,
-        select: ["id"] as any,
-      }),
-      this.workflowHistoryRepository.findOne({
-        where: {
-          instanceId: workflowInstanceId,
-          operatorId: userId,
-        } as any,
-        select: ["id"] as any,
-      }),
-    ]);
-    return Boolean(pendingTask || history);
-  }
-
-  private async getWorkflowVisibleProjectIdsForUser(userId: string) {
-    if (!userId) return [];
-    const [pendingTasks, histories] = await Promise.all([
-      this.workflowTaskRepository.find({
-        where: {
-          assigneeId: userId,
-          status: "1",
-        } as any,
-        select: ["instanceId"] as any,
-      }),
-      this.workflowHistoryRepository.find({
-        where: {
-          operatorId: userId,
-        } as any,
-        select: ["instanceId"] as any,
-      }),
-    ]);
-    const instanceIds = Array.from(
-      new Set(
-        [...pendingTasks, ...histories]
-          .map((item) => String(item.instanceId || ""))
-          .filter(Boolean),
-      ),
-    );
-    if (!instanceIds.length) return [];
-    const projects = await this.repository.find({
-      where: {
-        workflowInstanceId: In(instanceIds),
-        isDelete: null as any,
-      } as any,
-      select: ["id"] as any,
-    });
-    return projects.map((item) => String(item.id)).filter(Boolean);
-  }
-
   private async getApprovalVisibleProjectIdsForUser(userId: string) {
     if (!userId) return [];
-    const approvalVisibleProjectIds =
+    return (
       (await this.businessApprovalContextService?.findVisibleRootBusinessIdsForUser(
         userId,
         "project",
-      )) || [];
-    if (approvalVisibleProjectIds.length) {
-      return approvalVisibleProjectIds;
-    }
-    return this.getWorkflowVisibleProjectIdsForUser(userId);
+      )) || []
+    );
   }
 
   async assertProjectPermission(

@@ -333,7 +333,7 @@ describe("BusinessApprovalContextService", () => {
         rootBusinessType: "project",
       },
       select: ["id", "workflowInstanceId"] as any,
-      order: { createTime: "ASC" },
+      order: { id: "ASC" },
       take: 50,
     });
     expect(syncParticipantsSpy).toHaveBeenCalledTimes(2);
@@ -345,6 +345,46 @@ describe("BusinessApprovalContextService", () => {
       skipped: 1,
       failed: 0,
       failures: [],
+      nextAfterId: "ctx-3",
+      hasMore: false,
+    });
+  });
+
+  it("按游标批量回填历史审批参与人索引并返回下一批游标", async () => {
+    const { service, contextRepository } = createService();
+    contextRepository.find.mockResolvedValue([
+      { id: "ctx-11", workflowInstanceId: "wf-11" },
+      { id: "ctx-12", workflowInstanceId: "wf-12" },
+    ]);
+    const syncParticipantsSpy = jest
+      .spyOn(service, "syncParticipantsFromWorkflow")
+      .mockResolvedValue(undefined);
+
+    const result = await service.backfillParticipants({
+      rootBusinessType: "project",
+      limit: 2,
+      afterId: "ctx-10",
+    });
+
+    expect(contextRepository.find).toHaveBeenCalledWith({
+      where: {
+        isActive: "1",
+        rootBusinessType: "project",
+        id: expect.any(Object),
+      },
+      select: ["id", "workflowInstanceId"] as any,
+      order: { id: "ASC" },
+      take: 2,
+    });
+    expect(syncParticipantsSpy).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      total: 2,
+      processed: 2,
+      skipped: 0,
+      failed: 0,
+      failures: [],
+      nextAfterId: "ctx-12",
+      hasMore: true,
     });
   });
 

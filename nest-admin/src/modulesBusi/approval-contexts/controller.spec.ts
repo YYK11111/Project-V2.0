@@ -17,12 +17,14 @@ describe("BusinessApprovalContextController", () => {
       rootBusinessType: "project",
       businessType: "task",
       limit: "50",
+      afterId: "ctx-10",
     });
 
     expect(service.backfillParticipants).toHaveBeenCalledWith({
       rootBusinessType: "project",
       businessType: "task",
       limit: 50,
+      afterId: "ctx-10",
     });
     expect(result).toEqual({
       total: 2,

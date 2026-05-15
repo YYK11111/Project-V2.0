@@ -27,6 +27,7 @@ export class BusinessApprovalContextController {
       rootBusinessType: query.rootBusinessType,
       businessType: query.businessType,
       limit: Number(query.limit || 200),
+      afterId: query.afterId,
     });
   }
 }

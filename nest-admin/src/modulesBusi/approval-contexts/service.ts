@@ -1,6 +1,6 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
+import { In, MoreThan, Repository } from "typeorm";
 import { BusinessApprovalContext } from "./entity/business-approval-context.entity";
 import { BusinessApprovalParticipant } from "./entity/business-approval-participant.entity";
 import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
@@ -45,6 +45,7 @@ export interface BackfillApprovalParticipantsOptions {
   businessType?: string;
   rootBusinessType?: string;
   limit?: number;
+  afterId?: string;
 }
 
 @Injectable()
@@ -294,10 +295,13 @@ export class BusinessApprovalContextService {
     if (options.rootBusinessType) {
       where.rootBusinessType = String(options.rootBusinessType);
     }
+    if (options.afterId) {
+      where.id = MoreThan(String(options.afterId));
+    }
     const contexts = await this.contextRepository.find({
       where,
       select: ["id", "workflowInstanceId"] as any,
-      order: { createTime: "ASC" },
+      order: { id: "ASC" },
       take: limit,
     });
     const failures: Array<{ contextId: string; workflowInstanceId: string }> =
@@ -328,6 +332,10 @@ export class BusinessApprovalContextService {
       skipped,
       failed: failures.length,
       failures,
+      nextAfterId: contexts.length
+        ? String(contexts[contexts.length - 1].id || "")
+        : "",
+      hasMore: contexts.length >= limit,
     };
   }
 

@@ -31,8 +31,6 @@ import { HandoverRecord } from "../handover-records/entity";
 import { Contract } from "../crm/contracts/entity";
 import { SalesOpportunity } from "../crm/opportunities/entity";
 import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
-import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
-import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
 import { BusinessApprovalContextsModule } from "../approval-contexts/module";
 
 @Module({
@@ -56,8 +54,6 @@ import { BusinessApprovalContextsModule } from "../approval-contexts/module";
       HandoverRecord,
       Contract,
       SalesOpportunity,
-      WorkflowTask,
-      WorkflowHistory,
     ]),
     forwardRef(() => UsersModule),
     CrmModule,
