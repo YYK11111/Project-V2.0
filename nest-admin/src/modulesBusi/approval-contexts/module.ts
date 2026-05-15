@@ -6,6 +6,7 @@ import { BusinessApprovalContext } from "./entity/business-approval-context.enti
 import { BusinessApprovalParticipant } from "./entity/business-approval-participant.entity";
 import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
 import { ProjectChange } from "../changes/entity";
+import { Task } from "../tasks/entity";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ProjectChange } from "../changes/entity";
       BusinessApprovalParticipant,
       WorkflowInstance,
       ProjectChange,
+      Task,
     ]),
   ],
   controllers: [BusinessApprovalContextController],

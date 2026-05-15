@@ -5,6 +5,7 @@ import { BusinessApprovalContext } from "./entity/business-approval-context.enti
 import { BusinessApprovalParticipant } from "./entity/business-approval-participant.entity";
 import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
 import { ProjectChange } from "../changes/entity";
+import { Task } from "../tasks/entity";
 
 export interface CreateBusinessApprovalContextOptions {
   businessType: string;
@@ -47,6 +48,9 @@ export class BusinessApprovalContextService {
     @Optional()
     @InjectRepository(ProjectChange)
     private readonly changeRepository?: Repository<ProjectChange>,
+    @Optional()
+    @InjectRepository(Task)
+    private readonly taskRepository?: Repository<Task>,
   ) {}
 
   async createFromWorkflowStart(options: CreateBusinessApprovalContextOptions) {
@@ -151,9 +155,18 @@ export class BusinessApprovalContextService {
     projectId: string,
     existingContexts: BusinessApprovalContext[],
   ) {
-    if (!this.workflowInstanceRepository || !this.changeRepository) return;
+    if (
+      !this.workflowInstanceRepository ||
+      !this.changeRepository ||
+      !this.taskRepository
+    )
+      return;
 
     const changes = await this.changeRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
+    const tasks = await this.taskRepository.find({
       where: { projectId },
       select: ["id"],
     });
@@ -161,6 +174,7 @@ export class BusinessApprovalContextService {
       `project_${projectId}`,
       `project_close_${projectId}`,
       ...changes.map((change) => `change_${change.id}`),
+      ...tasks.map((task) => `task_${task.id}`),
     ];
     const workflowInstances = await this.workflowInstanceRepository.find({
       where: { businessKey: In(businessKeys) },
@@ -219,6 +233,15 @@ export class BusinessApprovalContextService {
         businessId: businessKey.replace("change_", ""),
         businessScene: "approval",
         sceneTitle: "变更审批",
+      };
+    }
+    if (businessKey.startsWith("task_")) {
+      return {
+        ...commonOptions,
+        businessType: "task",
+        businessId: businessKey.replace("task_", ""),
+        businessScene: "approval",
+        sceneTitle: "任务审批",
       };
     }
     return null;
