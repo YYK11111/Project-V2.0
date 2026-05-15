@@ -32,11 +32,18 @@ const businessReadActions = new Set([
 
 const businessAccessModuleAliases = {
   'business/tasks/dependency': ['business/tasks'],
-  'business/projects': ['business/workflow/tasks'],
+}
+
+const businessAccessActionAliases = {
+  'business/projects': {
+    getOne: ['business/workflow/tasks'],
+    fieldPermissions: ['business/workflow/tasks'],
+    viewContext: ['business/workflow/tasks'],
+  },
 }
 
 const businessAccessActionMap = {
-  'business/projects': new Set(['getOne', 'fieldPermissions']),
+  'business/projects': new Set(['getOne', 'fieldPermissions', 'viewContext', 'update', 'submitApproval', 'submitClose']),
   'business/workflow/definitions': new Set(['list', 'getOne']),
   'business/workflow/instances': new Set(['list', 'getOne', 'history', 'tasks']),
   'business/workflow/tasks': new Set(['list', 'complete', 'transfer', 'addSign']),
@@ -77,7 +84,13 @@ function hasModuleAccess(permissions = [], permissionKey) {
   if (normalizedPermissions.includes('*')) return true
   const moduleKey = getPermissionModuleKey(normalizedKey)
   if (!moduleKey) return false
-  const moduleKeys = [moduleKey, ...(businessAccessModuleAliases[moduleKey] || [])]
+  const segments = normalizedKey.split('/').filter(Boolean)
+  const action = segments.at(-1) || ''
+  const moduleKeys = [
+    moduleKey,
+    ...(businessAccessModuleAliases[moduleKey] || []),
+    ...(businessAccessActionAliases[moduleKey]?.[action] || []),
+  ]
   return moduleKeys.some((key) => normalizedPermissions.includes(`${key}/access`))
 }
 

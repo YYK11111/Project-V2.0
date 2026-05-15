@@ -636,6 +636,45 @@ describe("ProjectsService closure guards", () => {
     expect(context.canSubmitApproval).toBe(true);
   });
 
+  it("项目经理可以编辑自己项目但不能删除或归档项目", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "1",
+      leaderId: "leader-1",
+    });
+    (service as any).projectMemberRepository.findOne.mockResolvedValue({
+      id: "m1",
+      projectId: "p1",
+      userId: "manager-1",
+      role: "1",
+      isActive: "1",
+    });
+
+    const context = await service.assertProjectPermission(
+      "p1",
+      "manager-1",
+      "edit",
+      ["business/projects/access"],
+    );
+
+    expect(context.isManager).toBe(true);
+    expect(context.canEdit).toBe(true);
+    expect(context.canSubmitApproval).toBe(true);
+    expect(context.canDelete).toBe(false);
+    expect(context.canArchive).toBe(false);
+    await expect(
+      service.assertProjectPermission("p1", "manager-1", "delete", [
+        "business/projects/access",
+      ]),
+    ).rejects.toThrow("当前无该项目的操作权限");
+    await expect(
+      service.assertProjectPermission("p1", "manager-1", "archive", [
+        "business/projects/access",
+      ]),
+    ).rejects.toThrow("当前无该项目的操作权限");
+  });
+
   it("立项审批未结束时当前待办审批人可以只读查看项目详情", async () => {
     const { service, repository, businessApprovalContextService } =
       createService();

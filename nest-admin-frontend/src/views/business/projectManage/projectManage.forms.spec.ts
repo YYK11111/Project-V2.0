@@ -219,4 +219,13 @@ describe('项目链路表单结构整改守卫', () => {
       expect(rowBlock).toContain('margin-right: 0 !important;')
     })
   })
+
+  it('项目编辑页使用项目内权限上下文，不再把全局 update 作为前置条件', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain('const projectPermissionContext = ref(null)')
+    expect(source).toContain("const canEditCurrentProject = computed(() => isCreate.value || (projectPermissionContext.value?.canEdit === true && String(form.value.status || '') === '1'))")
+    expect(source).not.toContain('(isEdit.value && !canProjectUpdate.value)')
+    expect(source).not.toContain('isEdit && isDraftMode && canProjectUpdate')
+  })
 })

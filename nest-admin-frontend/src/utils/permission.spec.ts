@@ -88,12 +88,17 @@ describe('checkPermi', () => {
     expect(checkPermi(['business/projects/update'])).toBe(false)
   })
 
-  it('access 权限规则：项目 access 放行项目只读但不放行写操作', () => {
+  it('项目 access 权限放行项目作用域操作但不放行删除和归档', () => {
     userStoreState.permissions = ['business/projects/access']
 
     expect(checkPermi(['business/projects/list'])).toBe(true)
     expect(checkPermi(['business/projects/getOne'])).toBe(true)
-    expect(checkPermi(['business/projects/update'])).toBe(false)
+    expect(checkPermi(['business/projects/update'])).toBe(true)
+    expect(checkPermi(['business/projects/submitApproval'])).toBe(true)
+    expect(checkPermi(['business/projects/submitClose'])).toBe(true)
+    expect(checkPermi(['business/projects/add'])).toBe(false)
+    expect(checkPermi(['business/projects/delete'])).toBe(false)
+    expect(checkPermi(['business/projects/archive'])).toBe(false)
   })
 
   it('access 权限规则：工作流待办 access 放行审批表单项目只读但不放行项目写操作', () => {

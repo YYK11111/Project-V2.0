@@ -111,11 +111,24 @@ export class ProjectsController extends BaseController<
       req.user?.name,
     );
     const project = await this.service.getOne({ id });
-    return this.projectFieldPermissionService.getProjectFieldPermissions({
-      project,
-      rawRole: permissionContext.role,
-      canVisit: true,
-    });
+    const fieldPermissions =
+      await this.projectFieldPermissionService.getProjectFieldPermissions({
+        project,
+        rawRole: permissionContext.role,
+        canVisit: true,
+      });
+    return {
+      ...fieldPermissions,
+      permissionContext: {
+        role: permissionContext.role,
+        canManageAll: permissionContext.canManageAll,
+        canEdit: permissionContext.canEdit,
+        canSubmitApproval: permissionContext.canSubmitApproval,
+        canSubmitClose: permissionContext.canSubmitClose,
+        canArchive: permissionContext.canArchive,
+        canDelete: permissionContext.canDelete,
+      },
+    };
   }
 
   @Get(":id/view-context")

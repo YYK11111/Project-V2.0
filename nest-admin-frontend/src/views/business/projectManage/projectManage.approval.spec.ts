@@ -65,6 +65,16 @@ describe('projectManage 项目查看页治理守卫', () => {
     expect(source).toContain('label="实际成本"')
   })
 
+  it('项目查看页操作按钮使用项目内权限上下文', () => {
+    const source = readProjectApprovalSource()
+
+    expect(source).toContain('const projectPermissionContext = ref({})')
+    expect(source).toContain("const canEditProject = computed(() => projectPermissionContext.value?.canEdit === true && String(project.value?.status || '') !== '3')")
+    expect(source).toContain("const canSubmitApprovalCurrentProject = computed(() => projectPermissionContext.value?.canSubmitApproval === true)")
+    expect(source).not.toContain('const canEditProject = computed(() => canProjectUpdate.value')
+    expect(source).not.toContain('if (!canProjectSubmitApproval.value) return $sdk.msgWarning')
+  })
+
   it('立项审批页里程碑计划不展示延期原因', () => {
     const source = readProjectApprovalSource()
 

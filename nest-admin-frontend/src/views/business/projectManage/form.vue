@@ -231,9 +231,10 @@ const pageStatusText = computed(() => {
   return '审批/执行中'
 })
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
-const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
-const canEditCurrentProject = computed(() => isDraftMode.value)
+const projectPermissionContext = ref(null)
+const canEditCurrentProject = computed(() => isCreate.value || (projectPermissionContext.value?.canEdit === true && String(form.value.status || '') === '1'))
+const canSubmitApprovalCurrentProject = computed(() => isCreate.value ? canProjectSubmitApproval.value : projectPermissionContext.value?.canSubmitApproval === true)
 const isMobileScreen = computed(() => viewportWidth.value < 768)
 const isTabletScreen = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1024)
 const isCompactScreen = computed(() => viewportWidth.value < 1024)
@@ -367,6 +368,7 @@ async function loadProject() {
       ...(hydrateFromContractQuery() || {}),
     }
     fieldPermissionResult.value = null
+    projectPermissionContext.value = null
     return
   }
   isLoadingProject.value = true
@@ -390,12 +392,12 @@ async function loadProject() {
       members: (data.members || []).length ? data.members : [defaultMember(1)],
       milestones: (data.milestones || []).length ? data.milestones : createMilestonesByType(data.projectType || '1'),
     }
-    if (isDraftCreateLikeMode.value) {
-      fieldPermissionResult.value = null
-      return
-    }
     const permissionRes = await getFieldPermissions(route.query.id)
     fieldPermissionResult.value = permissionRes?.data || permissionRes || null
+    projectPermissionContext.value = fieldPermissionResult.value?.permissionContext || null
+    if (isDraftCreateLikeMode.value) {
+      return
+    }
   } finally {
     await nextTick()
     isLoadingProject.value = false
@@ -554,13 +556,13 @@ function launchProjectApproval(savedProjectId) {
 }
 
 function saveProject(triggerApproval = false) {
-  if ((isEdit.value && !canProjectUpdate.value) || (!isEdit.value && !canProjectAdd.value)) {
+  if (!isEdit.value && !canProjectAdd.value) {
     return $sdk.msgWarning('当前操作没有权限')
   }
   if (isEdit.value && !canEditCurrentProject.value) {
     return $sdk.msgWarning('执行中的项目不允许编辑')
   }
-  if (triggerApproval && !canProjectSubmitApproval.value) {
+  if (triggerApproval && !canSubmitApprovalCurrentProject.value) {
     return $sdk.msgWarning('当前操作没有权限')
   }
 
@@ -1283,7 +1285,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="footer-actions project-form-sticky-actions__buttons">
           <el-button
-            v-if="!isView && ((isEdit && isDraftMode && canProjectUpdate) || (isCreate && canProjectAdd))"
+            v-if="!isView && ((isEdit && canEditCurrentProject) || (isCreate && canProjectAdd))"
             type="primary"
             :loading="saveLoading"
             :disabled="approvalLoading"
@@ -1291,7 +1293,7 @@ onBeforeUnmount(() => {
             暂存
           </el-button>
           <el-button
-            v-if="!isView && canProjectSubmitApproval && form.status === '1'"
+            v-if="!isView && canSubmitApprovalCurrentProject && form.status === '1'"
             type="primary"
             :loading="approvalLoading"
             :disabled="saveLoading"

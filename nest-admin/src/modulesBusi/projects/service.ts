@@ -1281,8 +1281,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
             canEdit: canManageAll || isManager,
             canSubmitApproval: canManageAll || isManager,
             canSubmitClose: canManageAll || isManager,
-            canArchive: canManageAll || isManager,
-            canDelete: canManageAll || isManager,
+            canArchive: canManageAll,
+            canDelete: canManageAll,
           },
         });
       }
@@ -1636,12 +1636,14 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
         projectId,
       );
     const hasApprovalAccess = Boolean(hasApprovalParticipantAccess);
-    const canViewPrivateProject = this.canViewCreatorOnlyProject(
-      project,
-      userId,
-      userName,
-      hasApprovalAccess,
-    );
+    const canViewPrivateProject =
+      Boolean(member) ||
+      this.canViewCreatorOnlyProject(
+        project,
+        userId,
+        userName,
+        hasApprovalAccess,
+      );
 
     return {
       project,
@@ -1660,8 +1662,8 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       canEdit: canViewPrivateProject && (canManageAll || isManager),
       canSubmitApproval: canViewPrivateProject && (canManageAll || isManager),
       canSubmitClose: canViewPrivateProject && (canManageAll || isManager),
-      canArchive: canViewPrivateProject && (canManageAll || isManager),
-      canDelete: canViewPrivateProject && (canManageAll || isManager),
+      canArchive: canViewPrivateProject && canManageAll,
+      canDelete: canViewPrivateProject && canManageAll,
     };
   }
 

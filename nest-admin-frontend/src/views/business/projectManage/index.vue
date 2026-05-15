@@ -32,7 +32,7 @@ getDeptTrees({}).then((res) => {
 const rctRef = ref()
 const canProjectAdd = computed(() => checkPermi(['business/projects/add']))
 const showAdvanced = ref(false)
-const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
+const canProjectManageAll = computed(() => checkPermi(['business/projects/manageAll']))
 const canProjectDelete = computed(() => checkPermi(['business/projects/delete']))
 const canProjectArchive = computed(() => checkPermi(['business/projects/archive']))
 const recalculatingProgress = ref(false)
@@ -46,7 +46,7 @@ function getProjectApprovalText(row) {
 }
 
 function canEditProject(row) {
-  return canProjectUpdate.value && row.permissionContext?.canEdit !== false && String(row.status || '') === '1'
+  return row.permissionContext?.canEdit === true && String(row.status || '') === '1'
 }
 
 function isProjectInitiationStage(row) {
@@ -73,7 +73,7 @@ function handleArchive(row) {
 }
 
 function handleRecalculateAllProgress() {
-  if (!canProjectUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canProjectManageAll.value) return $sdk.msgWarning('当前操作没有权限')
   $sdk.confirm('确定要重算全部项目进度吗？系统会按项目下已完成任务数 / 总任务数重新计算。').then(() => {
     recalculatingProgress.value = true
     recalculateProgress().then((res) => {
@@ -167,7 +167,7 @@ const getButtons = (row) => [
           </div>
           <div class="project-index-operation__actions">
             <el-button v-if="canProjectAdd" type="primary" @click="rctRef.goRoute(null, '/projectManage/form')">新增项目</el-button>
-            <el-button v-if="canProjectUpdate" :loading="recalculatingProgress" @click="handleRecalculateAllProgress">重算全部进度</el-button>
+            <el-button v-if="canProjectManageAll" :loading="recalculatingProgress" @click="handleRecalculateAllProgress">重算全部进度</el-button>
             <el-button v-if="canProjectDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
           </div>
         </div>

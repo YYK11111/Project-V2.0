@@ -7,7 +7,6 @@ import { getList as getCustomerList } from '@/views/business/crm/customerManage/
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import { closeReturnedWorkflowInstance, getWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
-import { checkPermi } from '@/utils/permission'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import ViewFileList from '@/components/view/ViewFileList.vue'
@@ -23,8 +22,6 @@ const projectId = computed(() => String(route.query.id || ''))
 const workflowTaskId = computed(() => String(route.query.taskId || ''))
 const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const approvalRetryFailed = computed(() => route.query.approvalFailed === '1')
-const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
-const canProjectUpdate = computed(() => checkPermi(['business/projects/update']))
 const retryApprovalLoading = ref(false)
 
 const memberRoleOptions = {
@@ -61,13 +58,15 @@ const workflowInstance = ref(null)
 const approvalContexts = ref([])
 const currentApprovalContext = ref(null)
 const selectedApprovalContextId = ref('')
+const projectPermissionContext = ref({})
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
 const workflowInstanceId = computed(() => String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || project.value?.workflowInstanceId || ''))
 const currentApprovalTitle = computed(() => getApprovalContextTitle(currentApprovalContext.value))
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
-const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
+const canEditProject = computed(() => projectPermissionContext.value?.canEdit === true && String(project.value?.status || '') !== '3')
+const canSubmitApprovalCurrentProject = computed(() => projectPermissionContext.value?.canSubmitApproval === true)
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
 const isApprovalPassed = computed(() => project.value?.approvalStatus === '2')
 const isApprovalRunning = computed(() => project.value?.approvalStatus === '1')
@@ -155,6 +154,7 @@ async function reloadCurrent() {
   deptMap.value = map
   const viewContext = projectRes.data?.project ? projectRes.data : null
   const projectResData = viewContext?.project || projectRes.data || {}
+  projectPermissionContext.value = viewContext?.permissionContext || {}
   approvalContexts.value = viewContext?.approvalContexts || []
   currentApprovalContext.value = viewContext?.currentApprovalContext || null
   selectedApprovalContextId.value = String(currentApprovalContext.value?.id || '')
@@ -187,9 +187,9 @@ function clearApprovalFailedFlag() {
 }
 
 function handleRetryApproval() {
-  if (!canProjectSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSubmitApprovalCurrentProject.value) return $sdk.msgWarning('当前操作没有权限')
   retryApprovalLoading.value = true
-  submitApproval(projectId).then(() => {
+  submitApproval(projectId.value).then(() => {
     $sdk.msgSuccess('立项审批提交成功')
     clearApprovalFailedFlag()
     reloadCurrent()
@@ -201,10 +201,10 @@ function handleRetryApproval() {
 }
 
 function handleSubmitApproval() {
-  if (!canProjectSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSubmitApprovalCurrentProject.value) return $sdk.msgWarning('当前操作没有权限')
   const request = canCloseReturnedInstance.value
     ? resubmitReturnedWorkflowInstance(project.value.workflowInstanceId, { comment: '发起人重新提交审批' })
-    : submitApproval(projectId)
+    : submitApproval(projectId.value)
   request.then(() => {
     $sdk.msgSuccess('立项审批提交成功')
     clearApprovalFailedFlag()
@@ -259,7 +259,7 @@ watch(
     >
       <template #default>
         <div class="top-alert-actions">
-          <el-button v-if="canProjectSubmitApproval && project.status === '1'" type="warning" size="small" :loading="retryApprovalLoading" @click="handleRetryApproval">重试发起立项审批</el-button>
+          <el-button v-if="canSubmitApprovalCurrentProject && project.status === '1'" type="warning" size="small" :loading="retryApprovalLoading" @click="handleRetryApproval">重试发起立项审批</el-button>
         </div>
       </template>
     </el-alert>
@@ -275,7 +275,7 @@ watch(
       <template #default>
         <div class="top-alert-actions">
           <el-button v-if="canEditProject" type="primary" size="small" @click="goToEdit">去编辑项目</el-button>
-          <el-button v-if="canCloseReturnedInstance && canProjectSubmitApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交立项审批</el-button>
+          <el-button v-if="canCloseReturnedInstance && canSubmitApprovalCurrentProject" type="warning" size="small" @click="handleSubmitApproval">重新提交立项审批</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </div>
       </template>

@@ -32,6 +32,8 @@ describe('projectManage 列表治理守卫', () => {
     const source = readProjectManageView('index')
 
     expect(source).toContain("String(row.status || '') === '1'")
+    expect(source).toContain("return row.permissionContext?.canEdit === true && String(row.status || '') === '1'")
+    expect(source).not.toContain('return canProjectUpdate.value && row.permissionContext?.canEdit')
     expect(source).not.toContain("String(row.status || '') !== '3'")
   })
 

@@ -255,6 +255,52 @@ describe("AuthGuard", () => {
     ).toBe(false);
   });
 
+  it("项目 access 可以进入项目作用域操作但不能删除或归档项目", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/update",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/submitApproval",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/submitClose",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/add",
+      ),
+    ).toBe(false);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/delete",
+      ),
+    ).toBe(false);
+    expect(
+      (guard as any).hasPermission(
+        ["business/projects/access"],
+        "business/projects/archive",
+      ),
+    ).toBe(false);
+  });
+
   it("实例作用域的流程定义详情接口使用实例详情权限", () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

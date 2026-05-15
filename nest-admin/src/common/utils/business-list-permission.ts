@@ -36,11 +36,25 @@ const businessReadActions = new Set([
 
 const businessAccessModuleAliases: Record<string, string[]> = {
   "business/tasks/dependency": ["business/tasks"],
-  "business/projects": ["business/workflow/tasks"],
+};
+
+const businessAccessActionAliases: Record<string, Record<string, string[]>> = {
+  "business/projects": {
+    getOne: ["business/workflow/tasks"],
+    fieldPermissions: ["business/workflow/tasks"],
+    viewContext: ["business/workflow/tasks"],
+  },
 };
 
 const businessAccessActionMap: Record<string, Set<string>> = {
-  "business/projects": new Set(["getOne", "fieldPermissions", "viewContext"]),
+  "business/projects": new Set([
+    "getOne",
+    "fieldPermissions",
+    "viewContext",
+    "update",
+    "submitApproval",
+    "submitClose",
+  ]),
   "business/workflow/definitions": new Set(["list", "getOne"]),
   "business/workflow/instances": new Set([
     "list",
@@ -97,9 +111,12 @@ export function hasModuleAccess(
   if (normalizedPermissions.includes("*")) return true;
   const moduleKey = getPermissionModuleKey(normalizedKey);
   if (!moduleKey) return false;
+  const segments = normalizedKey.split("/").filter(Boolean);
+  const action = segments.at(-1) || "";
   const moduleKeys = [
     moduleKey,
     ...(businessAccessModuleAliases[moduleKey] || []),
+    ...(businessAccessActionAliases[moduleKey]?.[action] || []),
   ];
   return moduleKeys.some((key) =>
     normalizedPermissions.includes(`${key}/access`),
