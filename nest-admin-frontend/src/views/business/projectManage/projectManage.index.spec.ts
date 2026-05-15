@@ -35,17 +35,16 @@ describe('projectManage 列表治理守卫', () => {
     expect(source).not.toContain("String(row.status || '') !== '3'")
   })
 
-  it('项目列表非核心人员隐藏详情并通过查看进入立项信息页', () => {
+  it('项目列表按项目阶段统一详情和立项信息入口', () => {
     const source = readProjectManageView('index')
 
+    expect(source).toContain('function isProjectInitiationStage(row)')
     expect(source).toContain('function canViewProjectDetail(row)')
-    expect(source).toMatch(/function canViewProjectDetail\(row\) \{\s*return row\.permissionContext\?\.canManageAll === true\s*\|\| row\.permissionContext\?\.isCore === true\s*\}/)
-    expect(source).not.toContain("row.permissionContext?.isManager === true")
-    expect(source).not.toContain("row.permissionContext?.isDeliveryManager === true")
-    expect(source).not.toContain("row.permissionContext?.isFunctionalLead === true")
+    expect(source).toMatch(/function canViewProjectDetail\(row\) \{\s*return row\.permissionContext\?\.canView !== false && !isProjectInitiationStage\(row\)\s*\}/)
+    expect(source).toMatch(/function canEnterApprovalPage\(row\) \{\s*return row\.permissionContext\?\.canView !== false && isProjectInitiationStage\(row\)\s*\}/)
     expect(source).toContain("canViewProjectDetail(row) ? { key: 'view', label: '详情'")
-    expect(source).toContain("canEnterApprovalPage(row) ? { key: 'approval', label: '查看'")
-    expect(source).toContain('return row.permissionContext?.canView !== false')
+    expect(source).toContain("canEnterApprovalPage(row) ? { key: 'approval', label: '立项信息'")
+    expect(source).not.toContain("label: '查看'")
     expect(source).not.toContain('business/projects/submitApproval')
     expect(source).not.toContain("label: '立项审批'")
   })

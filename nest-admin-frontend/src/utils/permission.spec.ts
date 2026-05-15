@@ -87,4 +87,20 @@ describe('checkPermi', () => {
     expect(checkPermi(['business/projects/fieldPermissions'])).toBe(true)
     expect(checkPermi(['business/projects/update'])).toBe(false)
   })
+
+  it('access 权限规则：项目 access 放行项目只读但不放行写操作', () => {
+    userStoreState.permissions = ['business/projects/access']
+
+    expect(checkPermi(['business/projects/list'])).toBe(true)
+    expect(checkPermi(['business/projects/getOne'])).toBe(true)
+    expect(checkPermi(['business/projects/update'])).toBe(false)
+  })
+
+  it('access 权限规则：工作流待办 access 放行审批表单项目只读但不放行项目写操作', () => {
+    userStoreState.permissions = ['business/workflow/tasks/access']
+
+    expect(checkPermi(['business/projects/getOne'])).toBe(true)
+    expect(checkPermi(['business/projects/fieldPermissions'])).toBe(true)
+    expect(checkPermi(['business/projects/update'])).toBe(false)
+  })
 })

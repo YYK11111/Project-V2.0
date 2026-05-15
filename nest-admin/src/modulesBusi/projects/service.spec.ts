@@ -311,7 +311,7 @@ describe("ProjectsService closure guards", () => {
     );
   });
 
-  it("草稿和立项审批中项目列表仅允许项目发起人可见", async () => {
+  it("草稿项目列表仅允许项目发起人可见", async () => {
     const { service, repository } = createService();
     const queryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -339,6 +339,85 @@ describe("ProjectsService closure guards", () => {
         creatorOnlyStatuses: ["1", "2"],
         operatorId: "operator-1",
         operatorName: "zhangsan",
+      },
+    );
+  });
+
+  it("立项审批中项目列表允许当前待办审批人可见", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "p19",
+            name: "立项审批项目",
+            creatorId: "creator-1",
+            leaderId: "leader-1",
+            status: "2",
+            workflowInstanceId: "22",
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    (service as any).projectMemberRepository.find.mockResolvedValue([]);
+    jest
+      .spyOn(service as any, "getWorkflowVisibleProjectIdsForUser")
+      .mockResolvedValue(["p19"]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "approver-1",
+      _operatorName: "approver",
+      _operatorPermissions: [],
+    } as any);
+
+    expect(result.list).toHaveLength(1);
+    expect(result.list[0].id).toBe("p19");
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(project.status NOT IN (:...creatorOnlyStatuses) OR project.creatorId = :operatorId OR project.createUser = :operatorName OR project.id IN (:...workflowVisibleProjectIds))",
+      {
+        creatorOnlyStatuses: ["1", "2"],
+        operatorId: "approver-1",
+        operatorName: "approver",
+        workflowVisibleProjectIds: ["p19"],
+      },
+    );
+  });
+
+  it("项目可见 ID 范围和列表使用同一套审批中可见条件", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([{ id: "p19" }]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+    jest
+      .spyOn(service as any, "getWorkflowVisibleProjectIdsForUser")
+      .mockResolvedValue(["p19"]);
+
+    const result = await service.getVisibleProjectIdsForUser("approver-1", []);
+
+    expect(result).toEqual(["p19"]);
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(project.status NOT IN (:...creatorOnlyStatuses) OR project.creatorId = :operatorId OR project.createUser = :operatorName OR project.id IN (:...workflowVisibleProjectIds))",
+      {
+        creatorOnlyStatuses: ["1", "2"],
+        operatorId: "approver-1",
+        operatorName: "",
+        workflowVisibleProjectIds: ["p19"],
       },
     );
   });

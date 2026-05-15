@@ -119,6 +119,67 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     return hasModuleFullAccess(permissions, "business/projects/update");
   }
 
+  private buildProjectVisibleScopeParams(options: {
+    operatorId?: string;
+    operatorName?: string;
+    workflowVisibleProjectIds?: string[];
+  }) {
+    const operatorId = String(options.operatorId || "");
+    const operatorName = String(options.operatorName || "");
+    const workflowVisibleProjectIds = (options.workflowVisibleProjectIds || [])
+      .map((id) => String(id || ""))
+      .filter(Boolean);
+    const baseConditions = [
+      "project.leaderId = :operatorId",
+      "project.creatorId = :operatorId",
+      "project.createUser = :operatorName",
+      "projectMember.id IS NOT NULL",
+    ];
+    const creatorOnlyConditions = [
+      "project.status NOT IN (:...creatorOnlyStatuses)",
+      "project.creatorId = :operatorId",
+      "project.createUser = :operatorName",
+    ];
+    const scopeParams: Record<string, any> = {
+      operatorId,
+      operatorName,
+    };
+    const creatorOnlyParams: Record<string, any> = {
+      creatorOnlyStatuses: [ProjectStatus.draft, ProjectStatus.approvalPending],
+      operatorId,
+      operatorName,
+    };
+
+    if (workflowVisibleProjectIds.length) {
+      baseConditions.push("project.id IN (:...workflowVisibleProjectIds)");
+      creatorOnlyConditions.push(
+        "project.id IN (:...workflowVisibleProjectIds)",
+      );
+      scopeParams.workflowVisibleProjectIds = workflowVisibleProjectIds;
+      creatorOnlyParams.workflowVisibleProjectIds = workflowVisibleProjectIds;
+    }
+
+    return {
+      baseCondition: `(${baseConditions.join(" OR ")})`,
+      baseParams: scopeParams,
+      creatorOnlyCondition: `(${creatorOnlyConditions.join(" OR ")})`,
+      creatorOnlyParams,
+      workflowVisibleProjectIds,
+    };
+  }
+
+  private canViewCreatorOnlyProject(
+    project: Pick<Project, "status" | "creatorId" | "createUser">,
+    userId?: string,
+    userName?: string,
+    hasWorkflowAccess = false,
+  ) {
+    if (!this.isCreatorOnlyProject(project)) return true;
+    return (
+      this.isProjectCreator(project, userId, userName) || hasWorkflowAccess
+    );
+  }
+
   private mapContractSummary(contract?: Contract | null) {
     if (!contract) return null;
     return {
@@ -1092,6 +1153,11 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     const workflowVisibleProjectIds = canViewAll
       ? []
       : await this.getWorkflowVisibleProjectIdsForUser(_operatorId || "");
+    const visibleScope = this.buildProjectVisibleScopeParams({
+      operatorId: _operatorId,
+      operatorName: _operatorName,
+      workflowVisibleProjectIds,
+    });
 
     const queryBuilder = this.repository
       .createQueryBuilder("project")
@@ -1151,33 +1217,15 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       });
 
     if (!canViewAll) {
-      const scopeConditions = [
-        "project.leaderId = :operatorId",
-        "project.creatorId = :operatorId",
-        "project.createUser = :operatorName",
-        "projectMember.id IS NOT NULL",
-      ];
-      const scopeParams: Record<string, any> = {
-        operatorId: _operatorId || "",
-        operatorName: _operatorName || "",
-      };
-      if (workflowVisibleProjectIds.length) {
-        scopeConditions.push("project.id IN (:...workflowVisibleProjectIds)");
-        scopeParams.workflowVisibleProjectIds = workflowVisibleProjectIds;
-      }
-      queryBuilder.andWhere(`(${scopeConditions.join(" OR ")})`, scopeParams);
+      queryBuilder.andWhere(
+        visibleScope.baseCondition,
+        visibleScope.baseParams,
+      );
     }
 
     queryBuilder.andWhere(
-      "(project.status NOT IN (:...creatorOnlyStatuses) OR project.creatorId = :operatorId OR project.createUser = :operatorName)",
-      {
-        creatorOnlyStatuses: [
-          ProjectStatus.draft,
-          ProjectStatus.approvalPending,
-        ],
-        operatorId: _operatorId || "",
-        operatorName: _operatorName || "",
-      },
+      visibleScope.creatorOnlyCondition,
+      visibleScope.creatorOnlyParams,
     );
 
     const pageNum = Number(query.pageNum || 1);
@@ -1269,12 +1317,15 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     if (!project) return project;
     if (
       (_operatorId || _operatorName) &&
-      this.isCreatorOnlyProject(project) &&
-      !this.isProjectCreator(project, _operatorId, _operatorName) &&
-      !(await this.hasWorkflowAccess(
-        project.workflowInstanceId,
-        String(_operatorId || ""),
-      ))
+      !this.canViewCreatorOnlyProject(
+        project,
+        _operatorId,
+        _operatorName,
+        await this.hasWorkflowAccess(
+          project.workflowInstanceId,
+          String(_operatorId || ""),
+        ),
+      )
     ) {
       throw new ForbiddenException("项目不存在或当前无访问权限");
     }
@@ -1570,8 +1621,6 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     });
 
     const isLeader = String(project.leaderId || "") === String(userId || "");
-    const isCreator = this.isProjectCreator(project, userId, userName);
-    const isCreatorOnly = this.isCreatorOnlyProject(project);
     const role = member?.role || (isLeader ? ProjectMemberRole.manager : null);
     const isManager =
       canManageAll || isLeader || role === ProjectMemberRole.manager;
@@ -1587,9 +1636,12 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       project.workflowInstanceId,
       userId,
     );
-    const canViewPrivateProject = isCreatorOnly
-      ? isCreator || hasWorkflowAccess
-      : true;
+    const canViewPrivateProject = this.canViewCreatorOnlyProject(
+      project,
+      userId,
+      userName,
+      hasWorkflowAccess,
+    );
 
     return {
       project,
@@ -1638,31 +1690,31 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     if (canViewAll) return null;
     if (!userId) return [];
 
-    const [leaderProjects, memberProjects] = await Promise.all([
-      this.repository.find({
-        where: { leaderId: userId, isDelete: null as any } as any,
-        select: ["id"] as any,
-      }),
-      this.projectMemberRepository.find({
-        where: {
-          userId,
-          isActive: "1",
-          isDelete: null as any,
-        } as any,
-        select: ["projectId"] as any,
-      }),
-    ]);
     const workflowProjectIds =
       await this.getWorkflowVisibleProjectIdsForUser(userId);
+    const visibleScope = this.buildProjectVisibleScopeParams({
+      operatorId: userId,
+      workflowVisibleProjectIds: workflowProjectIds,
+    });
+    const projects = await this.repository
+      .createQueryBuilder("project")
+      .leftJoin(
+        ProjectMember,
+        "projectMember",
+        "projectMember.projectId = project.id AND projectMember.userId = :operatorId AND projectMember.isDelete IS NULL AND projectMember.isActive = '1'",
+        { operatorId: userId },
+      )
+      .where("project.isDelete IS NULL")
+      .andWhere(visibleScope.baseCondition, visibleScope.baseParams)
+      .andWhere(
+        visibleScope.creatorOnlyCondition,
+        visibleScope.creatorOnlyParams,
+      )
+      .select(["project.id"])
+      .getMany();
 
     return Array.from(
-      new Set(
-        [
-          ...leaderProjects.map((item) => String(item.id)),
-          ...memberProjects.map((item) => String(item.projectId)),
-          ...workflowProjectIds,
-        ].filter(Boolean),
-      ),
+      new Set(projects.map((item) => String(item.id || "")).filter(Boolean)),
     );
   }
 
