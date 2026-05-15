@@ -87,7 +87,7 @@ function handleRecalculateAllProgress() {
 }
 
 const getButtons = (row) => [
-  canViewProject(row) ? { key: 'approvalView', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
+  canViewProject(row) ? { key: 'approvalView', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/view') } : null,
   canViewProjectDetail(row) ? { key: 'detail', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') } : null,
   canEditProject(row) ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
   canProjectArchive.value && row.permissionContext?.canArchive !== false ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,

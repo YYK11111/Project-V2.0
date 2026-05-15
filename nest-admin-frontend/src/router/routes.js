@@ -124,6 +124,12 @@ export const constantRoutes = [
         meta: { title: '项目详情' },
       },
       {
+        path: '/projectManage/view',
+        component: () => import('@/views/business/projectManage/approval.vue'),
+        name: 'ProjectViewHidden',
+        meta: { title: '项目查看' },
+      },
+      {
         path: '/projectManage/approval',
         component: () => import('@/views/business/projectManage/approval.vue'),
         name: 'ProjectApprovalHidden',

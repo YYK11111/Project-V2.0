@@ -60,10 +60,12 @@ const workflowPanelRef = ref()
 const workflowInstance = ref(null)
 const approvalContexts = ref([])
 const currentApprovalContext = ref(null)
+const selectedApprovalContextId = ref('')
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
 const workflowInstanceId = computed(() => String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || project.value?.workflowInstanceId || ''))
+const currentApprovalTitle = computed(() => getApprovalContextTitle(currentApprovalContext.value))
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
 const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
@@ -82,6 +84,33 @@ function getApprovalType(status) {
   if (status === '1') return 'warning'
   if (status === '3') return 'danger'
   return 'info'
+}
+
+function getApprovalContextTitle(context) {
+  return context?.sceneTitle || ({ initiation: '立项审批', closure: '结项审批', change: '变更审批' }[context?.businessScene] || '审批记录')
+}
+
+function getApprovalContextStatusText(context) {
+  return ({ '1': '审批中', '2': '已通过', '3': '已结束', '4': '已挂起' }[String(context?.status || '')] || '-')
+}
+
+function getApprovalContextStatusType(context) {
+  if (String(context?.status || '') === '2') return 'success'
+  if (String(context?.status || '') === '1') return 'warning'
+  if (String(context?.status || '') === '3') return 'danger'
+  return 'info'
+}
+
+async function loadWorkflowInstance(instanceId) {
+  const finalWorkflowInstanceId = String(instanceId || '')
+  const workflowInstanceRes = finalWorkflowInstanceId ? await getWorkflowInstance(finalWorkflowInstanceId) : { data: null }
+  workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null
+}
+
+async function selectApprovalContext(context) {
+  currentApprovalContext.value = context || null
+  selectedApprovalContextId.value = String(context?.id || '')
+  await loadWorkflowInstance(context?.workflowInstanceId)
 }
 
 function getRiskLevelType(level) {
@@ -128,6 +157,7 @@ async function reloadCurrent() {
   const projectResData = viewContext?.project || projectRes.data || {}
   approvalContexts.value = viewContext?.approvalContexts || []
   currentApprovalContext.value = viewContext?.currentApprovalContext || null
+  selectedApprovalContextId.value = String(currentApprovalContext.value?.id || '')
   project.value = {
     attachments: [],
     members: [],
@@ -138,8 +168,7 @@ async function reloadCurrent() {
   }
 
   const finalWorkflowInstanceId = String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || projectResData?.workflowInstanceId || '')
-  const workflowInstanceRes = finalWorkflowInstanceId ? await getWorkflowInstance(finalWorkflowInstanceId) : { data: null }
-  workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null
+  await loadWorkflowInstance(finalWorkflowInstanceId)
 }
 
 function goToEdit() {
@@ -211,7 +240,7 @@ watch(
 <template>
   <div class="Gcard project-approval-page">
     <div class="mb20">
-      <el-page-header @back="$router.back()" title="项目审批">
+      <el-page-header @back="$router.back()" title="项目查看">
         <template #extra>
           <el-button v-if="isApprovalRejected && canEditProject" @click="goToEdit">去编辑项目</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
@@ -263,7 +292,7 @@ watch(
 
     <el-alert
       v-else-if="isApprovalRunning"
-      title="项目立项审批进行中，请在本页查看流程状态与审批处理进展。"
+      :title="`${currentApprovalTitle}进行中，请在本页查看流程状态与审批处理进展。`"
       type="info"
       :closable="false"
       show-icon
@@ -271,11 +300,39 @@ watch(
     />
 
     <div class="approval-sections">
+      <section v-if="approvalContexts.length" class="section-card section-card--approval-contexts">
+        <div class="section-header">
+          <div>
+            <div class="section-title">审批记录</div>
+            <div class="section-desc">按审批场景查看当前项目关联的流程记录。</div>
+          </div>
+        </div>
+
+        <div class="approval-context-list">
+          <button
+            v-for="context in approvalContexts"
+            :key="context.id || context.workflowInstanceId"
+            type="button"
+            class="approval-context-item"
+            :class="{ 'is-active': selectedApprovalContextId === String(context.id || '') }"
+            @click="selectApprovalContext(context)"
+          >
+            <span class="approval-context-item__main">
+              <span class="approval-context-item__title">{{ getApprovalContextTitle(context) }}</span>
+              <span class="approval-context-item__meta">{{ context.startedAt || context.createTime || '-' }}</span>
+            </span>
+            <el-tag :type="getApprovalContextStatusType(context)" size="small" effect="plain">
+              {{ getApprovalContextStatusText(context) }}
+            </el-tag>
+          </button>
+        </div>
+      </section>
+
       <section class="section-card section-card--summary">
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">审批摘要</div>
-            <div class="section-desc">聚焦展示立项审批决策所需的核心信息与当前流程状态。</div>
+            <div class="section-desc">聚焦展示当前审批决策所需的核心信息与流程状态。</div>
           </div>
         </div>
 
@@ -341,7 +398,7 @@ watch(
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">基本信息</div>
-            <div class="section-desc">仅展示立项审批所需的基础属性、基线计划和预算信息，去掉执行期字段。</div>
+            <div class="section-desc">展示项目查看和审批判断所需的基础属性、基线计划和预算信息。</div>
           </div>
         </div>
 
@@ -514,7 +571,7 @@ watch(
         <div class="section-header">
           <div>
             <div class="section-title">项目成员</div>
-            <div class="section-desc">审批时快速判断项目角色配置和核心成员是否齐备。</div>
+            <div class="section-desc">查看项目角色配置和核心成员是否齐备。</div>
           </div>
         </div>
 
@@ -549,7 +606,7 @@ watch(
         <div class="section-header">
           <div>
             <div class="section-title">里程碑计划</div>
-            <div class="section-desc">审批时核对里程碑、计划日期和关键交付物是否完整。</div>
+            <div class="section-desc">查看里程碑、计划日期和关键交付物是否完整。</div>
           </div>
         </div>
 
@@ -582,7 +639,7 @@ watch(
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">项目附件</div>
-            <div class="section-desc">审批时核对立项附件和支撑材料是否齐全。</div>
+            <div class="section-desc">查看项目附件和支撑材料是否齐全。</div>
           </div>
         </div>
 
@@ -599,7 +656,7 @@ watch(
         <div class="section-header section-header--stack">
           <div>
             <div class="section-title">{{ isWorkflowReadonly ? '流程图与审批历史' : '审批处理' }}</div>
-            <div class="section-desc">{{ isWorkflowReadonly ? '仅展示当前立项流程的流转图和审批历史记录。' : '请在核对项目立项材料后完成审批、驳回、转交或加签操作。' }}</div>
+            <div class="section-desc">{{ isWorkflowReadonly ? '展示当前流程的流转图和审批历史记录。' : '请在核对项目材料后完成审批、驳回、转交或加签操作。' }}</div>
           </div>
         </div>
         <WorkflowApprovalPanel
@@ -677,6 +734,57 @@ watch(
   overflow-y: hidden;
 }
 
+.approval-context-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.approval-context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.approval-context-item:hover,
+.approval-context-item.is-active {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.approval-context-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.approval-context-item__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.approval-context-item__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
 .preview-table {
   width: auto;
 }
@@ -694,5 +802,17 @@ watch(
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 1200px) {
+  .approval-context-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .approval-context-list {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

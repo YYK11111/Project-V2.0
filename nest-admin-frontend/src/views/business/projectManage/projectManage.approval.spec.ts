@@ -10,7 +10,34 @@ function readWorkflowApprovalPanelSource() {
   return readFileSync(resolve(__dirname, '../../../components/workflow/WorkflowApprovalPanel.vue'), 'utf-8')
 }
 
-describe('projectManage 立项查看页治理守卫', () => {
+function readRoutesSource() {
+  return readFileSync(resolve(__dirname, '../../../router/routes.js'), 'utf-8')
+}
+
+describe('projectManage 项目查看页治理守卫', () => {
+  it('项目查看页作为长期入口并保留旧审批页兼容入口', () => {
+    const routeSource = readRoutesSource()
+
+    expect(routeSource).toContain("path: '/projectManage/view'")
+    expect(routeSource).toContain("name: 'ProjectViewHidden'")
+    expect(routeSource).toContain("meta: { title: '项目查看' }")
+    expect(routeSource).toContain("path: '/projectManage/approval'")
+    expect(routeSource).toContain("component: () => import('@/views/business/projectManage/approval.vue')")
+  })
+
+  it('查看页标题为项目查看并展示审批记录列表', () => {
+    const source = readProjectApprovalSource()
+
+    expect(source).toContain('title="项目查看"')
+    expect(source).toContain('const selectedApprovalContextId = ref(\'\')')
+    expect(source).toContain('function selectApprovalContext(context)')
+    expect(source).toContain('function getApprovalContextStatusText(context)')
+    expect(source).toContain('<section v-if="approvalContexts.length" class="section-card section-card--approval-contexts">')
+    expect(source).toContain('v-for="context in approvalContexts"')
+    expect(source).toContain('@click="selectApprovalContext(context)"')
+    expect(source).toContain('审批记录')
+  })
+
   it('直接查看立项页时展示只读流程图和审批历史', () => {
     const source = readProjectApprovalSource()
     const panelSource = readWorkflowApprovalPanelSource()

@@ -43,7 +43,7 @@ describe('projectManage 列表治理守卫', () => {
     expect(source).toContain('function canViewProjectDetail(row)')
     expect(source).toMatch(/function canViewProject\(row\) \{\s*return row\.permissionContext\?\.canView !== false\s*\}/)
     expect(source).toContain('context.canManageAll || context.isCore || context.isManager || context.isDeliveryManager')
-    expect(source).toContain("canViewProject(row) ? { key: 'approvalView', label: '查看'")
+    expect(source).toContain("canViewProject(row) ? { key: 'approvalView', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/view') } : null")
     expect(source).toContain("canViewProjectDetail(row) ? { key: 'detail', label: '详情'")
     expect(source).not.toContain("label: '立项信息'")
     expect(source).not.toContain('business/projects/submitApproval')
