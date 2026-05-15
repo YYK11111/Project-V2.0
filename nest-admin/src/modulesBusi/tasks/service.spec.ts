@@ -935,6 +935,58 @@ describe("TasksService lifecycle actions", () => {
     expect(queueAssignmentReminders).not.toHaveBeenCalled();
   });
 
+  it("基础访问权限允许查看本人相关任务", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      timeLogRepository,
+      taskCommentRepository,
+      userRepository,
+    } = createService();
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue([]);
+    const taskQuery: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "task-1",
+            projectId: "project-1",
+            leaderId: "user-1",
+            createUser: "creator-1",
+            executorIds: ["executor-1"],
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(taskQuery);
+    userRepository.find.mockResolvedValue([
+      { id: "executor-1", name: "执行人" },
+    ]);
+    taskCommentRepository.query.mockResolvedValue([]);
+    timeLogRepository.query.mockResolvedValue([]);
+    jest.spyOn(service as any, "getTaskPermissions").mockResolvedValue({
+      canEdit: true,
+      canExecute: true,
+    });
+
+    const result = await service.list({
+      _operatorId: "user-1",
+      _operatorPermissions: ["business/tasks/access"],
+    } as any);
+
+    expect(result.total).toBe(1);
+    expect(taskQuery.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("task.leader_id = :operatorId"),
+      { operatorId: "user-1" },
+    );
+  });
+
   it("非允许状态拒绝延期", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({
@@ -1070,5 +1122,34 @@ describe("TasksService lifecycle actions", () => {
         canExecute: true,
       }),
     );
+  });
+
+  it("基础访问权限允许查看本人相关任务详情", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-5",
+      code: "TSK-002",
+      projectId: "project-1",
+      leaderId: "user-1",
+      createUser: "creator-1",
+      executorIds: [],
+      status: TaskStatus.inProgress,
+      project: null,
+      milestone: null,
+      leader: null,
+      parent: null,
+    });
+    projectsService.assertExecutionObjectPermission.mockRejectedValue(
+      new Error("当前无访问权限"),
+    );
+    projectsService.getProjectPermissionContext.mockResolvedValue(null);
+
+    const result = await service.getOne({
+      id: "task-5",
+      _operatorId: "user-1",
+      _operatorPermissions: ["business/tasks/access"],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "task-5" }));
   });
 });

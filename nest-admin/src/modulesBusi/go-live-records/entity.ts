@@ -3,6 +3,7 @@ import { BaseEntity, BaseColumn, MyEntity } from "src/common/entity/BaseEntity";
 import { JoinColumn, ManyToOne } from "typeorm";
 import { Project } from "../projects/entity";
 import { User } from "src/modules/users/entities/user.entity";
+import dayjs from "dayjs";
 
 export enum GoLiveRecordStatus {
   draft = "1",
@@ -46,7 +47,7 @@ export class GoLiveRecord extends BaseEntity {
   @BaseColumn({
     type: "datetime",
     transformer: {
-      from: (date) => date && new Date(date).toISOString().split("T")[0],
+      from: (date) => date && dayjs(date).format("YYYY-MM-DD"),
       to: (value: string) => value,
     },
     nullable: true,
@@ -58,7 +59,7 @@ export class GoLiveRecord extends BaseEntity {
   @BaseColumn({
     type: "datetime",
     transformer: {
-      from: (date) => date && new Date(date).toISOString().split("T")[0],
+      from: (date) => date && dayjs(date).format("YYYY-MM-DD HH:mm:ss"),
       to: (value: string) => value,
     },
     nullable: true,
@@ -71,7 +72,7 @@ export class GoLiveRecord extends BaseEntity {
     type: "text",
     nullable: true,
     name: "rollback_plan",
-    comment: "回退预案",
+    comment: "回退预案富文本",
   })
   rollbackPlan: string;
 
@@ -79,9 +80,17 @@ export class GoLiveRecord extends BaseEntity {
     type: "text",
     nullable: true,
     name: "checklist_summary",
-    comment: "检查项摘要",
+    comment: "检查项摘要富文本",
   })
   checklistSummary: string;
+
+  @BaseColumn({
+    type: "json",
+    nullable: true,
+    name: "related_attachments",
+    comment: "相关附件",
+  })
+  relatedAttachments: string[];
 
   @BaseColumn({
     type: "json",

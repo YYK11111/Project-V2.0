@@ -134,6 +134,7 @@ export class WorkflowController {
       this.getCurrentUserId(req),
       status,
       mode || "starter",
+      this.getCurrentPermissions(req),
     );
   }
 

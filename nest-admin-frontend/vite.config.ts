@@ -19,6 +19,13 @@ import { ViteImageOptimizer } from 'vite-plugin-image-optimizer'
 
 import tailwindcss from '@tailwindcss/vite'
 
+const elDatePickerWithNowPath = fileURLToPath(
+  new URL('./src/components/element-plus/ElDatePickerWithNow.ts', import.meta.url),
+)
+const elTimePickerWithNowPath = fileURLToPath(
+  new URL('./src/components/element-plus/ElTimePickerWithNow.ts', import.meta.url),
+)
+
 interface SysConfig {
   SYSTEM_NAME_ALL: string
   BASE_URL: string
@@ -28,6 +35,16 @@ interface SysConfig {
 interface ConfigEnv {
   command: string
   mode: string
+}
+
+const resolveElementPlusWithDefaults = (componentName: string) => {
+  if (componentName === 'ElDatePicker') {
+    return { name: 'default', from: elDatePickerWithNowPath }
+  }
+
+  if (componentName === 'ElTimePicker') {
+    return { name: 'default', from: elTimePickerWithNowPath }
+  }
 }
 
 export default defineConfig(async ({ command, mode }: ConfigEnv) => {
@@ -105,6 +122,7 @@ export default defineConfig(async ({ command, mode }: ConfigEnv) => {
       }),
       Components({
         resolvers: [
+          resolveElementPlusWithDefaults,
           ElementPlusResolver(),
           IconsResolver({
             enabledCollections: ['ep'],

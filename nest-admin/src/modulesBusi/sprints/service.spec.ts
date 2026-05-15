@@ -118,6 +118,38 @@ describe("SprintsService completeSprint guards", () => {
     expect(repository.findAndCount).not.toHaveBeenCalled();
   });
 
+  it("基础访问权限允许查看本人相关 Sprint 列表", async () => {
+    const repository = {
+      findAndCount: jest.fn().mockResolvedValue([[{ id: "s1" }], 1]),
+    };
+    const taskRepository = { find: jest.fn() };
+    const projectExecutionPermissionService = {
+      getVisibleProjectIds: jest.fn().mockResolvedValue([]),
+    };
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+      projectExecutionPermissionService as any,
+    );
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "u1",
+      _operatorPermissions: ["business/sprints/access"],
+    } as any);
+
+    expect(result.total).toBe(1);
+    expect(repository.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ ownerId: "u1" }),
+          expect.objectContaining({ scrumMasterId: "u1" }),
+        ]),
+      }),
+    );
+  });
+
   it("详情要求当前用户具备项目执行对象权限", async () => {
     const repository = {
       findOne: jest.fn().mockResolvedValue({
@@ -140,6 +172,35 @@ describe("SprintsService completeSprint guards", () => {
     await expect(
       service.getOne({ id: "s1", _operatorId: "viewer-1" } as any),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("基础访问权限允许查看本人相关 Sprint 详情", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "s1",
+        projectId: "p1",
+        ownerId: "viewer-1",
+      }),
+    };
+    const taskRepository = { find: jest.fn() };
+    const projectExecutionPermissionService = {
+      assertReadableProject: jest
+        .fn()
+        .mockRejectedValue(new ForbiddenException("当前无该项目的操作权限")),
+    };
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+      projectExecutionPermissionService as any,
+    );
+
+    const result = await service.getOne({
+      id: "s1",
+      _operatorId: "viewer-1",
+      _operatorPermissions: ["business/sprints/access"],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "s1" }));
   });
 
   it("详情会透传当前用户权限给项目执行对象权限校验", async () => {

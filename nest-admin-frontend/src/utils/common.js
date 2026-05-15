@@ -295,40 +295,57 @@ export function copyText(txt) {
   }
 }
 
+const createCurrentMomentShortcut = () => ({
+  text: '此刻',
+  value() {
+    return new Date()
+  },
+})
+
+const createRecentRangeShortcut = (text, days) => ({
+  text,
+  value() {
+    const end = new Date()
+    const start = new Date()
+    start.setTime(start.getTime() - 3600 * 1000 * 24 * days)
+    return [start, end]
+  },
+})
+
+export function getDatePickerShortcuts(type = 'date') {
+  const normalizedType = String(type || 'date').toLowerCase()
+  if (normalizedType.includes('range')) {
+    return [
+      createRecentRangeShortcut('最近一周', 7),
+      createRecentRangeShortcut('最近一个月', 30),
+      createRecentRangeShortcut('最近三个月', 90),
+    ]
+  }
+  if (normalizedType.includes('datetime') || normalizedType.includes('time')) {
+    return []
+  }
+  return [createCurrentMomentShortcut()]
+}
+
+export function getDatePickerProps(type = 'date') {
+  return {
+    showNow: true,
+    shortcuts: getDatePickerShortcuts(type),
+  }
+}
+
+export function getTimePickerProps() {
+  return {
+    showNow: true,
+  }
+}
+
 // 日期快捷选项
 export const datePickerOptions = {
   disabledDate(time) {
     return time.getTime() > Date.now()
   },
-  shortcuts: [
-    {
-      text: '最近一周',
-      value() {
-        const end = new Date()
-        const start = new Date()
-        start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
-        return [start, end]
-      },
-    },
-    {
-      text: '最近一个月',
-      value() {
-        const end = new Date()
-        const start = new Date()
-        start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-        return [start, end]
-      },
-    },
-    {
-      text: '最近三个月',
-      value() {
-        const end = new Date()
-        const start = new Date()
-        start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
-        return [start, end]
-      },
-    },
-  ],
+  ...getDatePickerProps('daterange'),
 }
 
 // echart图表配色规范

@@ -23,7 +23,7 @@ const canOpportunityDelete = computed(() => checkPermi(['business/crm/opportunit
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/opportunityManage/form') },
-  canOpportunityUpdate.value ? { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/opportunityManage/form') } : null,
+  canOpportunityUpdate.value ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/opportunityManage/form') } : null,
   canOpportunityDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>

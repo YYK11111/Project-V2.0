@@ -227,6 +227,34 @@ describe("AuthGuard", () => {
     ).toBe(false);
   });
 
+  it("工作流任务 access 可以读取审批中的项目详情和字段权限", () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/projects/getOne",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/projects/fieldPermissions",
+      ),
+    ).toBe(true);
+    expect(
+      (guard as any).hasPermission(
+        ["business/workflow/tasks/access"],
+        "business/projects/update",
+      ),
+    ).toBe(false);
+  });
+
   it("实例作用域的流程定义详情接口使用实例详情权限", () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -736,6 +764,34 @@ describe("AuthGuard", () => {
     expect(request.user.permissions).toEqual(["business/projects/dashboard"]);
   });
 
+  it("项目详情页自动同步提醒只需要项目驾驶舱查看权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/projects/18/sync-alerts",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+      name: "user",
+      roles: [{ permissionKey: "project_member" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/projects/dashboard" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("缺少定时任务列表权限时拒绝访问列表接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -896,6 +952,45 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("上线单执行结果接口使用上线单更新权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const requests = [
+      "/api/business/go-live-records/go-1/start",
+      "/api/business/go-live-records/go-1/success",
+      "/api/business/go-live-records/go-1/rollback",
+    ];
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/go-live-records/update" },
+    ]);
+    redisService.getPermissions.mockResolvedValue([
+      "business/go-live-records/update",
+    ]);
+
+    for (const path of requests) {
+      await expect(
+        guard.canActivate(
+          createContext({
+            headers: {
+              cookie: "admin_session=header.payload.signature",
+            },
+            path,
+            method: "POST",
+          }),
+        ),
+      ).resolves.toBe(true);
+    }
+  });
+
   it("登录后访问业务字典接口不要求菜单按钮权限", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
@@ -919,6 +1014,46 @@ describe("AuthGuard", () => {
     redisService.getPermissions.mockResolvedValue([]);
 
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("工作流待办审批人访问项目详情和字段权限接口可通过接口权限校验", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/workflow/tasks/access" },
+    ]);
+
+    await expect(
+      guard.canActivate(
+        createContext({
+          headers: {
+            cookie: "admin_session=header.payload.signature",
+          },
+          path: "/api/business/projects/getOne/19",
+          method: "GET",
+        }),
+      ),
+    ).resolves.toBe(true);
+
+    await expect(
+      guard.canActivate(
+        createContext({
+          headers: {
+            cookie: "admin_session=header.payload.signature",
+          },
+          path: "/api/business/projects/field-permissions/19",
+          method: "GET",
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 
   it("登录后访问文章知识类型字典接口不要求菜单按钮权限", async () => {

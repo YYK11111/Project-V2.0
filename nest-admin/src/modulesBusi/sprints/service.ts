@@ -78,6 +78,34 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     }
   }
 
+  private isPersonalReadableSprint(sprint: Sprint, operatorId: string) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(sprint.ownerId || "") === normalizedOperatorId ||
+      String(sprint.scrumMasterId || "") === normalizedOperatorId
+    );
+  }
+
+  private async assertSprintReadPermission(
+    sprint: Sprint,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId || !sprint.projectId) return;
+    try {
+      await this.projectExecutionPermissionService.assertReadableProject(
+        sprint.projectId,
+        operatorId,
+        permissions,
+        "business/sprints/manageAll",
+      );
+    } catch (error) {
+      if (this.isPersonalReadableSprint(sprint, operatorId)) return;
+      throw error;
+    }
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<Sprint>> {
     let {
       projectId,
@@ -99,14 +127,23 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
         "business/sprints/manageAll",
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalSprintScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalSprintScope
+    ) {
       return { data: [], total: 0, _flag: true } as any;
     }
     const explicitProjectId = String(projectId || "");
     if (
       explicitProjectId &&
       visibleProjectIds &&
-      !visibleProjectIds.includes(explicitProjectId)
+      !visibleProjectIds.includes(explicitProjectId) &&
+      !shouldUsePersonalSprintScope
     ) {
       return { data: [], total: 0, _flag: true } as any;
     }
@@ -114,16 +151,40 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       explicitProjectId ||
       (visibleProjectIds ? In(visibleProjectIds) : undefined);
     let queryOrm: FindManyOptions = {
-      where: {
-        name: this.sqlLike(name),
-        projectId: projectIdFilter,
-        status: status || undefined,
-        ownerId: ownerId || undefined,
-        changeImpactFlag:
-          changeImpactFlag !== undefined && changeImpactFlag !== ""
-            ? changeImpactFlag
-            : undefined,
-      },
+      where: shouldUsePersonalSprintScope
+        ? [
+            {
+              name: this.sqlLike(name),
+              projectId: explicitProjectId || undefined,
+              status: status || undefined,
+              ownerId: ownerId || String(_operatorId),
+              changeImpactFlag:
+                changeImpactFlag !== undefined && changeImpactFlag !== ""
+                  ? changeImpactFlag
+                  : undefined,
+            },
+            {
+              name: this.sqlLike(name),
+              projectId: explicitProjectId || undefined,
+              status: status || undefined,
+              ownerId: ownerId || undefined,
+              scrumMasterId: String(_operatorId),
+              changeImpactFlag:
+                changeImpactFlag !== undefined && changeImpactFlag !== ""
+                  ? changeImpactFlag
+                  : undefined,
+            },
+          ]
+        : {
+            name: this.sqlLike(name),
+            projectId: projectIdFilter,
+            status: status || undefined,
+            ownerId: ownerId || undefined,
+            changeImpactFlag:
+              changeImpactFlag !== undefined && changeImpactFlag !== ""
+                ? changeImpactFlag
+                : undefined,
+          },
       relations: ["project", "scrumMaster", "owner"],
       order: { sort: "ASC", startDate: "DESC" },
     };
@@ -348,14 +409,11 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     );
     if (!sprint) return sprint;
     if (_operatorId) {
-      if (sprint.projectId) {
-        await this.projectExecutionPermissionService.assertReadableProject(
-          sprint.projectId,
-          String(_operatorId),
-          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
-          "business/sprints/manageAll",
-        );
-      }
+      await this.assertSprintReadPermission(
+        sprint,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
     }
 
     return {

@@ -1,6 +1,6 @@
 <script>
 import { defineComponent } from 'vue'
-import { datePickerOptions } from '@/utils/common'
+import { datePickerOptions, getDatePickerProps } from '@/utils/common'
 import { ElFormItem } from 'element-plus'
 export default defineComponent({
   props: {
@@ -15,6 +15,13 @@ export default defineComponent({
   computed: {
     placeholderTransfer() {
       return this.placeholder || '请选择' + (this.$attrs.label || this.$.parent?.props?.label || '')
+    },
+    mergedDatePickerOptions() {
+      const type = this.$attrs.type || 'daterange'
+      return {
+        ...datePickerOptions,
+        ...getDatePickerProps(type),
+      }
     },
   },
 })
@@ -31,7 +38,7 @@ export default defineComponent({
       start-placeholder="开始日期"
       end-placeholder="结束日期"
       clearable
-      v-bind="Object.assign({}, datePickerOptions, $attrs, { style: '', class: '', id: '' })"></el-date-picker>
+      v-bind="Object.assign({}, mergedDatePickerOptions, $attrs, { style: '', class: '', id: '' })"></el-date-picker>
     <!-- v-bind="{ ...datePickerOptions, ...$attrs }"></el-date-picker> -->
   </component>
 </template>

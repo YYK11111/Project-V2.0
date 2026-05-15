@@ -90,6 +90,33 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
     };
   }
 
+  private isPersonalReadableRisk(risk: Risk, operatorId: string) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(risk.riskOwnerId || "") === normalizedOperatorId ||
+      String(risk.createUser || "") === normalizedOperatorId
+    );
+  }
+
+  private async assertRiskReadPermission(
+    risk: Risk,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return;
+    try {
+      await this.projectsService.assertExecutionObjectPermission(
+        risk.projectId,
+        operatorId,
+        permissions,
+      );
+    } catch (error) {
+      if (this.isPersonalReadableRisk(risk, operatorId)) return;
+      throw error;
+    }
+  }
+
   async resolve(id: string): Promise<any> {
     return this.repository.update(id, {
       status: RiskStatus.resolved,
@@ -218,8 +245,8 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       "business/risks/manageAll",
     );
     if ((query as any)._operatorId) {
-      await this.projectsService.assertExecutionObjectPermission(
-        risk.projectId,
+      await this.assertRiskReadPermission(
+        risk,
         String((query as any)._operatorId),
         operatorPermissions,
       );
@@ -269,11 +296,19 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
         String(_operatorId || ""),
         operatorPermissions,
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalRiskScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalRiskScope
+    ) {
       return { list: [], total: 0 } as any;
     }
     let executionVisibleProjectIds = visibleProjectIds;
-    if (_operatorId && visibleProjectIds) {
+    if (_operatorId && visibleProjectIds && !shouldUsePersonalRiskScope) {
       executionVisibleProjectIds = [];
       for (const id of visibleProjectIds) {
         try {
@@ -290,21 +325,48 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       }
     }
     let queryOrm: FindManyOptions = {
-      where: {
-        name: this.sqlLike(name),
-        projectId:
-          projectId ||
-          (executionVisibleProjectIds
-            ? In(executionVisibleProjectIds)
-            : undefined),
-        status: status || undefined,
-        level: level || undefined,
-        category: category || undefined,
-        knowledgeLinked:
-          knowledgeLinked !== undefined && knowledgeLinked !== ""
-            ? knowledgeLinked
-            : undefined,
-      },
+      where: shouldUsePersonalRiskScope
+        ? [
+            {
+              name: this.sqlLike(name),
+              projectId: projectId || undefined,
+              status: status || undefined,
+              level: level || undefined,
+              category: category || undefined,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              riskOwnerId: String(_operatorId),
+            },
+            {
+              name: this.sqlLike(name),
+              projectId: projectId || undefined,
+              status: status || undefined,
+              level: level || undefined,
+              category: category || undefined,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              createUser: String(_operatorId),
+            },
+          ]
+        : {
+            name: this.sqlLike(name),
+            projectId:
+              projectId ||
+              (executionVisibleProjectIds
+                ? In(executionVisibleProjectIds)
+                : undefined),
+            status: status || undefined,
+            level: level || undefined,
+            category: category || undefined,
+            knowledgeLinked:
+              knowledgeLinked !== undefined && knowledgeLinked !== ""
+                ? knowledgeLinked
+                : undefined,
+          },
       relations: ["project", "riskOwner"],
       order: { sort: "ASC", createTime: "DESC" },
     };

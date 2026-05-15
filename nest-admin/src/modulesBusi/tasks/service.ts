@@ -124,6 +124,35 @@ export class TasksService extends BaseService<Task, TaskDto> {
     }
   }
 
+  private isPersonalReadableTask(task: Task, operatorId: string) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(task.leaderId || "") === normalizedOperatorId ||
+      String(task.createUser || "") === normalizedOperatorId ||
+      (Array.isArray(task.executorIds) &&
+        task.executorIds.some((id) => String(id) === normalizedOperatorId))
+    );
+  }
+
+  private async assertTaskReadPermission(
+    task: Task,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return;
+    try {
+      await this.projectsService.assertExecutionObjectPermission(
+        task.projectId,
+        operatorId,
+        permissions,
+      );
+    } catch (error) {
+      if (this.isPersonalReadableTask(task, operatorId)) return;
+      throw error;
+    }
+  }
+
   private getTodayDate() {
     return new Date().toISOString().split("T")[0];
   }
@@ -1209,8 +1238,8 @@ export class TasksService extends BaseService<Task, TaskDto> {
       "business/tasks/manageAll",
     );
     if ((query as any)._operatorId) {
-      await this.projectsService.assertExecutionObjectPermission(
-        task.projectId,
+      await this.assertTaskReadPermission(
+        task,
         String((query as any)._operatorId),
         operatorPermissions,
       );
@@ -1254,11 +1283,19 @@ export class TasksService extends BaseService<Task, TaskDto> {
         String(_operatorId || ""),
         operatorPermissions,
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalTaskScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalTaskScope
+    ) {
       return { data: [], total: 0, _flag: true } as any;
     }
     let executionVisibleProjectIds = visibleProjectIds;
-    if (_operatorId && visibleProjectIds) {
+    if (_operatorId && visibleProjectIds && !shouldUsePersonalTaskScope) {
       executionVisibleProjectIds = [];
       for (const id of visibleProjectIds) {
         try {
@@ -1283,7 +1320,12 @@ export class TasksService extends BaseService<Task, TaskDto> {
       .leftJoinAndSelect("task.milestone", "milestone")
       .leftJoinAndSelect("task.sprint", "sprint");
 
-    if (executionVisibleProjectIds) {
+    if (shouldUsePersonalTaskScope) {
+      taskQuery.andWhere(
+        "(task.leader_id = :operatorId OR task.create_user = :operatorId OR JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId)))",
+        { operatorId: String(_operatorId) },
+      );
+    } else if (executionVisibleProjectIds) {
       taskQuery.andWhere("task.project_id IN (:...visibleProjectIds)", {
         visibleProjectIds: executionVisibleProjectIds,
       });

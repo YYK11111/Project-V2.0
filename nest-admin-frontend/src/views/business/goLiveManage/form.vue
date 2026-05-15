@@ -1,13 +1,17 @@
 <script setup>
 import { watch } from 'vue'
-import { getOne, save, update, getStatuses, submitApproval } from './api'
+import { confirmGoLiveRollback, confirmGoLiveSuccess, getOne, save, startGoLive, update, getStatuses, submitApproval } from './api'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
+import Editor from '@/components/Editor/index.vue'
 import FormPageShell from '@/components/FormPageShell.vue'
 import ProjectSelect from '@/components/ProjectSelect.vue'
+import Upload from '@/components/Upload.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
+import ViewFileList from '@/components/view/ViewFileList.vue'
+import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -23,6 +27,9 @@ const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId.value)
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const workflowPanelRef = ref()
+const canShowActualGoLiveTime = computed(() => (isEdit.value || isReadonly.value) && String(form.value.status || '') !== '1')
+const canStartGoLive = computed(() => !isReadonly.value && isEdit.value && String(form.value.status || '') === '3')
+const canConfirmGoLiveResult = computed(() => !isReadonly.value && isEdit.value && String(form.value.status || '') === '4')
 
 const form = ref({
   title: '',
@@ -31,6 +38,7 @@ const form = ref({
   actualGoLiveTime: '',
   rollbackPlan: '',
   checklistSummary: '',
+  relatedAttachments: [],
   dutyMembers: [],
   status: '1',
   ownerId: '',
@@ -53,7 +61,11 @@ async function loadData() {
   if (!isGoLiveFormRoute()) return
   if (!route.query.id) return
   const { data } = await getOne(route.query.id)
-  form.value = { ...form.value, ...(data || {}) }
+  form.value = {
+    ...form.value,
+    ...(data || {}),
+    relatedAttachments: data?.relatedAttachments || [],
+  }
 }
 
 watch(() => route.query.id, () => {
@@ -65,9 +77,42 @@ function submit() {
   formRef.value.validate((valid) => {
     if (!valid) return
     const api = isEdit.value ? update : save
-    api(form.value).then(() => {
+    const payload = { ...form.value }
+    delete payload.status
+    delete payload.actualGoLiveTime
+    api(payload).then(() => {
       $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
       router.back()
+    })
+  })
+}
+
+function handleStartGoLive() {
+  if (!route.query.id) return
+  $sdk.confirm('确定开始执行上线吗？').then(() => {
+    startGoLive(route.query.id).then(() => {
+      $sdk.msgSuccess('已开始上线')
+      loadData()
+    })
+  })
+}
+
+function handleConfirmSuccess() {
+  if (!route.query.id) return
+  $sdk.confirm('确定上线已成功吗？系统会自动写入实际上线时间。').then(() => {
+    confirmGoLiveSuccess(route.query.id).then(() => {
+      $sdk.msgSuccess('已确认上线成功')
+      loadData()
+    })
+  })
+}
+
+function handleConfirmRollback() {
+  if (!route.query.id) return
+  $sdk.confirm('确定本次上线已回退吗？系统会保留或写入实际上线时间，并将状态改为已回退。').then(() => {
+    confirmGoLiveRollback(route.query.id).then(() => {
+      $sdk.msgSuccess('已确认回退')
+      loadData()
     })
   })
 }
@@ -136,15 +181,11 @@ function scrollToWorkflowPanel() {
               <ViewField v-if="isReadonly" :value="form.plannedGoLiveTime" />
               <el-date-picker v-else v-model="form.plannedGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="实际上线日期">
-              <ViewField v-if="isReadonly" :value="form.actualGoLiveTime" />
-              <el-date-picker v-else v-model="form.actualGoLiveTime" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+            <el-form-item v-if="canShowActualGoLiveTime" label="实际上线日期">
+              <ViewField :value="form.actualGoLiveTime || '-'" />
             </el-form-item>
-            <el-form-item label="状态">
-              <ViewField v-if="isReadonly" :value="statusMap[form.status] || '-'" />
-              <el-select v-else v-model="form.status" style="width: 100%">
-                <el-option v-for="(label, key) in statusMap" :key="key" :label="label" :value="key" />
-              </el-select>
+            <el-form-item v-if="isEdit || isReadonly" label="状态">
+              <ViewField :value="statusMap[form.status] || '-'" />
             </el-form-item>
           </div>
         </section>
@@ -159,12 +200,16 @@ function scrollToWorkflowPanel() {
 
           <div class="business-form-fields business-form-fields--content">
             <el-form-item label="检查项摘要">
-              <ViewField v-if="isReadonly" :value="form.checklistSummary" />
-              <el-input v-else v-model="form.checklistSummary" type="textarea" :rows="3" placeholder="请输入检查项摘要" />
+              <ViewRichText v-if="isReadonly" :html="form.checklistSummary" />
+              <Editor v-else v-model="form.checklistSummary" style="min-height: 220px" placeholder="请输入检查项摘要" />
             </el-form-item>
             <el-form-item label="回退预案">
-              <ViewField v-if="isReadonly" :value="form.rollbackPlan" />
-              <el-input v-else v-model="form.rollbackPlan" type="textarea" :rows="3" placeholder="请输入回退预案" />
+              <ViewRichText v-if="isReadonly" :html="form.rollbackPlan" />
+              <Editor v-else v-model="form.rollbackPlan" style="min-height: 220px" placeholder="请输入回退预案" />
+            </el-form-item>
+            <el-form-item label="相关附件">
+              <ViewFileList v-if="isReadonly" :files="form.relatedAttachments || []" />
+              <Upload v-else v-model:fileList="form.relatedAttachments" type="file" multiple />
             </el-form-item>
           </div>
         </section>
@@ -177,7 +222,10 @@ function scrollToWorkflowPanel() {
     </el-form>
     <template #footer>
       <el-button v-if="!isReadonly && isEdit" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      <el-button type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canStartGoLive" type="success" @click="handleStartGoLive">开始上线</el-button>
+      <el-button v-if="canConfirmGoLiveResult" type="success" @click="handleConfirmSuccess">确认上线成功</el-button>
+      <el-button v-if="canConfirmGoLiveResult" type="danger" @click="handleConfirmRollback">确认回退</el-button>
+      <el-button v-if="!isReadonly" type="primary" @click="submit">提交</el-button>
       <el-button @click="$router.back()">取消</el-button>
     </template>
   </FormPageShell>

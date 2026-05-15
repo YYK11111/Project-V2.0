@@ -14,7 +14,7 @@ const canNoticeUpdate = computed(() => checkPermi(['system/notices/update']))
 const canNoticeDelete = computed(() => checkPermi(['system/notices/delete']))
 
 const getButtons = (row: any) => [
-  canNoticeUpdate.value ? { key: 'edit', label: '修改', onClick: () => dialogRef.value.action(row) } : null,
+  canNoticeUpdate.value ? { key: 'edit', label: '编辑', onClick: () => dialogRef.value.action(row) } : null,
   canNoticeDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
 </script>

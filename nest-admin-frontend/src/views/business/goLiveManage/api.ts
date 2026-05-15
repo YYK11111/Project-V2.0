@@ -31,3 +31,15 @@ export function getStatuses() {
 export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
 }
+
+export function startGoLive(id) {
+  return request({ url: `${baseUrl}/${id}/start`, method: 'post' })
+}
+
+export function confirmGoLiveSuccess(id) {
+  return request({ url: `${baseUrl}/${id}/success`, method: 'post' })
+}
+
+export function confirmGoLiveRollback(id) {
+  return request({ url: `${baseUrl}/${id}/rollback`, method: 'post' })
+}

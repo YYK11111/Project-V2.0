@@ -79,4 +79,12 @@ describe('checkPermi', () => {
     expect(checkPermi(['business/workflow/tasks/addSign'])).toBe(true)
     expect(checkPermi(['business/workflow/definitions/getOne'])).toBe(false)
   })
+
+  it('工作流任务 access 放行审批表单所需项目只读初始化权限', () => {
+    userStoreState.permissions = ['business/workflow/tasks/access']
+
+    expect(checkPermi(['business/projects/getOne'])).toBe(true)
+    expect(checkPermi(['business/projects/fieldPermissions'])).toBe(true)
+    expect(checkPermi(['business/projects/update'])).toBe(false)
+  })
 })

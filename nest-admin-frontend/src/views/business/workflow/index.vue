@@ -166,7 +166,7 @@ const getTriggerEventType = (event: string) => triggerEventTypeMap[event] || 'in
 
 const getButtons = (row: any) => [
   { key: 'design', label: '设计', onClick: () => router.push({ path: '/workflow/designer', query: { id: row.id } }) },
-  canWorkflowUpdate.value ? { key: 'edit', label: '修改', onClick: () => dialogRef.value.action({ ...row, category: normalizeWorkflowCategory(row.category) }) } : null,
+  canWorkflowUpdate.value ? { key: 'edit', label: '编辑', onClick: () => dialogRef.value.action({ ...row, category: normalizeWorkflowCategory(row.category) }) } : null,
   canWorkflowPublish.value ? { key: 'publish', label: row.isActive !== '1' ? '发布' : '停用', type: row.isActive !== '1' ? 'success' : 'info', onClick: () => row.isActive !== '1' ? handlePublish(row) : handleUnpublish(row) } : null,
   canWorkflowStart.value ? { key: 'start', label: '发起', type: 'warning', onClick: () => handleStart(row) } : null,
   canWorkflowCopy.value ? { key: 'copy', label: '复制', type: 'info', onClick: () => handleCopy(row) } : null,

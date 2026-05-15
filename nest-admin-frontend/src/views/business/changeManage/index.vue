@@ -117,7 +117,7 @@ const getButtons = (row) => [
     ? { key: 'republishKnowledge', label: '重新沉淀', onClick: () => handlePublishKnowledge(row) }
     : null,
   canChangeSubmitApproval.value && canSubmitChangeApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
-  canChangeUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canChangeUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   canChangeDelete.value && row.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 

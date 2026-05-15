@@ -91,7 +91,7 @@ function isCurrentUserComment(row: any) {
 
 const getButtons = (row: any) => [
   ...(canTaskCommentUpdate.value && isCurrentUserComment(row)
-    ? [{ key: 'edit', label: '修改', type: 'primary', onClick: () => handleEditComment(row) }]
+    ? [{ key: 'edit', label: '编辑', type: 'primary', onClick: () => handleEditComment(row) }]
     : []),
   ...(canTaskCommentDelete.value && isCurrentUserComment(row)
     ? [{ key: 'delete', label: '删除', danger: true, onClick: () => handleDeleteComment(row) }]

@@ -128,7 +128,7 @@ function getTypeTag(type) {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canStoryUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canStoryUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   canStoryDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDelete(row) } : null,
 ].filter(Boolean)
 </script>

@@ -125,6 +125,7 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
     menus.forEach((menu) => {
       menu.permissionKey = normalizePermissionKey(menu.permissionKey);
     });
+    await this.completeAccessBaseMenus(menus);
 
     menus.sort((a, b) => {
       const leftOrder = Number(a.order || 0);
@@ -136,6 +137,153 @@ export class RolesService extends BaseService<Role, SaveRoleDto> {
     });
 
     return isTree ? arrayToTree(menus) : menus;
+  }
+
+  private async completeAccessBaseMenus(menus: Menu[]) {
+    const accessMenus = menus.filter((menu) =>
+      normalizePermissionKey(menu.permissionKey).endsWith("/access"),
+    );
+    if (!accessMenus.length) return;
+
+    const allMenus = await this.menuRepository.find({
+      where: { isActive: BoolNum.Yes, isDelete: null as any } as any,
+    });
+    const allMenuMap = new Map(allMenus.map((menu) => [String(menu.id), menu]));
+    const existingMenuIds = new Set(menus.map((menu) => String(menu.id)));
+
+    const addMenu = (menu?: Menu | null) => {
+      if (!menu) return;
+      const menuId = String(menu.id);
+      if (existingMenuIds.has(menuId)) return;
+      menu.permissionKey = normalizePermissionKey(menu.permissionKey);
+      menus.push(menu);
+      existingMenuIds.add(menuId);
+    };
+
+    const addParentChain = (menu: Menu) => {
+      let current = menu;
+      const visited = new Set<string>();
+      while (current?.parentId && current.parentId !== "0") {
+        const parentId = String(current.parentId);
+        if (visited.has(parentId)) break;
+        visited.add(parentId);
+        const parent = allMenuMap.get(parentId);
+        addMenu(parent);
+        current = parent;
+      }
+    };
+
+    const getAccessModuleKey = (accessMenu: Menu) =>
+      normalizePermissionKey(accessMenu.permissionKey).replace(/\/access$/, "");
+
+    const moduleMenuAliases: Record<string, string[]> = {
+      "business/tickets": ["ticketmanage", "ticketinfo"],
+      "business/workflow/definitions": [
+        "business/workflow/index",
+        "definitions",
+      ],
+      "business/workflow/configs": [
+        "business/workflow/businessconfig",
+        "configs",
+      ],
+      "business/workflow/tasks": ["business/workflow/tasks", "tasks"],
+      "business/workflow/instances": [
+        "business/workflow/instances",
+        "instances",
+      ],
+      "business/articles": ["content/articlemanage", "articlemanage"],
+      "business/articlecatalogs": ["content/articlemanage", "articlemanage"],
+    };
+
+    const normalizeForMatch = (value?: string | null) =>
+      normalizePermissionKey(value)
+        .replace(/[^a-z0-9]/gi, "")
+        .toLowerCase();
+
+    const getModuleSegments = (moduleKey: string) =>
+      moduleKey
+        .split("/")
+        .filter(Boolean)
+        .slice(1)
+        .map((item) => item.replace(/s$/, ""));
+
+    const getMenuSearchText = (menu: Menu) =>
+      [
+        normalizePermissionKey(menu.permissionKey),
+        normalizePermissionKey(menu.path),
+        normalizePermissionKey(menu.component),
+      ]
+        .map((item) => item.toLowerCase())
+        .join("|");
+
+    const isAccessTargetMenu = (menu: Menu, moduleKey: string) => {
+      if (menu.type !== MenuType.menu || menu.isHidden === BoolNum.Yes) {
+        return false;
+      }
+      const searchText = getMenuSearchText(menu);
+      const aliases = moduleMenuAliases[moduleKey] || [];
+      if (
+        aliases.some((alias) =>
+          searchText.includes(normalizePermissionKey(alias).toLowerCase()),
+        )
+      ) {
+        return true;
+      }
+
+      const compactSearchText = normalizeForMatch(searchText);
+      const compactModuleKey = normalizeForMatch(moduleKey);
+      if (compactSearchText.includes(compactModuleKey)) {
+        return true;
+      }
+
+      const moduleSegments = getModuleSegments(moduleKey);
+      return moduleSegments.length > 0
+        ? moduleSegments.every((segment) =>
+            compactSearchText.includes(normalizeForMatch(segment)),
+          )
+        : false;
+    };
+
+    const findAccessTargetMenus = (accessMenu: Menu, parent?: Menu | null) => {
+      if (!parent) return [];
+      if (parent.type === MenuType.menu) return [parent];
+      if (parent.type !== MenuType.catalog) return [];
+
+      const moduleKey = getAccessModuleKey(accessMenu);
+      return allMenus.filter(
+        (menu) =>
+          String(menu.parentId || "") === String(parent.id) &&
+          isAccessTargetMenu(menu, moduleKey),
+      );
+    };
+
+    const addHiddenMenus = (parentMenu: Menu) => {
+      const hiddenMenus = allMenus.filter(
+        (menu) =>
+          menu.type === MenuType.menu &&
+          menu.isHidden === BoolNum.Yes &&
+          (String(menu.parentId || "") === String(parentMenu.id) ||
+            String(menu.parentId || "") === String(parentMenu.parentId || "")),
+      );
+      hiddenMenus.forEach(addMenu);
+    };
+
+    accessMenus.forEach((accessMenu) => {
+      const parent = allMenuMap.get(String(accessMenu.parentId || ""));
+      addMenu(parent);
+      if (parent) {
+        addParentChain(parent);
+        const targetMenus = findAccessTargetMenus(accessMenu, parent);
+        targetMenus.forEach((targetMenu) => {
+          addMenu(targetMenu);
+          addParentChain(targetMenu);
+          addHiddenMenus(targetMenu);
+        });
+        if (!targetMenus.length && parent.type === MenuType.menu) {
+          addHiddenMenus(parent);
+        }
+      }
+    });
   }
 
   async menuTreeselect() {

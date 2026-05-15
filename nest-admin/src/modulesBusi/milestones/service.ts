@@ -81,6 +81,38 @@ export class MilestonesService extends BaseService<
     }
   }
 
+  private isPersonalReadableMilestone(
+    milestone: Milestone,
+    operatorId: string,
+  ) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(milestone.ownerId || "") === normalizedOperatorId ||
+      String(milestone.creatorId || "") === normalizedOperatorId ||
+      String(milestone.createUser || "") === normalizedOperatorId
+    );
+  }
+
+  private async assertMilestoneReadPermission(
+    milestone: Milestone,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId || !milestone.projectId) return;
+    try {
+      await this.projectExecutionPermissionService.assertReadableProject(
+        milestone.projectId,
+        operatorId,
+        permissions,
+        "business/milestones/manageAll",
+      );
+    } catch (error) {
+      if (this.isPersonalReadableMilestone(milestone, operatorId)) return;
+      throw error;
+    }
+  }
+
   async list(query: QueryListDto): Promise<ResponseListDto<Milestone>> {
     let {
       projectId,
@@ -106,14 +138,23 @@ export class MilestonesService extends BaseService<
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
         "business/milestones/manageAll",
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalMilestoneScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalMilestoneScope
+    ) {
       return { data: [], total: 0, _flag: true } as any;
     }
     const explicitProjectId = String(projectId || "");
     if (
       explicitProjectId &&
       visibleProjectIds &&
-      !visibleProjectIds.includes(explicitProjectId)
+      !visibleProjectIds.includes(explicitProjectId) &&
+      !shouldUsePersonalMilestoneScope
     ) {
       return { data: [], total: 0, _flag: true } as any;
     }
@@ -121,21 +162,71 @@ export class MilestonesService extends BaseService<
       explicitProjectId ||
       (visibleProjectIds ? In(visibleProjectIds) : undefined);
     let queryOrm: FindManyOptions = {
-      where: {
-        name: this.sqlLike(name),
-        projectId: projectIdFilter,
-        status: status || undefined,
-        ownerId: ownerId || undefined,
-        phase: phase || undefined,
-        changeImpactFlag:
-          changeImpactFlag !== undefined && changeImpactFlag !== ""
-            ? changeImpactFlag
-            : undefined,
-        riskImpactFlag:
-          riskImpactFlag !== undefined && riskImpactFlag !== ""
-            ? riskImpactFlag
-            : undefined,
-      },
+      where: shouldUsePersonalMilestoneScope
+        ? [
+            {
+              name: this.sqlLike(name),
+              projectId: explicitProjectId || undefined,
+              status: status || undefined,
+              ownerId: ownerId || String(_operatorId),
+              phase: phase || undefined,
+              changeImpactFlag:
+                changeImpactFlag !== undefined && changeImpactFlag !== ""
+                  ? changeImpactFlag
+                  : undefined,
+              riskImpactFlag:
+                riskImpactFlag !== undefined && riskImpactFlag !== ""
+                  ? riskImpactFlag
+                  : undefined,
+            },
+            {
+              name: this.sqlLike(name),
+              projectId: explicitProjectId || undefined,
+              status: status || undefined,
+              ownerId: ownerId || undefined,
+              creatorId: String(_operatorId),
+              phase: phase || undefined,
+              changeImpactFlag:
+                changeImpactFlag !== undefined && changeImpactFlag !== ""
+                  ? changeImpactFlag
+                  : undefined,
+              riskImpactFlag:
+                riskImpactFlag !== undefined && riskImpactFlag !== ""
+                  ? riskImpactFlag
+                  : undefined,
+            },
+            {
+              name: this.sqlLike(name),
+              projectId: explicitProjectId || undefined,
+              status: status || undefined,
+              ownerId: ownerId || undefined,
+              createUser: String(_operatorId),
+              phase: phase || undefined,
+              changeImpactFlag:
+                changeImpactFlag !== undefined && changeImpactFlag !== ""
+                  ? changeImpactFlag
+                  : undefined,
+              riskImpactFlag:
+                riskImpactFlag !== undefined && riskImpactFlag !== ""
+                  ? riskImpactFlag
+                  : undefined,
+            },
+          ]
+        : {
+            name: this.sqlLike(name),
+            projectId: projectIdFilter,
+            status: status || undefined,
+            ownerId: ownerId || undefined,
+            phase: phase || undefined,
+            changeImpactFlag:
+              changeImpactFlag !== undefined && changeImpactFlag !== ""
+                ? changeImpactFlag
+                : undefined,
+            riskImpactFlag:
+              riskImpactFlag !== undefined && riskImpactFlag !== ""
+                ? riskImpactFlag
+                : undefined,
+          },
       relations: ["project", "creator", "owner"],
       order: { sort: "ASC", createTime: "DESC" },
     };
@@ -200,14 +291,11 @@ export class MilestonesService extends BaseService<
     );
     if (!milestone) return milestone;
     if (_operatorId) {
-      if (milestone.projectId) {
-        await this.projectExecutionPermissionService.assertReadableProject(
-          milestone.projectId,
-          String(_operatorId),
-          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
-          "business/milestones/manageAll",
-        );
-      }
+      await this.assertMilestoneReadPermission(
+        milestone,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
     }
 
     const tasks = await this.taskRepository.find({

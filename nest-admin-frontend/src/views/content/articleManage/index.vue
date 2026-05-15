@@ -312,7 +312,7 @@ catalog.getTrees()
         </template>
         <template #tableOperation="{ row }">
           <TbOpBtn icon="view" @click="$router.push({ path: '/content/articleManage/detail', query: { id: row.id } })">详情</TbOpBtn>
-          <TbOpBtn v-if="checkPermi(['business/articles/update']) && row.canEdit !== false" icon="edit" @click="rctRef.goRoute(row.id, '/content/aev')">修改</TbOpBtn>
+          <TbOpBtn v-if="checkPermi(['business/articles/update']) && row.canEdit !== false" icon="edit" @click="rctRef.goRoute(row.id, '/content/aev')">编辑</TbOpBtn>
           <TbOpBtn v-if="canAiOperate" icon="refresh" @click="rebuildChunks(row)">重建切片</TbOpBtn>
           <TbOpBtn v-if="canAiOperate" icon="refresh" @click="rebuildEmbeddings(row)">重建向量</TbOpBtn>
           <TbOpBtn v-if="checkPermi(['business/articles/delete']) && row.canDelete !== false" icon="delete" @click="rctRef.del(del, row.id)">删除</TbOpBtn>

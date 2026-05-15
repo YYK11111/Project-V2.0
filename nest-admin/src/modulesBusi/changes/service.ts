@@ -113,6 +113,33 @@ export class ChangesService extends BaseService<
     }
   }
 
+  private isPersonalReadableChange(change: ProjectChange, operatorId: string) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(change.requesterId || "") === normalizedOperatorId ||
+      String(change.createUser || "") === normalizedOperatorId
+    );
+  }
+
+  private async assertChangeReadPermission(
+    change: ProjectChange,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return;
+    try {
+      await this.projectsService.assertExecutionObjectPermission(
+        change.projectId,
+        operatorId,
+        permissions,
+      );
+    } catch (error) {
+      if (this.isPersonalReadableChange(change, operatorId)) return;
+      throw error;
+    }
+  }
+
   private normalizeChangePayload(
     dto: SaveDto<CreateChangeDto> & { attachments?: string[] },
   ) {
@@ -144,11 +171,19 @@ export class ChangesService extends BaseService<
         String(_operatorId || ""),
         operatorPermissions,
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalChangeScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalChangeScope
+    ) {
       return { list: [], total: 0 } as any;
     }
     let executionVisibleProjectIds = visibleProjectIds;
-    if (_operatorId && visibleProjectIds) {
+    if (_operatorId && visibleProjectIds && !shouldUsePersonalChangeScope) {
       executionVisibleProjectIds = [];
       for (const id of visibleProjectIds) {
         try {
@@ -165,20 +200,45 @@ export class ChangesService extends BaseService<
       }
     }
     let queryOrm: FindManyOptions = {
-      where: {
-        title: this.sqlLike(name),
-        projectId:
-          projectId ||
-          (executionVisibleProjectIds
-            ? In(executionVisibleProjectIds)
-            : undefined),
-        status: status || undefined,
-        type: type || undefined,
-        knowledgeLinked:
-          knowledgeLinked !== undefined && knowledgeLinked !== ""
-            ? knowledgeLinked
-            : undefined,
-      },
+      where: shouldUsePersonalChangeScope
+        ? [
+            {
+              title: this.sqlLike(name),
+              projectId: projectId || undefined,
+              status: status || undefined,
+              type: type || undefined,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              requesterId: String(_operatorId),
+            },
+            {
+              title: this.sqlLike(name),
+              projectId: projectId || undefined,
+              status: status || undefined,
+              type: type || undefined,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              createUser: String(_operatorId),
+            },
+          ]
+        : {
+            title: this.sqlLike(name),
+            projectId:
+              projectId ||
+              (executionVisibleProjectIds
+                ? In(executionVisibleProjectIds)
+                : undefined),
+            status: status || undefined,
+            type: type || undefined,
+            knowledgeLinked:
+              knowledgeLinked !== undefined && knowledgeLinked !== ""
+                ? knowledgeLinked
+                : undefined,
+          },
       relations: ["project", "requester", "approver"],
       order: { sort: "ASC", createTime: "DESC" },
     };
@@ -587,8 +647,8 @@ export class ChangesService extends BaseService<
       "business/changes/manageAll",
     );
     if ((query as any)._operatorId) {
-      await this.projectsService.assertExecutionObjectPermission(
-        change.projectId,
+      await this.assertChangeReadPermission(
+        change,
         String((query as any)._operatorId),
         operatorPermissions,
       );

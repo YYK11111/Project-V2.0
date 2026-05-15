@@ -51,4 +51,31 @@ export class GoLiveRecordsController extends BaseController<
     );
     return { success: true, instanceId };
   }
+
+  @Post(":id/start")
+  async startGoLive(@Param("id") id: string, @Req() req: any) {
+    return this.service.startGoLive(
+      id,
+      req.user?.id,
+      req.user?.permissions || [],
+    );
+  }
+
+  @Post(":id/success")
+  async confirmSuccess(@Param("id") id: string, @Req() req: any) {
+    return this.service.confirmSuccess(
+      id,
+      req.user?.id,
+      req.user?.permissions || [],
+    );
+  }
+
+  @Post(":id/rollback")
+  async confirmRollback(@Param("id") id: string, @Req() req: any) {
+    return this.service.confirmRollback(
+      id,
+      req.user?.id,
+      req.user?.permissions || [],
+    );
+  }
 }

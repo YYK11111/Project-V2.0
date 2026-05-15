@@ -10,6 +10,17 @@ import { Index } from "typeorm";
  */
 @MyEntity("wf_instance")
 @Index("idx_wf_instance_starter_start_time", ["starterId", "startTime"])
+@Index("idx_wf_instance_starter_delete_start_time", [
+  "starterId",
+  "isDelete",
+  "startTime",
+])
+@Index("idx_wf_instance_delete_start_time", ["isDelete", "startTime"])
+@Index("idx_wf_instance_delete_status_start_time", [
+  "isDelete",
+  "status",
+  "startTime",
+])
 @Index("idx_wf_instance_starter_status_start_time", [
   "starterId",
   "status",

@@ -10,6 +10,11 @@ import { Index } from "typeorm";
  */
 @MyEntity("wf_task")
 @Index("idx_wf_task_assignee_create_time", ["assigneeId", "createTime"])
+@Index("idx_wf_task_assignee_delete_create_time", [
+  "assigneeId",
+  "isDelete",
+  "createTime",
+])
 @Index("idx_wf_task_assignee_status_create_time", [
   "assigneeId",
   "status",

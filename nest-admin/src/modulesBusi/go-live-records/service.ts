@@ -17,33 +17,22 @@ export class GoLiveRecordsService extends BaseService<
   GoLiveRecord,
   GoLiveRecordDto
 > {
-  private readonly statusTransitions = {
-    [GoLiveRecordStatus.draft]: [
-      GoLiveRecordStatus.pendingApproval,
-      GoLiveRecordStatus.cancelled,
-    ],
-    [GoLiveRecordStatus.pendingApproval]: [
-      GoLiveRecordStatus.approved,
-      GoLiveRecordStatus.cancelled,
-    ],
-    [GoLiveRecordStatus.approved]: [
-      GoLiveRecordStatus.executing,
-      GoLiveRecordStatus.cancelled,
-    ],
-    [GoLiveRecordStatus.executing]: [
-      GoLiveRecordStatus.succeeded,
-      GoLiveRecordStatus.rolledBack,
-    ],
-    [GoLiveRecordStatus.succeeded]: [],
-    [GoLiveRecordStatus.rolledBack]: [],
-    [GoLiveRecordStatus.cancelled]: [],
-  };
-
   constructor(
     @InjectRepository(GoLiveRecord) repository: Repository<GoLiveRecord>,
     private readonly projectExecutionPermissionService: ProjectExecutionPermissionService,
   ) {
     super(GoLiveRecord, repository);
+  }
+
+  private stripUserControlledFields(dto: SaveDto<GoLiveRecordDto>) {
+    delete (dto as any).status;
+    delete (dto as any).actualGoLiveTime;
+  }
+
+  private getCurrentDateTime() {
+    const value = new Date();
+    const pad = (num: number) => String(num).padStart(2, "0");
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
   }
 
   private async assertRecordProjectPermissionById(
@@ -104,22 +93,27 @@ export class GoLiveRecordsService extends BaseService<
     }
   }
 
-  private async assertStatusTransition(dto: SaveDto<GoLiveRecordDto>) {
-    if (!dto.id || !Object.prototype.hasOwnProperty.call(dto, "status")) {
-      return;
-    }
-    const nextStatus = dto.status as GoLiveRecordStatus;
-    const record = await this.repository.findOne({
-      where: { id: String(dto.id), isDelete: null as any } as any,
-      select: ["id", "status"] as any,
-    });
-    if (!record) throw new Error("数据不存在");
-    if (record.status === nextStatus) return;
-    const allowedStatuses = this.statusTransitions[record.status] || [];
-    if (!allowedStatuses.includes(nextStatus)) {
-      throw new BadRequestException(
-        `上线单当前状态不允许变更为${goLiveRecordStatusMap[nextStatus] || nextStatus}`,
+  private isPersonalReadableRecord(record: GoLiveRecord, operatorId: string) {
+    if (!operatorId) return false;
+    return String(record.ownerId || "") === String(operatorId);
+  }
+
+  private async assertRecordReadPermission(
+    record: GoLiveRecord,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId || !record.projectId) return;
+    try {
+      await this.projectExecutionPermissionService.assertReadableProject(
+        record.projectId,
+        operatorId,
+        permissions,
+        "business/go-live-records/manageAll",
       );
+    } catch (error) {
+      if (this.isPersonalReadableRecord(record, operatorId)) return;
+      throw error;
     }
   }
 
@@ -132,14 +126,23 @@ export class GoLiveRecordsService extends BaseService<
         Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
         "business/go-live-records/manageAll",
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalRecordScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalRecordScope
+    ) {
       return { data: [], total: 0, _flag: true } as any;
     }
     const explicitProjectId = String(projectId || "");
     if (
       explicitProjectId &&
       visibleProjectIds &&
-      !visibleProjectIds.includes(explicitProjectId)
+      !visibleProjectIds.includes(explicitProjectId) &&
+      !shouldUsePersonalRecordScope
     ) {
       return { data: [], total: 0, _flag: true } as any;
     }
@@ -149,8 +152,11 @@ export class GoLiveRecordsService extends BaseService<
     const queryOrm: FindManyOptions = {
       where: {
         title: this.sqlLike(title),
-        projectId: projectIdFilter,
+        projectId: shouldUsePersonalRecordScope
+          ? explicitProjectId || undefined
+          : projectIdFilter,
         status,
+        ownerId: shouldUsePersonalRecordScope ? String(_operatorId) : undefined,
       },
       relations: ["project", "owner"],
       order: { createTime: "DESC" },
@@ -173,32 +179,111 @@ export class GoLiveRecordsService extends BaseService<
     );
     if (!record) return record;
     if (_operatorId) {
-      if (record.projectId) {
-        await this.projectExecutionPermissionService.assertReadableProject(
-          record.projectId,
-          String(_operatorId),
-          Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
-          "business/go-live-records/manageAll",
-        );
-      }
+      await this.assertRecordReadPermission(
+        record,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      );
     }
     return record;
   }
 
   async save(dto: SaveDto<GoLiveRecordDto>) {
+    this.stripUserControlledFields(dto);
     await this.assertRecordProjectPermissionForDto(dto);
     return super.save(dto);
   }
 
   async add(dto: SaveDto<GoLiveRecordDto>) {
+    this.stripUserControlledFields(dto);
     await this.assertRecordProjectPermissionForDto(dto);
     return super.add(dto);
   }
 
   async update(dto: SaveDto<GoLiveRecordDto>) {
+    this.stripUserControlledFields(dto);
     await this.assertRecordProjectPermissionForDto(dto);
-    await this.assertStatusTransition(dto);
     return super.update(dto);
+  }
+
+  private async getRecordForSystemAction(
+    id: string,
+    expectedStatus: GoLiveRecordStatus,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    const record = await this.repository.findOne({
+      where: { id, isDelete: null as any } as any,
+      select: ["id", "projectId", "status", "actualGoLiveTime"] as any,
+    });
+    if (!record) throw new Error("数据不存在");
+    if (record.status !== expectedStatus) {
+      throw new BadRequestException(
+        `上线单当前状态必须为${goLiveRecordStatusMap[expectedStatus]}`,
+      );
+    }
+    if (operatorId && record.projectId) {
+      await this.projectExecutionPermissionService.assertWritableProject(
+        record.projectId,
+        operatorId,
+        permissions,
+        "business/go-live-records/manageAll",
+      );
+    }
+    return record;
+  }
+
+  async startGoLive(
+    id: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    await this.getRecordForSystemAction(
+      id,
+      GoLiveRecordStatus.approved,
+      operatorId,
+      permissions,
+    );
+    await this.repository.update(id, {
+      status: GoLiveRecordStatus.executing,
+    } as any);
+    return { success: true };
+  }
+
+  async confirmSuccess(
+    id: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    await this.getRecordForSystemAction(
+      id,
+      GoLiveRecordStatus.executing,
+      operatorId,
+      permissions,
+    );
+    await this.repository.update(id, {
+      status: GoLiveRecordStatus.succeeded,
+      actualGoLiveTime: this.getCurrentDateTime(),
+    } as any);
+    return { success: true };
+  }
+
+  async confirmRollback(
+    id: string,
+    operatorId?: string,
+    permissions: string[] = [],
+  ) {
+    const record = await this.getRecordForSystemAction(
+      id,
+      GoLiveRecordStatus.executing,
+      operatorId,
+      permissions,
+    );
+    await this.repository.update(id, {
+      status: GoLiveRecordStatus.rolledBack,
+      actualGoLiveTime: record.actualGoLiveTime || this.getCurrentDateTime(),
+    } as any);
+    return { success: true };
   }
 
   async del(

@@ -45,6 +45,14 @@ describe('task form structure', () => {
     expect(source).toContain('<el-form-item v-if="hasTaskId" label="实际结束">')
   })
 
+  it('日期选择器交给全局默认配置提供此刻快捷项', () => {
+    const source = readSource()
+
+    expect(source).not.toContain("getDatePickerShortcuts('date')")
+    expect(source).not.toContain(':shortcuts="datePickerShortcuts"')
+    expect(source).toContain('<el-date-picker')
+  })
+
   it('详情页提供任务生命周期操作入口', () => {
     const source = readSource()
 

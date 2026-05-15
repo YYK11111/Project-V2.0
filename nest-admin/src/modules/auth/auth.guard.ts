@@ -359,7 +359,7 @@ export class AuthGuard implements CanActivate {
       [
         "POST",
         /^business\/projects\/[^/]+\/sync-alerts$/,
-        "business/projects/update",
+        "business/projects/dashboard",
       ],
       [
         "POST",
@@ -710,6 +710,21 @@ export class AuthGuard implements CanActivate {
         "POST",
         /^business\/go-live-records\/[^/]+\/submit-approval$/,
         "business/go-live-records/submitApproval",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/[^/]+\/start$/,
+        "business/go-live-records/update",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/[^/]+\/success$/,
+        "business/go-live-records/update",
+      ],
+      [
+        "POST",
+        /^business\/go-live-records\/[^/]+\/rollback$/,
+        "business/go-live-records/update",
       ],
 
       [

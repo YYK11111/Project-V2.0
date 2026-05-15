@@ -67,7 +67,7 @@ const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].inclu
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
-  canTicketUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
+  canTicketUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
     : canArticleAdd.value

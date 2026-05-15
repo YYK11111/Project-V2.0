@@ -213,4 +213,25 @@ describe("business-list-permission", () => {
       ),
     ).toBe(false);
   });
+
+  it("工作流任务 access 放行审批表单所需项目只读初始化接口", () => {
+    expect(
+      hasPermissionOrAccess(
+        ["business/workflow/tasks/access"],
+        "business/projects/getOne",
+      ),
+    ).toBe(true);
+    expect(
+      hasPermissionOrAccess(
+        ["business/workflow/tasks/access"],
+        "business/projects/fieldPermissions",
+      ),
+    ).toBe(true);
+    expect(
+      hasPermissionOrAccess(
+        ["business/workflow/tasks/access"],
+        "business/projects/update",
+      ),
+    ).toBe(false);
+  });
 });

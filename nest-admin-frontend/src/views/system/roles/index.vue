@@ -59,7 +59,7 @@ function getButtons(row: any) {
     canRoleUpdate.value && (!protectedRole || canManageAdminRole.value)
       ? {
           key: 'edit',
-          label: '修改',
+          label: '编辑',
           onClick: () => handleEdit(row),
         }
       : null,
@@ -204,7 +204,7 @@ function submit({ form, visible, loading }: any) {
         <div class="role-index-operation">
           <div class="role-index-operation__left">
             <el-button v-if="canRoleAdd" type="primary" @click="handleAdd">新增</el-button>
-            <el-button v-if="canRoleUpdate" class="ml-10" :disabled="selectedIds.length !== 1" @click="handleEdit({ id: selectedIds[0] })">修改</el-button>
+            <el-button v-if="canRoleUpdate" class="ml-10" :disabled="selectedIds.length !== 1" @click="handleEdit({ id: selectedIds[0] })">编辑</el-button>
             <el-button v-if="canRoleDelete" class="ml-10" type="danger" :disabled="!selectedIds.length" @click="rctRef?.del(delRole)">批量删除</el-button>
           </div>
         </div>

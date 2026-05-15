@@ -32,9 +32,11 @@ const businessReadActions = new Set([
 
 const businessAccessModuleAliases = {
   'business/tasks/dependency': ['business/tasks'],
+  'business/projects': ['business/workflow/tasks'],
 }
 
 const businessAccessActionMap = {
+  'business/projects': new Set(['getOne', 'fieldPermissions']),
   'business/workflow/definitions': new Set(['list', 'getOne']),
   'business/workflow/instances': new Set(['list', 'getOne', 'history', 'tasks']),
   'business/workflow/tasks': new Set(['list', 'complete', 'transfer', 'addSign']),

@@ -104,6 +104,34 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     }
   }
 
+  private isPersonalReadableTicket(ticket: Ticket, operatorId: string) {
+    if (!operatorId) return false;
+    const normalizedOperatorId = String(operatorId);
+    return (
+      String(ticket.handlerId || "") === normalizedOperatorId ||
+      String(ticket.submitterId || "") === normalizedOperatorId ||
+      String(ticket.createUser || "") === normalizedOperatorId
+    );
+  }
+
+  private async assertTicketReadPermission(
+    ticket: Ticket,
+    operatorId: string,
+    permissions: string[] = [],
+  ) {
+    if (!operatorId) return;
+    try {
+      await this.projectsService.assertExecutionObjectPermission(
+        ticket.projectId,
+        operatorId,
+        permissions,
+      );
+    } catch (error) {
+      if (this.isPersonalReadableTicket(ticket, operatorId)) return;
+      throw error;
+    }
+  }
+
   private normalizeTicketPayload(
     dto: SaveDto<TicketDto> & { attachments?: string[] },
   ) {
@@ -136,11 +164,19 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
         String(_operatorId || ""),
         operatorPermissions,
       );
-    if (visibleProjectIds && !visibleProjectIds.length) {
+    const shouldUsePersonalTicketScope =
+      Boolean(_operatorId) &&
+      Array.isArray(visibleProjectIds) &&
+      !visibleProjectIds.length;
+    if (
+      visibleProjectIds &&
+      !visibleProjectIds.length &&
+      !shouldUsePersonalTicketScope
+    ) {
       return { list: [], total: 0 } as any;
     }
     let executionVisibleProjectIds = visibleProjectIds;
-    if (_operatorId && visibleProjectIds) {
+    if (_operatorId && visibleProjectIds && !shouldUsePersonalTicketScope) {
       executionVisibleProjectIds = [];
       for (const id of visibleProjectIds) {
         try {
@@ -157,21 +193,60 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       }
     }
     let queryOrm: FindManyOptions = {
-      where: {
-        title: this.sqlLike(title),
-        type,
-        status,
-        projectId:
-          projectId ||
-          (executionVisibleProjectIds
-            ? In(executionVisibleProjectIds)
-            : undefined),
-        taskId,
-        knowledgeLinked:
-          knowledgeLinked !== undefined && knowledgeLinked !== ""
-            ? knowledgeLinked
-            : undefined,
-      },
+      where: shouldUsePersonalTicketScope
+        ? [
+            {
+              title: this.sqlLike(title),
+              type,
+              status,
+              projectId: projectId || undefined,
+              taskId,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              handlerId: String(_operatorId),
+            },
+            {
+              title: this.sqlLike(title),
+              type,
+              status,
+              projectId: projectId || undefined,
+              taskId,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              submitterId: String(_operatorId),
+            },
+            {
+              title: this.sqlLike(title),
+              type,
+              status,
+              projectId: projectId || undefined,
+              taskId,
+              knowledgeLinked:
+                knowledgeLinked !== undefined && knowledgeLinked !== ""
+                  ? knowledgeLinked
+                  : undefined,
+              createUser: String(_operatorId),
+            },
+          ]
+        : {
+            title: this.sqlLike(title),
+            type,
+            status,
+            projectId:
+              projectId ||
+              (executionVisibleProjectIds
+                ? In(executionVisibleProjectIds)
+                : undefined),
+            taskId,
+            knowledgeLinked:
+              knowledgeLinked !== undefined && knowledgeLinked !== ""
+                ? knowledgeLinked
+                : undefined,
+          },
       relations: ["submitter", "handler", "project", "task"],
     };
     const res = await this.listBy(queryOrm, query);
@@ -350,8 +425,8 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       "business/tickets/manageAll",
     );
     if ((query as any)._operatorId) {
-      await this.projectsService.assertExecutionObjectPermission(
-        ticket.projectId,
+      await this.assertTicketReadPermission(
+        ticket,
         String((query as any)._operatorId),
         operatorPermissions,
       );

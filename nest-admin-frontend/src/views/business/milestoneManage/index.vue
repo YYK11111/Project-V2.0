@@ -111,7 +111,7 @@ function exportMilestoneList() {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canMilestoneUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canMilestoneUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   canMilestoneDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>

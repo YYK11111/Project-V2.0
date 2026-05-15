@@ -197,7 +197,7 @@ const getButtons = (row: any) => {
     canUserUpdate.value && canOperateTargetUser(targetIsAdmin)
       ? {
           key: 'edit',
-          label: '修改',
+          label: '编辑',
           onClick: () => action('edit', row),
         }
       : null,

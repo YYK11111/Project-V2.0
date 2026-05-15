@@ -454,6 +454,7 @@ describe("WorkflowService 条件路由", () => {
 describe("WorkflowService listInstances", () => {
   const createService = () => {
     const instanceQb = {
+      useIndex: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -490,6 +491,7 @@ describe("WorkflowService listInstances", () => {
     const { service, instanceQb } = createService();
     instanceQb.getMany.mockResolvedValue([{ id: "ins_3" }, { id: "ins_1" }]);
     const taskQb = {
+      useIndex: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -499,6 +501,7 @@ describe("WorkflowService listInstances", () => {
         .mockResolvedValue([{ instanceId: "ins_2" }, { instanceId: "ins_1" }]),
     };
     const historyQb = {
+      useIndex: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -508,15 +511,16 @@ describe("WorkflowService listInstances", () => {
         .mockResolvedValue([{ instanceId: "ins_4" }, { instanceId: "ins_2" }]),
     };
     const finalInstanceQb = {
+      setOption: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([
-        { id: "ins_4", startTime: "2026-04-16 12:00:00" },
-        { id: "ins_3", startTime: "2026-04-16 11:00:00" },
-        { id: "ins_2", startTime: "2026-04-16 10:00:00" },
         { id: "ins_1", startTime: "2026-04-16 09:00:00" },
+        { id: "ins_4", startTime: "2026-04-16 12:00:00" },
+        { id: "ins_2", startTime: "2026-04-16 10:00:00" },
+        { id: "ins_3", startTime: "2026-04-16 11:00:00" },
       ]),
     };
     (service as any).taskRepo.createQueryBuilder = jest.fn(() => taskQb);
@@ -556,6 +560,10 @@ describe("WorkflowService listInstances", () => {
       "instance.status = :status",
       { status: "1" },
     );
+    expect(finalInstanceQb.setOption).toHaveBeenCalledWith(
+      "disable-global-order",
+    );
+    expect(finalInstanceQb.orderBy).not.toHaveBeenCalled();
     expect(result).toEqual([
       { id: "ins_4", startTime: "2026-04-16 12:00:00" },
       { id: "ins_3", startTime: "2026-04-16 11:00:00" },
@@ -579,6 +587,39 @@ describe("WorkflowService listInstances", () => {
       { status: "2" },
     );
     expect(result).toEqual([{ id: "ins_3" }]);
+  });
+
+  it("管理员权限访问实例列表时走全量最近实例索引查询", async () => {
+    const { service, instanceQb } = createService();
+    instanceQb.getMany.mockResolvedValue([{ id: "ins_9" }]);
+    (service as any).taskRepo.createQueryBuilder = jest.fn();
+    (service as any).historyRepo.createQueryBuilder = jest.fn();
+
+    const result = await service.listInstances("admin_1", "1", "participant", [
+      "*",
+    ]);
+
+    expect(instanceQb.useIndex).toHaveBeenCalledWith(
+      "idx_wf_instance_delete_status_start_time",
+    );
+    expect(instanceQb.andWhere).not.toHaveBeenCalledWith(
+      "instance.starterId = :userId",
+      expect.anything(),
+    );
+    expect(instanceQb.andWhere).toHaveBeenCalledWith(
+      "instance.status = :status",
+      { status: "1" },
+    );
+    expect(instanceQb.orderBy).toHaveBeenCalledWith(
+      "instance.startTime",
+      "DESC",
+    );
+    expect(instanceQb.limit).toHaveBeenCalledWith(100);
+    expect((service as any).taskRepo.createQueryBuilder).not.toHaveBeenCalled();
+    expect(
+      (service as any).historyRepo.createQueryBuilder,
+    ).not.toHaveBeenCalled();
+    expect(result).toEqual([{ id: "ins_9" }]);
   });
 });
 

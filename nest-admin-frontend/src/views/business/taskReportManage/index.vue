@@ -125,7 +125,7 @@ function isCurrentUserReport(row: any) {
 const getButtons = (row: any) => [
   canTaskReportAdd.value ? { key: 'add', label: '补汇报', type: 'primary', onClick: () => handleAddReport(row) } : null,
   ...(canTaskReportAdd.value && isCurrentUserReport(row)
-    ? [{ key: 'edit', label: '修改', type: 'primary', onClick: () => handleEditReport(row) }]
+    ? [{ key: 'edit', label: '编辑', type: 'primary', onClick: () => handleEditReport(row) }]
     : []),
   ...(canTaskReportDelete.value && isCurrentUserReport(row)
     ? [{ key: 'delete', label: '删除', danger: true, onClick: () => handleDeleteReport(row) }]

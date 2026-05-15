@@ -106,7 +106,7 @@ watch(
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canSprintUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEdit(row) } : null,
+  canSprintUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
   canSprintDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>

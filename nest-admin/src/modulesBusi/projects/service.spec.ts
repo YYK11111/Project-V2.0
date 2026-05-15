@@ -545,7 +545,7 @@ describe("ProjectsService closure guards", () => {
     expect(context.canSubmitApproval).toBe(true);
   });
 
-  it("立项审批未结束时当前待办审批人不可查看项目详情", async () => {
+  it("立项审批未结束时当前待办审批人可以只读查看项目详情", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({
       id: "p1",
@@ -558,12 +558,19 @@ describe("ProjectsService closure guards", () => {
       id: "task-1",
     });
 
-    await expect(
-      service.assertProjectPermission("p1", "approver-1", "view", []),
-    ).rejects.toThrow(new ForbiddenException("当前无该项目的操作权限"));
+    const context = await service.assertProjectPermission(
+      "p1",
+      "approver-1",
+      "view",
+      [],
+    );
+
+    expect(context.canView).toBe(true);
+    expect(context.canEdit).toBe(false);
+    expect(context.canSubmitApproval).toBe(false);
   });
 
-  it("立项审批未结束时历史审批人不可查看项目详情", async () => {
+  it("立项审批未结束时历史审批人可以只读查看项目详情", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({
       id: "p1",
@@ -577,9 +584,41 @@ describe("ProjectsService closure guards", () => {
       id: "history-1",
     });
 
-    await expect(
-      service.assertProjectPermission("p1", "approver-1", "view", []),
-    ).rejects.toThrow(new ForbiddenException("当前无该项目的操作权限"));
+    const context = await service.assertProjectPermission(
+      "p1",
+      "approver-1",
+      "view",
+      [],
+    );
+
+    expect(context.canView).toBe(true);
+    expect(context.canEdit).toBe(false);
+    expect(context.canSubmitApproval).toBe(false);
+  });
+
+  it("工作流审批人可以直接读取立项审批中的项目详情", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "p1",
+      status: "2",
+      workflowInstanceId: "inst-1",
+      creatorId: "creator-1",
+      createUser: "creator",
+    });
+    repository.update.mockResolvedValue({ affected: 1 });
+    (service as any).projectMemberRepository.find.mockResolvedValue([]);
+    (service as any).milestoneRepository.find.mockResolvedValue([]);
+    (service as any).workflowTaskRepository.findOne.mockResolvedValue({
+      id: "task-1",
+    });
+    jest.spyOn(service, "calculateProjectProgress").mockResolvedValue(0);
+
+    const result = await service.getOne({
+      id: "p1",
+      _operatorId: "approver-1",
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "p1" }));
   });
 
   it("历史审批人应能在项目列表中看到项目", async () => {

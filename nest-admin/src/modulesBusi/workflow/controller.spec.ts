@@ -115,6 +115,26 @@ describe("WorkflowController", () => {
     );
   });
 
+  it("获取实例列表时透传服务端认证用户 ID 与权限", async () => {
+    const controller = new WorkflowController(
+      workflowService as any,
+      businessFieldService,
+    );
+    workflowService.listInstances.mockResolvedValue([]);
+
+    await controller.listInstances("1", "participant", {
+      user: { id: "admin-user-id" },
+      permissions: ["business/workflow/instances/manageAll"],
+    } as any);
+
+    expect(workflowService.listInstances).toHaveBeenCalledWith(
+      "admin-user-id",
+      "1",
+      "participant",
+      ["business/workflow/instances/manageAll"],
+    );
+  });
+
   it("按 ID 更新流程定义时只使用服务端认证用户作为更新人", async () => {
     const controller = new WorkflowController(
       workflowService as any,

@@ -51,6 +51,8 @@ import { DeptService } from "../../modules/depts/depts.service";
 import { WorkflowDataLoaderService } from "./workflow-data-loader.service";
 import { WorkflowAssigneeResolverService } from "../../common/services/workflow-assignee-resolver.service";
 import { WorkflowIntegrationService } from "../../common/services/workflow-integration.service";
+import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
+import { normalizePermissionKeys } from "src/common/utils/permission-key";
 
 @Injectable()
 export class WorkflowService {
@@ -1934,9 +1936,12 @@ export class WorkflowService {
   }
 
   private hasWorkflowManageAllPermission(permissions: string[] = []) {
+    const normalizedPermissions = normalizePermissionKeys(permissions);
     return (
-      permissions.includes("business/workflow/instances/manageAll") ||
-      permissions.includes("business/workflow/manageAll")
+      hasModuleFullAccess(
+        normalizedPermissions,
+        "business/workflow/instances/list",
+      ) || normalizedPermissions.includes("business/workflow/manageAll")
     );
   }
 
@@ -2011,7 +2016,9 @@ export class WorkflowService {
     status?: string,
     limit = 100,
   ): Promise<WorkflowInstance[]> {
-    const instanceQb = this.instanceRepo.createQueryBuilder("instance");
+    const instanceQb = this.instanceRepo
+      .createQueryBuilder("instance")
+      .useIndex("idx_wf_instance_starter_delete_start_time");
     instanceQb.where("instance.starterId = :userId", { userId });
     if (status) {
       instanceQb.andWhere("instance.status = :status", { status });
@@ -2032,6 +2039,11 @@ export class WorkflowService {
     const repo = source === "task" ? this.taskRepo : this.historyRepo;
     const rows = await repo
       .createQueryBuilder(alias)
+      .useIndex(
+        source === "task"
+          ? "idx_wf_task_assignee_delete_create_time"
+          : "idx_wf_history_operator_delete_time",
+      )
       .select(`${alias}.instanceId`, "instanceId")
       .where(`${alias}.${userField} = :userId`, { userId })
       .orderBy(`${alias}.createTime`, "DESC")
@@ -2044,6 +2056,26 @@ export class WorkflowService {
     ];
   }
 
+  private async getRecentManageAllInstances(
+    status?: string,
+    limit = 100,
+  ): Promise<WorkflowInstance[]> {
+    const instanceQb = this.instanceRepo
+      .createQueryBuilder("instance")
+      .useIndex(
+        status
+          ? "idx_wf_instance_delete_status_start_time"
+          : "idx_wf_instance_delete_start_time",
+      );
+    if (status) {
+      instanceQb.andWhere("instance.status = :status", { status });
+    }
+    return instanceQb
+      .orderBy("instance.startTime", "DESC")
+      .limit(limit)
+      .getMany();
+  }
+
   /**
    * 获取流程实例列表（支持筛选）
    */
@@ -2051,10 +2083,13 @@ export class WorkflowService {
     userId?: string,
     status?: string,
     mode: "starter" | "participant" = "starter",
+    permissions: string[] = [],
   ): Promise<any[]> {
     let instances: WorkflowInstance[] = [];
 
-    if (mode === "participant" && userId) {
+    if (this.hasWorkflowManageAllPermission(permissions)) {
+      instances = await this.getRecentManageAllInstances(status);
+    } else if (mode === "participant" && userId) {
       const [starterInstances, taskInstanceIds, historyInstanceIds] =
         await Promise.all([
           this.getRecentStarterInstances(userId, status),
@@ -2075,14 +2110,16 @@ export class WorkflowService {
       }
       const instanceQb = this.instanceRepo
         .createQueryBuilder("instance")
+        .setOption("disable-global-order")
         .where("instance.id IN (:...instanceIds)", { instanceIds });
       if (status) {
         instanceQb.andWhere("instance.status = :status", { status });
       }
-      instances = await instanceQb
-        .orderBy("instance.startTime", "DESC")
-        .limit(100)
-        .getMany();
+      instances = (await instanceQb.limit(100).getMany()).sort(
+        (a, b) =>
+          new Date(b.startTime || 0).getTime() -
+          new Date(a.startTime || 0).getTime(),
+      );
     } else {
       const instanceQb = this.instanceRepo.createQueryBuilder("instance");
 

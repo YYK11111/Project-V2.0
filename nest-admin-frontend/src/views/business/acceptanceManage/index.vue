@@ -12,7 +12,7 @@ getResults().then(({ data }) => {
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/acceptanceManage/form') },
-  { key: 'edit', label: '修改', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/acceptanceManage/form') },
+  { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/acceptanceManage/form') },
   { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) },
 ]
 </script>

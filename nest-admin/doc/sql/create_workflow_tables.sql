@@ -65,7 +65,10 @@ CREATE TABLE IF NOT EXISTS `wf_instance` (
   KEY `idx_definition_id` (`definition_id`),
   KEY `idx_business_key` (`business_key`),
   KEY `idx_status` (`status`),
-  KEY `idx_starter_id` (`starter_id`)
+  KEY `idx_starter_id` (`starter_id`),
+  KEY `idx_wf_instance_starter_delete_start_time` (`starter_id`, `is_delete`, `start_time`),
+  KEY `idx_wf_instance_delete_start_time` (`is_delete`, `start_time`),
+  KEY `idx_wf_instance_delete_status_start_time` (`is_delete`, `status`, `start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='流程实例表';
 
 -- 3. 流程任务表
@@ -95,7 +98,8 @@ CREATE TABLE IF NOT EXISTS `wf_task` (
   PRIMARY KEY (`id`),
   KEY `idx_instance_id` (`instance_id`),
   KEY `idx_assignee_id` (`assignee_id`),
-  KEY `idx_status` (`status`)
+  KEY `idx_status` (`status`),
+  KEY `idx_wf_task_assignee_delete_create_time` (`assignee_id`, `is_delete`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='流程任务表';
 
 -- 4. 流程历史记录表
@@ -117,7 +121,8 @@ CREATE TABLE IF NOT EXISTS `wf_history` (
   `variables` json DEFAULT NULL COMMENT '当时变量状态',
   PRIMARY KEY (`id`),
   KEY `idx_instance_id` (`instance_id`),
-  KEY `idx_task_id` (`task_id`)
+  KEY `idx_task_id` (`task_id`),
+  KEY `idx_wf_history_operator_delete_time` (`operator_id`, `is_delete`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='流程历史记录表';
 
 -- ============================================
@@ -161,4 +166,3 @@ VALUES
   ('ticket', '工单', 'tickets', 'id', '{"on_create": {"triggerEvent": "on_create", "name": "工单创建审批"}, "on_status_change": {"triggerEvent": "on_status_change", "name": "缺陷关闭审批", "statusTriggerValues": ["3", "4"]}}', '1'),
   ('change', '变更请求', 'changes', 'id', '{"on_create": {"triggerEvent": "on_create", "name": "变更申请审批"}}', '1')
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `trigger_config` = VALUES(`trigger_config`);
-

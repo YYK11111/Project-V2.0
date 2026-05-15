@@ -1270,7 +1270,11 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     if (
       (_operatorId || _operatorName) &&
       this.isCreatorOnlyProject(project) &&
-      !this.isProjectCreator(project, _operatorId, _operatorName)
+      !this.isProjectCreator(project, _operatorId, _operatorName) &&
+      !(await this.hasWorkflowAccess(
+        project.workflowInstanceId,
+        String(_operatorId || ""),
+      ))
     ) {
       throw new ForbiddenException("项目不存在或当前无访问权限");
     }
@@ -1583,7 +1587,9 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       project.workflowInstanceId,
       userId,
     );
-    const canViewPrivateProject = isCreatorOnly ? isCreator : true;
+    const canViewPrivateProject = isCreatorOnly
+      ? isCreator || hasWorkflowAccess
+      : true;
 
     return {
       project,

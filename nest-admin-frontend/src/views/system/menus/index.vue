@@ -255,7 +255,7 @@ getTreesFun()
             </el-table-column>
             <el-table-column label="操作">
               <template #default="{ row }">
-                <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? $refs.dialogRef.action(row) : $sdk.msgWarning('当前操作没有权限')">修改</el-button>
+                <el-button v-if="canMenuUpdate" text @click="canOperateProtectedMenu(row) ? $refs.dialogRef.action(row) : $sdk.msgWarning('当前操作没有权限')">编辑</el-button>
                 <el-button v-if="canMenuAdd" text @click="$refs.dialogRef.action({ parentId: row.id, ...formDefault })">新增</el-button>
                 <el-button v-if="canMenuDelete" text @click="canOperateProtectedMenu(row) ? $refs.rctRef.del(del, row.id) : $sdk.msgWarning('当前操作没有权限')" :disabled="isAdmin(row) && !canManageProtectedMenu">删除</el-button>
               </template>

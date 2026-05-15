@@ -526,6 +526,8 @@ function normalizeSubmitPayload() {
       ...(isEdit.value && item.id ? { id: item.id } : {}),
       name: item.name,
       dueDate: item.dueDate,
+      description: item.description || '',
+      deliverables: item.deliverables || [],
       sort: item.sort,
     }))
   }
@@ -1068,7 +1070,7 @@ onBeforeUnmount(() => {
           <div class="section-header km-section-header">
             <div>
               <div class="section-title km-section-title">里程碑计划</div>
-              <div class="section-desc km-section-desc">新建阶段先录入关键里程碑与计划完成日期，执行中的责任人、状态、延期原因和影响标记在项目详情中继续维护。</div>
+              <div class="section-desc km-section-desc">新建阶段先录入关键里程碑、计划完成日期、交付物和描述，执行中的责任人、状态、延期原因和影响标记在项目详情中继续维护。</div>
             </div>
             <div class="section-actions">
               <el-button v-if="!isView" @click="resetMilestoneTemplate">重置模板</el-button>
@@ -1116,7 +1118,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isDraftCreateLikeMode" label="交付物" width="220">
+              <el-table-column label="交付物" width="220">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
                   <div v-else class="cell-editor">
@@ -1126,7 +1128,7 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column v-if="!isDraftCreateLikeMode" label="描述" width="180">
+              <el-table-column label="描述" width="180">
                 <template #default="{ row }">
                   <ViewField v-if="isView" :value="row.description" />
                   <div v-else class="cell-editor">
@@ -1191,13 +1193,13 @@ onBeforeUnmount(() => {
                   <ViewField v-if="isView" :value="row.sort" />
                   <el-input-number v-else v-model="row.sort" :min="0" style="width: 100%" />
                 </el-form-item>
-                <el-form-item v-if="!isDraftCreateLikeMode" label="交付物" class="mobile-edit-card__item mobile-edit-card__item--full">
+                <el-form-item label="交付物" class="mobile-edit-card__item mobile-edit-card__item--full">
                   <ViewField v-if="isView" :value="(row.deliverables || []).join('、')" />
                   <el-select v-else v-model="row.deliverables" multiple filterable allow-create default-first-option collapse-tags collapse-tags-tooltip placeholder="请输入交付物" style="width: 100%">
                     <el-option v-for="item in row.deliverables || []" :key="item" :label="item" :value="item" />
                   </el-select>
                 </el-form-item>
-                <el-form-item v-if="!isDraftCreateLikeMode" label="描述" class="mobile-edit-card__item mobile-edit-card__item--full">
+                <el-form-item label="描述" class="mobile-edit-card__item mobile-edit-card__item--full">
                   <ViewField v-if="isView" :value="row.description" />
                   <el-input v-else v-model="row.description" type="textarea" :rows="2" placeholder="请输入说明" />
                 </el-form-item>

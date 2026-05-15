@@ -36,9 +36,11 @@ const businessReadActions = new Set([
 
 const businessAccessModuleAliases: Record<string, string[]> = {
   "business/tasks/dependency": ["business/tasks"],
+  "business/projects": ["business/workflow/tasks"],
 };
 
 const businessAccessActionMap: Record<string, Set<string>> = {
+  "business/projects": new Set(["getOne", "fieldPermissions"]),
   "business/workflow/definitions": new Set(["list", "getOne"]),
   "business/workflow/instances": new Set([
     "list",

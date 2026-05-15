@@ -182,7 +182,7 @@ function handleRemoveMember(row: any) {
 }
 
 const getButtons = (row: any) => [
-  canProjectMemberUpdate.value ? { key: 'edit', label: '修改', onClick: () => handleEditMember(row) } : null,
+  canProjectMemberUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEditMember(row) } : null,
   canProjectMemberDelete.value && row.isActive === '1' ? { key: 'remove', label: '移除', danger: true, onClick: () => handleRemoveMember(row) } : null,
 ].filter(Boolean)
 

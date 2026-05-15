@@ -95,7 +95,7 @@ const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
   { key: 'comment', label: '评论', onClick: () => goToTaskSection(row, 'comment') },
   { key: 'report', label: '汇报', onClick: () => goToTaskSection(row, 'report') },
-  canTaskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '修改', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
+  canTaskUpdate.value && row.canEdit !== false ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/taskManage/form') } : null,
   canTaskExecute.value && canStartCurrentTask(row) ? { key: 'startTask', label: '开始任务', type: 'success', onClick: () => handleStartTask(row) } : null,
   canTaskUpdate.value && canPauseCurrentTask(row) ? { key: 'pauseTask', label: '暂缓任务', type: 'warning', onClick: () => handlePauseTask(row) } : null,
   canTaskUpdate.value && canResumeCurrentTask(row) ? { key: 'resumeTask', label: '恢复任务', type: 'success', onClick: () => handleResumeTask(row) } : null,

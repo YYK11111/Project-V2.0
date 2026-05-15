@@ -105,6 +105,33 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).not.toMatch(/\.table-wrapper--milestones\s+:deep\(\.el-table\)\s*\{[\s\S]*width:\s*1280px;/)
   })
 
+  it('新建项目页里程碑计划应录入交付物和描述并随暂存提交', () => {
+    const source = readBusinessView('projectManage/form.vue')
+    const desktopMilestoneSection = source.slice(
+      source.indexOf('<el-table :data="form.milestones"'),
+      source.indexOf('<el-table-column v-if="!isDraftCreateLikeMode" label="延期原因"'),
+    )
+    const mobileMilestoneSection = source.slice(
+      source.indexOf('<div v-else class="mobile-card-list">'),
+      source.indexOf('<el-form-item v-if="!isDraftCreateLikeMode" label="延期原因"'),
+    )
+    const draftPayloadSection = source.slice(
+      source.indexOf('payload.milestones = payload.milestones.map((item) => ({'),
+      source.indexOf('  return payload'),
+    )
+
+    expect(desktopMilestoneSection).toContain('label="交付物"')
+    expect(desktopMilestoneSection).toContain('label="描述"')
+    expect(desktopMilestoneSection).not.toContain('v-if="!isDraftCreateLikeMode" label="交付物"')
+    expect(desktopMilestoneSection).not.toContain('v-if="!isDraftCreateLikeMode" label="描述"')
+    expect(mobileMilestoneSection).toContain('label="交付物"')
+    expect(mobileMilestoneSection).toContain('label="描述"')
+    expect(mobileMilestoneSection).not.toContain('v-if="!isDraftCreateLikeMode" label="交付物"')
+    expect(mobileMilestoneSection).not.toContain('v-if="!isDraftCreateLikeMode" label="描述"')
+    expect(draftPayloadSection).toContain('description: item.description || \'\'')
+    expect(draftPayloadSection).toContain('deliverables: item.deliverables || []')
+  })
+
   it('立项后项目编辑页应跳转详情并提示走项目变更', () => {
     const source = readBusinessView('projectManage/form.vue')
 

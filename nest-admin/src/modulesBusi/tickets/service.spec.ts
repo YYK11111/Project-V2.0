@@ -1,6 +1,88 @@
 import { TicketsService } from "./service";
 
 describe("TicketsService convert to task", () => {
+  it("基础访问权限允许查看本人相关工单", async () => {
+    const projectsService = {
+      getVisibleProjectIdsForUser: jest.fn().mockResolvedValue([]),
+      getProjectPermissionContext: jest.fn(async () => ({
+        isManager: false,
+        isDeliveryManager: false,
+        isFunctionalLead: false,
+      })),
+    };
+    const service = new TicketsService(
+      {} as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+      {} as any,
+    );
+    jest.spyOn(service as any, "listBy").mockResolvedValue({
+      list: [
+        {
+          id: "ticket-1",
+          projectId: "project-1",
+          handlerId: "user-1",
+          submitterId: "submitter-1",
+          createUser: "creator-1",
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "user-1",
+      _operatorPermissions: ["business/tickets/access"],
+    } as any);
+
+    expect(result.total).toBe(1);
+    expect((service as any).listBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ handlerId: "user-1" }),
+          expect.objectContaining({ submitterId: "user-1" }),
+          expect.objectContaining({ createUser: "user-1" }),
+        ]),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("基础访问权限允许查看本人相关工单详情", async () => {
+    const projectsService = {
+      assertExecutionObjectPermission: jest
+        .fn()
+        .mockRejectedValue(new Error("当前无访问权限")),
+      getProjectPermissionContext: jest.fn(async () => null),
+    };
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        projectId: "project-1",
+        handlerId: "user-1",
+        submitterId: "submitter-1",
+        createUser: "creator-1",
+      }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+      {} as any,
+    );
+
+    const result = await service.getOne({
+      id: "ticket-1",
+      _operatorId: "user-1",
+      _operatorPermissions: ["business/tickets/access"],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({ id: "ticket-1" }));
+  });
+
   it("工单全量管理权限在列表行上返回可操作权限", async () => {
     const projectsService = {
       getVisibleProjectIdsForUser: jest.fn().mockResolvedValue(null),
