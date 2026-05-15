@@ -167,7 +167,7 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="milestone-form-page">
+  <FormPageShell class="milestone-form-page milestone-form-shell">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="hasMilestoneId">当前里程碑已关联任务</span>
@@ -365,6 +365,13 @@ function cancel() {
 <style scoped>
 .milestone-form-page {
   min-height: 100%;
+}
+
+.milestone-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .milestone-sections {

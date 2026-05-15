@@ -141,7 +141,7 @@ async function handleConvertToTask() {
 </script>
 
 <template>
-  <FormPageShell class="risk-form-page">
+  <FormPageShell class="risk-form-page risk-form-shell">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="form.knowledgeArticleId">已沉淀知识</span>
@@ -282,6 +282,13 @@ async function handleConvertToTask() {
 <style lang="scss" scoped>
 .risk-form-page {
   min-height: 100%;
+}
+
+.risk-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .risk-sections {

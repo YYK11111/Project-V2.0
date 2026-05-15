@@ -95,7 +95,7 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <FormPageShell class="business-form-page">
+  <FormPageShell class="business-form-page handover-form-shell">
     <template #footerMeta>
       <span>{{ isReadonly ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
@@ -185,3 +185,12 @@ function scrollToWorkflowPanel() {
     </template>
   </FormPageShell>
 </template>
+
+<style scoped>
+.handover-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+</style>

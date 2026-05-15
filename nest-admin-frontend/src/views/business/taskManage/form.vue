@@ -1189,6 +1189,13 @@ watch(hasTaskId, (value) => {
   padding: 0;
 }
 
+.task-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .task-sections {
   display: flex;
   flex-direction: column;

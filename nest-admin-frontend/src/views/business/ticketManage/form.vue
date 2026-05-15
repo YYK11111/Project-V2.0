@@ -238,7 +238,7 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <FormPageShell class="ticket-form-page">
+  <FormPageShell class="ticket-form-page ticket-form-shell">
     <template #footerMeta>
       <span>{{ isReadonly ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
@@ -505,6 +505,13 @@ function scrollToWorkflowPanel() {
 <style lang="scss" scoped>
 .ticket-form-page {
   min-height: 100%;
+}
+
+.ticket-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .ticket-form-page :deep(.el-row) {

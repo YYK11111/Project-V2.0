@@ -142,7 +142,7 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="sprint-form-page">
+  <FormPageShell class="sprint-form-page sprint-form-shell">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="hasSprintId">当前 Sprint 已关联任务</span>
@@ -296,6 +296,13 @@ function cancel() {
 <style scoped>
 .sprint-form-page {
   min-height: 100%;
+}
+
+.sprint-form-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .sprint-form-page :deep(.el-row) {
