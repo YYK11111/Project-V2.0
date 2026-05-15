@@ -22,12 +22,16 @@ describe("BusinessApprovalContextService", () => {
     const taskRepository = {
       find: jest.fn(),
     };
+    const ticketRepository = {
+      find: jest.fn(),
+    };
     const service = new BusinessApprovalContextService(
       contextRepository as any,
       participantRepository as any,
       workflowInstanceRepository as any,
       changeRepository as any,
       taskRepository as any,
+      ticketRepository as any,
     );
     return {
       service,
@@ -36,6 +40,7 @@ describe("BusinessApprovalContextService", () => {
       workflowInstanceRepository,
       changeRepository,
       taskRepository,
+      ticketRepository,
     };
   };
 
@@ -164,6 +169,7 @@ describe("BusinessApprovalContextService", () => {
       workflowInstanceRepository,
       changeRepository,
       taskRepository,
+      ticketRepository,
     } = createService();
     contextRepository.find
       .mockResolvedValueOnce([
@@ -179,6 +185,7 @@ describe("BusinessApprovalContextService", () => {
       ]);
     changeRepository.find.mockResolvedValue([{ id: "change-1" }]);
     taskRepository.find.mockResolvedValue([{ id: "task-1" }]);
+    ticketRepository.find.mockResolvedValue([{ id: "ticket-1" }]);
     workflowInstanceRepository.find.mockResolvedValue([
       {
         id: "wf-project",
@@ -220,6 +227,16 @@ describe("BusinessApprovalContextService", () => {
         starterId: "u4",
         startTime: "2026-05-15 13:00:00",
       },
+      {
+        id: "wf-ticket",
+        businessKey: "ticket_ticket-1",
+        definitionId: "def-5",
+        definitionCode: "ticket-approval",
+        status: "1",
+        currentNodeId: "node-ticket",
+        starterId: "u5",
+        startTime: "2026-05-15 14:00:00",
+      },
     ]);
 
     const result = await service.findProjectApprovalContexts("19");
@@ -232,6 +249,10 @@ describe("BusinessApprovalContextService", () => {
       where: { projectId: "19" },
       select: ["id"],
     });
+    expect(ticketRepository.find).toHaveBeenCalledWith({
+      where: { projectId: "19" },
+      select: ["id"],
+    });
     expect(workflowInstanceRepository.find).toHaveBeenCalled();
     expect(contextRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -240,6 +261,18 @@ describe("BusinessApprovalContextService", () => {
         businessScene: "closure",
         sceneTitle: "结项审批",
         workflowInstanceId: "wf-close",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+    expect(contextRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "ticket",
+        businessId: "ticket-1",
+        businessScene: "approval",
+        sceneTitle: "工单审批",
+        workflowInstanceId: "wf-ticket",
         rootBusinessType: "project",
         rootBusinessId: "19",
         projectId: "19",

@@ -6,6 +6,7 @@ import { BusinessApprovalParticipant } from "./entity/business-approval-particip
 import { WorkflowInstance } from "../workflow/entity/workflow-instance.entity";
 import { ProjectChange } from "../changes/entity";
 import { Task } from "../tasks/entity";
+import { Ticket } from "../tickets/entity";
 
 export interface CreateBusinessApprovalContextOptions {
   businessType: string;
@@ -51,6 +52,9 @@ export class BusinessApprovalContextService {
     @Optional()
     @InjectRepository(Task)
     private readonly taskRepository?: Repository<Task>,
+    @Optional()
+    @InjectRepository(Ticket)
+    private readonly ticketRepository?: Repository<Ticket>,
   ) {}
 
   async createFromWorkflowStart(options: CreateBusinessApprovalContextOptions) {
@@ -158,7 +162,8 @@ export class BusinessApprovalContextService {
     if (
       !this.workflowInstanceRepository ||
       !this.changeRepository ||
-      !this.taskRepository
+      !this.taskRepository ||
+      !this.ticketRepository
     )
       return;
 
@@ -170,11 +175,16 @@ export class BusinessApprovalContextService {
       where: { projectId },
       select: ["id"],
     });
+    const tickets = await this.ticketRepository.find({
+      where: { projectId },
+      select: ["id"],
+    });
     const businessKeys = [
       `project_${projectId}`,
       `project_close_${projectId}`,
       ...changes.map((change) => `change_${change.id}`),
       ...tasks.map((task) => `task_${task.id}`),
+      ...tickets.map((ticket) => `ticket_${ticket.id}`),
     ];
     const workflowInstances = await this.workflowInstanceRepository.find({
       where: { businessKey: In(businessKeys) },
@@ -242,6 +252,15 @@ export class BusinessApprovalContextService {
         businessId: businessKey.replace("task_", ""),
         businessScene: "approval",
         sceneTitle: "任务审批",
+      };
+    }
+    if (businessKey.startsWith("ticket_")) {
+      return {
+        ...commonOptions,
+        businessType: "ticket",
+        businessId: businessKey.replace("ticket_", ""),
+        businessScene: "approval",
+        sceneTitle: "工单审批",
       };
     }
     return null;

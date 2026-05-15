@@ -640,6 +640,18 @@ export class WorkflowIntegrationService {
       initiatorId,
     );
 
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "ticket",
+      businessId: ticketId,
+      businessScene: "approval",
+      sceneTitle: "工单审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: ticket.projectId,
+      projectId: ticket.projectId,
+    });
+
     await this.ticketRepository.update(ticketId, {
       workflowInstanceId: instance.id,
       approvalStatus: "1",
