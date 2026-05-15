@@ -107,14 +107,13 @@ function getDateRange(startDate, endDate) {
 
 async function reloadCurrent() {
   if (!projectId.value) return
-  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, workflowRes, permissionRes] = await Promise.all([
+  const [statusRes, priorityRes, projectTypeRes, customerRes, deptRes, projectRes, permissionRes] = await Promise.all([
     getStatus(),
     getPriority(),
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
     getDeptTrees({}),
     getOne(projectId.value),
-    workflowInstanceId.value ? getWorkflowInstance(workflowInstanceId.value) : Promise.resolve({ data: null }),
     getFieldPermissions(projectId.value),
   ])
   statusMap.value = statusRes.data || {}
@@ -138,13 +137,11 @@ async function reloadCurrent() {
     members: projectRes.data?.members || [],
     milestones: projectRes.data?.milestones || [],
   }
-  workflowInstance.value = workflowRes.data || null
   fieldPermissionResult.value = permissionRes?.data || permissionRes || null
 
-  if (!workflowInstance.value && project.value?.workflowInstanceId) {
-    const fallbackWorkflowRes = await getWorkflowInstance(project.value.workflowInstanceId)
-    workflowInstance.value = fallbackWorkflowRes.data || null
-  }
+  const finalWorkflowInstanceId = String(route.query.instanceId || projectRes.data?.workflowInstanceId || '')
+  const workflowInstanceRes = finalWorkflowInstanceId ? await getWorkflowInstance(finalWorkflowInstanceId) : { data: null }
+  workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null
 }
 
 function goToEdit() {
@@ -507,14 +504,9 @@ watch(
         </el-row>
 
         <el-row :gutter="20" class="basic-info-row basic-info-row--last" v-if="canViewGroup('projectPlan')">
-          <el-col :xs="24" :sm="8">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="计划说明">
               <ViewField :value="project.baselinePlanNote || '-'" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="项目描述">
-              <ViewRichText :html="project.description || '-'" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -581,9 +573,6 @@ watch(
             <el-table-column label="交付物" min-width="260">
               <template #default="{ row }"><ViewField :value="(row.deliverables || []).join('、')" /></template>
             </el-table-column>
-            <el-table-column label="延期原因" min-width="200">
-              <template #default="{ row }"><ViewField :value="row.delayReason" /></template>
-            </el-table-column>
             <el-table-column label="描述" min-width="220">
               <template #default="{ row }"><ViewField :value="row.description" /></template>
             </el-table-column>
@@ -598,6 +587,10 @@ watch(
             <div class="section-desc">审批时核对立项附件和支撑材料是否齐全。</div>
           </div>
         </div>
+
+        <el-form-item label="项目描述">
+          <ViewRichText :html="project.description || '-'" />
+        </el-form-item>
 
         <el-form-item label="项目附件">
           <ViewFileList :files="project.attachments || []" />
