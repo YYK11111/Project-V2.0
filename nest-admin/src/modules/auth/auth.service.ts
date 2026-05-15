@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Optional,
   SetMetadata,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -17,6 +18,9 @@ import dayjs from "dayjs";
 import { CaptchaService } from "../common/captcha.service";
 import { getIpAddress } from "../../common/utils/common";
 import { verifyPassword } from "src/common/utils/password";
+import { ExternalAccountPlatform } from "../external-accounts/entity";
+import { UserExternalAccountsService } from "../external-accounts/service";
+import { FeishuNotifyProvider } from "../external-notify/providers/feishu.provider";
 
 import { config } from "config";
 export const Public = () => SetMetadata(config.isPublicKey, true);
@@ -33,6 +37,10 @@ export class AuthService {
     private redisService: RedisService,
     private systemConfigsService: SystenConfigsService,
     private captchaService: CaptchaService,
+    @Optional()
+    private externalAccountsService?: UserExternalAccountsService,
+    @Optional()
+    private feishuProvider?: FeishuNotifyProvider,
   ) {}
   async login(req, res: Response): Promise<{ success: boolean }> {
     let user: any = {};
@@ -66,10 +74,104 @@ export class AuthService {
       await this.loginLogsService.createLog(req, log);
       throw error;
     }
-    let { password: _, ...result } = user;
+    await this.createAuthenticatedSession(req, res, user, body);
 
+    return {
+      success: true,
+    };
+  }
+
+  async getFeishuLoginUrl(redirect?: string) {
+    const runtimeConfig =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    if (!this.feishuProvider?.isEnabled(runtimeConfig)) {
+      throw new UnauthorizedException("飞书登录未启用或配置不完整");
+    }
+    const normalizedRedirect = this.normalizeRedirectUrl(
+      redirect,
+      runtimeConfig?.siteUrl,
+    );
+    const state = await this.jwtService.signAsync(
+      {
+        redirect: normalizedRedirect,
+        source: "feishu",
+      },
+      {
+        secret: config.jwtSecret,
+        expiresIn: "10m",
+      },
+    );
+    return this.feishuProvider.buildOAuthAuthorizeUrl(
+      {
+        redirectUri: this.buildSiteApiUrl(
+          "/auth/feishu/callback",
+          runtimeConfig?.siteUrl,
+        ),
+        state,
+      },
+      runtimeConfig,
+    );
+  }
+
+  async loginWithFeishuCode(
+    req: Record<string, any>,
+    res: Response,
+    options: { code?: string; state?: string },
+  ) {
+    if (!options.code || !options.state) {
+      throw new UnauthorizedException("飞书授权参数不完整");
+    }
+    if (!this.feishuProvider || !this.externalAccountsService) {
+      throw new UnauthorizedException("飞书登录服务未启用");
+    }
+    const runtimeConfig =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    if (!this.feishuProvider.isEnabled(runtimeConfig)) {
+      throw new UnauthorizedException("飞书登录未启用或配置不完整");
+    }
+    const state = await this.jwtService.verifyAsync(options.state, {
+      secret: config.jwtSecret,
+    });
+    const redirect = this.normalizeRedirectUrl(
+      state?.redirect,
+      runtimeConfig?.siteUrl,
+    );
+    const feishuUser = await this.feishuProvider.getOAuthUser(
+      options.code,
+      runtimeConfig,
+    );
+    const account =
+      await this.externalAccountsService.findActiveAccountByExternalIdentity(
+        ExternalAccountPlatform.feishu,
+        {
+          externalUserId: feishuUser.externalUserId,
+          openId: feishuUser.openId,
+          unionId: feishuUser.unionId,
+        },
+      );
+    if (!account?.userId) {
+      throw new UnauthorizedException("飞书账号未绑定系统用户");
+    }
+    const user = await this.usersService.getOne({ id: account.userId });
+    await this.rolesService.getUserMenus(user);
+    await this.createAuthenticatedSession(req, res, user, {
+      account: user?.name,
+      loginType: "feishu",
+      externalUserId: feishuUser.externalUserId,
+      openId: feishuUser.openId,
+    });
+    return { redirect };
+  }
+
+  private async createAuthenticatedSession(
+    req: Record<string, any>,
+    res: Response,
+    user: Record<string, any>,
+    logParams: Record<string, any> = {},
+  ) {
+    let { password: _, ...result } = user;
     let address = await getIpAddress(
-      req.headers["x-forwarded-for"] || req.connection.remoteAddress,
+      req.headers?.["x-forwarded-for"] || req.connection?.remoteAddress,
     );
 
     const { permissions: _permissions, ...resultWithoutPermissions } = result;
@@ -92,7 +194,7 @@ export class AuthService {
       session: accessToken.split(".").at(-1),
       loginTime: payload.loginTime,
       address,
-      ...body,
+      ...logParams,
     });
 
     await this.redisService.setRedisOnlineUser(
@@ -101,10 +203,31 @@ export class AuthService {
       sessionExpireMinutes * 60,
     );
     this.setSessionCookie(res, accessToken, sessionExpireMinutes);
+  }
 
-    return {
-      success: true,
-    };
+  private normalizeRedirectUrl(redirect?: string, siteUrl?: string) {
+    const normalizedSiteUrl = String(siteUrl || "").replace(/\/+$/, "");
+    if (!redirect) return normalizedSiteUrl || "/";
+    try {
+      const parsedRedirect = new URL(redirect, normalizedSiteUrl || undefined);
+      if (normalizedSiteUrl) {
+        const site = new URL(normalizedSiteUrl);
+        if (parsedRedirect.origin !== site.origin) {
+          return normalizedSiteUrl;
+        }
+        return parsedRedirect.toString();
+      }
+      return `${parsedRedirect.pathname}${parsedRedirect.search}${parsedRedirect.hash}`;
+    } catch {
+      return normalizedSiteUrl || "/";
+    }
+  }
+
+  private buildSiteApiUrl(path: string, siteUrl?: string) {
+    const normalizedSiteUrl = String(siteUrl || "").replace(/\/+$/, "");
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const apiPath = `${config.apiBase || "/api"}${normalizedPath}`;
+    return normalizedSiteUrl ? `${normalizedSiteUrl}${apiPath}` : apiPath;
   }
 
   async logout(req: Record<string, any>, isQuit = false, res?: Response) {

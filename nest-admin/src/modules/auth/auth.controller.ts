@@ -38,6 +38,31 @@ export class AuthController {
   }
 
   @Public()
+  @Get("feishu/login")
+  async redirectToFeishuLogin(
+    @Query("redirect") redirect: string,
+    @Res() res: Response,
+  ) {
+    const loginUrl = await this.authService.getFeishuLoginUrl(redirect);
+    return res.redirect(loginUrl);
+  }
+
+  @Public()
+  @Get("feishu/callback")
+  async handleFeishuCallback(
+    @Request() req: Record<string, any>,
+    @Query("code") code: string,
+    @Query("state") state: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.authService.loginWithFeishuCode(req, res, {
+      code,
+      state,
+    });
+    return res.redirect(result.redirect);
+  }
+
+  @Public()
   @Post("register")
   async register(@Body() body: { name; password; uuid; code; email? }) {
     let result = this.captchaService.validateCaptcha(body.uuid, body.code);

@@ -33,6 +33,17 @@ describe("AuthService", () => {
 
   const systemConfigsService = {
     getSessionExpireMinutes: jest.fn(),
+    getExternalNotifyRuntimeConfig: jest.fn(),
+  };
+
+  const externalAccountsService = {
+    findActiveAccountByExternalIdentity: jest.fn(),
+  };
+
+  const feishuProvider = {
+    isEnabled: jest.fn(),
+    buildOAuthAuthorizeUrl: jest.fn(),
+    getOAuthUser: jest.fn(),
   };
 
   const createService = () => {
@@ -44,6 +55,8 @@ describe("AuthService", () => {
       redisService as any,
       systemConfigsService as any,
       captchaService as any,
+      externalAccountsService as any,
+      feishuProvider as any,
     );
   };
 
@@ -52,11 +65,33 @@ describe("AuthService", () => {
     jest.spyOn(commonUtils, "getIpAddress").mockResolvedValue("本地");
     captchaService.validateCaptcha.mockReturnValue("true");
     systemConfigsService.getSessionExpireMinutes.mockResolvedValue(30);
+    systemConfigsService.getExternalNotifyRuntimeConfig.mockResolvedValue({
+      enabled: true,
+      siteUrl: "https://admin.example.com",
+      feishu: {
+        enabled: true,
+        appId: "app_1",
+        appSecret: "secret_1",
+        baseUrl: "https://open.feishu.test",
+      },
+    });
     loginLogsService.createLog.mockResolvedValue({ session: "signature" });
     redisService.setRedisOnlineUser.mockResolvedValue(undefined);
     redisService.delRedisOnlineUser.mockResolvedValue(undefined);
     jwtService.signAsync.mockResolvedValue("header.payload.signature");
     rolesService.getUserMenus.mockResolvedValue([]);
+    feishuProvider.isEnabled.mockReturnValue(true);
+    feishuProvider.buildOAuthAuthorizeUrl.mockReturnValue(
+      "https://open.feishu.test/open-apis/authen/v1/index?app_id=app_1",
+    );
+    feishuProvider.getOAuthUser.mockResolvedValue({
+      externalUserId: "ou_1",
+      openId: "open_1",
+      unionId: "union_1",
+    });
+    externalAccountsService.findActiveAccountByExternalIdentity.mockResolvedValue(
+      { userId: "user_1" },
+    );
   });
 
   it("登录成功时写入 HttpOnly Cookie 并记录在线会话", async () => {
@@ -237,6 +272,75 @@ describe("AuthService", () => {
         isSuccess: BoolNum.No,
         msg: "密码错误",
       }),
+    );
+  });
+
+  it("生成飞书 OAuth 授权地址并把目标地址放入 state", async () => {
+    const service = createService();
+    jwtService.signAsync.mockResolvedValue("state-token");
+
+    const url = await service.getFeishuLoginUrl("/projectManage/approval");
+
+    expect(url).toContain("open-apis/authen/v1/index");
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        redirect: "https://admin.example.com/projectManage/approval",
+      }),
+      expect.objectContaining({ expiresIn: "10m" }),
+    );
+    expect(feishuProvider.buildOAuthAuthorizeUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        redirectUri: "https://admin.example.com/api/auth/feishu/callback",
+        state: "state-token",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("飞书 OAuth 回调匹配外部账号后签发系统 Cookie", async () => {
+    const service = createService();
+    jwtService.verifyAsync = jest.fn().mockResolvedValue({
+      redirect: "https://admin.example.com/projectManage/approval",
+    });
+    usersService.getOne.mockResolvedValue({
+      id: "user_1",
+      name: "tester",
+      roles: [],
+    });
+    const req = {
+      headers: {},
+      connection: { remoteAddress: "127.0.0.1" },
+    };
+    const res = {
+      cookie: jest.fn(),
+    };
+
+    const result = await service.loginWithFeishuCode(req as any, res as any, {
+      code: "code_1",
+      state: "state-token",
+    });
+
+    expect(result.redirect).toBe(
+      "https://admin.example.com/projectManage/approval",
+    );
+    expect(feishuProvider.getOAuthUser).toHaveBeenCalledWith(
+      "code_1",
+      expect.any(Object),
+    );
+    expect(
+      externalAccountsService.findActiveAccountByExternalIdentity,
+    ).toHaveBeenCalledWith(
+      "feishu",
+      expect.objectContaining({
+        externalUserId: "ou_1",
+        openId: "open_1",
+        unionId: "union_1",
+      }),
+    );
+    expect(res.cookie).toHaveBeenCalledWith(
+      "admin_session",
+      "header.payload.signature",
+      expect.objectContaining({ httpOnly: true }),
     );
   });
 });

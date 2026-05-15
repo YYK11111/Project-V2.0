@@ -30,6 +30,44 @@ export class UserExternalAccountsService {
     });
   }
 
+  async findActiveAccountByExternalIdentity(
+    platform: ExternalAccountPlatform | string,
+    identity: {
+      externalUserId?: string;
+      openId?: string;
+      unionId?: string;
+    },
+  ) {
+    if (!platform) return null;
+    const baseWhere = {
+      platform: String(platform) as ExternalAccountPlatform,
+      bindStatus: ExternalAccountBindStatus.bound,
+      isDelete: null as any,
+    };
+    const where = [
+      identity.externalUserId
+        ? {
+            ...baseWhere,
+            externalUserId: String(identity.externalUserId),
+          }
+        : null,
+      identity.openId
+        ? {
+            ...baseWhere,
+            openId: String(identity.openId),
+          }
+        : null,
+      identity.unionId
+        ? {
+            ...baseWhere,
+            unionId: String(identity.unionId),
+          }
+        : null,
+    ].filter(Boolean);
+    if (!where.length) return null;
+    return this.repository.findOne({ where: where as any });
+  }
+
   async list(query: QueryListDto) {
     const pageNum = Number(query.pageNum || 1);
     const pageSize = Number(query.pageSize || 10);

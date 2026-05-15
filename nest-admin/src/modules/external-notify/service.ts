@@ -108,6 +108,7 @@ export class ExternalNotifyService {
             templateKey: "workflowTodo",
           },
           config,
+          "feishu",
         );
         try {
           await this.feishuProvider.updateWorkflowTodoCard?.(
@@ -281,6 +282,7 @@ export class ExternalNotifyService {
               extraData: payload.extraData || {},
             },
             config,
+            "feishu",
           ),
           {
             status: payload.status || "cancelled",
@@ -405,7 +407,7 @@ export class ExternalNotifyService {
     try {
       const response = await provider.sendText(
         account,
-        this.normalizeMessageForProvider(message, config),
+        this.normalizeMessageForProvider(message, config, provider.platform),
         config,
       );
       await this.saveLog(provider.platform, account, message, {
@@ -443,15 +445,33 @@ export class ExternalNotifyService {
   private normalizeMessageForProvider(
     message: NotifyMessage,
     config: ExternalNotifyConfig,
+    platform?: string,
   ) {
+    const linkUrl = this.buildAbsoluteLink(
+      message.linkUrl,
+      message.linkParams,
+      config,
+    );
     return {
       ...message,
-      linkUrl: this.buildAbsoluteLink(
-        message.linkUrl,
-        message.linkParams,
-        config,
-      ),
+      linkUrl:
+        platform === "feishu" && message.templateKey === "workflowTodo"
+          ? this.buildFeishuLoginLink(linkUrl, config)
+          : linkUrl,
     };
+  }
+
+  private buildFeishuLoginLink(
+    targetUrl: string,
+    config?: ExternalNotifyConfig,
+  ) {
+    if (!targetUrl) return "";
+    const siteUrl = String((config as any)?.siteUrl || "").trim();
+    if (!siteUrl) return targetUrl;
+    const normalizedBase = siteUrl.replace(/\/+$/, "");
+    return `${normalizedBase}/api/auth/feishu/login?redirect=${encodeURIComponent(
+      targetUrl,
+    )}`;
   }
 
   private async saveLog(

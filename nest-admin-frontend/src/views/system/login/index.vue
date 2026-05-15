@@ -48,11 +48,8 @@
     </el-form>
 
     <el-divider><span class="" style="color: var(--FontBlack7)">其他方式登录</span></el-divider>
-    <div class="third pointer" @click="$sdk.demoDisabled()">
-      <SvgIcon icon="wechat" style="color: #05e06d" />
-      <SvgIcon icon="gitee" />
-      <SvgIcon icon="phone" />
-      <SvgIcon icon="github" style="color: var(--FontBlack)" />
+    <div class="third">
+      <el-button class="feishu-login-button" round @click="loginByFeishu">飞书登录</el-button>
     </div>
   </div>
 </template>
@@ -143,6 +140,12 @@ async function submit() {
     loading.value = false
   }
 }
+
+function loginByFeishu() {
+  const target = redirect.value || '/'
+  const apiBase = process.env.NODE_ENV === 'development' ? '/api' : window.sysConfig.BASE_API
+  location.href = `${apiBase}/auth/feishu/login?redirect=${encodeURIComponent(target)}`
+}
 </script>
 
 <style lang="scss" scoped>
@@ -173,11 +176,11 @@ async function submit() {
 }
 .third {
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
   align-items: center;
-  .SvgIcon {
-    font-size: 30px;
-    color: var(--FontBlack5);
-  }
+}
+
+.feishu-login-button {
+  width: 100%;
 }
 </style>

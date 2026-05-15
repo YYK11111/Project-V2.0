@@ -15,10 +15,17 @@ type FeishuTenantTokenCache = {
   cacheKey: string;
 };
 
+type FeishuAppTokenCache = {
+  token: string;
+  expiresAt: number;
+  cacheKey: string;
+};
+
 @Injectable()
 export class FeishuNotifyProvider implements ExternalNotifyProvider {
   readonly platform = "feishu";
   private tokenCache: FeishuTenantTokenCache | null = null;
+  private appTokenCache: FeishuAppTokenCache | null = null;
 
   constructor(private readonly httpService: HttpService) {}
 
@@ -112,6 +119,135 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
       cacheKey,
     };
     return this.tokenCache.token;
+  }
+
+  async getAppAccessToken(config?: ExternalNotifyConfig) {
+    const feishuConfig = this.resolveFeishuConfig(config);
+    const cacheKey = this.getCacheKey(config);
+    const now = Date.now();
+    if (
+      this.appTokenCache &&
+      this.appTokenCache.cacheKey === cacheKey &&
+      this.appTokenCache.expiresAt > now + 60_000
+    ) {
+      return this.appTokenCache.token;
+    }
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.post(
+          `${this.getBaseUrl(config)}/open-apis/auth/v3/app_access_token/internal`,
+          {
+            app_id: feishuConfig.appId,
+            app_secret: feishuConfig.appSecret,
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(
+        this.formatFeishuError(error, "获取飞书 app_access_token 失败"),
+      );
+    }
+    const data = response?.data || {};
+    if (data.code !== 0 || !data.app_access_token) {
+      throw new Error(
+        this.formatFeishuError(
+          { response: { data } },
+          "获取飞书 app_access_token 失败",
+        ),
+      );
+    }
+    this.appTokenCache = {
+      token: data.app_access_token,
+      expiresAt: now + Number(data.expire || 7200) * 1000,
+      cacheKey,
+    };
+    return this.appTokenCache.token;
+  }
+
+  buildOAuthAuthorizeUrl(
+    options: { redirectUri: string; state: string },
+    config?: ExternalNotifyConfig,
+  ) {
+    const feishuConfig = this.resolveFeishuConfig(config);
+    const url = new URL(`${this.getBaseUrl(config)}/open-apis/authen/v1/index`);
+    url.searchParams.set("app_id", feishuConfig.appId || "");
+    url.searchParams.set("redirect_uri", options.redirectUri);
+    url.searchParams.set("state", options.state);
+    return url.toString();
+  }
+
+  async getOAuthUser(code: string, config?: ExternalNotifyConfig) {
+    if (!code) {
+      throw new Error("飞书授权码为空");
+    }
+    const appToken = await this.getAppAccessToken(config);
+    let tokenResponse;
+    try {
+      tokenResponse = await firstValueFrom(
+        await this.httpService.post(
+          `${this.getBaseUrl(config)}/open-apis/authen/v1/access_token`,
+          {
+            grant_type: "authorization_code",
+            code,
+          },
+          {
+            headers: { Authorization: `Bearer ${appToken}` },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(this.formatFeishuError(error, "获取飞书用户授权失败"));
+    }
+    const tokenData = tokenResponse?.data || {};
+    if (tokenData.code !== 0 || !tokenData.data?.access_token) {
+      throw new Error(
+        this.formatFeishuError(
+          { response: { data: tokenData } },
+          "获取飞书用户授权失败",
+        ),
+      );
+    }
+
+    const userAccessToken = tokenData.data.access_token;
+    let userInfo = {};
+    try {
+      const userResponse = await firstValueFrom(
+        await this.httpService.get(
+          `${this.getBaseUrl(config)}/open-apis/authen/v1/user_info`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${userAccessToken}` },
+          },
+        ),
+      );
+      const data = userResponse?.data || {};
+      if (data.code !== 0) {
+        throw { response: { data } };
+      }
+      userInfo = data.data || {};
+    } catch (error) {
+      const fallbackUser = tokenData.data || {};
+      if (!fallbackUser.user_id && !fallbackUser.open_id) {
+        throw new Error(
+          this.formatFeishuError(error, "获取飞书登录用户信息失败"),
+        );
+      }
+    }
+
+    const mergedUser = {
+      ...(tokenData.data || {}),
+      ...(userInfo || {}),
+    } as Record<string, any>;
+    return {
+      externalUserId: mergedUser.user_id || "",
+      openId: mergedUser.open_id || "",
+      unionId: mergedUser.union_id || "",
+      name: mergedUser.name || mergedUser.en_name || "",
+      email: mergedUser.email || "",
+      mobile: mergedUser.mobile || "",
+      raw: mergedUser,
+    };
   }
 
   async sendText(

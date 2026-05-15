@@ -35,6 +35,47 @@ describe("UserExternalAccountsService", () => {
     });
   });
 
+  it("按飞书 UserID、OpenID 或 UnionID 查询有效映射", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      userId: "1",
+      platform: ExternalAccountPlatform.feishu,
+      externalUserId: "ou_1",
+      openId: "open_1",
+      unionId: "union_1",
+    });
+
+    const result = await service.findActiveAccountByExternalIdentity(
+      ExternalAccountPlatform.feishu,
+      {
+        externalUserId: "ou_1",
+        openId: "open_1",
+        unionId: "union_1",
+      },
+    );
+
+    expect(result.userId).toBe("1");
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: [
+        expect.objectContaining({
+          platform: ExternalAccountPlatform.feishu,
+          externalUserId: "ou_1",
+          bindStatus: ExternalAccountBindStatus.bound,
+        }),
+        expect.objectContaining({
+          platform: ExternalAccountPlatform.feishu,
+          openId: "open_1",
+          bindStatus: ExternalAccountBindStatus.bound,
+        }),
+        expect.objectContaining({
+          platform: ExternalAccountPlatform.feishu,
+          unionId: "union_1",
+          bindStatus: ExternalAccountBindStatus.bound,
+        }),
+      ],
+    });
+  });
+
   it("手动绑定时复用同用户同平台旧记录", async () => {
     const { service, repository } = createService();
     repository.findOne.mockResolvedValue({ id: "map-1", userId: "1" });

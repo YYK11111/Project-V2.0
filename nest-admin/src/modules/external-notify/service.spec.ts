@@ -160,7 +160,7 @@ describe("ExternalNotifyService", () => {
     );
   });
 
-  it("工作流待办发送前补全系统审批绝对链接", async () => {
+  it("工作流待办发送给飞书前包装为免登录审批入口", async () => {
     const { service, feishuProvider } = createService({
       account: { userId: "1", externalUserId: "ou_1" },
     });
@@ -179,7 +179,7 @@ describe("ExternalNotifyService", () => {
       expect.objectContaining({ externalUserId: "ou_1" }),
       expect.objectContaining({
         linkUrl:
-          "https://admin.example.com/projectManage/approval?id=19&taskId=task-1&fromWorkflow=1",
+          "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3Fid%3D19%26taskId%3Dtask-1%26fromWorkflow%3D1",
       }),
       expect.objectContaining({
         enabled: true,
@@ -552,7 +552,7 @@ describe("ExternalNotifyService", () => {
       expect.objectContaining({
         messageId: "msg-1",
         linkUrl:
-          "https://admin.example.com/projectManage/approval?id=19&taskId=task-1",
+          "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3Fid%3D19%26taskId%3Dtask-1",
         extraData: { businessLabel: "客户项目A" },
       }),
       expect.objectContaining({ status: "approved", statusText: "已同意" }),
@@ -682,7 +682,7 @@ describe("ExternalNotifyService", () => {
       expect.objectContaining({
         messageId: "msg-1",
         linkUrl:
-          "https://admin.example.com/projectManage/approval?id=19&taskId=task-1",
+          "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3Fid%3D19%26taskId%3Dtask-1",
       }),
       expect.objectContaining({ status: "approved", statusText: "已同意" }),
       expect.any(Object),

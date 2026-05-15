@@ -23,6 +23,6 @@ import { DingTalkNotifyProvider } from "./providers/dingtalk.provider";
     FeishuNotifyProvider,
     DingTalkNotifyProvider,
   ],
-  exports: [ExternalNotifyService],
+  exports: [ExternalNotifyService, FeishuNotifyProvider],
 })
 export class ExternalNotifyModule {}

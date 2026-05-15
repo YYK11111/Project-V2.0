@@ -16,6 +16,9 @@ describe('login branding structure', () => {
 
     expect(source).toContain("account: ''")
     expect(source).toContain("password: ''")
+    expect(source).toContain('飞书登录')
+    expect(source).toContain('loginByFeishu')
+    expect(source).toContain('/auth/feishu/login')
     expect(source).not.toContain('NestAdmin')
     expect(source).not.toContain('SYSTEM_SLOGAN')
     expect(source).not.toContain('loginSlogan')

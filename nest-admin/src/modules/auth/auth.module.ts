@@ -9,6 +9,8 @@ import { LoginLogsModule } from "../loginLogs/module";
 import { CommonModule } from "../common/common.module";
 import { RolesModule } from "../roles/module";
 import { SystenConfigsModule } from "../configs/module";
+import { UserExternalAccountsModule } from "../external-accounts/module";
+import { ExternalNotifyModule } from "../external-notify/module";
 // import { config } from 'config'
 
 @Module({
@@ -18,6 +20,8 @@ import { SystenConfigsModule } from "../configs/module";
     CommonModule,
     LoginLogsModule,
     SystenConfigsModule,
+    UserExternalAccountsModule,
+    ExternalNotifyModule,
     JwtModule.register({
       global: true,
       // secret: config.jwtSecret,
