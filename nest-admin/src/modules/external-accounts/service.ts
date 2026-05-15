@@ -54,7 +54,7 @@ export class UserExternalAccountsService {
     }
     if (query.keyword) {
       qb.andWhere(
-        "(account.externalUserId LIKE :keyword OR account.name LIKE :keyword OR account.email LIKE :keyword OR account.mobile LIKE :keyword)",
+        "(account.externalUserId LIKE :keyword OR account.openId LIKE :keyword OR account.unionId LIKE :keyword OR account.name LIKE :keyword OR account.email LIKE :keyword OR account.mobile LIKE :keyword)",
         { keyword: `%${String(query.keyword)}%` },
       );
     }

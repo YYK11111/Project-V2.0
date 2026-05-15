@@ -585,20 +585,29 @@ export class ExternalNotifyService {
       mobile,
     });
     if (!matchedUser?.user_id) return null;
+    const userDetail =
+      (await this.feishuProvider.getUserDetail(
+        matchedUser.user_id,
+        runtimeConfig,
+      )) || {};
+    const feishuUser = {
+      ...matchedUser,
+      ...userDetail,
+    };
 
     return this.externalAccountsService.upsertManualAccount({
       userId: user.id,
       platform: ExternalAccountPlatform.feishu,
-      externalUserId: matchedUser.user_id,
-      openId: matchedUser.open_id || "",
-      unionId: matchedUser.union_id || "",
-      name: matchedUser.name || matchedUser.en_name || "",
-      email: matchedUser.email || email,
-      mobile: matchedUser.mobile || mobile,
+      externalUserId: feishuUser.user_id,
+      openId: feishuUser.open_id || "",
+      unionId: feishuUser.union_id || "",
+      name: feishuUser.name || feishuUser.en_name || "",
+      email: feishuUser.email || email,
+      mobile: feishuUser.mobile || mobile,
       bindStatus: ExternalAccountBindStatus.bound,
       bindSource: "sync",
       lastSyncTime: new Date().toISOString(),
-      extraData: matchedUser,
+      extraData: feishuUser,
     });
   }
 

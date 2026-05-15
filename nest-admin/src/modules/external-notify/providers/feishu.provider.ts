@@ -322,4 +322,32 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
     }
     return data?.data?.user_list || data?.data?.users || [];
   }
+
+  async getUserDetail(userId: string, config?: ExternalNotifyConfig) {
+    if (!userId) return null;
+    const token = await this.getTenantAccessToken(config);
+    let response;
+    try {
+      response = await firstValueFrom(
+        await this.httpService.get(
+          `${this.getBaseUrl(config)}/open-apis/contact/v3/users/${encodeURIComponent(
+            userId,
+          )}`,
+          { user_id_type: "user_id" },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new Error(this.formatFeishuError(error, "获取飞书用户详情失败"));
+    }
+    const data = response?.data || {};
+    if (data.code !== 0) {
+      throw new Error(
+        this.formatFeishuError({ response: { data } }, "获取飞书用户详情失败"),
+      );
+    }
+    return data?.data?.user || data?.data || null;
+  }
 }

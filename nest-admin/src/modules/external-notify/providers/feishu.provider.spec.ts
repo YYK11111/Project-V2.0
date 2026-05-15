@@ -283,6 +283,53 @@ describe("FeishuNotifyProvider", () => {
     );
   });
 
+  it("通过 UserID 获取飞书用户详情", async () => {
+    const httpService = {
+      post: jest.fn().mockResolvedValueOnce(
+        of({
+          data: {
+            code: 0,
+            tenant_access_token: "tenant-token",
+            expire: 7200,
+          },
+        }),
+      ),
+      get: jest.fn().mockResolvedValueOnce(
+        of({
+          data: {
+            code: 0,
+            data: {
+              user: {
+                user_id: "ou_1",
+                open_id: "open_1",
+                union_id: "union_1",
+                name: "用户1",
+                email: "u1@example.com",
+                mobile: "13800138000",
+              },
+            },
+          },
+        }),
+      ),
+    };
+    const provider = new FeishuNotifyProvider(httpService as any);
+
+    await expect(provider.getUserDetail("ou_1")).resolves.toEqual(
+      expect.objectContaining({
+        user_id: "ou_1",
+        open_id: "open_1",
+        name: "用户1",
+      }),
+    );
+    expect(httpService.get).toHaveBeenCalledWith(
+      "https://open.feishu.test/open-apis/contact/v3/users/ou_1",
+      { user_id_type: "user_id" },
+      expect.objectContaining({
+        headers: { Authorization: "Bearer tenant-token" },
+      }),
+    );
+  });
+
   it("发送消息时透出飞书接口返回的错误信息", async () => {
     const requestError: any = new Error("Request failed with status code 400");
     requestError.response = {

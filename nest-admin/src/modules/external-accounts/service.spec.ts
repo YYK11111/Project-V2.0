@@ -1,14 +1,12 @@
 import { UserExternalAccountsService } from "./service";
-import {
-  ExternalAccountBindStatus,
-  ExternalAccountPlatform,
-} from "./entity";
+import { ExternalAccountBindStatus, ExternalAccountPlatform } from "./entity";
 
 describe("UserExternalAccountsService", () => {
   const createService = () => {
     const repository = {
       findOne: jest.fn(),
       save: jest.fn(async (data) => data),
+      createQueryBuilder: jest.fn(),
     };
     const service = new UserExternalAccountsService(repository as any);
     return { service, repository };
@@ -56,6 +54,31 @@ describe("UserExternalAccountsService", () => {
         bindStatus: ExternalAccountBindStatus.bound,
         bindSource: "manual",
       }),
+    );
+  });
+
+  it("列表关键字支持匹配 UserID、OpenID 和 UnionID", async () => {
+    const { service, repository } = createService();
+    const qb = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+    };
+    repository.createQueryBuilder.mockReturnValue(qb);
+
+    await service.list({ keyword: "open_1" } as any);
+
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("account.openId LIKE :keyword"),
+      { keyword: "%open_1%" },
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("account.unionId LIKE :keyword"),
+      { keyword: "%open_1%" },
     );
   });
 });

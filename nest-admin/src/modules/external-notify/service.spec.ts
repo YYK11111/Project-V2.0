@@ -45,6 +45,9 @@ describe("ExternalNotifyService", () => {
         .fn()
         .mockResolvedValue(options.sendResponse || { code: 0 }),
       batchGetUserId: jest.fn().mockResolvedValue(options.feishuUsers || []),
+      getUserDetail: jest
+        .fn()
+        .mockResolvedValue(options.feishuUserDetail || null),
       updateWorkflowTodoCard: jest.fn().mockResolvedValue({ code: 0 }),
     };
     const dingtalkProvider = {
@@ -258,6 +261,50 @@ describe("ExternalNotifyService", () => {
         platform: "feishu",
         externalUserId: "ou_1",
         sendStatus: ExternalMessageSendStatus.succeeded,
+      }),
+    );
+  });
+
+  it("同步飞书账号时按 UserID 再获取 OpenID 和外部用户姓名", async () => {
+    const { service, feishuProvider, externalAccountsService } = createService({
+      user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+      feishuUsers: [
+        {
+          user_id: "ou_1",
+          email: "u1@example.com",
+          mobile: "13800138000",
+        },
+      ],
+      feishuUserDetail: {
+        user_id: "ou_1",
+        open_id: "open_1",
+        union_id: "union_1",
+        name: "用户1",
+        email: "u1@example.com",
+        mobile: "13800138000",
+      },
+    });
+
+    await service.syncFeishuAccount("1");
+
+    expect(feishuProvider.getUserDetail).toHaveBeenCalledWith(
+      "ou_1",
+      expect.objectContaining({ enabled: true }),
+    );
+    expect(externalAccountsService.upsertManualAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "1",
+        platform: "feishu",
+        externalUserId: "ou_1",
+        openId: "open_1",
+        unionId: "union_1",
+        name: "用户1",
+        email: "u1@example.com",
+        mobile: "13800138000",
+        extraData: expect.objectContaining({
+          user_id: "ou_1",
+          open_id: "open_1",
+        }),
       }),
     );
   });
