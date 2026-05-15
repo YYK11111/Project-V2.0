@@ -275,6 +275,13 @@ function diagnoseFeishu() {
       diagnoseLoading.value = false
     })
 }
+
+function formatDiagnoseData(data) {
+  // callbackUrl 是飞书后台安全设置需要复制的关键字段。
+  return Object.entries(data || {})
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => ({ key, value: String(value) }))
+}
 </script>
 
 <template>
@@ -449,6 +456,12 @@ function diagnoseFeishu() {
                       <span class="feishu-diagnose-result__label">{{ step.label }}</span>
                     </div>
                     <div class="feishu-diagnose-result__message">{{ step.message }}</div>
+                    <div v-if="formatDiagnoseData(step.data).length" class="feishu-diagnose-result__data">
+                      <div v-for="item in formatDiagnoseData(step.data)" :key="item.key" class="feishu-diagnose-result__data-item">
+                        <span class="feishu-diagnose-result__data-key">{{ item.key }}</span>
+                        <span class="feishu-diagnose-result__data-value">{{ item.value }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -679,6 +692,31 @@ function diagnoseFeishu() {
 
 .feishu-diagnose-result__message {
   color: var(--el-text-color-regular);
+}
+
+.feishu-diagnose-result__data {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--el-bg-color);
+}
+
+.feishu-diagnose-result__data-item {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+
+.feishu-diagnose-result__data-key {
+  color: var(--el-text-color-secondary);
+}
+
+.feishu-diagnose-result__data-value {
+  overflow-wrap: anywhere;
+  color: var(--el-text-color-primary);
 }
 
 .system-config-page__footer {

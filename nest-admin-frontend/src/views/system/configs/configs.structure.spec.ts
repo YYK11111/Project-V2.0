@@ -64,6 +64,9 @@ describe('system configs structure', () => {
     expect(source).toContain('diagnoseFeishu')
     expect(source).toContain('diagnoseResult')
     expect(source).toContain('自检结果')
+    expect(source).toContain('feishu-diagnose-result__data')
+    expect(source).toContain('formatDiagnoseData')
+    expect(source).toContain('callbackUrl')
   })
 
   it('系统配置无更新权限时以只读查看态展示', () => {

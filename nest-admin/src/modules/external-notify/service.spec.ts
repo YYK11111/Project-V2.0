@@ -430,8 +430,14 @@ describe("ExternalNotifyService", () => {
   });
 
   it("飞书配置自检返回 token、用户匹配、用户详情和卡片发送结果", async () => {
-    const { service, feishuProvider } = createService({
+    const { service, feishuProvider, externalAccountsService } = createService({
       user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+      account: {
+        userId: "1",
+        externalUserId: "ou_1",
+        openId: "open_1",
+        unionId: "union_1",
+      },
       feishuUsers: [
         {
           user_id: "ou_1",
@@ -455,6 +461,18 @@ describe("ExternalNotifyService", () => {
     expect(result.steps).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "config", success: true }),
+        expect.objectContaining({
+          key: "siteUrl",
+          success: true,
+          data: expect.objectContaining({
+            callbackUrl: "https://admin.example.com/api/auth/feishu/callback",
+          }),
+        }),
+        expect.objectContaining({
+          key: "oauthRedirect",
+          success: true,
+          message: "请确认飞书后台已配置该重定向 URL，否则会出现 20029",
+        }),
         expect.objectContaining({ key: "tenantToken", success: true }),
         expect.objectContaining({
           key: "userMatch",
@@ -466,16 +484,76 @@ describe("ExternalNotifyService", () => {
           success: true,
           data: expect.objectContaining({ openId: "open_1", name: "用户1" }),
         }),
+        expect.objectContaining({
+          key: "accountMapping",
+          success: true,
+          data: expect.objectContaining({
+            externalUserId: "ou_1",
+            openId: "open_1",
+            unionId: "union_1",
+          }),
+        }),
+        expect.objectContaining({
+          key: "approvalLink",
+          success: true,
+          data: expect.objectContaining({
+            loginUrl:
+              "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3FfromWorkflow%3D1%26source%3Ddiagnose",
+          }),
+        }),
         expect.objectContaining({ key: "cardSend", success: true }),
       ]),
+    );
+    expect(externalAccountsService.getActiveAccount).toHaveBeenCalledWith(
+      "1",
+      "feishu",
     );
     expect(feishuProvider.sendText).toHaveBeenCalledWith(
       expect.objectContaining({ externalUserId: "ou_1" }),
       expect.objectContaining({
         templateKey: "workflowTodo",
         title: "飞书配置自检",
+        linkUrl:
+          "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3FfromWorkflow%3D1%26source%3Ddiagnose",
       }),
       expect.any(Object),
+    );
+  });
+
+  it("飞书配置自检在 siteUrl 缺失时返回失败项并提示回调地址不可生成", async () => {
+    const { service, feishuProvider } = createService({
+      externalNotifyConfig: {
+        enabled: true,
+        siteUrl: "",
+        feishu: {
+          enabled: true,
+          appId: "app_1",
+          appSecret: "secret_1",
+          baseUrl: "https://open.feishu.cn",
+        },
+      },
+      user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+    });
+    feishuProvider.getTenantAccessToken = jest
+      .fn()
+      .mockResolvedValue("tenant-token");
+
+    const result = await service.diagnoseFeishuConfig("1");
+
+    expect(result.success).toBe(false);
+    expect(result.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "siteUrl",
+          success: false,
+          message: "站点地址未配置，无法生成飞书登录回调地址",
+        }),
+        expect.objectContaining({
+          key: "oauthRedirect",
+          success: false,
+          message: "站点地址无效，跳过 OAuth 重定向 URL 检查",
+        }),
+      ]),
     );
   });
 

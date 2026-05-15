@@ -619,6 +619,35 @@ export class ExternalNotifyService {
         baseUrl: feishuConfig.baseUrl || "",
       },
     );
+    const siteUrl = String((config as any)?.siteUrl || "").trim();
+    const siteUrlOk = /^https?:\/\/[^/]+/i.test(siteUrl);
+    const callbackUrl = siteUrlOk
+      ? `${siteUrl.replace(/\/+$/, "")}/api/auth/feishu/callback`
+      : "";
+    addStep(
+      "siteUrl",
+      "站点地址",
+      siteUrlOk,
+      siteUrlOk
+        ? "站点地址可用于生成飞书登录回调地址"
+        : "站点地址未配置，无法生成飞书登录回调地址",
+      {
+        siteUrl,
+        callbackUrl,
+      },
+    );
+    addStep(
+      "oauthRedirect",
+      "OAuth 重定向 URL",
+      siteUrlOk,
+      siteUrlOk
+        ? "请确认飞书后台已配置该重定向 URL，否则会出现 20029"
+        : "站点地址无效，跳过 OAuth 重定向 URL 检查",
+      {
+        callbackUrl,
+        feishuAdminPath: "开发配置 → 安全设置 → 重定向 URL",
+      },
+    );
     if (!configOk) {
       return { success: false, steps };
     }
@@ -714,6 +743,49 @@ export class ExternalNotifyService {
       );
     }
 
+    const activeAccount = await this.externalAccountsService.getActiveAccount(
+      String(userId),
+      ExternalAccountPlatform.feishu,
+    );
+    const mappingHasUserId = Boolean(activeAccount?.externalUserId);
+    const mappingHasOpenId = Boolean(activeAccount?.openId);
+    const mappingHasUnionId = Boolean(activeAccount?.unionId);
+    addStep(
+      "accountMapping",
+      "外部账号映射",
+      Boolean(mappingHasUserId && mappingHasOpenId && mappingHasUnionId),
+      mappingHasUserId && mappingHasOpenId && mappingHasUnionId
+        ? "系统用户已绑定完整飞书身份字段"
+        : "飞书映射字段不完整，请重新同步该用户飞书账号",
+      {
+        externalUserId: activeAccount?.externalUserId || "",
+        openId: activeAccount?.openId || "",
+        unionId: activeAccount?.unionId || "",
+      },
+    );
+
+    const approvalTargetUrl = this.buildAbsoluteLink(
+      "/projectManage/approval",
+      { fromWorkflow: "1", source: "diagnose" },
+      config,
+    );
+    const approvalLoginUrl = this.buildFeishuLoginLink(
+      approvalTargetUrl,
+      config,
+    );
+    addStep(
+      "approvalLink",
+      "审批免登录链接",
+      Boolean(approvalLoginUrl),
+      approvalLoginUrl
+        ? "审批卡片将通过飞书免登录入口跳转"
+        : "无法生成审批免登录入口，请检查站点地址",
+      {
+        targetUrl: approvalTargetUrl,
+        loginUrl: approvalLoginUrl,
+      },
+    );
+
     try {
       await this.feishuProvider.sendText(
         {
@@ -724,8 +796,7 @@ export class ExternalNotifyService {
           templateKey: "workflowTodo",
           title: "飞书配置自检",
           content: "这是一条飞书配置自检卡片，用于验证机器人消息能力。",
-          linkUrl:
-            this.buildAbsoluteLink("/", {}, config) || "https://open.feishu.cn",
+          linkUrl: approvalLoginUrl || "https://open.feishu.cn",
           extraData: {
             businessLabel: "系统配置",
             nodeName: "飞书配置自检",
