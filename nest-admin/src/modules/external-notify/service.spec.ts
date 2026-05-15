@@ -429,6 +429,86 @@ describe("ExternalNotifyService", () => {
     );
   });
 
+  it("飞书配置自检返回 token、用户匹配、用户详情和卡片发送结果", async () => {
+    const { service, feishuProvider } = createService({
+      user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+      feishuUsers: [
+        {
+          user_id: "ou_1",
+          email: "u1@example.com",
+          mobile: "13800138000",
+        },
+      ],
+      feishuUserDetail: {
+        user_id: "ou_1",
+        open_id: "open_1",
+        name: "用户1",
+      },
+    });
+    feishuProvider.getTenantAccessToken = jest
+      .fn()
+      .mockResolvedValue("tenant-token");
+
+    const result = await service.diagnoseFeishuConfig("1");
+
+    expect(result.success).toBe(true);
+    expect(result.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "config", success: true }),
+        expect.objectContaining({ key: "tenantToken", success: true }),
+        expect.objectContaining({
+          key: "userMatch",
+          success: true,
+          data: expect.objectContaining({ userId: "ou_1" }),
+        }),
+        expect.objectContaining({
+          key: "userDetail",
+          success: true,
+          data: expect.objectContaining({ openId: "open_1", name: "用户1" }),
+        }),
+        expect.objectContaining({ key: "cardSend", success: true }),
+      ]),
+    );
+    expect(feishuProvider.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({ externalUserId: "ou_1" }),
+      expect.objectContaining({
+        templateKey: "workflowTodo",
+        title: "飞书配置自检",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("飞书配置自检在用户无法匹配时返回失败项但不抛出", async () => {
+    const { service, feishuProvider } = createService({
+      user: { id: "1", email: "u1@example.com", phone: "" },
+      feishuUsers: [],
+    });
+    feishuProvider.getTenantAccessToken = jest
+      .fn()
+      .mockResolvedValue("tenant-token");
+
+    const result = await service.diagnoseFeishuConfig("1");
+
+    expect(result.success).toBe(false);
+    expect(result.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "config", success: true }),
+        expect.objectContaining({ key: "tenantToken", success: true }),
+        expect.objectContaining({
+          key: "userMatch",
+          success: false,
+          message: "未匹配到飞书用户",
+        }),
+        expect.objectContaining({
+          key: "cardSend",
+          success: false,
+          message: "未匹配到飞书用户，跳过发送检查",
+        }),
+      ]),
+    );
+  });
+
   it("根据发送成功日志更新飞书工作流待办卡片状态", async () => {
     const { service, logRepository, feishuProvider } = createService({
       logs: [

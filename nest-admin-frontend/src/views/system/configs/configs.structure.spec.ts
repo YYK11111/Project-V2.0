@@ -59,6 +59,11 @@ describe('system configs structure', () => {
     expect(source).toContain('发送测试消息')
     expect(source).toContain('userId: testUserId.value || undefined')
     expect(source).toContain('testFeishuNotify')
+    expect(source).toContain('diagnoseFeishuNotify')
+    expect(source).toContain('飞书配置自检')
+    expect(source).toContain('diagnoseFeishu')
+    expect(source).toContain('diagnoseResult')
+    expect(source).toContain('自检结果')
   })
 
   it('系统配置无更新权限时以只读查看态展示', () => {

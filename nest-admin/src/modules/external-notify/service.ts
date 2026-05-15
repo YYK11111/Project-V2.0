@@ -557,6 +557,179 @@ export class ExternalNotifyService {
     }
   }
 
+  async diagnoseFeishuConfig(userId: string) {
+    const steps: Array<{
+      key: string;
+      label: string;
+      success: boolean;
+      message: string;
+      data?: Record<string, any>;
+    }> = [];
+    const addStep = (
+      key: string,
+      label: string,
+      success: boolean,
+      message: string,
+      data?: Record<string, any>,
+    ) => {
+      steps.push({ key, label, success, message, data });
+    };
+
+    const config =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    const feishuConfig = config?.feishu || {};
+    const configOk = Boolean(
+      config?.enabled &&
+        feishuConfig.enabled &&
+        feishuConfig.appId &&
+        feishuConfig.appSecret,
+    );
+    addStep(
+      "config",
+      "配置完整性",
+      configOk,
+      configOk
+        ? "飞书配置已启用且 AppId/AppSecret 完整"
+        : "飞书通知未启用或配置不完整",
+      {
+        enabled: Boolean(config?.enabled),
+        feishuEnabled: Boolean(feishuConfig.enabled),
+        hasAppId: Boolean(feishuConfig.appId),
+        hasAppSecret: Boolean(feishuConfig.appSecret),
+        baseUrl: feishuConfig.baseUrl || "",
+      },
+    );
+    if (!configOk) {
+      return { success: false, steps };
+    }
+
+    try {
+      await this.feishuProvider.getTenantAccessToken(config);
+      addStep("tenantToken", "应用凭证", true, "tenant_access_token 获取成功");
+    } catch (error) {
+      addStep(
+        "tenantToken",
+        "应用凭证",
+        false,
+        error?.message || "tenant_access_token 获取失败",
+      );
+      return { success: false, steps };
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: String(userId), isDelete: null as any } as any,
+    });
+    if (!user) {
+      addStep("userMatch", "用户匹配", false, "系统用户不存在");
+      addStep("cardSend", "卡片发送", false, "系统用户不存在，跳过发送检查");
+      return { success: false, steps };
+    }
+    const email = String(user.email || "").trim();
+    const mobile = String(user.phone || "").trim();
+    if (!email && !mobile) {
+      addStep("userMatch", "用户匹配", false, "系统用户缺少邮箱和手机号");
+      addStep("cardSend", "卡片发送", false, "缺少用户匹配条件，跳过发送检查");
+      return { success: false, steps };
+    }
+
+    let matchedUser: any = null;
+    try {
+      const matchedUsers = await this.feishuProvider.batchGetUserId(
+        {
+          emails: email ? [email] : [],
+          mobiles: mobile ? [mobile] : [],
+        },
+        config,
+      );
+      matchedUser = this.pickMatchedFeishuUser(matchedUsers, { email, mobile });
+      if (matchedUser?.user_id) {
+        addStep("userMatch", "用户匹配", true, "已匹配到飞书 UserID", {
+          userId: matchedUser.user_id,
+          email: matchedUser.email || email,
+          mobile: matchedUser.mobile || mobile,
+        });
+      } else {
+        addStep("userMatch", "用户匹配", false, "未匹配到飞书用户", {
+          email,
+          mobile,
+        });
+        addStep(
+          "cardSend",
+          "卡片发送",
+          false,
+          "未匹配到飞书用户，跳过发送检查",
+        );
+        return { success: false, steps };
+      }
+    } catch (error) {
+      addStep(
+        "userMatch",
+        "用户匹配",
+        false,
+        error?.message || "获取飞书 UserID 失败",
+      );
+      addStep("cardSend", "卡片发送", false, "用户匹配失败，跳过发送检查");
+      return { success: false, steps };
+    }
+
+    let userDetail: any = {};
+    try {
+      userDetail =
+        (await this.feishuProvider.getUserDetail(
+          matchedUser.user_id,
+          config,
+        )) || {};
+      addStep("userDetail", "用户详情", true, "飞书用户详情获取成功", {
+        userId: userDetail.user_id || matchedUser.user_id,
+        openId: userDetail.open_id || "",
+        unionId: userDetail.union_id || "",
+        name: userDetail.name || userDetail.en_name || "",
+      });
+    } catch (error) {
+      addStep(
+        "userDetail",
+        "用户详情",
+        false,
+        error?.message || "飞书用户详情获取失败",
+      );
+    }
+
+    try {
+      await this.feishuProvider.sendText(
+        {
+          externalUserId: matchedUser.user_id,
+        } as any,
+        {
+          receiverId: String(userId),
+          templateKey: "workflowTodo",
+          title: "飞书配置自检",
+          content: "这是一条飞书配置自检卡片，用于验证机器人消息能力。",
+          linkUrl:
+            this.buildAbsoluteLink("/", {}, config) || "https://open.feishu.cn",
+          extraData: {
+            businessLabel: "系统配置",
+            nodeName: "飞书配置自检",
+            starterName: "系统",
+          },
+        },
+        config,
+      );
+      addStep("cardSend", "卡片发送", true, "飞书卡片发送成功");
+    } catch (error) {
+      addStep(
+        "cardSend",
+        "卡片发送",
+        false,
+        error?.message || "飞书卡片发送失败",
+      );
+    }
+
+    return {
+      success: steps.every((step) => step.success),
+      steps,
+    };
+  }
+
   async syncFeishuAccount(
     userId: string,
     config?: ExternalNotifyConfig,

@@ -27,3 +27,4 @@ export const getList = async (params) => {
 export { save }
 
 export const testFeishuNotify = (data = {}) => post(`${externalNotifyServe}/feishu/test`, data)
+export const diagnoseFeishuNotify = (data = {}) => post(`${externalNotifyServe}/feishu/diagnose`, data)

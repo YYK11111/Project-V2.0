@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // @ts-nocheck
 import { computed, ref } from 'vue'
-import { getList, save, testFeishuNotify } from './api'
+import { diagnoseFeishuNotify, getList, save, testFeishuNotify } from './api'
 import { checkPermi } from '@/utils/permission'
 import { useAppStore } from '@/stores/app'
 import UserSelect from '@/components/UserSelect.vue'
@@ -9,6 +9,8 @@ import UserSelect from '@/components/UserSelect.vue'
 const activeTab = ref('basic')
 const appStore = useAppStore()
 const testUserId = ref('')
+const diagnoseLoading = ref(false)
+const diagnoseResult = ref<any>(null)
 const fieldGroups = [
   { code: 'projectBasic', label: '基础组', desc: '项目名称、类型、优先级、负责人、发起人、描述等基础字段' },
   { code: 'projectMember', label: '成员组', desc: '项目成员集合权限，控制成员表格的显示与编辑' },
@@ -254,6 +256,25 @@ function testFeishu() {
     $sdk.msgSuccess('测试消息已发送')
   })
 }
+
+function diagnoseFeishu() {
+  if (!canConfigUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  diagnoseLoading.value = true
+  diagnoseFeishuNotify({
+    userId: testUserId.value || undefined,
+  })
+    .then((res) => {
+      diagnoseResult.value = res?.data || res
+      if (diagnoseResult.value?.success) {
+        $sdk.msgSuccess('飞书配置自检通过')
+      } else {
+        $sdk.msgWarning('飞书配置自检未通过，请查看结果')
+      }
+    })
+    .finally(() => {
+      diagnoseLoading.value = false
+    })
+}
 </script>
 
 <template>
@@ -414,7 +435,22 @@ function testFeishu() {
                   <div class="external-notify-test-row__label">测试用户</div>
                   <UserSelect v-model="testUserId" placeholder="默认当前登录用户，可选其他用户" clearable :disabled="isConfigReadonly" />
                 </div>
-                <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
+                <div class="external-notify-test-row__actions">
+                  <el-button v-if="canConfigUpdate" :loading="diagnoseLoading" @click="diagnoseFeishu">飞书配置自检</el-button>
+                  <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
+                </div>
+              </div>
+              <div v-if="diagnoseResult" class="feishu-diagnose-result">
+                <div class="feishu-diagnose-result__title">自检结果</div>
+                <div class="feishu-diagnose-result__list">
+                  <div v-for="step in diagnoseResult.steps || []" :key="step.key" class="feishu-diagnose-result__item">
+                    <div class="feishu-diagnose-result__meta">
+                      <el-tag :type="step.success ? 'success' : 'danger'" size="small" effect="plain">{{ step.success ? '通过' : '失败' }}</el-tag>
+                      <span class="feishu-diagnose-result__label">{{ step.label }}</span>
+                    </div>
+                    <div class="feishu-diagnose-result__message">{{ step.message }}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </el-card>
@@ -599,6 +635,49 @@ function testFeishu() {
 .external-notify-test-row__label {
   margin-bottom: 8px;
   font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+
+.external-notify-test-row__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feishu-diagnose-result {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.feishu-diagnose-result__title {
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.feishu-diagnose-result__list {
+  display: grid;
+  gap: 8px;
+}
+
+.feishu-diagnose-result__item {
+  display: grid;
+  gap: 4px;
+}
+
+.feishu-diagnose-result__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feishu-diagnose-result__label {
+  font-weight: 600;
+}
+
+.feishu-diagnose-result__message {
   color: var(--el-text-color-regular);
 }
 

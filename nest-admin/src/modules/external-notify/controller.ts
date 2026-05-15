@@ -20,6 +20,14 @@ export class ExternalNotifyController {
     );
   }
 
+  @Post("feishu/diagnose")
+  @Permission("system/configs/update")
+  diagnoseFeishu(@Req() req: any, @Body() body: any) {
+    return this.service.diagnoseFeishuConfig(
+      String(body?.userId || req.user?.id || ""),
+    );
+  }
+
   @Post("feishu/sync-user/:userId")
   @Permission("system/externalAccounts/update")
   syncFeishuUser(@Param("userId") userId: string) {
