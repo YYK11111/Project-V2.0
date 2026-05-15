@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Project, ProjectStatus } from "src/modulesBusi/projects/entity";
@@ -21,6 +21,7 @@ import {
 } from "src/modulesBusi/handover-records/entity";
 import { WorkflowService } from "src/modulesBusi/workflow/service";
 import { CustomersService } from "src/modulesBusi/crm/customers/service";
+import { BusinessApprovalContextService } from "src/modulesBusi/approval-contexts/service";
 
 @Injectable()
 export class WorkflowIntegrationService {
@@ -44,6 +45,8 @@ export class WorkflowIntegrationService {
     private readonly workflowService: WorkflowService,
     private readonly projectsService: ProjectsService,
     private readonly customersService?: CustomersService,
+    @Optional()
+    private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {}
 
   private getTodayDate() {
@@ -78,6 +81,18 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "project",
+      businessId: projectId,
+      businessScene: "initiation",
+      sceneTitle: "立项审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: projectId,
+      projectId,
+    });
 
     project.workflowInstanceId = instance.id;
     project.status = ProjectStatus.approvalPending;
@@ -117,6 +132,18 @@ export class WorkflowIntegrationService {
       },
       initiatorId,
     );
+
+    await this.businessApprovalContextService?.createFromWorkflowStart({
+      businessType: "project",
+      businessId: projectId,
+      businessScene: "closure",
+      sceneTitle: "结项审批",
+      workflowInstance: instance,
+      starterId: initiatorId,
+      rootBusinessType: "project",
+      rootBusinessId: projectId,
+      projectId,
+    });
 
     project.workflowInstanceId = instance.id;
     project.status = ProjectStatus.closeApprovalPending;
@@ -240,6 +267,12 @@ export class WorkflowIntegrationService {
     variables: any,
   ): Promise<void> {
     const businessKey = variables.businessKey;
+    await this.businessApprovalContextService?.syncWorkflowStatus(instanceId, {
+      status: status === "completed" ? "2" : "3",
+      endedAt: new Date().toISOString(),
+      currentNodeId: status === "completed" ? "end" : "cancelled",
+      currentNodeName: status === "completed" ? "审批完成" : "审批取消",
+    });
 
     if (businessKey?.startsWith("project_") && !businessKey.includes("close")) {
       const projectId = businessKey.replace("project_", "");

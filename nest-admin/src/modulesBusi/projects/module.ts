@@ -33,6 +33,7 @@ import { SalesOpportunity } from "../crm/opportunities/entity";
 import { SystemScheduledJobsModule } from "src/modules/systemScheduledJobs/module";
 import { WorkflowTask } from "../workflow/entity/workflow-task.entity";
 import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
+import { BusinessApprovalContextsModule } from "../approval-contexts/module";
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
     MessagesModule,
     SystenConfigsModule,
     forwardRef(() => SystemScheduledJobsModule),
+    BusinessApprovalContextsModule,
   ],
   controllers: [ProjectsController, UserStoryController],
   providers: [

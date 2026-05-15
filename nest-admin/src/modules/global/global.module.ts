@@ -17,6 +17,7 @@ import { AcceptanceRecord } from "src/modulesBusi/acceptance-records/entity";
 import { HandoverRecord } from "src/modulesBusi/handover-records/entity";
 import { SystenConfigsModule } from "../configs/module";
 import { CrmModule } from "src/modulesBusi/crm/module";
+import { BusinessApprovalContextsModule } from "src/modulesBusi/approval-contexts/module";
 
 @Global()
 @Module({
@@ -37,6 +38,7 @@ import { CrmModule } from "src/modulesBusi/crm/module";
     WorkflowModule,
     MilestonesModule,
     CrmModule,
+    BusinessApprovalContextsModule,
     forwardRef(() => ProjectsModule),
   ],
   controllers: [],

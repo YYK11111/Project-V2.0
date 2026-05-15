@@ -53,12 +53,13 @@ function isProjectInitiationStage(row) {
   return ['1', '2'].includes(String(row.status || ''))
 }
 
-function canViewProjectDetail(row) {
-  return row.permissionContext?.canView !== false && !isProjectInitiationStage(row)
+function canViewProject(row) {
+  return row.permissionContext?.canView !== false
 }
 
-function canEnterApprovalPage(row) {
-  return row.permissionContext?.canView !== false && isProjectInitiationStage(row)
+function canViewProjectDetail(row) {
+  const context = row.permissionContext || {}
+  return canViewProject(row) && !isProjectInitiationStage(row) && (context.canManageAll || context.isCore || context.isManager || context.isDeliveryManager)
 }
 
 function handleArchive(row) {
@@ -86,9 +87,9 @@ function handleRecalculateAllProgress() {
 }
 
 const getButtons = (row) => [
-  canViewProjectDetail(row) ? { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') } : null,
+  canViewProject(row) ? { key: 'approvalView', label: '查看', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
+  canViewProjectDetail(row) ? { key: 'detail', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/detail') } : null,
   canEditProject(row) ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/projectManage/form') } : null,
-  canEnterApprovalPage(row) ? { key: 'approval', label: '立项信息', onClick: () => rctRef.value.goRoute({ id: row.id }, '/projectManage/approval') } : null,
   canProjectArchive.value && row.permissionContext?.canArchive !== false ? { key: 'archive', label: '归档', type: 'success', onClick: () => handleArchive(row) } : null,
   canProjectDelete.value && row.permissionContext?.canDelete !== false ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)

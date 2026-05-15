@@ -1,4 +1,5 @@
 import { WorkflowIntegrationService } from "./workflow-integration.service";
+import { ProjectStatus } from "src/modulesBusi/projects/entity";
 import { TaskStatus } from "src/modulesBusi/tasks/entity";
 import { GoLiveRecordStatus } from "src/modulesBusi/go-live-records/entity";
 import { AcceptanceRecordResult } from "src/modulesBusi/acceptance-records/entity";
@@ -73,7 +74,18 @@ describe("WorkflowIntegrationService 任务完成审批回调", () => {
 describe("WorkflowIntegrationService 审批发起权限", () => {
   const createService = () => {
     const workflowService = {
-      startBusinessWorkflow: jest.fn().mockResolvedValue({ id: "wf-1" }),
+      startBusinessWorkflow: jest.fn().mockResolvedValue({
+        id: "wf-1",
+        definitionId: "def-1",
+        definitionCode: "project-init",
+        status: "1",
+        currentNodeId: "node-1",
+        startTime: "2026-05-15 10:00:00",
+      }),
+    };
+    const approvalContextService = {
+      createFromWorkflowStart: jest.fn(),
+      syncWorkflowStatus: jest.fn(),
     };
     const repositories = {
       project: { findOne: jest.fn(), update: jest.fn(), save: jest.fn() },
@@ -100,9 +112,85 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
       repositories.handover as any,
       workflowService as any,
       projectsService as any,
+      undefined,
+      approvalContextService as any,
     );
-    return { service, repositories, workflowService, projectsService };
+    return {
+      service,
+      repositories,
+      workflowService,
+      projectsService,
+      approvalContextService,
+    };
   };
+
+  it("发起项目立项审批后创建立项审批上下文", async () => {
+    const { service, repositories, approvalContextService } = createService();
+    repositories.project.findOne.mockResolvedValue({
+      id: "19",
+      status: ProjectStatus.draft,
+      name: "项目A",
+    });
+
+    await service.startProjectApproval("19", "u1");
+
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "project",
+        businessId: "19",
+        businessScene: "initiation",
+        sceneTitle: "立项审批",
+        starterId: "u1",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+  });
+
+  it("发起项目结项审批后创建结项审批上下文", async () => {
+    const { service, repositories, approvalContextService } = createService();
+    repositories.project.findOne.mockResolvedValue({
+      id: "19",
+      status: ProjectStatus.executing,
+      name: "项目A",
+    });
+
+    await service.startProjectCloseApproval("19", "u1");
+
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "project",
+        businessId: "19",
+        businessScene: "closure",
+        sceneTitle: "结项审批",
+        starterId: "u1",
+        rootBusinessType: "project",
+        rootBusinessId: "19",
+        projectId: "19",
+      }),
+    );
+  });
+
+  it("项目审批回调时同步审批上下文状态", async () => {
+    const { service, repositories, approvalContextService } = createService();
+    repositories.project.findOne.mockResolvedValue({
+      id: "19",
+      status: ProjectStatus.approvalPending,
+    });
+
+    await service.handleWorkflowCallback("wf-1", "completed", {
+      businessKey: "project_19",
+    });
+
+    expect(approvalContextService.syncWorkflowStatus).toHaveBeenCalledWith(
+      "wf-1",
+      expect.objectContaining({
+        status: "2",
+        endedAt: expect.any(String),
+      }),
+    );
+  });
 
   it("发起上线审批前校验项目执行对象权限", async () => {
     const { service, repositories, projectsService } = createService();

@@ -61,10 +61,12 @@ describe('projectManage 立项查看页治理守卫', () => {
     expect(attachmentSection).toContain('label="项目附件"')
   })
 
-  it('直接入口和工作流入口使用同一个最终流程实例加载流程信息', () => {
+  it('直接入口和工作流入口使用审批上下文选择最终流程实例', () => {
     const source = readProjectApprovalSource()
 
-    expect(source).toContain('const finalWorkflowInstanceId = String(route.query.instanceId || projectRes.data?.workflowInstanceId || \'\')')
+    expect(source).toContain('getViewContext(projectId.value, { instanceId: route.query.instanceId })')
+    expect(source).toContain('const currentApprovalContext = ref(null)')
+    expect(source).toContain('const finalWorkflowInstanceId = String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || projectResData?.workflowInstanceId || \'\')')
     expect(source).toContain('workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null')
     expect(source).not.toContain('if (!workflowInstance.value && project.value?.workflowInstanceId)')
   })

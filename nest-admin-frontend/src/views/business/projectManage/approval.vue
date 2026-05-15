@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getOne, getStatus, getPriority, getProjectType, submitApproval } from './api'
+import { getStatus, getPriority, getProjectType, getViewContext, submitApproval } from './api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.vue'
@@ -21,7 +21,6 @@ const router = useRouter()
 
 const projectId = computed(() => String(route.query.id || ''))
 const workflowTaskId = computed(() => String(route.query.taskId || ''))
-const workflowInstanceId = computed(() => String(route.query.instanceId || project.value?.workflowInstanceId || ''))
 const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const approvalRetryFailed = computed(() => route.query.approvalFailed === '1')
 const canProjectSubmitApproval = computed(() => checkPermi(['business/projects/submitApproval']))
@@ -59,9 +58,12 @@ const customerList = ref([])
 const deptMap = ref({})
 const workflowPanelRef = ref()
 const workflowInstance = ref(null)
+const approvalContexts = ref([])
+const currentApprovalContext = ref(null)
 
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
+const workflowInstanceId = computed(() => String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || project.value?.workflowInstanceId || ''))
 const canCloseReturnedInstance = computed(() => project.value?.workflowInstanceId && project.value?.approvalStatus === '3' && String(project.value?.currentNodeName || '').includes('退回发起人'))
 const canEditProject = computed(() => canProjectUpdate.value && String(project.value?.status || '') !== '3')
 const isApprovalRejected = computed(() => project.value?.approvalStatus === '3')
@@ -107,7 +109,7 @@ async function reloadCurrent() {
     getProjectType(),
     getCustomerList({ pageNum: 1, pageSize: 1000 }),
     getDeptTrees({}),
-    getOne(projectId.value),
+    getViewContext(projectId.value, { instanceId: route.query.instanceId }),
   ])
   statusMap.value = statusRes.data || {}
   priorityMap.value = priorityRes.data || {}
@@ -122,16 +124,20 @@ async function reloadCurrent() {
   }
   walk(deptRes.data || [])
   deptMap.value = map
+  const viewContext = projectRes.data?.project ? projectRes.data : null
+  const projectResData = viewContext?.project || projectRes.data || {}
+  approvalContexts.value = viewContext?.approvalContexts || []
+  currentApprovalContext.value = viewContext?.currentApprovalContext || null
   project.value = {
     attachments: [],
     members: [],
     milestones: [],
-    ...projectRes.data,
-    members: projectRes.data?.members || [],
-    milestones: projectRes.data?.milestones || [],
+    ...projectResData,
+    members: projectResData?.members || [],
+    milestones: projectResData?.milestones || [],
   }
 
-  const finalWorkflowInstanceId = String(route.query.instanceId || projectRes.data?.workflowInstanceId || '')
+  const finalWorkflowInstanceId = String(route.query.instanceId || currentApprovalContext.value?.workflowInstanceId || projectResData?.workflowInstanceId || '')
   const workflowInstanceRes = finalWorkflowInstanceId ? await getWorkflowInstance(finalWorkflowInstanceId) : { data: null }
   workflowInstance.value = finalWorkflowInstanceId ? workflowInstanceRes.data || null : null
 }

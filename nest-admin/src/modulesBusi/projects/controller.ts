@@ -118,6 +118,20 @@ export class ProjectsController extends BaseController<
     });
   }
 
+  @Get(":id/view-context")
+  async getViewContext(
+    @Param("id") id: string,
+    @Query() query: any,
+    @Req() req: any,
+  ) {
+    return this.service.getProjectViewContext(id, {
+      operatorId: req.user?.id,
+      operatorName: req.user?.name,
+      permissions: req.user?.permissions || [],
+      instanceId: query.instanceId,
+    });
+  }
+
   @Post(":id/sync-alerts")
   syncAlerts(@Param("id") id: string, @Req() req: any) {
     const userId = req.user?.id || req.user?.name;

@@ -54,6 +54,7 @@ import { ProjectFieldPermissionService } from "./project-field-permission.servic
 import { SystemScheduledJobsService } from "src/modules/systemScheduledJobs/service";
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
 import { WorkflowHistory } from "../workflow/entity/workflow-history.entity";
+import { BusinessApprovalContextService } from "../approval-contexts/service";
 
 @Injectable()
 export class ProjectsService extends BaseService<Project, ProjectDto> {
@@ -97,6 +98,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     private workflowTaskRepository: Repository<WorkflowTask>,
     @InjectRepository(WorkflowHistory)
     private workflowHistoryRepository: Repository<WorkflowHistory>,
+    private readonly businessApprovalContextService?: BusinessApprovalContextService,
   ) {
     super(Project, repository);
   }
@@ -1829,6 +1831,51 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       throw new ForbiddenException("访客角色不可查看项目内执行对象");
     }
     return context;
+  }
+
+  async getProjectViewContext(
+    projectId: string,
+    options: {
+      operatorId?: string;
+      operatorName?: string;
+      permissions?: string[];
+      instanceId?: string;
+    } = {},
+  ) {
+    const permissionContext = await this.assertProjectPermission(
+      projectId,
+      options.operatorId,
+      "view",
+      options.permissions || [],
+      options.operatorName,
+    );
+    const project = await this.getOne({ id: projectId });
+    const fieldPermissions =
+      this.projectFieldPermissionService.getProjectFieldPermissions({
+        project,
+        rawRole: permissionContext.role,
+        canVisit: true,
+      });
+    const approvalContexts =
+      (await this.businessApprovalContextService?.findByRootBusiness(
+        "project",
+        projectId,
+      )) || [];
+    const currentApprovalContext =
+      approvalContexts.find(
+        (context) => context.workflowInstanceId === options.instanceId,
+      ) ||
+      approvalContexts.find((context) => String(context.status) === "1") ||
+      approvalContexts[0] ||
+      null;
+
+    return {
+      project,
+      fieldPermissions,
+      approvalContexts,
+      currentApprovalContext,
+      permissionContext,
+    };
   }
 
   /**

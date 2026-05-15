@@ -899,4 +899,87 @@ describe("ProjectsService closure guards", () => {
       }),
     );
   });
+
+  it("项目查看上下文返回项目、字段权限、审批上下文和默认当前审批", async () => {
+    const { service } = createService();
+    const project = { id: "19", status: "2", name: "项目A" };
+    const fieldPermissions = { projectBasic: { visible: true } };
+    const approvalContexts = [
+      {
+        id: "ctx-running",
+        workflowInstanceId: "wf-running",
+        businessScene: "closure",
+        status: "1",
+        startedAt: "2026-05-15 11:00:00",
+      },
+      {
+        id: "ctx-done",
+        workflowInstanceId: "wf-done",
+        businessScene: "initiation",
+        status: "2",
+        startedAt: "2026-05-15 10:00:00",
+      },
+    ];
+    jest
+      .spyOn(service, "assertProjectPermission")
+      .mockResolvedValue({ role: "visitor", canView: true } as any);
+    jest.spyOn(service, "getOne").mockResolvedValue(project as any);
+    (service as any).projectFieldPermissionService = {
+      getProjectFieldPermissions: jest.fn().mockReturnValue(fieldPermissions),
+    };
+    (service as any).businessApprovalContextService = {
+      findByRootBusiness: jest.fn().mockResolvedValue(approvalContexts),
+    };
+
+    const result = await service.getProjectViewContext("19", {
+      operatorId: "u1",
+      operatorName: "李四",
+      permissions: ["business/projects/access"],
+    });
+
+    expect(result).toEqual({
+      project,
+      fieldPermissions,
+      approvalContexts,
+      currentApprovalContext: approvalContexts[0],
+      permissionContext: { role: "visitor", canView: true },
+    });
+  });
+
+  it("项目查看上下文优先选择传入流程实例对应的审批上下文", async () => {
+    const { service } = createService();
+    const approvalContexts = [
+      {
+        id: "ctx-running",
+        workflowInstanceId: "wf-running",
+        status: "1",
+        startedAt: "2026-05-15 11:00:00",
+      },
+      {
+        id: "ctx-target",
+        workflowInstanceId: "wf-target",
+        status: "2",
+        startedAt: "2026-05-15 10:00:00",
+      },
+    ];
+    jest
+      .spyOn(service, "assertProjectPermission")
+      .mockResolvedValue({ role: "visitor", canView: true } as any);
+    jest.spyOn(service, "getOne").mockResolvedValue({ id: "19" } as any);
+    (service as any).projectFieldPermissionService = {
+      getProjectFieldPermissions: jest.fn().mockReturnValue({}),
+    };
+    (service as any).businessApprovalContextService = {
+      findByRootBusiness: jest.fn().mockResolvedValue(approvalContexts),
+    };
+
+    const result = await service.getProjectViewContext("19", {
+      operatorId: "u1",
+      operatorName: "李四",
+      permissions: ["business/projects/access"],
+      instanceId: "wf-target",
+    });
+
+    expect(result.currentApprovalContext).toBe(approvalContexts[1]);
+  });
 });

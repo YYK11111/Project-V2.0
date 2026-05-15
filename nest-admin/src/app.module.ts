@@ -41,6 +41,7 @@ import { GoLiveRecordsModule } from "./modulesBusi/go-live-records/module";
 import { AcceptanceRecordsModule } from "./modulesBusi/acceptance-records/module";
 import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
 import { SystemScheduledJobsModule } from "./modules/systemScheduledJobs/module";
+import { BusinessApprovalContextsModule } from "./modulesBusi/approval-contexts/module";
 
 @Dependencies(DataSource)
 @Module({
@@ -83,6 +84,7 @@ import { SystemScheduledJobsModule } from "./modules/systemScheduledJobs/module"
     GoLiveRecordsModule,
     AcceptanceRecordsModule,
     HandoverRecordsModule,
+    BusinessApprovalContextsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
