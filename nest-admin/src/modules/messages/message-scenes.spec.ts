@@ -102,4 +102,12 @@ describe("message scenes", () => {
       MESSAGE_SCENE_KEYS.taskReminderReportStale,
     ]);
   });
+
+  it("所有业务场景都声明飞书发送模板", () => {
+    const scenes = listMessageScenes();
+
+    expect(
+      scenes.every((scene) => Boolean(scene.supportedTemplates.feishu)),
+    ).toBe(true);
+  });
 });

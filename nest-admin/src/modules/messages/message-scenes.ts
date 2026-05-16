@@ -58,7 +58,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待阅",
     description: "流程抄送节点、通知节点和退回发起人消息。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.messageType === MessageType.cc &&
       message.sourceType === "workflow_instance",
@@ -70,7 +70,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待阅",
     description: "项目驾驶舱异常提醒同步到消息中心。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.messageType === MessageType.cc &&
       message.sourceType === "project_alert",
@@ -82,7 +82,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待办",
     description: "任务创建或分配后发送给负责人和执行人的待办。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.sourceType === "task" &&
       message.extraData?.reminderType === "taskAssigned",
@@ -94,7 +94,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待办/待阅",
     description: "任务开始、延期、完成通过和完成驳回等状态变化通知。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.sourceType === "task" &&
       TASK_STATUS_REMINDER_TYPES.includes(
@@ -108,7 +108,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待阅",
     description: "定时扫描生成的任务临期提醒。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.sourceType === "task_reminder" &&
       message.extraData?.reminderType === "taskDueSoon",
@@ -120,7 +120,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待办",
     description: "定时扫描生成的任务逾期处理提醒。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.sourceType === "task_reminder" &&
       message.extraData?.reminderType === "taskOverdue",
@@ -132,7 +132,7 @@ export const MESSAGE_SCENES: MessageScene[] = [
     messageTypeLabel: "待办",
     description: "定时扫描生成的长时间未汇报提醒。",
     defaultEnabledPlatforms: ["feishu"],
-    supportedTemplates: { feishu: "feishuText" },
+    supportedTemplates: { feishu: "feishuCard" },
     match: (message) =>
       message.sourceType === "task_reminder" &&
       message.extraData?.reminderType === "taskReportStale",

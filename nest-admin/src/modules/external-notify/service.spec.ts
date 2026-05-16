@@ -140,6 +140,36 @@ describe("ExternalNotifyService", () => {
     );
   });
 
+  it("普通业务场景卡片发送日志记录为send_card", async () => {
+    const { service, logRepository } = createService({
+      account: { userId: "1", externalUserId: "ou_1" },
+      sendResponse: { code: 0, data: { message_id: "om_1" } },
+    });
+
+    await service.sendToUser("1", {
+      notificationId: "ntf_1",
+      receiverId: "1",
+      templateKey: "feishuCard",
+      sceneKey: "project.alert",
+      title: "项目提醒",
+      content: "项目存在高风险事项",
+      linkUrl: "/projectManage/detail",
+      messageId: "msg-1",
+    });
+
+    expect(logRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationId: "ntf_1",
+        platform: "feishu",
+        operationType: "send_card",
+        templateKey: "feishuCard",
+        messageId: "msg-1",
+        externalMessageId: "om_1",
+        sendStatus: ExternalMessageSendStatus.succeeded,
+      }),
+    );
+  });
+
   it("记录系统内消息投递日志", async () => {
     const { service, logRepository } = createService();
 

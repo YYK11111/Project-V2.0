@@ -144,7 +144,7 @@ describe("MessagesService 外部通知", () => {
         sceneKey: "project.alert",
         sourceType: "project_alert",
         title: "项目提醒",
-        templateKey: "feishuText",
+        templateKey: "feishuCard",
       }),
     );
     expect(

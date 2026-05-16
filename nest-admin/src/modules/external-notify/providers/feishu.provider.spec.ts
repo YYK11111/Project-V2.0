@@ -178,6 +178,64 @@ describe("FeishuNotifyProvider", () => {
     );
   });
 
+  it("发送普通业务场景时使用飞书卡片并带查看详情按钮", async () => {
+    const httpService = {
+      post: jest
+        .fn()
+        .mockResolvedValueOnce(
+          of({
+            data: {
+              code: 0,
+              tenant_access_token: "tenant-token",
+              expire: 7200,
+            },
+          }),
+        )
+        .mockResolvedValueOnce(
+          of({ data: { code: 0, data: { message_id: "m1" } } }),
+        ),
+    };
+    const provider = new FeishuNotifyProvider(httpService as any);
+
+    await provider.sendText(
+      { externalUserId: "6400000001" } as any,
+      {
+        receiverId: "1",
+        templateKey: "feishuCard",
+        sceneKey: "project.alert",
+        title: "项目提醒：测试项目",
+        content: "项目存在高风险事项，请及时处理。",
+        linkUrl:
+          "https://admin.example.com/projectManage/detail?id=19&tab=overview",
+      },
+      {
+        enabled: true,
+        feishu: {
+          enabled: true,
+          appId: "app_1",
+          appSecret: "secret_1",
+          baseUrl: "https://open.feishu.test",
+        },
+      } as any,
+    );
+
+    const payload = httpService.post.mock.calls[1][1];
+    const card = JSON.parse(payload.content);
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        receive_id: "6400000001",
+        msg_type: "interactive",
+      }),
+    );
+    expect(card.header.title.content).toBe("项目提醒：测试项目");
+    expect(JSON.stringify(card)).toContain("查看详情");
+    expect(JSON.stringify(card)).toContain("项目存在高风险事项，请及时处理。");
+    expect(JSON.stringify(card)).toContain(
+      "https://admin.example.com/projectManage/detail?id=19&tab=overview",
+    );
+  });
+
   it("更新工作流待办卡片时调用飞书消息更新接口并切换状态颜色", async () => {
     const httpService = {
       post: jest.fn().mockResolvedValueOnce(

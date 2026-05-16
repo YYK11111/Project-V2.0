@@ -91,7 +91,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       messageId: message.id,
       notificationId: message.notificationId,
       receiverId: message.receiverId,
-      templateKey: scene.supportedTemplates.feishu || "feishuText",
+      templateKey: scene.supportedTemplates.feishu || "feishuCard",
       title: message.title,
       content: message.content,
       linkUrl: message.linkUrl,

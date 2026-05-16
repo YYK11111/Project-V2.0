@@ -64,6 +64,7 @@ describe('system configs structure', () => {
     expect(source).toContain('enabledScenes')
     expect(source).toContain('toggleFeishuScene')
     expect(source).toContain('已支持')
+    expect(source).not.toContain('暂未支持')
     expect(source).toContain('发送测试消息')
     expect(source).toContain('userId: testUserId.value || undefined')
     expect(source).toContain('testFeishuNotify')

@@ -541,7 +541,12 @@ export class ExternalNotifyService {
 
   private getOperationType(platform: string, message: NotifyMessage) {
     if (platform === "system") return "create_message";
-    if (message.templateKey === "workflowTodo") return "send_card";
+    if (
+      message.templateKey === "workflowTodo" ||
+      message.templateKey === "feishuCard"
+    ) {
+      return "send_card";
+    }
     return "send_text";
   }
 

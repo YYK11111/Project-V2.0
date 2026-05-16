@@ -293,6 +293,14 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
       };
     }
 
+    if (message.templateKey === "feishuCard" && message.linkUrl) {
+      return {
+        receive_id: receiveId,
+        msg_type: "interactive",
+        content: JSON.stringify(this.buildGenericMessageCard(message)),
+      };
+    }
+
     const text = [message.title, message.content, message.linkUrl || ""]
       .filter(Boolean)
       .join("\n");
@@ -301,6 +309,66 @@ export class FeishuNotifyProvider implements ExternalNotifyProvider {
       msg_type: "text",
       content: JSON.stringify({ text }),
     };
+  }
+
+  private buildGenericMessageCard(message: NotifyMessage) {
+    const fields = [
+      ["消息内容", message.content],
+      ["业务场景", this.getSceneLabel(message.sceneKey)],
+    ].filter(([, value]) => Boolean(value));
+
+    return {
+      config: { wide_screen_mode: true, update_multi: true },
+      header: {
+        template: this.getGenericCardTemplate(message),
+        title: {
+          tag: "plain_text",
+          content: message.title || "系统消息",
+        },
+      },
+      elements: [
+        ...fields.map(([label, value]) => ({
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `**${label}：**${value}`,
+          },
+        })),
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: {
+                tag: "plain_text",
+                content: "查看详情",
+              },
+              type: "primary",
+              url: message.linkUrl,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  private getSceneLabel(sceneKey?: string) {
+    const map: Record<string, string> = {
+      "workflow.instance.cc": "流程待阅通知",
+      "project.alert": "项目提醒",
+      "task.assignment": "任务指派",
+      "task.status": "任务状态通知",
+      "task.reminder.dueSoon": "任务即将到期",
+      "task.reminder.overdue": "任务已逾期",
+      "task.reminder.reportStale": "任务汇报提醒",
+    };
+    return sceneKey ? map[sceneKey] || sceneKey : "";
+  }
+
+  private getGenericCardTemplate(message: NotifyMessage) {
+    if (message.messageType === "todo") return "blue";
+    if (message.sourceType === "project_alert") return "orange";
+    return "wathet";
   }
 
   private buildWorkflowTodoCard(
