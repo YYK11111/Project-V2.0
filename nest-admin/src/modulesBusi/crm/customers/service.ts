@@ -2,9 +2,17 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Is, Not, Repository, SelectQueryBuilder } from "typeorm";
+import {
+  In,
+  LessThanOrEqual,
+  MoreThan,
+  Not,
+  Repository,
+  SelectQueryBuilder,
+} from "typeorm";
 import { Customer } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
@@ -355,6 +363,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     userId: string,
     sourceType: CustomerViewerSourceType,
     operatorId?: string,
+    grantType?: CustomerViewerGrantType,
+    startTime?: Date,
+    endTime?: Date,
+    canEdit?: boolean,
+    grantReason?: string,
   ) {
     if (!customerId || !userId) return;
     const exists = await this.viewerRepository.findOne({
@@ -372,7 +385,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         customerId: String(customerId),
         userId: String(userId),
         sourceType,
-        canEdit: "0",
+        grantType: grantType || CustomerViewerGrantType.permanent,
+        startTime,
+        endTime,
+        canEdit: canEdit ? "1" : "0",
+        grantReason,
         createUser: operatorId || "system",
         updateUser: operatorId || "system",
       }),
@@ -395,6 +412,13 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     operatorId?: string,
     operatorName?: string,
     permissions: string[] = [],
+    options?: {
+      grantType?: CustomerViewerGrantType;
+      startTime?: Date;
+      endTime?: Date;
+      canEdit?: boolean;
+      grantReason?: string;
+    },
   ) {
     await this.assertCustomerWritable(
       customerId,
@@ -411,6 +435,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         userId,
         CustomerViewerSourceType.manual,
         operatorId,
+        options?.grantType,
+        options?.startTime,
+        options?.endTime,
+        options?.canEdit,
+        options?.grantReason,
       );
     }
     return { success: true, userIds: normalizedUserIds };
@@ -469,7 +498,8 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       where: {
         status: CustomerViewerStatus.enabled,
         grantType: CustomerViewerGrantType.temporary,
-        endTime: Not(Is(null)),
+        endTime: LessThanOrEqual(futureDate),
+        startTime: MoreThan(now),
         isDelete: null as any,
       } as any,
     });
