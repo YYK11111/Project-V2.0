@@ -241,15 +241,14 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       select: ["id", "grantType", "startTime", "endTime", "status"] as any,
     });
-    if (viewer && !this.isViewerActive(viewer)) {
+    if (!viewer || !this.isViewerActive(viewer)) {
       const hasApprovalAccess =
         await this.businessApprovalContextService?.hasBusinessParticipantAccess(
           operatorId,
           "customer",
           customerId,
         );
-      if (hasApprovalAccess) return;
-      throw new ForbiddenException("当前无查看该客户的权限");
+      if (!hasApprovalAccess) throw new ForbiddenException("当前无查看该客户的权限");
     }
   }
 
@@ -388,8 +387,9 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         grantType: grantType || CustomerViewerGrantType.permanent,
         startTime,
         endTime,
-        canEdit: canEdit ? "1" : "0",
+        canEdit: canEdit === "1" ? "1" : "0",
         grantReason,
+        grantUserId: operatorId || "system",
         createUser: operatorId || "system",
         updateUser: operatorId || "system",
       }),
@@ -466,7 +466,13 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         sourceType: CustomerViewerSourceType.manual,
         isDelete: null as any,
       } as any,
-      { isDelete: "1" as any, updateUser: operatorId } as any,
+      {
+        status: CustomerViewerStatus.disabled,
+        revokeUserId: operatorId,
+        revokeTime: new Date(),
+        revokeReason: options?.reason,
+        updateUser: operatorId,
+      } as any,
     );
     return { success: true, reason: options?.reason };
   }
@@ -482,6 +488,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       {
         id: In(viewerIds),
         customerId,
+        sourceType: CustomerViewerSourceType.manual,
         isDelete: null as any,
       } as any,
       { status, updateUser: operatorId } as any,
@@ -499,7 +506,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         status: CustomerViewerStatus.enabled,
         grantType: CustomerViewerGrantType.temporary,
         endTime: LessThanOrEqual(futureDate),
-        startTime: MoreThan(now),
+        endTime: MoreThan(now),
         isDelete: null as any,
       } as any,
     });
