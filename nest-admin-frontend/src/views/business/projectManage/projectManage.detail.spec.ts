@@ -6,6 +6,10 @@ function readDetailSource() {
   return readFileSync(resolve(__dirname, 'detail.vue'), 'utf-8')
 }
 
+function readProjectComponentSource(name: string) {
+  return readFileSync(resolve(__dirname, 'components', name), 'utf-8')
+}
+
 describe('projectManage 详情页治理守卫', () => {
   it('项目详情页仅草稿项目显示编辑项目入口', () => {
     const source = readDetailSource()
@@ -103,17 +107,17 @@ describe('projectManage 详情页治理守卫', () => {
   })
 
   it('访客模式不展示执行类概览指标入口', () => {
-    const source = readDetailSource()
+    const source = readProjectComponentSource('ProjectOverviewSummary.vue')
 
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'tasks\', \'all\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'tickets\', \'open\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'risks\', \'active\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'changes\', \'pending\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'sprints\', \'active\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick(\'milestones\', \'delayed\')"')
-    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="goToTab(\'plan\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'tasks\', \'all\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'tickets\', \'open\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'risks\', \'active\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'changes\', \'pending\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'sprints\', \'active\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitMetricCardClick(\'milestones\', \'delayed\')"')
+    expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="emitGoToTab(\'plan\')"')
     expect(source).toContain('v-if="!isProjectVisitor" shadow="hover" class="metric-card"')
-    expect(source).toContain('v-if="!isProjectVisitor && canViewGroup(\'projectClosure\')" shadow="hover" class="metric-card metric-card--clickable" @click="goToTab(\'closure\')"')
+    expect(source).toContain('v-if="!isProjectVisitor && canViewProjectClosure" shadow="hover" class="metric-card metric-card--clickable" @click="emitGoToTab(\'closure\')"')
   })
 
   it('访客模式不展示执行类页签和图表', () => {
@@ -152,6 +156,20 @@ describe('projectManage 详情页治理守卫', () => {
     expect(source).toContain('@chart-slice-click="handleChartSliceClick"')
     expect(source).not.toContain("import ChartPie from '@/components/ChartPie.vue'")
     expect(source).not.toContain('<ChartPie')
+  })
+
+  it('概览摘要区应拆分为独立组件，详情页只保留数据传入和事件转发', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain("import ProjectOverviewSummary from './components/ProjectOverviewSummary.vue'")
+    expect(source).toContain('<ProjectOverviewSummary')
+    expect(source).toContain(':can-view-project-closure="canViewGroup(\'projectClosure\')"')
+    expect(source).toContain('@metric-card-click="handleMetricCardClick"')
+    expect(source).toContain('@go-to-tab="goToTab"')
+    expect(source).toContain('@project-alert-click="handleProjectAlertClick"')
+    expect(source).not.toContain('<div class="metric-grid">')
+    expect(source).not.toContain('class="project-alert-grid"')
+    expect(source).not.toContain('class="focus-grid mt20"')
   })
 
   it('顶部快捷发起应拆分并收敛为常用动作加更多操作', () => {
