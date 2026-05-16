@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { getList, getCustomerTypes, getCustomerLevels, getCustomerStatuses, del, submitApproval, grantCustomerViewAccess, revokeCustomerViewAccess, getCustomerAuthUsers } from './api'
+import { getList, getCustomerTypes, getCustomerLevels, getCustomerStatuses, del, submitApproval } from './api'
+import AuthDialog from './components/AuthDialog.vue'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
-import UserSelect from '@/components/UserSelect.vue'
 
 const params = ref({})
 
@@ -17,10 +17,9 @@ const customerStatuses = ref({})
 getCustomerStatuses().then(({ data }) => (customerStatuses.value = data))
 
 const rctRef = ref()
-const shareDialogVisible = ref(false)
-const shareCustomer = ref(null)
-const shareUserIds = ref([])
-const originalShareUserIds = ref([])
+const authDialogVisible = ref(false)
+const authCustomer = ref(null)
+
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
 const canCustomerDelete = computed(() => checkPermi(['business/crm/customers/delete']))
@@ -36,35 +35,16 @@ async function handleSubmitApproval(row) {
 
 const canSubmitCustomerApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
-async function handleOpenShareDialog(row) {
+async function handleOpenAuthDialog(row) {
   if (!canCustomerUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  shareCustomer.value = row
-  shareUserIds.value = []
-  shareDialogVisible.value = true
-  const res = await getCustomerAuthUsers(row.id)
-  const list = res?.data?.data || res?.data || []
-  shareUserIds.value = (Array.isArray(list) ? list : []).map((item) => item.userId).filter(Boolean)
-  originalShareUserIds.value = [...shareUserIds.value]
-}
-
-async function handleGrantViewAccess() {
-  if (!shareCustomer.value?.id) return
-  const nextUserIds = Array.from(new Set(shareUserIds.value.filter(Boolean)))
-  const removedUserIds = originalShareUserIds.value.filter((userId) => !nextUserIds.includes(userId))
-  if (nextUserIds.length) {
-    await grantCustomerViewAccess(shareCustomer.value.id, nextUserIds)
-  }
-  for (const userId of removedUserIds) {
-    await revokeCustomerViewAccess(shareCustomer.value.id, userId)
-  }
-  $sdk.msgSuccess('授权成功')
-  shareDialogVisible.value = false
+  authCustomer.value = row
+  authDialogVisible.value = true
 }
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
   canCustomerUpdate.value ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') } : null,
-  canCustomerUpdate.value ? { key: 'share', label: '授权查看', type: 'success', onClick: () => handleOpenShareDialog(row) } : null,
+  canCustomerUpdate.value ? { key: 'share', label: '授权查看', type: 'success', onClick: () => handleOpenAuthDialog(row) } : null,
   canCustomerSubmitApproval.value && canSubmitCustomerApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
   canCustomerDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
 ].filter(Boolean)
@@ -144,19 +124,7 @@ const getButtons = (row) => [
       </template>
     </RequestChartTable>
 
-    <el-dialog v-model="shareDialogVisible" title="授权查看客户" width="720px" append-to-body>
-      <div class="customer-share-dialog">
-        <div class="customer-share-dialog__target">
-          <span class="customer-share-dialog__label">客户</span>
-          <strong>{{ shareCustomer?.name || '-' }}</strong>
-        </div>
-        <UserSelect v-model="shareUserIds" multiple filter-dept placeholder="请选择可查看人员" />
-      </div>
-      <template #footer>
-        <el-button @click="shareDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleGrantViewAccess">确认授权</el-button>
-      </template>
-    </el-dialog>
+    <AuthDialog v-model="authDialogVisible" :customer="authCustomer" @success="rctRef?.getList()" />
   </div>
 </template>
 
