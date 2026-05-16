@@ -23,7 +23,6 @@ import {
 import { BaseController } from "src/common/BaseController";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
-@Controller("business/crm/customers")
 export class GrantCustomerViewAccessDto {
   customerId: string;
   userIds: string[];
@@ -47,6 +46,7 @@ export class UpdateViewerStatusDto {
   status: CustomerViewerStatus;
 }
 
+@Controller("business/crm/customers")
 export class CustomersController extends BaseController<
   Customer,
   CustomersService
@@ -198,7 +198,7 @@ export class CustomersController extends BaseController<
       dto.userId,
       operatorId,
       operatorName,
-      [],
+      req.user?.permissions || [],
       { reason: dto.reason },
     );
   }

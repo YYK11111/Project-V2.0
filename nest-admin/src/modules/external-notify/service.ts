@@ -207,7 +207,9 @@ export class ExternalNotifyService {
     } as any);
   }
 
-  async retryPendingWorkflowTodoCardStatuses(options: { limit?: number; force?: boolean } = {}) {
+  async retryPendingWorkflowTodoCardStatuses(
+    options: { limit?: number; force?: boolean } = {},
+  ) {
     const limit = Math.min(Math.max(Number(options.limit || 50), 1), 200);
     const now = new Date().toISOString();
     const pendingWhere: Record<string, any> = {
@@ -494,11 +496,24 @@ export class ExternalNotifyService {
       templateKey: message.templateKey || "",
       requestPayload: {
         title: message.title,
+        sceneKey: message.sceneKey,
+        messageType: message.messageType,
         sourceType: message.sourceType,
         sourceId: message.sourceId,
       },
       ...result,
     } as any);
+  }
+
+  async saveSkippedExternalNotificationLog(
+    platform: string,
+    message: NotifyMessage,
+    errorMessage: string,
+  ) {
+    await this.saveLog(platform, null, message, {
+      sendStatus: ExternalMessageSendStatus.skipped,
+      errorMessage,
+    });
   }
 
   async saveSystemMessageLog(message: NotifyMessage & { id?: string }) {
@@ -512,6 +527,8 @@ export class ExternalNotifyService {
       requestPayload: {
         title: message.title,
         content: message.content,
+        sceneKey: message.sceneKey,
+        messageType: message.messageType,
         sourceType: message.sourceType,
         sourceId: message.sourceId,
         linkUrl: message.linkUrl,

@@ -5,6 +5,7 @@ export interface FeishuNotifyConfig {
   appId?: string;
   appSecret?: string;
   baseUrl?: string;
+  enabledScenes?: string[];
 }
 
 export interface DingTalkNotifyConfig {
@@ -41,6 +42,7 @@ export interface NotifyMessage {
   sourceType?: string;
   sourceId?: string;
   messageType?: string;
+  sceneKey?: string;
 }
 
 export interface ExternalNotifyProvider {

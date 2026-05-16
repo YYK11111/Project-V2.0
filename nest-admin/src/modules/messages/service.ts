@@ -11,6 +11,8 @@ import { QueryListDto } from "src/common/dto";
 import { SystenConfigsService } from "../configs/service";
 import { ExternalNotifyService } from "../external-notify/service";
 import { WorkflowTodoCardStatusOptions } from "../external-notify/provider.interface";
+import { getMessageScene, MessageScene } from "./message-scenes";
+import dayjs from "dayjs";
 
 @Injectable()
 export class MessagesService extends BaseService<Message, MessageDto> {
@@ -46,8 +48,9 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       isRead: BoolNum.No,
       isActive: BoolNum.Yes,
     } as any);
-    this.saveSystemMessageLog(message);
-    this.sendExternalNotification(message);
+    const scene = getMessageScene(message);
+    this.saveSystemMessageLog(message, scene);
+    this.sendExternalNotification(message, scene);
     return message;
   }
 
@@ -55,37 +58,65 @@ export class MessagesService extends BaseService<Message, MessageDto> {
     return `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  private saveSystemMessageLog(message: Message) {
+  private saveSystemMessageLog(message: Message, scene?: MessageScene | null) {
     if (!this.externalNotifyService) return;
     void this.externalNotifyService
-      .saveSystemMessageLog(message)
+      .saveSystemMessageLog({
+        ...(message as any),
+        sceneKey: scene?.key || "",
+      })
       .catch(() => undefined);
   }
 
-  private sendExternalNotification(message: Message) {
+  private sendExternalNotification(
+    message: Message,
+    scene?: MessageScene | null,
+  ) {
     if (!this.externalNotifyService) return;
-    if (
-      message.messageType !== MessageType.todo ||
-      message.sourceType !== "workflow_task"
-    ) {
-      return;
-    }
-    void this.externalNotifyService
-      .sendToUser(message.receiverId, {
-        messageId: message.id,
-        notificationId: message.notificationId,
-        receiverId: message.receiverId,
-        templateKey: "workflowTodo",
-        title: message.title,
-        content: message.content,
-        linkUrl: message.linkUrl,
-        linkParams: message.linkParams,
-        extraData: message.extraData || {},
-        sourceType: message.sourceType,
-        sourceId: message.sourceId,
-        messageType: message.messageType,
-      })
-      .catch(() => undefined);
+    if (!scene) return;
+    void this.sendExternalNotificationByScene(message, scene).catch(
+      () => undefined,
+    );
+  }
+
+  private async sendExternalNotificationByScene(
+    message: Message,
+    scene: MessageScene,
+  ) {
+    const config =
+      await this.systemConfigsService.getExternalNotifyRuntimeConfig();
+    if (!this.isSceneEnabledForFeishu(config, scene.key)) return;
+
+    const notifyMessage = {
+      messageId: message.id,
+      notificationId: message.notificationId,
+      receiverId: message.receiverId,
+      templateKey: scene.supportedTemplates.feishu || "feishuText",
+      title: message.title,
+      content: message.content,
+      linkUrl: message.linkUrl,
+      linkParams: message.linkParams,
+      extraData: message.extraData || {},
+      sourceType: message.sourceType,
+      sourceId: message.sourceId,
+      messageType: message.messageType,
+      sceneKey: scene.key,
+    };
+
+    await this.externalNotifyService.sendToUser(
+      message.receiverId,
+      notifyMessage,
+    );
+  }
+
+  private isSceneEnabledForFeishu(config: any, sceneKey: string) {
+    const enabledScenes = Array.isArray(config?.feishu?.enabledScenes)
+      ? config.feishu.enabledScenes
+      : [];
+    return (
+      Boolean(config?.enabled && config?.feishu?.enabled) &&
+      enabledScenes.includes(sceneKey)
+    );
   }
 
   async getUnreadCount(userId: string) {
@@ -193,7 +224,10 @@ export class MessagesService extends BaseService<Message, MessageDto> {
   async markRead(id: string, userId: string) {
     await this.repository.update(
       { id, receiverId: userId } as any,
-      { isRead: BoolNum.Yes as any, readTime: new Date().toISOString() } as any,
+      {
+        isRead: BoolNum.Yes as any,
+        readTime: this.getCurrentDateTime(),
+      } as any,
     );
   }
 
@@ -208,7 +242,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       } as any,
       {
         isRead: BoolNum.Yes as any,
-        readTime: new Date().toISOString(),
+        readTime: this.getCurrentDateTime(),
       } as any,
     );
   }
@@ -224,7 +258,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       {
         isActive: BoolNum.No as any,
         isRead: BoolNum.Yes as any,
-        readTime: new Date().toISOString(),
+        readTime: this.getCurrentDateTime(),
       } as any,
     );
   }
@@ -256,7 +290,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       {
         isActive: BoolNum.No as any,
         isRead: BoolNum.Yes as any,
-        readTime: new Date().toISOString(),
+        readTime: this.getCurrentDateTime(),
       } as any,
     );
     if (this.externalNotifyService && activeMessages.length) {
@@ -328,7 +362,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       {
         isActive: BoolNum.No as any,
         isRead: BoolNum.Yes as any,
-        readTime: new Date().toISOString(),
+        readTime: this.getCurrentDateTime(),
       } as any,
     );
   }
@@ -367,7 +401,7 @@ export class MessagesService extends BaseService<Message, MessageDto> {
       {
         isActive: BoolNum.No as any,
         isRead: BoolNum.Yes as any,
-        readTime: new Date().toISOString(),
+        readTime: this.getCurrentDateTime(),
       } as any,
     );
     return staleMessageIds.length;
@@ -547,11 +581,15 @@ export class MessagesService extends BaseService<Message, MessageDto> {
         {
           isActive: BoolNum.No as any,
           isRead: BoolNum.Yes as any,
-          readTime: new Date().toISOString(),
+          readTime: this.getCurrentDateTime(),
         } as any,
       );
     }
     return filteredAlerts.length;
+  }
+
+  private getCurrentDateTime() {
+    return dayjs().format("YYYY-MM-DD HH:mm:ss");
   }
 
   private getBusinessRoute(businessKey: string) {

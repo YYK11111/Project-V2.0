@@ -314,6 +314,7 @@ describe("SystenConfigsService", () => {
           appId: "app_1",
           appSecret: "",
           baseUrl: "https://open.feishu.cn",
+          enabledScenes: ["workflow.approval.todo"],
         }),
         siteUrl: "",
         dingtalk: expect.objectContaining({

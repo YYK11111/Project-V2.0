@@ -26,6 +26,80 @@ const form = ref<any>({
 const rules = {}
 const canConfigUpdate = computed(() => checkPermi(['system/configs/update']))
 const isConfigReadonly = computed(() => !canConfigUpdate.value)
+const externalNotifyScenes = [
+  {
+    key: 'workflow.approval.todo',
+    label: '流程审批待办',
+    category: '工作流',
+    messageTypeLabel: '待办',
+    supported: true,
+    templateStatus: '已支持',
+    description: '审批节点、加签等工作流任务生成的待办消息。',
+  },
+  {
+    key: 'workflow.instance.cc',
+    label: '流程待阅通知',
+    category: '工作流',
+    messageTypeLabel: '待阅',
+    supported: true,
+    templateStatus: '已支持',
+    description: '流程抄送节点、通知节点和退回发起人消息。',
+  },
+  {
+    key: 'project.alert',
+    label: '项目提醒',
+    category: '项目',
+    messageTypeLabel: '待阅',
+    supported: true,
+    templateStatus: '已支持',
+    description: '项目驾驶舱异常提醒同步到消息中心。',
+  },
+  {
+    key: 'task.assignment',
+    label: '任务指派',
+    category: '任务',
+    messageTypeLabel: '待办',
+    supported: true,
+    templateStatus: '已支持',
+    description: '任务创建或分配后发送给负责人和执行人的待办。',
+  },
+  {
+    key: 'task.status',
+    label: '任务状态通知',
+    category: '任务',
+    messageTypeLabel: '待办/待阅',
+    supported: true,
+    templateStatus: '已支持',
+    description: '任务开始、延期、完成通过和完成驳回等状态变化通知。',
+  },
+  {
+    key: 'task.reminder.dueSoon',
+    label: '任务即将到期',
+    category: '任务',
+    messageTypeLabel: '待阅',
+    supported: true,
+    templateStatus: '已支持',
+    description: '定时扫描生成的任务临期提醒。',
+  },
+  {
+    key: 'task.reminder.overdue',
+    label: '任务已逾期',
+    category: '任务',
+    messageTypeLabel: '待办',
+    supported: true,
+    templateStatus: '已支持',
+    description: '定时扫描生成的任务逾期处理提醒。',
+  },
+  {
+    key: 'task.reminder.reportStale',
+    label: '任务汇报提醒',
+    category: '任务',
+    messageTypeLabel: '待办',
+    supported: true,
+    templateStatus: '已支持',
+    description: '定时扫描生成的长时间未汇报提醒。',
+  },
+]
 
 function getDefaultReminderStrategy() {
   return {
@@ -71,6 +145,7 @@ function getDefaultExternalNotifyConfig() {
       appId: '',
       appSecret: '',
       baseUrl: 'https://open.feishu.cn',
+      enabledScenes: ['workflow.approval.todo'],
     },
     dingtalk: {
       enabled: false,
@@ -117,11 +192,28 @@ function mergeExternalNotifyConfig(config) {
     feishu: {
       ...defaults.feishu,
       ...(config?.feishu || {}),
+      enabledScenes: Array.isArray(config?.feishu?.enabledScenes)
+        ? config.feishu.enabledScenes
+        : defaults.feishu.enabledScenes,
     },
     dingtalk: {
       ...defaults.dingtalk,
       ...(config?.dingtalk || {}),
     },
+  }
+}
+
+function isFeishuSceneEnabled(sceneKey) {
+  return form.value.externalNotifyConfig.feishu.enabledScenes.includes(sceneKey)
+}
+
+function toggleFeishuScene(sceneKey, checked) {
+  const scenes = form.value.externalNotifyConfig.feishu.enabledScenes
+  if (checked && !scenes.includes(sceneKey)) {
+    scenes.push(sceneKey)
+  }
+  if (!checked) {
+    form.value.externalNotifyConfig.feishu.enabledScenes = scenes.filter((item) => item !== sceneKey)
   }
 }
 
@@ -350,6 +442,38 @@ function formatDiagnoseData(data) {
               <BaInput v-model="form.externalNotifyConfig.feishu.appId" label="AppId" prop="externalNotifyConfig.feishu.appId" :disabled="isConfigReadonly" />
               <BaInput v-model="form.externalNotifyConfig.feishu.appSecret" label="AppSecret" prop="externalNotifyConfig.feishu.appSecret" :disabled="isConfigReadonly" />
               <BaInput v-model="form.externalNotifyConfig.feishu.baseUrl" label="BaseUrl" prop="externalNotifyConfig.feishu.baseUrl" :disabled="isConfigReadonly" />
+              <div class="external-notify-scene-panel">
+                <div class="external-notify-scene-panel__head">
+                  <div>
+                    <div class="external-notify-scene-panel__title">消息场景</div>
+                    <div class="external-notify-scene-panel__desc">按业务场景控制哪些本站消息同步发送到飞书。</div>
+                  </div>
+                </div>
+                <el-table :data="externalNotifyScenes" size="small" class="external-notify-scene-table">
+                  <el-table-column label="飞书发送" width="92">
+                    <template #default="{ row }">
+                      <el-switch
+                        :model-value="isFeishuSceneEnabled(row.key)"
+                        :disabled="isConfigReadonly || !row.supported"
+                        @change="(checked) => toggleFeishuScene(row.key, checked)"
+                      />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="场景名称" min-width="150">
+                    <template #default="{ row }">
+                      <div class="external-notify-scene-table__name">{{ row.label }}</div>
+                      <div class="external-notify-scene-table__desc">{{ row.description }}</div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="分类" prop="category" width="90" />
+                  <el-table-column label="本站类型" prop="messageTypeLabel" width="100" />
+                  <el-table-column label="模板状态" width="100">
+                    <template #default="{ row }">
+                      <el-tag :type="row.supported ? 'success' : 'info'" size="small" effect="plain">{{ row.templateStatus }}</el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
               <div class="external-notify-test-row">
                 <div class="external-notify-test-row__field">
                   <div class="external-notify-test-row__label">测试用户</div>
@@ -517,6 +641,49 @@ function formatDiagnoseData(data) {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.external-notify-scene-panel {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.external-notify-scene-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.external-notify-scene-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.external-notify-scene-panel__desc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.external-notify-scene-table {
+  width: 100%;
+}
+
+.external-notify-scene-table__name {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.external-notify-scene-table__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
 }
 
 .feishu-diagnose-result {

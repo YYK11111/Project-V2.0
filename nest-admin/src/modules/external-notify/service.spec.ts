@@ -87,6 +87,7 @@ describe("ExternalNotifyService", () => {
       title: "审批待办",
       content: "您有一个新的审批任务",
       messageId: "msg-1",
+      sceneKey: "workflow.approval.todo",
     });
 
     expect(feishuProvider.sendText).toHaveBeenCalledWith(
@@ -105,6 +106,9 @@ describe("ExternalNotifyService", () => {
         messageId: "msg-1",
         externalUserId: "ou_1",
         sendStatus: ExternalMessageSendStatus.succeeded,
+        requestPayload: expect.objectContaining({
+          sceneKey: "workflow.approval.todo",
+        }),
       }),
     );
   });
@@ -148,6 +152,7 @@ describe("ExternalNotifyService", () => {
       messageType: "cc",
       sourceType: "project_alert",
       sourceId: "p1",
+      sceneKey: "project.alert",
     } as any);
 
     expect(logRepository.save).toHaveBeenCalledWith(
@@ -158,6 +163,45 @@ describe("ExternalNotifyService", () => {
         messageId: "msg-1",
         receiverId: "u1",
         sendStatus: ExternalMessageSendStatus.succeeded,
+        requestPayload: expect.objectContaining({
+          sceneKey: "project.alert",
+        }),
+      }),
+    );
+  });
+
+  it("记录业务场景已启用但平台模板未支持的跳过日志", async () => {
+    const { service, logRepository } = createService();
+
+    await service.saveSkippedExternalNotificationLog(
+      "feishu",
+      {
+        notificationId: "ntf_1",
+        messageId: "msg-1",
+        receiverId: "u1",
+        sceneKey: "project.alert",
+        title: "项目提醒",
+        content: "项目异常",
+        sourceType: "project_alert",
+        sourceId: "p1",
+        messageType: "cc",
+      },
+      "当前业务场景暂未支持飞书消息模板",
+    );
+
+    expect(logRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationId: "ntf_1",
+        platform: "feishu",
+        operationType: "send_text",
+        messageId: "msg-1",
+        receiverId: "u1",
+        sendStatus: ExternalMessageSendStatus.skipped,
+        errorMessage: "当前业务场景暂未支持飞书消息模板",
+        requestPayload: expect.objectContaining({
+          sceneKey: "project.alert",
+          sourceType: "project_alert",
+        }),
       }),
     );
   });
@@ -432,29 +476,30 @@ describe("ExternalNotifyService", () => {
   });
 
   it("飞书配置自检返回 token、用户匹配、用户详情和卡片发送结果", async () => {
-    const { service, feishuProvider, externalAccountsService, logRepository } = createService({
-      user: { id: "1", email: "u1@example.com", phone: "13800138000" },
-      account: {
-        userId: "1",
-        externalUserId: "ou_1",
-        openId: "open_1",
-        unionId: "union_1",
-      },
-      feishuUsers: [
-        {
-          user_id: "ou_1",
-          email: "u1@example.com",
-          mobile: "13800138000",
+    const { service, feishuProvider, externalAccountsService, logRepository } =
+      createService({
+        user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+        account: {
+          userId: "1",
+          externalUserId: "ou_1",
+          openId: "open_1",
+          unionId: "union_1",
         },
-      ],
-      feishuUserDetail: {
-        user_id: "ou_1",
-        open_id: "open_1",
-        union_id: "union_1",
-        name: "用户1",
-      },
-      sendResponse: { code: 0, data: { message_id: "om_diagnose_1" } },
-    });
+        feishuUsers: [
+          {
+            user_id: "ou_1",
+            email: "u1@example.com",
+            mobile: "13800138000",
+          },
+        ],
+        feishuUserDetail: {
+          user_id: "ou_1",
+          open_id: "open_1",
+          union_id: "union_1",
+          name: "用户1",
+        },
+        sendResponse: { code: 0, data: { message_id: "om_diagnose_1" } },
+      });
     feishuProvider.getTenantAccessToken = jest
       .fn()
       .mockResolvedValue("tenant-token");
@@ -564,7 +609,9 @@ describe("ExternalNotifyService", () => {
       .fn()
       .mockResolvedValue("tenant-token");
     feishuProvider.sendText.mockRejectedValue(
-      new Error("发送飞书消息失败：Bot ability is not activated.（code: 230006，status: 400）"),
+      new Error(
+        "发送飞书消息失败：Bot ability is not activated.（code: 230006，status: 400）",
+      ),
     );
 
     const result = await service.diagnoseFeishuConfig("1");
@@ -577,7 +624,8 @@ describe("ExternalNotifyService", () => {
           success: false,
           data: expect.objectContaining({
             errorCode: "230006",
-            suggestion: "请在飞书开放平台启用机器人能力，并确认应用已发布到目标企业后重试。",
+            suggestion:
+              "请在飞书开放平台启用机器人能力，并确认应用已发布到目标企业后重试。",
           }),
         }),
         expect.objectContaining({
@@ -916,9 +964,18 @@ describe("ExternalNotifyService", () => {
       messageId: "msg-1",
       total: 3,
       logs: expect.arrayContaining([
-        expect.objectContaining({ platform: "system", operationType: "create_message" }),
-        expect.objectContaining({ platform: "feishu", operationType: "send_card" }),
-        expect.objectContaining({ platform: "feishu", operationType: "update_card_status" }),
+        expect.objectContaining({
+          platform: "system",
+          operationType: "create_message",
+        }),
+        expect.objectContaining({
+          platform: "feishu",
+          operationType: "send_card",
+        }),
+        expect.objectContaining({
+          platform: "feishu",
+          operationType: "update_card_status",
+        }),
       ]),
     });
   });

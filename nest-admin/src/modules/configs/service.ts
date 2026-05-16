@@ -7,6 +7,7 @@ import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { SysFileService } from "src/modules/sys/file/service";
 import { BusinessType } from "src/modules/sys/file/entity";
+import { MESSAGE_SCENE_KEYS } from "../messages/message-scenes";
 
 @Injectable()
 export class SystenConfigsService extends BaseService<
@@ -142,6 +143,7 @@ export class SystenConfigsService extends BaseService<
         appId: "",
         appSecret: "",
         baseUrl: "https://open.feishu.cn",
+        enabledScenes: [MESSAGE_SCENE_KEYS.workflowApprovalTodo],
       },
       dingtalk: {
         enabled: false,
@@ -214,6 +216,7 @@ export class SystenConfigsService extends BaseService<
           appId: process.env.FEISHU_APP_ID || "",
           appSecret: process.env.FEISHU_APP_SECRET || "",
           baseUrl: process.env.FEISHU_BASE_URL || defaults.feishu.baseUrl,
+          enabledScenes: defaults.feishu.enabledScenes,
         },
         dingtalk: {
           ...defaults.dingtalk,
