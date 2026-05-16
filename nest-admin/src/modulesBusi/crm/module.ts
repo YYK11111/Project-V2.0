@@ -2,6 +2,7 @@ import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CustomersService } from "./customers/service";
 import { CustomersController } from "./customers/controller";
+import { CustomerViewerTimeoutService } from "./customers/customer-viewer-timeout.service";
 import { Customer } from "./customers/entity";
 import { CustomerViewer } from "./customers/entities/customer-viewer.entity";
 import { CustomerInteractionService } from "./interactions/service";
@@ -38,6 +39,7 @@ import { BusinessApprovalContextsModule } from "../approval-contexts/module";
   ],
   providers: [
     CustomersService,
+    CustomerViewerTimeoutService,
     CustomerInteractionService,
     OpportunitiesService,
     ContractsService,
