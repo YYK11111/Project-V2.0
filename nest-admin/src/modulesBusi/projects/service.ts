@@ -1874,7 +1874,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     );
     const project = await this.getOne({ id: projectId });
     const fieldPermissions =
-      this.projectFieldPermissionService.getProjectFieldPermissions({
+      await this.projectFieldPermissionService.getProjectFieldPermissions({
         project,
         rawRole: permissionContext.role,
         canVisit: true,

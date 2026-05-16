@@ -36,7 +36,7 @@ describe('projectManage 详情页治理守卫', () => {
 
     expect(source).toContain('...(dashboard.value.permissionContext || {})')
     expect(source).toContain('...(fieldPermissionResult.value?.permissionContext || {})')
-    expect(source).toContain("const canOperateProject = computed(() => projectPermissionContext.value?.isVisitor !== true)")
+    expect(source).toContain("const canOperateProject = computed(() => projectPermissionContext.value != null && projectPermissionContext.value?.isVisitor !== true)")
     expect(source).toContain("const canAddTaskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)")
     expect(source).toContain("const canAddTicketInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)")
     expect(source).toContain("const canAddRiskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageRisks === true)")
@@ -44,6 +44,7 @@ describe('projectManage 详情页治理守卫', () => {
     expect(source).toContain("const canAddSprintInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageExecution === true)")
     expect(source).toContain("const canAddKnowledgeInProject = computed(() => canOperateProject.value && (projectPermissionContext.value?.canEdit === true || projectPermissionContext.value?.canManageExecution === true || projectPermissionContext.value?.canManageDelivery === true))")
     expect(source).toContain("const canSubmitCloseCurrentProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canSubmitClose === true)")
+    expect(source).toContain("const isProjectVisitor = computed(() => projectPermissionContext.value == null || projectPermissionContext.value?.isVisitor === true)")
     expect(source).not.toContain("const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))")
     expect(source).not.toContain("const canProjectSubmitClose = computed(() => checkPermi(['business/projects/submitClose']))")
   })
@@ -170,6 +171,52 @@ describe('projectManage 详情页治理守卫', () => {
     expect(source).not.toContain('<div class="metric-grid">')
     expect(source).not.toContain('class="project-alert-grid"')
     expect(source).not.toContain('class="focus-grid mt20"')
+  })
+
+  it('概览详情面板应拆分为独立组件，详情页只保留数据传入和事件转发', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain("import ProjectOverviewPanels from './components/ProjectOverviewPanels.vue'")
+    expect(source).toContain('<ProjectOverviewPanels')
+    expect(source).toContain(':project="project"')
+    expect(source).toContain(':task-summary="taskSummary"')
+    expect(source).toContain(':milestone-summary="milestoneSummary"')
+    expect(source).toContain(':project-health-summary="projectHealthSummary"')
+    expect(source).toContain(':due-soon-milestones="dueSoonMilestones"')
+    expect(source).toContain(':milestones="milestones"')
+    expect(source).toContain(':can-view-project-member="canViewGroup(\'projectMember\')"')
+    expect(source).toContain(':cost-variance="costVariance"')
+    expect(source).not.toContain('class="panel-progress-list"')
+    expect(source).not.toContain('class="cost-grid"')
+    expect(source).not.toContain('class="health-score-card"')
+    expect(source).not.toContain('class="health-dimension-grid"')
+    expect(source).not.toContain('class="health-alert-list"')
+    expect(source).not.toContain('class="side-panel-block"')
+    expect(source).not.toContain('<ViewRichText')
+  })
+
+  it('项目权限在数据加载前默认收口，避免先放行后收紧', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain('const projectPermissionContext = ref(null)')
+    expect(source).toContain('const fieldPermissionResult = ref(null)')
+    expect(source).toContain('projectPermissionContext.value = null')
+    expect(source).toContain('fieldPermissionResult.value = null')
+    expect(source).toContain('if (!fieldPermissionResult.value) return false')
+  })
+
+  it('概览详情面板组件应保留进度、健康度和成员信息结构', () => {
+    const source = readProjectComponentSource('ProjectOverviewPanels.vue')
+
+    expect(source).toContain('class="panel-progress-list"')
+    expect(source).toContain('class="cost-grid"')
+    expect(source).toContain('class="health-score-card"')
+    expect(source).toContain('class="health-dimension-grid"')
+    expect(source).toContain('class="health-alert-list"')
+    expect(source).toContain('<ViewRichText :html="project.description" />')
+    expect(source).toContain('v-if="canViewProjectMember && coreMembers.length"')
+    expect(source).toContain('memberRoleMap[row.role] || row.role')
+    expect(source).toContain('milestoneStatusMap[item.status] || \'-\'')
   })
 
   it('顶部快捷发起应拆分并收敛为常用动作加更多操作', () => {

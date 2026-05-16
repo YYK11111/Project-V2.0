@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { QuestionFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getDashboard, getStatus, getPriority, getProjectType, publishCloseReview, submitClose, syncProjectAlerts, getFieldPermissions } from './api'
 import { confirmPlanImpact, confirmPlanImpactScope, confirmPlanImpactTarget } from '@/views/business/changeManage/api'
@@ -10,10 +9,10 @@ import { getList as getCustomerList } from '@/views/business/crm/customerManage/
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { phaseMap } from './fieldMaps'
 import ProjectHeroActions from './components/ProjectHeroActions.vue'
-import ProjectOverviewCharts from './components/ProjectOverviewCharts.vue'
 import ProjectOverviewSummary from './components/ProjectOverviewSummary.vue'
+import ProjectOverviewPanels from './components/ProjectOverviewPanels.vue'
+import ProjectOverviewCharts from './components/ProjectOverviewCharts.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
-import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 
@@ -37,7 +36,7 @@ const changes = ref([])
 const sprints = ref([])
 const knowledgeSummary = ref({})
 const knowledgeArticles = ref([])
-const projectPermissionContext = ref({})
+const projectPermissionContext = ref(null)
 const fieldPermissionResult = ref(null)
 const activeTab = ref('overview')
 const taskFilter = ref('all')
@@ -46,7 +45,7 @@ const milestoneFilter = ref('all')
 const riskFilter = ref('all')
 const changeFilter = ref('all')
 const sprintFilter = ref('all')
-const canOperateProject = computed(() => projectPermissionContext.value?.isVisitor !== true)
+const canOperateProject = computed(() => projectPermissionContext.value != null && projectPermissionContext.value?.isVisitor !== true)
 const canAddTaskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)
 const canAddTicketInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)
 const canAddRiskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageRisks === true)
@@ -57,10 +56,11 @@ const canManagePlanInProject = computed(() => canOperateProject.value && project
 const canManageDeliveryInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageDelivery === true)
 const canEditCurrentProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canEdit === true && String(project.value?.status || '') === '1')
 const canSubmitCloseCurrentProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canSubmitClose === true)
-const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
+const isProjectVisitor = computed(() => projectPermissionContext.value == null || projectPermissionContext.value?.isVisitor === true)
 const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
 
 function canViewGroup(groupCode) {
+  if (!fieldPermissionResult.value) return false
   return (groupPermissions.value[groupCode] || 'editable') !== 'hidden'
 }
 
@@ -170,13 +170,6 @@ function getChangeImpactType(impact) {
   return 'info'
 }
 
-function getHealthTagType(level) {
-  if (level === 'healthy') return 'success'
-  if (level === 'stable') return 'primary'
-  if (level === 'attention') return 'warning'
-  return 'danger'
-}
-
 const taskSummary = computed(() => dashboard.value.summary?.taskSummary || { total: 0, completed: 0, inProgress: 0, pending: 0, overdue: 0, dueSoon: 0, completionRate: 0 })
 const ticketSummary = computed(() => dashboard.value.summary?.ticketSummary || { total: 0, open: 0, critical: 0 })
 const riskSummary = computed(() => dashboard.value.summary?.riskSummary || { total: 0, active: 0, high: 0, overdue: 0 })
@@ -196,8 +189,6 @@ const pendingChanges = computed(() => dashboard.value.focus?.pendingChanges || [
 const dueSoonMilestones = computed(() => dashboard.value.focus?.dueSoonMilestones || [])
 const latestKnowledgeArticles = computed(() => knowledgeArticles.value || [])
 const projectAlerts = computed(() => dashboard.value.focus?.alerts || [])
-const delayedMilestones = computed(() => milestones.value.filter(item => String(item.status || '') === '3').slice(0, 5))
-const coreMembers = computed(() => (project.value.members || []).filter(item => String(item.isCore || '0') === '1'))
 const overdueMilestoneCount = computed(() => milestoneSummary.value.overdue || 0)
 const overdueRiskCount = computed(() => riskSummary.value.overdue || 0)
 const implementedChangeCount = computed(() => changeSummary.value.implemented || 0)
@@ -467,6 +458,8 @@ watch(
 
 async function reloadCurrent() {
   if (!projectId.value) return
+  projectPermissionContext.value = null
+  fieldPermissionResult.value = null
   const [statusRes, priorityRes, projectTypeRes, knowledgeTypeRes, customerRes, deptRes, dashboardRes, fieldPermissionsRes] = await Promise.all([
     getStatus(),
     getPriority(),
@@ -930,163 +923,16 @@ function getProjectApprovalText(project) {
           :risk-level-chart-data="riskLevelChartData"
           @chart-slice-click="handleChartSliceClick"
         />
-
-        <el-row :gutter="20" class="mt20">
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="hover" class="panel-card">
-              <template #header>进度与成本</template>
-              <div class="panel-progress-list">
-                <div class="panel-progress-item">
-                  <div class="panel-progress-item__header">
-                    <span class="panel-progress-item__label">
-                      总体进度
-                      <el-tooltip content="按项目下已完成任务数 / 总任务数自动计算" placement="top">
-                        <el-icon class="panel-progress-item__tip"><QuestionFilled /></el-icon>
-                      </el-tooltip>
-                    </span>
-                    <span>{{ project.progress || 0 }}%</span>
-                  </div>
-                  <el-progress :percentage="project.progress || 0" :stroke-width="10" />
-                </div>
-                <div class="panel-progress-item">
-                  <div class="panel-progress-item__header">
-                    <span>任务完成率</span>
-                    <span>{{ taskSummary.completionRate }}%</span>
-                  </div>
-                  <el-progress :percentage="taskSummary.completionRate" :stroke-width="10" status="success" />
-                </div>
-                <div class="panel-progress-item">
-                  <div class="panel-progress-item__header">
-                    <span>里程碑完成率</span>
-                    <span>{{ milestoneSummary.completionRate }}%</span>
-                  </div>
-                  <el-progress :percentage="milestoneSummary.completionRate" :stroke-width="10" color="#9096f9" />
-                </div>
-              </div>
-              <div class="cost-grid">
-                <div class="cost-card">
-                  <div class="cost-card__label">项目预算</div>
-                  <div class="cost-card__value">¥ {{ Number(project.budget || 0).toLocaleString() }}</div>
-                </div>
-                <div class="cost-card">
-                  <div class="cost-card__label">实际成本</div>
-                  <div class="cost-card__value">¥ {{ Number(project.actualCost || 0).toLocaleString() }}</div>
-                </div>
-                <div class="cost-card" :class="{ 'cost-card--warning': costVariance > 0 }">
-                  <div class="cost-card__label">成本偏差</div>
-                  <div class="cost-card__value">¥ {{ Math.abs(costVariance).toLocaleString() }}</div>
-                  <div class="cost-card__desc">{{ costVariance > 0 ? '超出预算' : '预算内' }}</div>
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="hover" class="panel-card">
-              <template #header>团队与里程碑</template>
-              <div class="side-panel-block">
-                <div class="side-panel-block__title">核心成员</div>
-                <div v-if="canViewGroup('projectMember') && coreMembers.length" class="core-member-list">
-                  <div v-for="item in coreMembers" :key="item.id || item.userId" class="core-member-item">
-                    <ViewUser :user="item.user" />
-                    <div class="core-member-item__role">{{ item.role ? item.role : '-' }}</div>
-                  </div>
-                </div>
-                <div v-else class="focus-list__empty">{{ canViewGroup('projectMember') ? '暂无核心成员' : '当前角色无权查看项目成员' }}</div>
-              </div>
-              <div class="side-panel-block">
-                <div class="side-panel-block__title">近期里程碑</div>
-                <div v-if="dueSoonMilestones.length || delayedMilestones.length" class="focus-list">
-                  <div v-for="item in [...dueSoonMilestones, ...delayedMilestones].slice(0, 5)" :key="item.id" class="focus-list__item">
-                    <div class="focus-list__title">{{ item.name }}</div>
-                    <div class="focus-list__meta">{{ item.dueDate || '-' }} / {{ { '1': '待完成', '2': '已完成', '3': '已延期', '4': '已取消' }[item.status] || '-' }}</div>
-                  </div>
-                </div>
-                <div v-else class="focus-list__empty">暂无关键里程碑提醒</div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="20" class="mt20">
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="hover" class="panel-card">
-              <template #header>项目健康度</template>
-              <div class="health-score-card">
-                <div class="health-score-card__main">
-                  <div class="health-score-card__score">{{ projectHealthSummary.totalScore || 0 }}</div>
-                  <ViewTagField :text="projectHealthSummary.levelLabel || '基本健康'" :type="getHealthTagType(projectHealthSummary.level)" />
-                </div>
-                <div class="health-score-card__desc">基于进度、风险、变更、执行透明度、交付达成和知识沉淀六个维度综合评估当前项目运行状态。</div>
-              </div>
-              <div class="health-dimension-grid">
-                <div class="health-dimension-card">
-                  <span>进度</span>
-                  <strong>{{ projectHealthSummary.dimensions?.progress?.score || 0 }}/25</strong>
-                </div>
-                <div class="health-dimension-card">
-                  <span>风险</span>
-                  <strong>{{ projectHealthSummary.dimensions?.risk?.score || 0 }}/20</strong>
-                </div>
-                <div class="health-dimension-card">
-                  <span>变更</span>
-                  <strong>{{ projectHealthSummary.dimensions?.change?.score || 0 }}/15</strong>
-                </div>
-                <div class="health-dimension-card">
-                  <span>执行</span>
-                  <strong>{{ projectHealthSummary.dimensions?.execution?.score || 0 }}/15</strong>
-                </div>
-                <div class="health-dimension-card">
-                  <span>交付</span>
-                  <strong>{{ projectHealthSummary.dimensions?.delivery?.score || 0 }}/15</strong>
-                </div>
-                <div class="health-dimension-card">
-                  <span>知识</span>
-                  <strong>{{ projectHealthSummary.dimensions?.knowledge?.score || 0 }}/10</strong>
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="hover" class="panel-card">
-              <template #header>健康度异常提示</template>
-              <div v-if="projectHealthSummary.alerts?.length" class="health-alert-list">
-                <div v-for="item in projectHealthSummary.alerts" :key="item" class="health-alert-item">
-                  {{ item }}
-                </div>
-              </div>
-              <div v-else class="focus-list__empty">当前暂无健康度异常提示</div>
-            </el-card>
-          </el-col>
-        </el-row>
-
-        <el-card shadow="hover" class="mt20 panel-card">
-          <template #header>项目描述</template>
-          <ViewRichText :html="project.description" />
-        </el-card>
-
-        <el-card v-if="canViewGroup('projectMember')" shadow="hover" class="mt20 panel-card">
-          <template #header>项目成员</template>
-            <el-table :data="project.members || []" size="small" border>
-            <el-table-column label="成员" min-width="180">
-              <template #default="{ row }">
-                <ViewUser :user="row.user" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="role" label="角色" min-width="140">
-              <template #default="{ row }">
-                {{ { '1': '项目经理', '2': '交付经理', '3': '技术负责人', '4': '实施负责人', '5': '测试负责人', '6': '客户联系人', '7': '商务接口人', '8': '开发工程师', '9': '实施顾问', 'A': '测试工程师', 'B': '运维工程师', 'C': '培训顾问', 'D': '数据迁移工程师', 'E': '驻场支持', 'F': '普通成员', 'G': '访客' }[row.role] || row.role }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="isCore" label="核心成员" width="100">
-              <template #default="{ row }">
-                <ViewTagField :text="row.isCore === '1' ? '是' : '否'" :type="row.isCore === '1' ? 'success' : 'info'" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="180" />
-          </el-table>
-        </el-card>
+        <ProjectOverviewPanels
+          :project="project"
+          :task-summary="taskSummary"
+          :milestone-summary="milestoneSummary"
+          :project-health-summary="projectHealthSummary"
+          :due-soon-milestones="dueSoonMilestones"
+          :milestones="milestones"
+          :can-view-project-member="canViewGroup('projectMember')"
+          :cost-variance="costVariance"
+        />
       </el-tab-pane>
 
       <el-tab-pane v-if="!isProjectVisitor" lazy label="交付焦点" name="focus">
@@ -2044,12 +1890,6 @@ function getProjectApprovalText(project) {
   color: var(--el-text-color-primary);
 }
 
-.focus-board {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .focus-card {
   border-radius: 14px;
 }
@@ -2452,129 +2292,6 @@ function getProjectApprovalText(project) {
   margin-top: 14px;
 }
 
-.panel-progress-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.panel-progress-item__header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-regular);
-}
-
-.panel-progress-item__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.panel-progress-item__tip {
-  color: var(--el-text-color-secondary);
-  font-size: 14px;
-  cursor: help;
-}
-
-.cost-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.cost-card {
-  padding: 14px;
-  border-radius: 12px;
-  background: var(--el-fill-color-extra-light);
-}
-
-.cost-card--warning {
-  background: color-mix(in srgb, var(--el-color-danger) 10%, var(--el-fill-color-extra-light));
-}
-
-.cost-card__label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.cost-card__value {
-  margin-top: 8px;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-}
-
-.cost-card__desc {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.health-score-card__main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.health-score-card__score {
-  font-size: 40px;
-  line-height: 1;
-  font-weight: 700;
-  color: var(--el-color-primary);
-}
-
-.health-score-card__desc {
-  margin-top: 12px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-text-color-secondary);
-}
-
-.health-dimension-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.health-dimension-card {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--el-fill-color-extra-light);
-}
-
-.health-dimension-card span {
-  display: block;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.health-dimension-card strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 18px;
-  color: var(--el-text-color-primary);
-}
-
-.health-alert-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.health-alert-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--el-color-danger) 18%, var(--el-border-color-lighter));
-  background: color-mix(in srgb, var(--el-color-danger) 8%, var(--el-bg-color));
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-text-color-regular);
-}
-
 .closure-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2587,39 +2304,6 @@ function getProjectApprovalText(project) {
   line-height: 1.8;
   color: var(--el-text-color-regular);
   white-space: pre-wrap;
-}
-
-.side-panel-block + .side-panel-block {
-  margin-top: 20px;
-}
-
-.side-panel-block__title,
-.current-sprint-card__header {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.core-member-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.core-member-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--el-fill-color-extra-light);
-}
-
-.core-member-item__role {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
 
 .tab-summary-grid {
@@ -2895,13 +2579,11 @@ function getProjectApprovalText(project) {
   }
 
   .closure-grid,
-  .health-dimension-grid,
   .plan-deviation-grid,
   .plan-intro-card,
   .plan-sprint-list,
   .plan-sprint-card__stats,
   .project-meta-grid,
-  .cost-grid,
   .tab-summary-grid,
   .milestone-timeline-rail__body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2916,13 +2598,11 @@ function getProjectApprovalText(project) {
   .project-hero,
   .focus-board,
   .closure-grid,
-  .health-dimension-grid,
   .plan-deviation-grid,
   .plan-intro-card,
   .plan-sprint-list,
   .plan-sprint-card__stats,
   .project-meta-grid,
-  .cost-grid,
   .tab-summary-grid,
   .milestone-timeline-rail__body {
     grid-template-columns: 1fr;

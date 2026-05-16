@@ -1192,6 +1192,31 @@ describe("ProjectsService closure guards", () => {
     });
   });
 
+  it("项目查看上下文字段权限必须等待异步计算完成", async () => {
+    const { service } = createService();
+    const project = { id: "19", status: "2", name: "项目A" };
+    const fieldPermissions = { projectBasic: { visible: true } };
+    jest
+      .spyOn(service, "assertProjectPermission")
+      .mockResolvedValue({ role: "visitor", canView: true } as any);
+    jest.spyOn(service, "getOne").mockResolvedValue(project as any);
+    (service as any).projectFieldPermissionService = {
+      getProjectFieldPermissions: jest.fn().mockResolvedValue(fieldPermissions),
+    };
+    (service as any).businessApprovalContextService = {
+      findProjectApprovalContexts: jest.fn().mockResolvedValue([]),
+    };
+
+    const result = await service.getProjectViewContext("19", {
+      operatorId: "u1",
+      operatorName: "李四",
+      permissions: ["business/projects/access"],
+    });
+
+    expect(result.fieldPermissions).toEqual(fieldPermissions);
+    expect(result.fieldPermissions).not.toBeInstanceOf(Promise);
+  });
+
   it("项目查看上下文优先选择传入流程实例对应的审批上下文", async () => {
     const { service } = createService();
     const approvalContexts = [
