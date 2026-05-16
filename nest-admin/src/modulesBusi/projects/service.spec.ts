@@ -166,6 +166,65 @@ describe("ProjectsService closure guards", () => {
     return { service, repository, businessApprovalContextService };
   };
 
+  it("保存项目时使用计划周期回填旧起止字段", () => {
+    const { service } = createService();
+    const dto = {
+      planStartDate: "2026-05-01",
+      planEndDate: "2026-05-31",
+      startDate: "",
+      endDate: "",
+    };
+
+    (service as any).normalizeProjectPlanDates(dto);
+
+    expect(dto.startDate).toBe("2026-05-01");
+    expect(dto.endDate).toBe("2026-05-31");
+    expect(dto.planStartDate).toBe("2026-05-01");
+    expect(dto.planEndDate).toBe("2026-05-31");
+  });
+
+  it("局部更新未携带周期字段时不主动写空项目周期", () => {
+    const { service } = createService();
+    const dto = {
+      id: "p1",
+      name: "项目名称调整",
+    };
+
+    (service as any).normalizeProjectPlanDates(dto);
+
+    expect(dto).toEqual({
+      id: "p1",
+      name: "项目名称调整",
+    });
+  });
+
+  it("发起立项审批允许使用计划周期作为项目起止时间", async () => {
+    const { service } = createService();
+    jest.spyOn(service, "getOne").mockResolvedValue({
+      id: "p1",
+      startDate: "",
+      endDate: "",
+      planStartDate: "2026-05-01",
+      planEndDate: "2026-05-31",
+      baselineDeliverables: "交付物",
+      scopeBoundary: "范围边界",
+    } as any);
+    (service as any).milestoneRepository = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: "m1",
+          name: "项目启动",
+          dueDate: "2026-05-10",
+        },
+      ]),
+    };
+
+    await expect(service.validateBaselinePlan("p1")).resolves.toEqual({
+      projectId: "p1",
+      baselineMilestoneCount: 1,
+    });
+  });
+
   it("发起结项审批前要求至少存在一条成功上线单", async () => {
     const { service } = createService();
     jest.spyOn(service, "getOne").mockResolvedValue({

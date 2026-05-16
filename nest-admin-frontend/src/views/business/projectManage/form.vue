@@ -162,33 +162,8 @@ const rules = {
   leaderId: [{ required: true, message: '请选择项目负责人', trigger: 'change' }],
   creatorId: [{ required: true, message: '请选择项目发起人', trigger: 'change' }],
   departmentId: [{ required: true, message: '请选择所属部门', trigger: 'change' }],
-  startDate: [
-    { required: true, message: '请选择开始时间', trigger: 'change' },
-    {
-      trigger: 'change',
-      validator: (_rule, value, callback) => {
-        if (value && form.value.endDate && value > form.value.endDate) {
-          callback(new Error('开始时间不能晚于结束时间'))
-          return
-        }
-        callback()
-      },
-    },
-  ],
-  endDate: [
-    { required: true, message: '请选择结束时间', trigger: 'change' },
-    {
-      trigger: 'change',
-      validator: (_rule, value, callback) => {
-        if (value && form.value.startDate && value < form.value.startDate) {
-          callback(new Error('结束时间不能早于开始时间'))
-          return
-        }
-        callback()
-      },
-    },
-  ],
   planStartDate: [
+    { required: true, message: '请选择计划开始时间', trigger: 'change' },
     {
       trigger: 'change',
       validator: (_rule, value, callback) => {
@@ -201,6 +176,7 @@ const rules = {
     },
   ],
   planEndDate: [
+    { required: true, message: '请选择计划结束时间', trigger: 'change' },
     {
       trigger: 'change',
       validator: (_rule, value, callback) => {
@@ -296,8 +272,10 @@ function hydrateFromContractQuery() {
     customerId: route.query.customerId ? Number(route.query.customerId) : null,
     contractId: String(route.query.contractId || ''),
     opportunityId: String(route.query.opportunityId || ''),
-    startDate: String(route.query.startDate || ''),
-    endDate: String(route.query.endDate || ''),
+    startDate: String(route.query.planStartDate || route.query.startDate || ''),
+    endDate: String(route.query.planEndDate || route.query.endDate || ''),
+    planStartDate: String(route.query.planStartDate || route.query.startDate || ''),
+    planEndDate: String(route.query.planEndDate || route.query.endDate || ''),
     projectSource: String(route.query.projectSource || 'contract'),
     contract: route.query.contractId
       ? {
@@ -499,6 +477,12 @@ function normalizeSubmitPayload() {
         deliverables: item.deliverables || [],
       })),
   }
+  const normalizedPlanStartDate = payload.planStartDate || payload.startDate || ''
+  const normalizedPlanEndDate = payload.planEndDate || payload.endDate || ''
+  payload.planStartDate = normalizedPlanStartDate
+  payload.planEndDate = normalizedPlanEndDate
+  payload.startDate = normalizedPlanStartDate
+  payload.endDate = normalizedPlanEndDate
 
   if (isDraftCreateLikeMode.value) {
     payload.creatorId = String(userStore.id || payload.creatorId || '')
@@ -824,7 +808,7 @@ onBeforeUnmount(() => {
               </el-col>
             </el-row>
 
-            <el-row v-if="canViewGroup('projectPlan') && !isDraftCreateLikeMode" :gutter="20" class="basic-info-row">
+            <el-row v-if="canViewGroup('projectPlan')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="计划开始" prop="planStartDate">
                   <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.planStartDate" />
@@ -839,7 +823,7 @@ onBeforeUnmount(() => {
               </el-col>
             </el-row>
 
-            <el-row v-if="canViewGroup('projectPlan') && !isDraftCreateLikeMode" :gutter="20" class="basic-info-row">
+            <el-row v-if="!isDraftCreateLikeMode && canViewGroup('projectPlan')" :gutter="20" class="basic-info-row">
               <el-col :xs="24" :sm="12">
                 <el-form-item label="实际开始">
                   <ViewField :value="form.actualStartDate" />
@@ -848,21 +832,6 @@ onBeforeUnmount(() => {
               <el-col :xs="24" :sm="12">
                 <el-form-item label="实际结束">
                   <ViewField :value="form.actualEndDate" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-row v-if="canViewGroup('projectPlan')" :gutter="20" class="basic-info-row">
-              <el-col :xs="24" :sm="12">
-                <el-form-item label="开始时间" prop="startDate">
-                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.startDate" />
-                  <el-date-picker v-else v-model="form.startDate" type="date" placeholder="选择开始时间" value-format="YYYY-MM-DD" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :xs="24" :sm="12">
-                <el-form-item label="结束时间" prop="endDate">
-                  <ViewField v-if="isGroupReadonly('projectPlan')" :value="form.endDate" />
-                  <el-date-picker v-else v-model="form.endDate" type="date" placeholder="选择结束时间" value-format="YYYY-MM-DD" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>

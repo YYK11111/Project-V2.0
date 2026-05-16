@@ -65,6 +65,19 @@ describe('projectManage 项目查看页治理守卫', () => {
     expect(source).toContain('label="实际成本"')
   })
 
+  it('项目查看页统一展示计划周期和实际周期，不再同时展示旧开始结束字段', () => {
+    const source = readProjectApprovalSource()
+
+    expect(source).toContain('label="计划周期"')
+    expect(source).toContain('getDateRange(project.planStartDate || project.startDate, project.planEndDate || project.endDate)')
+    expect(source).toContain('label="实际周期"')
+    expect(source).toContain('getDateRange(project.actualStartDate, project.actualEndDate)')
+    expect(source).not.toContain('label="开始时间"')
+    expect(source).not.toContain('label="结束时间"')
+    expect(source).not.toContain('label="计划开始"')
+    expect(source).not.toContain('label="计划结束"')
+  })
+
   it('项目查看页操作按钮使用项目内权限上下文', () => {
     const source = readProjectApprovalSource()
 

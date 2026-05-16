@@ -457,6 +457,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       ? await this.repository.findOne({ where: { id: dto.id } as any })
       : null;
 
+    this.normalizeProjectPlanDates(dto);
     this.validateProjectSourceMutation(previousProject, dto);
 
     return this.dataSource.transaction(async (manager) => {
@@ -519,6 +520,27 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       ) {
         throw new BadRequestException("项目进入审批后不允许修改来源商机");
       }
+    }
+  }
+
+  private normalizeProjectPlanDates(dto: Partial<ProjectDto | Project>) {
+    const hasStartDate =
+      Object.prototype.hasOwnProperty.call(dto, "planStartDate") ||
+      Object.prototype.hasOwnProperty.call(dto, "startDate");
+    const hasEndDate =
+      Object.prototype.hasOwnProperty.call(dto, "planEndDate") ||
+      Object.prototype.hasOwnProperty.call(dto, "endDate");
+
+    if (hasStartDate) {
+      const normalizedPlanStartDate = dto.planStartDate || dto.startDate || "";
+      dto.planStartDate = normalizedPlanStartDate;
+      dto.startDate = normalizedPlanStartDate;
+    }
+
+    if (hasEndDate) {
+      const normalizedPlanEndDate = dto.planEndDate || dto.endDate || "";
+      dto.planEndDate = normalizedPlanEndDate;
+      dto.endDate = normalizedPlanEndDate;
     }
   }
 
@@ -845,8 +867,10 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       where: { projectId, isDelete: null as any } as any,
       order: { sort: "ASC", createTime: "ASC" },
     });
+    const projectPlanStartDate = project.planStartDate || project.startDate;
+    const projectPlanEndDate = project.planEndDate || project.endDate;
 
-    if (!project.startDate || !project.endDate) {
+    if (!projectPlanStartDate || !projectPlanEndDate) {
       throw new Error("发起立项审批前，请先补齐项目起止时间");
     }
     if (

@@ -508,26 +508,13 @@ watch(
 
         <el-row :gutter="20" class="basic-info-row">
           <el-col :xs="24" :sm="12">
-            <el-form-item label="开始时间">
-              <ViewField :value="project.startDate" />
+            <el-form-item label="计划周期">
+              <ViewField :value="getDateRange(project.planStartDate || project.startDate, project.planEndDate || project.endDate)" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="结束时间">
-              <ViewField :value="project.endDate" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="20" class="basic-info-row">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="计划开始">
-              <ViewField :value="project.planStartDate" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="计划结束">
-              <ViewField :value="project.planEndDate" />
+            <el-form-item label="实际周期">
+              <ViewField :value="getDateRange(project.actualStartDate, project.actualEndDate)" />
             </el-form-item>
           </el-col>
         </el-row>

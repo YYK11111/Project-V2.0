@@ -45,6 +45,11 @@ function getProjectApprovalText(row) {
   return ({ '0': '未提交审批', '1': '审批中', '2': '已通过', '3': '已驳回' }[row?.approvalStatus] || '-')
 }
 
+function getProjectDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return '-'
+  return `${startDate || '-'} 至 ${endDate || '-'}`
+}
+
 function canEditProject(row) {
   return row.permissionContext?.canEdit === true && String(row.status || '') === '1'
 }
@@ -199,10 +204,16 @@ const getButtons = (row) => [
             {{ projectType[row.projectType] || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="开始时间" prop="startDate" width="120" />
-        <el-table-column label="结束时间" prop="endDate" width="120" />
-        <el-table-column label="计划开始" prop="planStartDate" width="120" />
-        <el-table-column label="计划结束" prop="planEndDate" width="120" />
+        <el-table-column label="计划周期" width="190">
+          <template #default="{ row }">
+            {{ getProjectDateRange(row.planStartDate || row.startDate, row.planEndDate || row.endDate) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="实际周期" width="190">
+          <template #default="{ row }">
+            {{ getProjectDateRange(row.actualStartDate, row.actualEndDate) }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" prop="status" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === '6' ? 'success' : row.status === '2' || row.status === '3' || row.status === '5' ? 'warning' : row.status === '7' ? 'danger' : 'info'" effect="plain">

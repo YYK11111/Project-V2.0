@@ -51,4 +51,18 @@ describe('projectManage 列表治理守卫', () => {
     expect(source).not.toContain('business/projects/submitApproval')
     expect(source).not.toContain("label: '立项审批'")
   })
+
+  it('项目列表统一展示计划周期和实际周期，不再同时展示旧开始结束字段', () => {
+    const source = readProjectManageView('index')
+
+    expect(source).toContain('function getProjectDateRange(startDate, endDate)')
+    expect(source).toContain('<el-table-column label="计划周期" width="190">')
+    expect(source).toContain('getProjectDateRange(row.planStartDate || row.startDate, row.planEndDate || row.endDate)')
+    expect(source).toContain('<el-table-column label="实际周期" width="190">')
+    expect(source).toContain('getProjectDateRange(row.actualStartDate, row.actualEndDate)')
+    expect(source).not.toContain('<el-table-column label="开始时间" prop="startDate"')
+    expect(source).not.toContain('<el-table-column label="结束时间" prop="endDate"')
+    expect(source).not.toContain('<el-table-column label="计划开始" prop="planStartDate"')
+    expect(source).not.toContain('<el-table-column label="计划结束" prop="planEndDate"')
+  })
 })

@@ -228,4 +228,22 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).not.toContain('(isEdit.value && !canProjectUpdate.value)')
     expect(source).not.toContain('isEdit && isDraftMode && canProjectUpdate')
   })
+
+  it('项目表单统一使用计划周期作为主时间输入，旧开始结束字段仅做兼容提交', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain("{ required: true, message: '请选择计划开始时间', trigger: 'change' }")
+    expect(source).toContain("{ required: true, message: '请选择计划结束时间', trigger: 'change' }")
+    expect(source).toContain("const normalizedPlanStartDate = payload.planStartDate || payload.startDate || ''")
+    expect(source).toContain("const normalizedPlanEndDate = payload.planEndDate || payload.endDate || ''")
+    expect(source).toContain('payload.planStartDate = normalizedPlanStartDate')
+    expect(source).toContain('payload.planEndDate = normalizedPlanEndDate')
+    expect(source).toContain('payload.startDate = normalizedPlanStartDate')
+    expect(source).toContain('payload.endDate = normalizedPlanEndDate')
+    expect(source).toContain("planStartDate: String(route.query.planStartDate || route.query.startDate || '')")
+    expect(source).toContain("planEndDate: String(route.query.planEndDate || route.query.endDate || '')")
+    expect(source).not.toContain('<el-form-item label="开始时间" prop="startDate">')
+    expect(source).not.toContain('<el-form-item label="结束时间" prop="endDate">')
+    expect(source).not.toContain('v-if="canViewGroup(\'projectPlan\') && !isDraftCreateLikeMode"')
+  })
 })

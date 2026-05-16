@@ -9,7 +9,6 @@ import { getKnowledgeTypes } from '@/views/content/articleManage/api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { phaseMap } from './fieldMaps'
-import { checkPermi } from '@/utils/permission'
 import ChartPie from '@/components/ChartPie.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
@@ -45,30 +44,17 @@ const milestoneFilter = ref('all')
 const riskFilter = ref('all')
 const changeFilter = ref('all')
 const sprintFilter = ref('all')
-const canProjectSubmitClose = computed(() => checkPermi(['business/projects/submitClose']))
-const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
-const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
-const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
-const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
-const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
-const canKnowledgeAdd = computed(() => checkPermi(['business/articles/add']))
-const canOperateExecutionObjects = computed(() => {
-  const context = projectPermissionContext.value || {}
-  return context.isVisitor !== true && (
-    context.canEdit !== false ||
-    context.isManager === true ||
-    context.isDeliveryManager === true ||
-    context.isFunctionalLead === true
-  )
-})
-const canAddTaskInProject = computed(() => canTaskAdd.value && canOperateExecutionObjects.value)
-const canAddTicketInProject = computed(() => canTicketAdd.value && canOperateExecutionObjects.value)
-const canAddRiskInProject = computed(() => canRiskAdd.value && canOperateExecutionObjects.value)
-const canAddChangeInProject = computed(() => canChangeAdd.value && canOperateExecutionObjects.value)
-const canAddSprintInProject = computed(() => canSprintAdd.value && canOperateExecutionObjects.value)
-const canAddKnowledgeInProject = computed(() => canKnowledgeAdd.value && canOperateExecutionObjects.value)
-const canEditCurrentProject = computed(() => projectPermissionContext.value?.canEdit !== false && String(project.value?.status || '') === '1')
-const canSubmitCloseCurrentProject = computed(() => canProjectSubmitClose.value && projectPermissionContext.value?.canSubmitClose !== false)
+const canOperateProject = computed(() => projectPermissionContext.value?.isVisitor !== true)
+const canAddTaskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)
+const canAddTicketInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageTasks === true)
+const canAddRiskInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageRisks === true)
+const canAddChangeInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageChanges === true)
+const canAddSprintInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageExecution === true)
+const canAddKnowledgeInProject = computed(() => canOperateProject.value && (projectPermissionContext.value?.canEdit === true || projectPermissionContext.value?.canManageExecution === true || projectPermissionContext.value?.canManageDelivery === true))
+const canManagePlanInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManagePlan === true)
+const canManageDeliveryInProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canManageDelivery === true)
+const canEditCurrentProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canEdit === true && String(project.value?.status || '') === '1')
+const canSubmitCloseCurrentProject = computed(() => canOperateProject.value && projectPermissionContext.value?.canSubmitClose === true)
 const isProjectVisitor = computed(() => projectPermissionContext.value?.isVisitor === true)
 const groupPermissions = computed(() => fieldPermissionResult.value?.groups || {})
 
@@ -84,6 +70,10 @@ const confirmTargetLoading = ref(false)
 const today = computed(() => new Date())
 const customerMap = computed(() => new Map((customerList.value || []).map((item) => [String(item.id), item])))
 const currentCustomer = computed(() => project.value.customer || customerMap.value.get(String(project.value.customerId || '')) || null)
+const displayPlanStartDate = computed(() => project.value?.planStartDate || project.value?.startDate || '')
+const displayPlanEndDate = computed(() => project.value?.planEndDate || project.value?.endDate || '')
+const displayActualStartDate = computed(() => project.value?.actualStartDate || '')
+const displayActualEndDate = computed(() => project.value?.actualEndDate || '')
 const completedTaskStatuses = ['3']
 const resolvedTicketStatuses = ['3', '4']
 const closedRiskStatuses = ['4', '5']
@@ -110,6 +100,11 @@ function getDaysDiff(targetDate) {
   if (!date) return null
   const diff = date.getTime() - today.value.getTime()
   return Math.ceil(diff / (24 * 60 * 60 * 1000))
+}
+
+function formatDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return '-'
+  return `${startDate || '-'} 至 ${endDate || '-'}`
 }
 
 function formatDiffLabel(targetDate, overdueLabel = '已逾期', dueSoonLabel = '临近截止') {
@@ -496,7 +491,10 @@ async function reloadCurrent() {
   deptMap.value = map
   dashboard.value = dashboardRes.data || {}
   fieldPermissionResult.value = fieldPermissionsRes?.data || fieldPermissionsRes || null
-  projectPermissionContext.value = dashboard.value.permissionContext || {}
+  projectPermissionContext.value = {
+    ...(dashboard.value.permissionContext || {}),
+    ...(fieldPermissionResult.value?.permissionContext || {}),
+  }
   project.value = dashboard.value.project || {}
   tasks.value = dashboard.value.tasks || []
   tickets.value = dashboard.value.tickets || []
@@ -515,11 +513,13 @@ function goToProjectKnowledgeList() {
 }
 
 function goToProjectKnowledgeCreate() {
+  if (!canAddKnowledgeInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!project.value?.knowledgeCatalogId) return
   router.push({ path: '/content/aev', query: { catalogId: project.value.knowledgeCatalogId } })
 }
 
 function goToProjectKnowledgeTemplate(template) {
+  if (!canAddKnowledgeInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!project.value?.knowledgeCatalogId) return
   router.push({ path: '/content/aev', query: { catalogId: project.value.knowledgeCatalogId, template } })
 }
@@ -545,6 +545,7 @@ function handleSubmitClose() {
 }
 
 function handlePublishCloseReview() {
+  if (!canAddKnowledgeInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!projectId.value) return
   if (!project.value?.closeReview?.trim()) {
     return $sdk.msgWarning('请先完善项目复盘后再沉淀到知识中心')
@@ -595,7 +596,7 @@ function resetTabFilters() {
 
 function getValidTab(value) {
   const tab = String(value || 'overview')
-  if (isProjectVisitor.value && ['plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'closure'].includes(tab)) {
+  if (isProjectVisitor.value && ['focus', 'plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'closure'].includes(tab)) {
     return 'overview'
   }
   return validTabs.has(tab) ? tab : 'overview'
@@ -701,6 +702,7 @@ function handleOpenImpactedGroup(type) {
 }
 
 function handleConfirmPlanImpact(changeId) {
+  if (!canManagePlanInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!changeId) return
   ElMessageBox.prompt('请输入本次计划影响处理说明（选填）', '确认已处理', {
     confirmButtonText: '确认',
@@ -721,6 +723,7 @@ function handleConfirmPlanImpact(changeId) {
 }
 
 function handleConfirmPlanImpactScope(changeId, scope) {
+  if (!canManagePlanInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!changeId || !scope) return
   ElMessageBox.prompt('请输入本次分项处理说明（选填）', '确认分项已处理', {
     confirmButtonText: '确认',
@@ -741,6 +744,7 @@ function handleConfirmPlanImpactScope(changeId, scope) {
 }
 
 function handleConfirmPlanImpactTarget(changeId, scope, target) {
+  if (!canManagePlanInProject.value) return $sdk.msgWarning('当前操作没有权限')
   if (!changeId || !scope || !target?.id) return
   ElMessageBox.prompt('请输入本次对象处理说明（选填）', '确认对象已处理', {
     confirmButtonText: '确认',
@@ -785,7 +789,7 @@ function getProjectApprovalText(project) {
       <template #extra>
         <el-button @click="goToCockpit">进入驾驶舱</el-button>
         <el-button v-if="canEditCurrentProject" type="primary" @click="goToEdit">编辑项目</el-button>
-        <el-button type="warning" :disabled="!canSubmitCloseCurrentProject" @click="handleSubmitClose" v-if="project.status === '3'">提交结项申请</el-button>
+        <el-button v-if="canSubmitCloseCurrentProject && project.status === '3'" type="warning" @click="handleSubmitClose">提交结项申请</el-button>
       </template>
     </el-page-header>
 
@@ -843,20 +847,12 @@ function getProjectApprovalText(project) {
             <div class="project-meta-item__value">{{ project.creator?.nickname || project.creator?.name || '-' }}</div>
           </div>
           <div class="project-meta-item">
-            <span class="project-meta-item__label">开始时间</span>
-            <div class="project-meta-item__value">{{ project.startDate || '-' }}</div>
+            <span class="project-meta-item__label">计划周期</span>
+            <div class="project-meta-item__value">{{ formatDateRange(displayPlanStartDate, displayPlanEndDate) }}</div>
           </div>
           <div class="project-meta-item">
-            <span class="project-meta-item__label">结束时间</span>
-            <div class="project-meta-item__value">{{ project.endDate || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
-            <span class="project-meta-item__label">计划开始</span>
-            <div class="project-meta-item__value">{{ project.planStartDate || '-' }}</div>
-          </div>
-          <div class="project-meta-item">
-            <span class="project-meta-item__label">计划结束</span>
-            <div class="project-meta-item__value">{{ project.planEndDate || '-' }}</div>
+            <span class="project-meta-item__label">实际周期</span>
+            <div class="project-meta-item__value">{{ formatDateRange(displayActualStartDate, displayActualEndDate) }}</div>
           </div>
           <div class="project-meta-item">
             <span class="project-meta-item__label">业务线</span>
@@ -901,32 +897,32 @@ function getProjectApprovalText(project) {
     <el-tabs v-model="activeTab" class="mt20 project-tabs">
       <el-tab-pane label="概览" name="overview">
         <div class="metric-grid">
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('tasks', 'all')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('tasks', 'all')">
             <div class="metric-card__value">{{ taskSummary.total }}</div>
             <div class="metric-card__label">总任务数</div>
             <div class="metric-card__desc">已完成 {{ taskSummary.completed }}，逾期 {{ taskSummary.overdue }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('tickets', 'open')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('tickets', 'open')">
             <div class="metric-card__value">{{ ticketSummary.open }}</div>
             <div class="metric-card__label">打开缺陷</div>
             <div class="metric-card__desc">严重缺陷 {{ ticketSummary.critical }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('risks', 'active')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('risks', 'active')">
             <div class="metric-card__value">{{ riskSummary.active }}</div>
             <div class="metric-card__label">活跃风险</div>
             <div class="metric-card__desc">高风险 {{ riskSummary.high }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('changes', 'pending')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('changes', 'pending')">
             <div class="metric-card__value">{{ changeSummary.pendingApproval }}</div>
             <div class="metric-card__label">待审批变更</div>
             <div class="metric-card__desc">高影响 {{ changeSummary.highImpact }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('sprints', 'active')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('sprints', 'active')">
             <div class="metric-card__value">{{ sprintSummary.active }}</div>
             <div class="metric-card__label">当前 Sprint</div>
             <div class="metric-card__desc">总 Sprint {{ sprintSummary.total }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('milestones', 'delayed')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="handleMetricCardClick('milestones', 'delayed')">
             <div class="metric-card__value">{{ milestoneSummary.completionRate }}%</div>
             <div class="metric-card__label">里程碑达成率</div>
             <div class="metric-card__desc">延期 {{ milestoneSummary.delayed }}，临近 {{ milestoneSummary.dueSoon }}</div>
@@ -936,19 +932,19 @@ function getProjectApprovalText(project) {
             <div class="metric-card__label">项目知识</div>
             <div class="metric-card__desc">最近更新 {{ projectKnowledgeSummary.recentUpdatedCount || 0 }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('plan')">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('plan')">
             <div class="metric-card__value">{{ executionPlanProgress }}%</div>
             <div class="metric-card__label">执行计划覆盖率</div>
             <div class="metric-card__desc">已纳入 {{ executionPlanSummary.plannedTasks }} / 总任务 {{ taskSummary.total }}</div>
           </el-card>
-          <el-card shadow="hover" class="metric-card">
+          <el-card v-if="!isProjectVisitor" shadow="hover" class="metric-card">
             <div class="metric-card__value">{{ projectHealthSummary.totalScore || 0 }}</div>
             <div class="metric-card__label">项目健康度</div>
             <div class="metric-card__desc">
               <ViewTagField :text="projectHealthSummary.levelLabel || '基本健康'" :type="getHealthTagType(projectHealthSummary.level)" />
             </div>
           </el-card>
-          <el-card shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('closure')">
+          <el-card v-if="!isProjectVisitor && canViewGroup('projectClosure')" shadow="hover" class="metric-card metric-card--clickable" @click="goToTab('closure')">
             <div class="metric-card__value">{{ project.closeReview ? '已补齐' : '待完善' }}</div>
             <div class="metric-card__label">结项资料</div>
             <div class="metric-card__desc">验收说明、交付清单、遗留问题与项目复盘</div>
@@ -1035,7 +1031,7 @@ function getProjectApprovalText(project) {
           </el-card>
         </div>
 
-        <el-row v-if="hasOverviewCharts" :gutter="20" class="mt20">
+        <el-row v-if="!isProjectVisitor && hasOverviewCharts" :gutter="20" class="mt20">
           <el-col :xs="24" :lg="8">
             <el-card shadow="hover" class="panel-card chart-card">
               <template #header>任务状态分布</template>
@@ -1219,7 +1215,7 @@ function getProjectApprovalText(project) {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="交付焦点" name="focus">
+      <el-tab-pane v-if="!isProjectVisitor" label="交付焦点" name="focus">
         <div class="focus-board">
           <el-card shadow="hover" class="focus-card focus-card--alert">
             <template #header>
@@ -1354,10 +1350,10 @@ function getProjectApprovalText(project) {
               <div class="plan-impact-confirm-item__actions">
                 <ViewTagField :text="String(item.planImpactConfirmed || '0') === '1' ? '已确认处理' : '待确认处理'" :type="String(item.planImpactConfirmed || '0') === '1' ? 'success' : 'warning'" />
                 <el-button link type="primary" @click="goToDetail('/changeManage/form', item.id)">详情</el-button>
-                <el-button v-if="!item.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'milestone')">确认里程碑已处理</el-button>
-                <el-button v-if="!item.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'sprint')">确认 Sprint 已处理</el-button>
-                <el-button v-if="!item.planImpactScopes?.task?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'task')">确认任务已处理</el-button>
-                <el-button v-if="String(item.planImpactConfirmed || '0') !== '1'" :loading="confirmPlanImpactLoading" type="primary" @click="handleConfirmPlanImpact(item.id)">确认已处理</el-button>
+                <el-button v-if="canManagePlanInProject && !item.planImpactScopes?.milestone?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'milestone')">确认里程碑已处理</el-button>
+                <el-button v-if="canManagePlanInProject && !item.planImpactScopes?.sprint?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'sprint')">确认 Sprint 已处理</el-button>
+                <el-button v-if="canManagePlanInProject && !item.planImpactScopes?.task?.confirmed" :loading="confirmScopeLoading" @click="handleConfirmPlanImpactScope(item.id, 'task')">确认任务已处理</el-button>
+                <el-button v-if="canManagePlanInProject && String(item.planImpactConfirmed || '0') !== '1'" :loading="confirmPlanImpactLoading" type="primary" @click="handleConfirmPlanImpact(item.id)">确认已处理</el-button>
               </div>
             </div>
           </div>
@@ -1371,7 +1367,9 @@ function getProjectApprovalText(project) {
                   </div>
                   <div class="focus-list__meta">计划完成 {{ item.dueDate || '-' }}</div>
                   <div class="focus-list__actions">
-                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'milestone', item)">确认 {{ change.title }} 已处理</el-button>
+                    <template v-for="change in changeImpactSummary.actionableChanges" :key="change.id">
+                      <el-button v-if="canManagePlanInProject && !item.confirms?.some((confirm) => confirm.changeId === change.id)" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'milestone', item)">确认 {{ change.title }} 已处理</el-button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1387,7 +1385,9 @@ function getProjectApprovalText(project) {
                   </div>
                   <div class="focus-list__meta">{{ item.startDate || '-' }} 至 {{ item.endDate || '-' }}</div>
                   <div class="focus-list__actions">
-                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'sprint', item)">确认 {{ change.title }} 已处理</el-button>
+                    <template v-for="change in changeImpactSummary.actionableChanges" :key="change.id">
+                      <el-button v-if="canManagePlanInProject && !item.confirms?.some((confirm) => confirm.changeId === change.id)" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'sprint', item)">确认 {{ change.title }} 已处理</el-button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1403,7 +1403,9 @@ function getProjectApprovalText(project) {
                   </div>
                   <div class="focus-list__meta">截止 {{ item.endDate || '-' }}</div>
                   <div class="focus-list__actions">
-                    <el-button v-for="change in changeImpactSummary.actionableChanges.filter((change) => !item.confirms?.some((confirm) => confirm.changeId === change.id))" :key="change.id" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'task', item)">确认 {{ change.title }} 已处理</el-button>
+                    <template v-for="change in changeImpactSummary.actionableChanges" :key="change.id">
+                      <el-button v-if="canManagePlanInProject && !item.confirms?.some((confirm) => confirm.changeId === change.id)" link type="warning" :loading="confirmTargetLoading" @click="handleConfirmPlanImpactTarget(change.id, 'task', item)">确认 {{ change.title }} 已处理</el-button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1431,7 +1433,7 @@ function getProjectApprovalText(project) {
             <div class="plan-action-card__actions">
               <el-button v-if="canAddSprintInProject" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
               <el-button v-if="canAddTaskInProject" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
-              <el-button type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
+              <el-button v-if="canManagePlanInProject" type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
             </div>
           </div>
         </el-card>
@@ -1440,7 +1442,6 @@ function getProjectApprovalText(project) {
           <template #header>
             <div class="focus-card__header">
               <span>执行计划说明</span>
-              <el-button link type="primary" @click="goToProjectChange('2')">调整基线计划</el-button>
             </div>
           </template>
           <div class="plan-intro-card">
@@ -1648,7 +1649,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="缺陷" name="tickets">
+      <el-tab-pane v-if="!isProjectVisitor" label="缺陷" name="tickets">
         <div v-if="ticketFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { open: '未解决缺陷', critical: '严重缺陷', unassigned: '待分配缺陷' }[ticketFilter] || '缺陷' }}</span>
           <el-button link type="primary" @click="clearTabFilter('tickets')">查看全部</el-button>
@@ -1974,8 +1975,8 @@ function getProjectApprovalText(project) {
             <div class="knowledge-summary-card__actions">
               <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeList">查看全部</el-button>
               <el-button v-if="canAddKnowledgeInProject" type="primary" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeCreate">新增知识</el-button>
-              <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('implementationGuide')">实施模板</el-button>
-              <el-button v-if="!isProjectVisitor" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('faq')">FAQ 模板</el-button>
+              <el-button v-if="canAddKnowledgeInProject" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('implementationGuide')">实施模板</el-button>
+              <el-button v-if="canAddKnowledgeInProject" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('faq')">FAQ 模板</el-button>
             </div>
           </div>
         </el-card>
@@ -2018,17 +2019,16 @@ function getProjectApprovalText(project) {
         <el-card shadow="hover" class="mt16 panel-card plan-action-card">
           <div class="plan-action-card__header">
             <div>
-              <div class="plan-action-card__title">结项审批与沉淀动作</div>
-              <div class="plan-action-card__desc">在资料与佐证齐备后，从这里继续发起结项审批、维护执行凭证和沉淀知识。</div>
+              <div class="plan-action-card__title">结项资料与沉淀动作</div>
+              <div class="plan-action-card__desc">在这里维护结项资料、交付凭证和项目复盘沉淀，提交结项申请统一从页面顶部发起。</div>
             </div>
             <div class="plan-action-card__actions">
-              <el-button @click="goToProjectChange('6')">去完善结项资料</el-button>
-              <el-button @click="createProjectScopedRecord('/goLiveManage/form')">新增上线单</el-button>
-              <el-button @click="createProjectScopedRecord('/acceptanceManage/form')">新增验收单</el-button>
-              <el-button @click="createProjectScopedRecord('/handoverManage/form')">新增运维交接单</el-button>
-              <el-button :loading="publishReviewLoading" :disabled="!project.closeReview" @click="handlePublishCloseReview">沉淀到知识中心</el-button>
-              <el-button :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('review')">复盘模板</el-button>
-              <el-button v-if="canProjectSubmitClose && project.status === '3'" type="warning" @click="handleSubmitClose">提交结项审批</el-button>
+              <el-button v-if="canSubmitCloseCurrentProject" @click="goToProjectChange('6')">去完善结项资料</el-button>
+              <el-button v-if="canManageDeliveryInProject" @click="createProjectScopedRecord('/goLiveManage/form')">新增上线单</el-button>
+              <el-button v-if="canManageDeliveryInProject" @click="createProjectScopedRecord('/acceptanceManage/form')">新增验收单</el-button>
+              <el-button v-if="canManageDeliveryInProject" @click="createProjectScopedRecord('/handoverManage/form')">新增运维交接单</el-button>
+              <el-button v-if="canAddKnowledgeInProject" :loading="publishReviewLoading" :disabled="!project.closeReview" @click="handlePublishCloseReview">沉淀到知识中心</el-button>
+              <el-button v-if="canAddKnowledgeInProject" :disabled="!project.knowledgeCatalogId" @click="goToProjectKnowledgeTemplate('review')">复盘模板</el-button>
             </div>
           </div>
         </el-card>
