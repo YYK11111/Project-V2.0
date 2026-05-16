@@ -18,6 +18,7 @@ const traceLoading = ref(false)
 const traceError = ref('')
 const compensationSummary = ref<any>(null)
 const compensationLoading = ref(false)
+const compensationRunning = ref(false)
 const activePlatform = ref('system')
 const canList = computed(() => checkPermi(['system/externalNotifyLogs/list']))
 const canRunCompensation = computed(() => checkPermi(['system/scheduledJobs/run']))
@@ -100,8 +101,14 @@ async function loadCompensationStatus() {
 }
 
 async function handleRunCompensation() {
-  await runFeishuPendingDeliveryCompensation()
-  ElMessage.success('补偿任务已提交')
+  compensationRunning.value = true
+  try {
+    const result = await runFeishuPendingDeliveryCompensation()
+    const processedCount = result?.processedCount ?? result?.data?.processedCount ?? 0
+    ElMessage.success(`补偿已执行，处理 ${processedCount} 条`)
+  } finally {
+    compensationRunning.value = false
+  }
   await loadCompensationStatus()
 }
 
@@ -130,7 +137,7 @@ onMounted(() => {
             <span>最近失败原因</span>
             <strong>{{ compensationSummary?.latestFailedLog?.errorMessage || '-' }}</strong>
           </div>
-          <el-button v-if="canRunCompensation" type="primary" plain @click="handleRunCompensation">手动补偿</el-button>
+          <el-button v-if="canRunCompensation" :loading="compensationRunning" type="primary" plain @click="handleRunCompensation">手动补偿</el-button>
         </div>
       </div>
 

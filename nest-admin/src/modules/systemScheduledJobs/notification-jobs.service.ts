@@ -13,7 +13,7 @@ export class NotificationScheduledJobsService {
   ) {}
 
   @Cron("0 */5 * * * *")
-  async retryPendingDelivery() {
+  async retryPendingDelivery(force = false) {
     if (
       !(await this.systemScheduledJobsService.isJobEnabled(
         "notifications.retryPendingDelivery",
@@ -24,7 +24,7 @@ export class NotificationScheduledJobsService {
     await this.systemScheduledJobsService.runJob(
       "notifications.retryPendingDelivery",
       "scheduled",
-      () => this.runRetryPendingDelivery(),
+      () => this.runRetryPendingDelivery(force),
     );
   }
 
@@ -60,9 +60,10 @@ export class NotificationScheduledJobsService {
     );
   }
 
-  runRetryPendingDelivery() {
+  runRetryPendingDelivery(force = false) {
     return this.externalNotifyService.retryPendingWorkflowTodoCardStatuses({
       limit: 100,
+      force,
     });
   }
 

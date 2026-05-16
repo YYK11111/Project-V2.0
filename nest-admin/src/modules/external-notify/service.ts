@@ -207,18 +207,21 @@ export class ExternalNotifyService {
     } as any);
   }
 
-  async retryPendingWorkflowTodoCardStatuses(options: { limit?: number } = {}) {
+  async retryPendingWorkflowTodoCardStatuses(options: { limit?: number; force?: boolean } = {}) {
     const limit = Math.min(Math.max(Number(options.limit || 50), 1), 200);
     const now = new Date().toISOString();
+    const pendingWhere: Record<string, any> = {
+      platform: "feishu",
+      operationType: "update_card_status",
+      templateKey: "workflowTodoStatus",
+      sendStatus: ExternalMessageSendStatus.pending,
+      isDelete: null as any,
+    };
+    if (!options.force) {
+      pendingWhere.nextRetryTime = LessThan(now);
+    }
     const pendingLogs = await this.logRepository.find({
-      where: {
-        platform: "feishu",
-        operationType: "update_card_status",
-        templateKey: "workflowTodoStatus",
-        sendStatus: ExternalMessageSendStatus.pending,
-        nextRetryTime: LessThan(now),
-        isDelete: null as any,
-      } as any,
+      where: pendingWhere as any,
       order: { createTime: "ASC" as any },
       take: limit,
     });

@@ -967,4 +967,57 @@ describe("ExternalNotifyService", () => {
       }),
     });
   });
+
+  it("手动补偿时应忽略nextRetryTime立即处理待补偿日志", async () => {
+    const { service, logRepository, feishuProvider } = createService();
+    logRepository.find
+      .mockResolvedValueOnce([
+        {
+          id: "retry-1",
+          notificationId: "ntf_1",
+          messageId: "msg-1",
+          receiverId: "u1",
+          requestPayload: {
+            title: "待办审批：项目立项",
+            content: "您有一个新的审批任务待处理。",
+            status: "approved",
+            statusText: "已同意",
+            linkUrl: "/projectManage/approval",
+            linkParams: { id: "19", taskId: "task-1" },
+          },
+          retryCount: 0,
+          nextRetryTime: "2999-01-01T00:00:00.000Z",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          notificationId: "ntf_1",
+          messageId: "msg-1",
+          responsePayload: { data: { message_id: "om_1" } },
+        },
+      ]);
+
+    const result = await service.retryPendingWorkflowTodoCardStatuses({
+      limit: 10,
+      force: true,
+    });
+
+    expect(feishuProvider.updateWorkflowTodoCard).toHaveBeenCalledWith(
+      "om_1",
+      expect.objectContaining({
+        messageId: "msg-1",
+      }),
+      expect.objectContaining({ status: "approved", statusText: "已同意" }),
+      expect.any(Object),
+    );
+    expect(logRepository.update).toHaveBeenCalledWith(
+      "retry-1",
+      expect.objectContaining({
+        sendStatus: ExternalMessageSendStatus.succeeded,
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ processedCount: 1, successCount: 1 }),
+    );
+  });
 });
