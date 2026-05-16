@@ -1242,6 +1242,7 @@ export class AuthGuard implements CanActivate {
       ["GET", "system/users/options"],
       ["GET", "system/dept/options"],
       ["GET", "system/dept/getTrees"],
+      ["POST", "system/common/upload"],
       ["GET", "business/projects/list"],
     ].some(([m, path]) => m === method && path === api);
   }

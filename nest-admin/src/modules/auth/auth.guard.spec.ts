@@ -660,6 +660,33 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("登录后通用文件上传不要求菜单权限", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/system/common/upload",
+      method: "POST",
+      body: {},
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_yyk",
+      name: "yyk",
+      roles: [{ permissionKey: "user" }],
+    });
+    rolesService.getUserMenus.mockResolvedValue([]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("缺少用户管理列表权限时拒绝访问系统用户列表", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,
