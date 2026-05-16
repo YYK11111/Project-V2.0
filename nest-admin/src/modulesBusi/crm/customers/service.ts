@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository, SelectQueryBuilder } from "typeorm";
+import { In, Is, Not, Repository, SelectQueryBuilder } from "typeorm";
 import { Customer } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
@@ -14,7 +14,10 @@ import { User } from "src/modules/users/entities/user.entity";
 import {
   CustomerViewer,
   CustomerViewerSourceType,
+  CustomerViewerGrantType,
+  CustomerViewerStatus,
 } from "./entities/customer-viewer.entity";
+import { MessagesService } from "src/modules/messages/service";
 import { WorkflowHistory } from "src/modulesBusi/workflow/entity/workflow-history.entity";
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
 import { BusinessApprovalContextService } from "src/modulesBusi/approval-contexts/service";
@@ -26,6 +29,8 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     @InjectRepository(CustomerViewer)
     private readonly viewerRepository: Repository<CustomerViewer>,
     private readonly businessApprovalContextService?: BusinessApprovalContextService,
+    @Optional()
+    private readonly messagesService?: MessagesService,
   ) {
     super(Customer, repository);
   }
@@ -72,6 +77,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       where: {
         userId: In(operatorKeys),
         isDelete: null as any,
+        status: CustomerViewerStatus.enabled,
       } as any,
       select: ["customerId"] as any,
     });
@@ -80,14 +86,16 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         operatorId,
         "customer",
       )) || [];
-    return Array.from(
+    const activeViewers = viewers.filter((v) => this.isViewerActive(v));
+    const visibleCustomerIds = Array.from(
       new Set(
         [
-          ...viewers.map((item) => String(item.customerId)),
+          ...activeViewers.map((item) => String(item.customerId)),
           ...approvalVisibleCustomerIds,
         ].filter(Boolean),
       ),
     );
+    return visibleCustomerIds;
   }
 
   async applyCustomerVisibility(
@@ -221,10 +229,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         customerId,
         userId: In(this.getOperatorKeys(operatorId, operatorName)),
         isDelete: null as any,
+        status: CustomerViewerStatus.enabled as any,
       } as any,
-      select: ["id"] as any,
+      select: ["id", "grantType", "startTime", "endTime", "status"] as any,
     });
-    if (!viewer) {
+    if (viewer && !this.isViewerActive(viewer)) {
       const hasApprovalAccess =
         await this.businessApprovalContextService?.hasBusinessParticipantAccess(
           operatorId,
@@ -232,8 +241,8 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
           customerId,
         );
       if (hasApprovalAccess) return;
+      throw new ForbiddenException("当前无查看该客户的权限");
     }
-    if (!viewer) throw new ForbiddenException("当前无查看该客户的权限");
   }
 
   async assertCustomerWritable(
@@ -413,6 +422,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     operatorId?: string,
     operatorName?: string,
     permissions: string[] = [],
+    options?: { reason?: string },
   ) {
     await this.assertCustomerWritable(
       customerId,
@@ -429,7 +439,53 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       { isDelete: "1" as any, updateUser: operatorId } as any,
     );
-    return { success: true };
+    return { success: true, reason: options?.reason };
+  }
+
+  async updateViewerStatus(
+    customerId: string,
+    viewerIds: string[],
+    status: CustomerViewerStatus,
+    operatorId?: string,
+  ) {
+    if (!viewerIds.length) return { success: true, count: 0 };
+    const result = await this.viewerRepository.update(
+      {
+        id: In(viewerIds),
+        customerId,
+        isDelete: null as any,
+      } as any,
+      { status, updateUser: operatorId } as any,
+    );
+    return { success: true, count: result.affected || 0 };
+  }
+
+  async getExpiringViewers(daysAhead: number = 7) {
+    const now = new Date();
+    const futureDate = new Date(
+      now.getTime() + daysAhead * 24 * 60 * 60 * 1000,
+    );
+    return this.viewerRepository.find({
+      where: {
+        status: CustomerViewerStatus.enabled,
+        grantType: CustomerViewerGrantType.temporary,
+        endTime: Not(Is(null)),
+        isDelete: null as any,
+      } as any,
+    });
+  }
+
+  async expireViewers(viewerIds: string[]) {
+    if (!viewerIds.length) return { success: true, count: 0 };
+    const result = await this.viewerRepository.update(
+      {
+        id: In(viewerIds),
+        status: CustomerViewerStatus.enabled,
+        isDelete: null as any,
+      } as any,
+      { status: CustomerViewerStatus.disabled, updateUser: "system" } as any,
+    );
+    return { success: true, count: result.affected || 0 };
   }
 
   async getCustomerAuthUsers(
@@ -509,5 +565,14 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return this.getOperatorKeys(operatorId, operatorName).includes(
       String(customer.createUser || ""),
     );
+  }
+
+  private isViewerActive(viewer: CustomerViewer): boolean {
+    if (viewer.status !== CustomerViewerStatus.enabled) return false;
+    if (viewer.grantType === CustomerViewerGrantType.permanent) return true;
+    const now = new Date();
+    if (viewer.startTime && new Date(viewer.startTime) > now) return false;
+    if (viewer.endTime && new Date(viewer.endTime) < now) return false;
+    return true;
   }
 }
