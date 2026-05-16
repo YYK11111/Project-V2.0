@@ -24,7 +24,7 @@ import { BaseController } from "src/common/BaseController";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
 @Controller("business/crm/customers")
-class GrantCustomerViewAccessDto {
+export class GrantCustomerViewAccessDto {
   customerId: string;
   userIds: string[];
   permissions?: string[];
@@ -35,13 +35,13 @@ class GrantCustomerViewAccessDto {
   grantReason?: string;
 }
 
-class RevokeCustomerViewAccessDto {
+export class RevokeCustomerViewAccessDto {
   customerId: string;
   userId: string;
   reason?: string;
 }
 
-class UpdateViewerStatusDto {
+export class UpdateViewerStatusDto {
   customerId: string;
   viewerIds: string[];
   status: CustomerViewerStatus;
@@ -193,7 +193,7 @@ export class CustomersController extends BaseController<
   ) {
     const operatorId = req?.user?.id || "system";
     const operatorName = req?.user?.name || "system";
-    return this.customerService.revokeCustomerViewAccess(
+    return this.service.revokeCustomerViewAccess(
       dto.customerId,
       dto.userId,
       operatorId,
@@ -209,7 +209,7 @@ export class CustomersController extends BaseController<
     @Req() req: any,
   ) {
     const operatorId = req?.user?.id || "system";
-    return this.customerService.updateViewerStatus(
+    return this.service.updateViewerStatus(
       dto.customerId,
       dto.viewerIds,
       dto.status,
