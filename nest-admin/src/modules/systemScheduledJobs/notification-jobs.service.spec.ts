@@ -4,7 +4,11 @@ describe("NotificationScheduledJobsService", () => {
   function createService() {
     const systemScheduledJobsService = {
       isJobEnabled: jest.fn().mockResolvedValue(true),
-      runJob: jest.fn().mockImplementation(async (_jobKey, _triggerMode, handler) => handler()),
+      runJob: jest
+        .fn()
+        .mockImplementation(async (_jobKey, _triggerMode, handler) =>
+          handler(),
+        ),
     };
     const externalNotifyService = {
       retryPendingWorkflowTodoCardStatuses: jest.fn().mockResolvedValue({
@@ -33,7 +37,9 @@ describe("NotificationScheduledJobsService", () => {
 
     const result = await service.runRetryPendingDelivery(true);
 
-    expect(externalNotifyService.retryPendingWorkflowTodoCardStatuses).toHaveBeenCalledWith({
+    expect(
+      externalNotifyService.retryPendingWorkflowTodoCardStatuses,
+    ).toHaveBeenCalledWith({
       limit: 100,
       force: true,
     });
@@ -49,7 +55,9 @@ describe("NotificationScheduledJobsService", () => {
 
     await service.runRetryPendingDelivery();
 
-    expect(externalNotifyService.retryPendingWorkflowTodoCardStatuses).toHaveBeenCalledWith({
+    expect(
+      externalNotifyService.retryPendingWorkflowTodoCardStatuses,
+    ).toHaveBeenCalledWith({
       limit: 100,
       force: false,
     });

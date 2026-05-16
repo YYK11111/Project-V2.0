@@ -7,7 +7,11 @@ describe("SystemScheduledJobsController", () => {
       listLogs: jest.fn(),
       getLogDetail: jest.fn(),
       setJobEnabled: jest.fn(),
-      runJob: jest.fn().mockImplementation(async (_jobKey, _triggerMode, handler) => handler()),
+      runJob: jest
+        .fn()
+        .mockImplementation(async (_jobKey, _triggerMode, handler) =>
+          handler(),
+        ),
     };
     const tasksService = {
       scanDueSoonTaskReminders: jest.fn(),
@@ -52,6 +56,8 @@ describe("SystemScheduledJobsController", () => {
         failedCount: 0,
       }),
     );
-    expect(notificationScheduledJobsService.runRetryPendingDelivery).toHaveBeenCalledWith(true);
+    expect(
+      notificationScheduledJobsService.runRetryPendingDelivery,
+    ).toHaveBeenCalledWith(true);
   });
 });

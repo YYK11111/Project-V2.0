@@ -19,6 +19,7 @@ const traceError = ref('')
 const compensationSummary = ref<any>(null)
 const compensationLoading = ref(false)
 const compensationRunning = ref(false)
+const compensationLastRun = ref<any>(null)
 const activePlatform = ref('system')
 const canList = computed(() => checkPermi(['system/externalNotifyLogs/list']))
 const canRunCompensation = computed(() => checkPermi(['system/scheduledJobs/run']))
@@ -104,6 +105,7 @@ async function handleRunCompensation() {
   compensationRunning.value = true
   try {
     const result = await runFeishuPendingDeliveryCompensation()
+    compensationLastRun.value = result?.data || result || null
     const processedCount = result?.processedCount ?? result?.data?.processedCount ?? 0
     ElMessage.success(`补偿已执行，处理 ${processedCount} 条`)
   } finally {
@@ -138,6 +140,28 @@ onMounted(() => {
             <strong>{{ compensationSummary?.latestFailedLog?.errorMessage || '-' }}</strong>
           </div>
           <el-button v-if="canRunCompensation" :loading="compensationRunning" type="primary" plain @click="handleRunCompensation">手动补偿</el-button>
+        </div>
+        <div v-if="compensationLastRun" class="external-notify-summary__result">
+          <div class="external-notify-summary__item">
+            <span>本次处理数量</span>
+            <strong>{{ compensationLastRun.processedCount ?? 0 }}</strong>
+          </div>
+          <div class="external-notify-summary__item">
+            <span>成功数量</span>
+            <strong>{{ compensationLastRun.successCount ?? 0 }}</strong>
+          </div>
+          <div class="external-notify-summary__item">
+            <span>失败数量</span>
+            <strong>{{ compensationLastRun.failedCount ?? 0 }}</strong>
+          </div>
+          <div class="external-notify-summary__item">
+            <span>跳过数量</span>
+            <strong>{{ compensationLastRun.skippedCount ?? 0 }}</strong>
+          </div>
+          <div class="external-notify-summary__item external-notify-summary__item--full">
+            <span>最近一次运行结果</span>
+            <strong>{{ compensationLastRun.summary || '-' }}</strong>
+          </div>
         </div>
       </div>
 
@@ -266,10 +290,21 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.external-notify-summary__result {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .external-notify-summary__item {
   display: grid;
   gap: 4px;
   min-width: 180px;
+}
+
+.external-notify-summary__item--full {
+  grid-column: 1 / -1;
 }
 
 .external-notify-summary__item span {
@@ -316,5 +351,11 @@ pre {
   background: var(--el-fill-color-extra-light);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .external-notify-summary__result {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

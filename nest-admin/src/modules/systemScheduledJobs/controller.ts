@@ -100,7 +100,9 @@ export class SystemScheduledJobsController {
       },
       "notifications.retryPendingDelivery": async () => {
         const result =
-          await this.notificationScheduledJobsService.runRetryPendingDelivery(true);
+          await this.notificationScheduledJobsService.runRetryPendingDelivery(
+            true,
+          );
         return {
           ...result,
           summary: `补偿 ${Number(result?.processedCount || 0)} 条通知投递`,
