@@ -1,8 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThanOrEqual, MoreThan } from "typeorm";
-import { CustomerViewer, CustomerViewerStatus, CustomerViewerGrantType } from "./entities/customer-viewer.entity";
+import { Between, In, Repository, LessThanOrEqual } from "typeorm";
+import {
+  CustomerViewer,
+  CustomerViewerStatus,
+  CustomerViewerGrantType,
+} from "./entities/customer-viewer.entity";
 import { Customer } from "./entity";
 
 @Injectable()
@@ -28,22 +32,26 @@ export class CustomerViewerTimeoutService {
 
     if (!expiredViewers.length) return;
 
-    const expiredIds = expiredViewers.map(v => v.id);
+    const expiredIds = expiredViewers.map((v) => v.id);
     await this.viewerRepository.update(
-      { id: LessThanOrEqual(expiredIds.map(id => id)) as any } as any,
-      { status: CustomerViewerStatus.disabled as any, updateUser: "system" } as any,
+      { id: In(expiredIds) as any } as any,
+      {
+        status: CustomerViewerStatus.disabled as any,
+        updateUser: "system",
+      } as any,
     );
   }
 
   async getExpiringViewers(daysAhead: number = 7) {
     const now = new Date();
-    const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    const futureDate = new Date(
+      now.getTime() + daysAhead * 24 * 60 * 60 * 1000,
+    );
     return this.viewerRepository.find({
       where: {
         status: CustomerViewerStatus.enabled as any,
         grantType: CustomerViewerGrantType.temporary as any,
-        endTime: LessThanOrEqual(futureDate) as any,
-        endTime: MoreThan(now) as any,
+        endTime: Between(now, futureDate) as any,
         isDelete: null as any,
       } as any,
       relations: ["customer"],

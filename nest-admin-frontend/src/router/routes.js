@@ -253,6 +253,19 @@ export const constantRoutes = [
     ],
   },
   {
+    path: '/crm/customerManage/auth/:customerId',
+    component: Layout,
+    isHidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/business/crm/customerManage/auth.vue'),
+        name: 'CustomerViewerAuth',
+        meta: { title: '授权查看' },
+      },
+    ],
+  },
+  {
     path: '/404',
     component: () => import('@/views/system/error/404'),
     isHidden: true,

@@ -5,14 +5,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import {
-  In,
-  LessThanOrEqual,
-  MoreThan,
-  Not,
-  Repository,
-  SelectQueryBuilder,
-} from "typeorm";
+import { In, Between, Repository, SelectQueryBuilder } from "typeorm";
 import { Customer } from "./entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
@@ -25,8 +18,14 @@ import {
   CustomerViewerGrantType,
   CustomerViewerStatus,
 } from "./entities/customer-viewer.entity";
+import {
+  CustomerViewerRecord,
+  CustomerViewerRecordActionType,
+} from "./entities/customer-viewer-record.entity";
 import { MessagesService } from "src/modules/messages/service";
 import { WorkflowHistory } from "src/modulesBusi/workflow/entity/workflow-history.entity";
+import { WorkflowInstance } from "src/modulesBusi/workflow/entity/workflow-instance.entity";
+import { InstanceStatus } from "src/modulesBusi/workflow/interface/node-type.enum";
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
 import { BusinessApprovalContextService } from "src/modulesBusi/approval-contexts/service";
 
@@ -39,6 +38,9 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     private readonly businessApprovalContextService?: BusinessApprovalContextService,
     @Optional()
     private readonly messagesService?: MessagesService,
+    @Optional()
+    @InjectRepository(CustomerViewerRecord)
+    private readonly viewerRecordRepository?: Repository<CustomerViewerRecord>,
   ) {
     super(Customer, repository);
   }
@@ -73,13 +75,22 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return hasModuleFullAccess(permissions, "business/crm/customers/update");
   }
 
-  async getVisibleCustomerIds(
+  private isViewerEditable(viewer: CustomerViewer) {
+    return this.isViewerActive(viewer) && String(viewer.canEdit || "") === "1";
+  }
+
+  private async getCustomerVisibilityInfo(
     operatorId: string,
     operatorName?: string,
     permissions: string[] = [],
   ) {
-    if (!operatorId) return [];
-    if (this.canViewAllCustomers(permissions)) return null;
+    if (!operatorId) {
+      return {
+        visibleCustomerIds: [],
+        editableCustomerIds: [],
+      };
+    }
+
     const operatorKeys = this.getOperatorKeys(operatorId, operatorName);
     const viewers = await this.viewerRepository.find({
       where: {
@@ -87,23 +98,61 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         isDelete: null as any,
         status: CustomerViewerStatus.enabled,
       } as any,
-      select: ["customerId"] as any,
+      select: [
+        "customerId",
+        "canEdit",
+        "grantType",
+        "startTime",
+        "endTime",
+        "status",
+      ] as any,
     });
-    const approvalVisibleCustomerIds =
-      (await this.businessApprovalContextService?.findVisibleBusinessIdsForUser(
-        operatorId,
-        "customer",
-      )) || [];
-    const activeViewers = viewers.filter((v) => this.isViewerActive(v));
-    const visibleCustomerIds = Array.from(
+    const approvalVisibleCustomerIds = this.canViewAllCustomers(permissions)
+      ? []
+      : (await this.businessApprovalContextService?.findVisibleBusinessIdsForUser(
+          operatorId,
+          "customer",
+        )) || [];
+    const activeViewers = viewers.filter((viewer) =>
+      this.isViewerActive(viewer),
+    );
+    const visibleCustomerIds = this.canViewAllCustomers(permissions)
+      ? null
+      : Array.from(
+          new Set(
+            [
+              ...activeViewers.map((item) => String(item.customerId)),
+              ...approvalVisibleCustomerIds,
+            ].filter(Boolean),
+          ),
+        );
+    const editableCustomerIds = Array.from(
       new Set(
-        [
-          ...activeViewers.map((item) => String(item.customerId)),
-          ...approvalVisibleCustomerIds,
-        ].filter(Boolean),
+        activeViewers
+          .filter((viewer) => String(viewer.canEdit || "") === "1")
+          .map((viewer) => String(viewer.customerId))
+          .filter(Boolean),
       ),
     );
-    return visibleCustomerIds;
+
+    return {
+      visibleCustomerIds,
+      editableCustomerIds,
+    };
+  }
+
+  async getVisibleCustomerIds(
+    operatorId: string,
+    operatorName?: string,
+    permissions: string[] = [],
+  ) {
+    return (
+      await this.getCustomerVisibilityInfo(
+        operatorId,
+        operatorName,
+        permissions,
+      )
+    ).visibleCustomerIds;
   }
 
   async applyCustomerVisibility(
@@ -111,13 +160,20 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     operatorId?: string,
     operatorName?: string,
     permissions: string[] = [],
+    visibilityInfo?: {
+      visibleCustomerIds: string[] | null;
+      editableCustomerIds: string[];
+    },
   ) {
     if (!operatorId || this.canViewAllCustomers(permissions)) return;
-    const visibleCustomerIds = await this.getVisibleCustomerIds(
-      String(operatorId),
-      operatorName,
-      permissions,
-    );
+    const info =
+      visibilityInfo ||
+      (await this.getCustomerVisibilityInfo(
+        String(operatorId),
+        operatorName,
+        permissions,
+      ));
+    const visibleCustomerIds = info.visibleCustomerIds;
     if (!visibleCustomerIds?.length) {
       queryBuilder.andWhere("customer.createUser IN (:...creatorKeys)", {
         creatorKeys: this.getOperatorKeys(operatorId, operatorName),
@@ -147,6 +203,12 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       _operatorPermissions,
     } = query as any;
 
+    const visibilityInfo = await this.getCustomerVisibilityInfo(
+      _operatorId,
+      _operatorName,
+      Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+    );
+
     const queryBuilder = this.repository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.sales", "sales")
@@ -175,6 +237,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       _operatorId,
       _operatorName,
       Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+      visibilityInfo,
     );
 
     const pageNum = Number(query.pageNum || 1);
@@ -184,6 +247,20 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       .skip((pageNum - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
+
+    const editableCustomerIds = new Set(
+      visibilityInfo.editableCustomerIds || [],
+    );
+    for (const customer of list as any[]) {
+      customer.permissionContext = {
+        canEdit:
+          this.canManageAllCustomers(
+            Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+          ) ||
+          this.isCustomerCreator(customer, _operatorId, _operatorName) ||
+          editableCustomerIds.has(String(customer.id)),
+      };
+    }
 
     return { list, total } as any;
   }
@@ -248,7 +325,8 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
           "customer",
           customerId,
         );
-      if (!hasApprovalAccess) throw new ForbiddenException("当前无查看该客户的权限");
+      if (!hasApprovalAccess)
+        throw new ForbiddenException("当前无查看该客户的权限");
     }
   }
 
@@ -264,8 +342,29 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       select: ["id", "createUser"] as any,
     });
     if (!customer) throw new NotFoundException("客户不存在");
-    if (!this.isCustomerCreator(customer, operatorId, operatorName)) {
-      throw new ForbiddenException("当前无编辑该客户的权限");
+    if (
+      !this.isCustomerCreator(customer, operatorId, operatorName) &&
+      !this.canManageAllCustomers(permissions)
+    ) {
+      const viewer = await this.viewerRepository.findOne({
+        where: {
+          customerId,
+          userId: In(this.getOperatorKeys(operatorId, operatorName)),
+          isDelete: null as any,
+          status: CustomerViewerStatus.enabled as any,
+        } as any,
+        select: [
+          "id",
+          "canEdit",
+          "grantType",
+          "startTime",
+          "endTime",
+          "status",
+        ] as any,
+      });
+      if (!viewer || !this.isViewerEditable(viewer)) {
+        throw new ForbiddenException("当前无编辑该客户的权限");
+      }
     }
   }
 
@@ -344,17 +443,125 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       isError,
     );
     if (!customer) return customer;
+    const reconciledCustomer =
+      await this.reconcileCustomerApprovalStatus(customer);
     await this.assertCustomerReadable(
-      customer.id,
+      reconciledCustomer.id,
+      query?._operatorId,
+      query?._operatorName,
+      query?._operatorPermissions || [],
+    );
+    const permissionContext = await this.buildCustomerPermissionContext(
+      reconciledCustomer,
       query?._operatorId,
       query?._operatorName,
       query?._operatorPermissions || [],
     );
 
     return {
-      ...customer,
-      sales: this.mapUserSummary(customer.sales),
+      ...reconciledCustomer,
+      sales: this.mapUserSummary(reconciledCustomer.sales),
+      permissionContext,
     };
+  }
+
+  private async reconcileCustomerApprovalStatus(customer: Customer) {
+    if (
+      String(customer.approvalStatus || "") !== "1" ||
+      !customer.workflowInstanceId
+    ) {
+      return customer;
+    }
+
+    const instanceRepository =
+      this.repository.manager.getRepository(WorkflowInstance);
+    const instance = await instanceRepository.findOne({
+      where: { id: customer.workflowInstanceId } as any,
+      select: ["id", "status", "endTime"] as any,
+    });
+    if (!instance || instance.status === InstanceStatus.RUNNING) {
+      return customer;
+    }
+
+    const historyRepository =
+      this.repository.manager.getRepository(WorkflowHistory);
+    const endHistory = await historyRepository.findOne({
+      where: {
+        instanceId: customer.workflowInstanceId,
+        nodeName: "结束",
+        action: "execute",
+        isDelete: null as any,
+      } as any,
+      select: ["id"] as any,
+    });
+    const isCompleted =
+      instance.status === InstanceStatus.COMPLETED || !!endHistory?.id;
+    const nextState = isCompleted
+      ? {
+          status: "2",
+          approvalStatus: "2",
+          currentNodeName: "客户审批已通过，转为意向客户",
+        }
+      : {
+          status: "4",
+          approvalStatus: "3",
+          currentNodeName: "客户审批已驳回，实例已结束",
+        };
+    await this.repository.update(customer.id, nextState as any);
+    Object.assign(customer, nextState);
+    return customer;
+  }
+
+  private async buildCustomerPermissionContext(
+    customer: Pick<Customer, "id" | "createUser">,
+    operatorId?: string,
+    operatorName?: string,
+    permissions: string[] = [],
+    visibilityInfo?: {
+      visibleCustomerIds: string[] | null;
+      editableCustomerIds: string[];
+    },
+  ) {
+    const canManageAll = this.canManageAllCustomers(permissions);
+    const canEditByCreator = this.isCustomerCreator(
+      customer,
+      operatorId,
+      operatorName,
+    );
+    if (canManageAll || canEditByCreator) {
+      return { canEdit: true };
+    }
+
+    if (!operatorId) {
+      return { canEdit: false };
+    }
+
+    if (visibilityInfo) {
+      return {
+        canEdit:
+          !canManageAll &&
+          visibilityInfo.editableCustomerIds.includes(String(customer.id)),
+      };
+    }
+
+    const viewer = await this.viewerRepository.findOne({
+      where: {
+        customerId: String(customer.id),
+        userId: In(this.getOperatorKeys(operatorId, operatorName)),
+        isDelete: null as any,
+        status: CustomerViewerStatus.enabled as any,
+      } as any,
+      select: [
+        "id",
+        "canEdit",
+        "grantType",
+        "startTime",
+        "endTime",
+        "status",
+      ] as any,
+    });
+    const canEdit = !!viewer && this.isViewerEditable(viewer);
+    return { canEdit };
   }
 
   private async ensureViewer(
@@ -365,10 +572,10 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     grantType?: CustomerViewerGrantType,
     startTime?: Date,
     endTime?: Date,
-    canEdit?: boolean,
+    canEdit?: string,
     grantReason?: string,
-  ) {
-    if (!customerId || !userId) return;
+  ): Promise<CustomerViewer | undefined> {
+    if (!customerId || !userId) return undefined;
     const exists = await this.viewerRepository.findOne({
       where: {
         customerId: String(customerId),
@@ -378,8 +585,38 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       select: ["id"] as any,
     });
-    if (exists) return;
-    await this.viewerRepository.save(
+    if (exists?.id) {
+      await this.viewerRepository.update(
+        { id: exists.id } as any,
+        {
+          grantType: grantType || CustomerViewerGrantType.permanent,
+          startTime,
+          endTime,
+          canEdit: canEdit === "1" ? "1" : "0",
+          grantReason,
+          grantUserId: this.getNullableUserId(operatorId),
+          revokeUserId: null,
+          revokeTime: null,
+          revokeReason: null,
+          status: CustomerViewerStatus.enabled,
+          updateUser: operatorId || "system",
+        } as any,
+      );
+      return new CustomerViewer({
+        id: exists.id,
+        customerId: String(customerId),
+        userId: String(userId),
+        sourceType,
+        grantType: grantType || CustomerViewerGrantType.permanent,
+        startTime,
+        endTime,
+        canEdit: canEdit === "1" ? "1" : "0",
+        grantReason,
+        grantUserId: this.getNullableUserId(operatorId),
+        status: CustomerViewerStatus.enabled,
+      });
+    }
+    return this.viewerRepository.save(
       new CustomerViewer({
         customerId: String(customerId),
         userId: String(userId),
@@ -389,11 +626,171 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
         endTime,
         canEdit: canEdit === "1" ? "1" : "0",
         grantReason,
-        grantUserId: operatorId || "system",
+        grantUserId: this.getNullableUserId(operatorId),
         createUser: operatorId || "system",
         updateUser: operatorId || "system",
       }),
     );
+  }
+
+  private createViewerBatchNo(actionType: string) {
+    return `customer-viewer-${actionType}-${Date.now()}-${Math.round(
+      Math.random() * 1e9,
+    )}`;
+  }
+
+  private async saveViewerRecords(records: CustomerViewerRecord[]) {
+    if (!records.length || !this.viewerRecordRepository) return;
+    await this.viewerRecordRepository.save(records);
+  }
+
+  private getUserRepository(): Repository<User> {
+    return this.repository.manager.getRepository(User);
+  }
+
+  async allocatedViewerList(
+    customerId: string,
+    query: { pageNum?: number; pageSize?: number },
+    operator: { id?: string; name?: string; permissions?: string[] } = {},
+  ) {
+    await this.assertCustomerReadable(
+      customerId,
+      operator.id,
+      operator.name,
+      operator.permissions || [],
+    );
+    const pageNum = Number(query.pageNum || 1);
+    const pageSize = Number(query.pageSize || 10);
+    const [viewers, total] = await (this.viewerRepository as any).findAndCount({
+      where: {
+        customerId,
+        sourceType: CustomerViewerSourceType.manual,
+        status: CustomerViewerStatus.enabled,
+        isDelete: null as any,
+      } as any,
+      order: { createTime: "DESC" } as any,
+      skip: (pageNum - 1) * pageSize,
+      take: pageSize,
+    });
+    const userIds = viewers.map((viewer) => String(viewer.userId));
+    const users = userIds.length
+      ? await this.getUserRepository().find({
+          where: { id: In(userIds), isDelete: null as any } as any,
+          relations: ["dept"],
+        })
+      : [];
+    const userMap = new Map(users.map((user) => [String(user.id), user]));
+    const list = viewers.map((viewer) => {
+      const user = userMap.get(String(viewer.userId)) as any;
+      return {
+        ...(user || {}),
+        id: viewer.userId,
+        viewerId: viewer.id,
+        customerId: viewer.customerId,
+        grantType: viewer.grantType,
+        startTime: viewer.startTime,
+        endTime: viewer.endTime,
+        canEdit: viewer.canEdit,
+        grantReason: viewer.grantReason,
+        grantUserId: viewer.grantUserId,
+        grantTime: viewer.createTime,
+        status: viewer.status,
+        deptName: user?.dept?.name || "",
+      };
+    });
+    return { list, total };
+  }
+
+  async unallocatedViewerList(
+    customerId: string,
+    query: { pageNum?: number; pageSize?: number; userName?: string },
+    operator: { id?: string; name?: string; permissions?: string[] } = {},
+  ) {
+    await this.assertCustomerWritable(
+      customerId,
+      operator.id,
+      operator.name,
+      operator.permissions || [],
+    );
+    const pageNum = Number(query.pageNum || 1);
+    const pageSize = Number(query.pageSize || 10);
+    const viewers = await this.viewerRepository.find({
+      where: {
+        customerId,
+        sourceType: CustomerViewerSourceType.manual,
+        status: CustomerViewerStatus.enabled,
+        isDelete: null as any,
+      } as any,
+      select: ["userId"] as any,
+    });
+    const allocatedUserIds = viewers.map((viewer) => String(viewer.userId));
+    const entity = this.getUserRepository().createQueryBuilder("user");
+    entity.where("user.isDelete IS NULL");
+    entity.leftJoinAndSelect("user.dept", "dept");
+    if (allocatedUserIds.length) {
+      entity.andWhere("user.id NOT IN (:...allocatedUserIds)", {
+        allocatedUserIds,
+      });
+    }
+    if (query.userName) {
+      entity.andWhere("user.name LIKE :userName", {
+        userName: `%${query.userName}%`,
+      });
+    }
+    const total = await entity.getCount();
+    const list = await entity
+      .skip((pageNum - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+    return { list, total };
+  }
+
+  async viewerRecords(
+    customerId: string,
+    query: { pageNum?: number; pageSize?: number },
+    operator: { id?: string; name?: string; permissions?: string[] } = {},
+  ) {
+    await this.assertCustomerReadable(
+      customerId,
+      operator.id,
+      operator.name,
+      operator.permissions || [],
+    );
+    if (!this.viewerRecordRepository) {
+      return { list: [], total: 0 };
+    }
+    const pageNum = Number(query.pageNum || 1);
+    const pageSize = Number(query.pageSize || 10);
+    const [records] = await this.viewerRecordRepository.findAndCount({
+      where: { customerId, isDelete: null as any } as any,
+      order: { operateTime: "DESC" as any, createTime: "DESC" as any },
+    });
+    const batchMap = new Map<string, any>();
+    for (const record of records as any[]) {
+      const batchNo = record.batchNo || record.id;
+      const batch =
+        batchMap.get(batchNo) ||
+        ({
+          batchNo,
+          actionType: record.actionType,
+          operatorId: record.operatorId,
+          operatorName: record.operatorName,
+          operateTime: record.operateTime,
+          grantType: record.grantType,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          canEdit: record.canEdit,
+          grantReason: record.grantReason,
+          revokeReason: record.revokeReason,
+          items: [],
+        } as any);
+      batch.items.push(record);
+      batch.userCount = batch.items.length;
+      batchMap.set(batchNo, batch);
+    }
+    const allList = Array.from(batchMap.values());
+    const list = allList.slice((pageNum - 1) * pageSize, pageNum * pageSize);
+    return { list, total: allList.length };
   }
 
   private async ensureCreatorViewer(customerId: string, userId?: string) {
@@ -416,7 +813,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       grantType?: CustomerViewerGrantType;
       startTime?: Date;
       endTime?: Date;
-      canEdit?: boolean;
+      canEdit?: string;
       grantReason?: string;
     },
   ) {
@@ -445,6 +842,72 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return { success: true, userIds: normalizedUserIds };
   }
 
+  async selectCustomerViewers(
+    customerId: string,
+    dto: {
+      userIds?: string[];
+      grantType?: CustomerViewerGrantType;
+      startTime?: Date;
+      endTime?: Date;
+      canEdit?: string;
+      grantReason?: string;
+    },
+    operator: {
+      id?: string;
+      name?: string;
+      permissions?: string[];
+    } = {},
+  ) {
+    await this.assertCustomerWritable(
+      customerId,
+      operator.id,
+      operator.name,
+      operator.permissions || [],
+    );
+    const normalizedUserIds = Array.from(
+      new Set(
+        (dto.userIds || []).map((item) => String(item || "")).filter(Boolean),
+      ),
+    );
+    const batchNo = this.createViewerBatchNo("grant");
+    const records: CustomerViewerRecord[] = [];
+    for (const userId of normalizedUserIds) {
+      const viewer = await this.ensureViewer(
+        customerId,
+        userId,
+        CustomerViewerSourceType.manual,
+        operator.id,
+        dto.grantType,
+        dto.startTime,
+        dto.endTime,
+        dto.canEdit,
+        dto.grantReason,
+      );
+      records.push(
+        new CustomerViewerRecord({
+          customerId,
+          batchNo,
+          actionType: CustomerViewerRecordActionType.grant,
+          viewerId: viewer?.id,
+          userId,
+          grantType: dto.grantType || CustomerViewerGrantType.permanent,
+          startTime: dto.startTime,
+          endTime: dto.endTime,
+          canEdit: dto.canEdit === "1" ? "1" : "0",
+          grantReason: dto.grantReason,
+          operatorId: this.getNullableUserId(operator.id),
+          operatorName: operator.name,
+          operateTime: new Date(),
+          status: CustomerViewerStatus.enabled,
+          createUser: operator.id || "system",
+          updateUser: operator.id || "system",
+        }),
+      );
+    }
+    await this.saveViewerRecords(records);
+    return { success: true, batchNo, userIds: normalizedUserIds };
+  }
+
   async revokeCustomerViewAccess(
     customerId: string,
     userId: string,
@@ -468,13 +931,94 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       } as any,
       {
         status: CustomerViewerStatus.disabled,
-        revokeUserId: operatorId,
+        revokeUserId: this.getNullableUserId(operatorId),
         revokeTime: new Date(),
         revokeReason: options?.reason,
-        updateUser: operatorId,
+        updateUser: operatorId || "system",
       } as any,
     );
     return { success: true, reason: options?.reason };
+  }
+
+  async cancelCustomerViewer(
+    customerId: string,
+    dto: { userId: string; reason?: string },
+    operator: { id?: string; name?: string; permissions?: string[] } = {},
+  ) {
+    return this.cancelCustomerViewers(
+      customerId,
+      { userIds: [dto.userId], reason: dto.reason },
+      operator,
+    );
+  }
+
+  async cancelCustomerViewers(
+    customerId: string,
+    dto: { userIds?: string[]; reason?: string },
+    operator: { id?: string; name?: string; permissions?: string[] } = {},
+  ) {
+    await this.assertCustomerWritable(
+      customerId,
+      operator.id,
+      operator.name,
+      operator.permissions || [],
+    );
+    const userIds = Array.from(
+      new Set(
+        (dto.userIds || []).map((item) => String(item || "")).filter(Boolean),
+      ),
+    );
+    if (!userIds.length) return { success: true, count: 0 };
+    const viewers = await this.viewerRepository.find({
+      where: {
+        customerId,
+        userId: In(userIds),
+        sourceType: CustomerViewerSourceType.manual,
+        isDelete: null as any,
+      } as any,
+    });
+    const result = await this.viewerRepository.update(
+      {
+        customerId,
+        userId: In(userIds),
+        sourceType: CustomerViewerSourceType.manual,
+        isDelete: null as any,
+      } as any,
+      {
+        status: CustomerViewerStatus.disabled,
+        revokeUserId: this.getNullableUserId(operator.id),
+        revokeTime: new Date(),
+        revokeReason: dto.reason,
+        updateUser: operator.id || "system",
+      } as any,
+    );
+    const batchNo = this.createViewerBatchNo(
+      userIds.length > 1 ? "revokeAll" : "revoke",
+    );
+    await this.saveViewerRecords(
+      viewers.map(
+        (viewer) =>
+          new CustomerViewerRecord({
+            customerId,
+            batchNo,
+            actionType: CustomerViewerRecordActionType.revoke,
+            viewerId: viewer.id,
+            userId: viewer.userId,
+            grantType: viewer.grantType,
+            startTime: viewer.startTime,
+            endTime: viewer.endTime,
+            canEdit: viewer.canEdit,
+            revokeReason: dto.reason,
+            operatorId: this.getNullableUserId(operator.id),
+            operatorName: operator.name,
+            operateTime: new Date(),
+            status: CustomerViewerStatus.disabled,
+            createUser: operator.id || "system",
+            updateUser: operator.id || "system",
+          }),
+      ),
+    );
+    return { success: true, count: result.affected || viewers.length };
   }
 
   async updateViewerStatus(
@@ -505,8 +1049,7 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
       where: {
         status: CustomerViewerStatus.enabled,
         grantType: CustomerViewerGrantType.temporary,
-        endTime: LessThanOrEqual(futureDate),
-        endTime: MoreThan(now),
+        endTime: Between(now, futureDate),
         isDelete: null as any,
       } as any,
     });
@@ -602,6 +1145,11 @@ export class CustomersService extends BaseService<Customer, CustomerDto> {
     return this.getOperatorKeys(operatorId, operatorName).includes(
       String(customer.createUser || ""),
     );
+  }
+
+  private getNullableUserId(userId?: string) {
+    if (!userId || userId === "system") return null;
+    return userId;
   }
 
   private isViewerActive(viewer: CustomerViewer): boolean {

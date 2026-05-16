@@ -1,11 +1,11 @@
 <script setup>
 import { ref } from 'vue'
 import { getList, getCustomerTypes, getCustomerLevels, getCustomerStatuses, del, submitApproval } from './api'
-import AuthDialog from './components/AuthDialog.vue'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 
 const params = ref({})
+const router = useRouter()
 
 const customerTypes = ref({})
 getCustomerTypes().then(({ data }) => (customerTypes.value = data))
@@ -17,13 +17,12 @@ const customerStatuses = ref({})
 getCustomerStatuses().then(({ data }) => (customerStatuses.value = data))
 
 const rctRef = ref()
-const authDialogVisible = ref(false)
-const authCustomer = ref(null)
 
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
 const canCustomerDelete = computed(() => checkPermi(['business/crm/customers/delete']))
 const canCustomerSubmitApproval = computed(() => checkPermi(['business/crm/customers/update']))
+const canEditCustomer = (row) => canCustomerUpdate.value || row.permissionContext?.canEdit === true
 
 async function handleSubmitApproval(row) {
   if (!canCustomerSubmitApproval.value) return $sdk.msgWarning('当前操作没有权限')
@@ -37,13 +36,12 @@ const canSubmitCustomerApproval = (row) => row.status === '1' && !['1', '2'].inc
 
 async function handleOpenAuthDialog(row) {
   if (!canCustomerUpdate.value) return $sdk.msgWarning('当前操作没有权限')
-  authCustomer.value = row
-  authDialogVisible.value = true
+  router.push(`/crm/customerManage/auth/${row.id}`)
 }
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/crm/customerManage/form') },
-  canCustomerUpdate.value ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') } : null,
+  canEditCustomer(row) ? { key: 'edit', label: '编辑', type: 'primary', onClick: () => rctRef.value.goRoute(row.id, '/crm/customerManage/form') } : null,
   canCustomerUpdate.value ? { key: 'share', label: '授权查看', type: 'success', onClick: () => handleOpenAuthDialog(row) } : null,
   canCustomerSubmitApproval.value && canSubmitCustomerApproval(row) ? { key: 'submit', label: '提交审批', type: 'warning', onClick: () => handleSubmitApproval(row) } : null,
   canCustomerDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => rctRef.value.del(del, row.id) } : null,
@@ -123,8 +121,6 @@ const getButtons = (row) => [
         <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
-
-    <AuthDialog v-model="authDialogVisible" :customer="authCustomer" @success="rctRef?.getList()" />
   </div>
 </template>
 

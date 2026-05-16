@@ -930,6 +930,41 @@ export class AuthGuard implements CanActivate {
         "business/crm/customers/update",
       ],
       [
+        "POST",
+        /^business\/crm\/customers\/grantViewAccess$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "GET",
+        /^business\/crm\/customers\/[^/]+\/viewers\/allocatedList$/,
+        "business/crm/customers/getOne",
+      ],
+      [
+        "GET",
+        /^business\/crm\/customers\/[^/]+\/viewers\/unallocatedList$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "POST",
+        /^business\/crm\/customers\/[^/]+\/viewers\/selectAll$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "PUT",
+        /^business\/crm\/customers\/[^/]+\/viewers\/cancel$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "PUT",
+        /^business\/crm\/customers\/[^/]+\/viewers\/cancelAll$/,
+        "business/crm/customers/update",
+      ],
+      [
+        "GET",
+        /^business\/crm\/customers\/[^/]+\/viewers\/records$/,
+        "business/crm/customers/getOne",
+      ],
+      [
         "DELETE",
         /^business\/crm\/customers\/[^/]+\/auth\/[^/]+$/,
         "business/crm/customers/update",

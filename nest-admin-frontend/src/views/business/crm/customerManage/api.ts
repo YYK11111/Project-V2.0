@@ -4,6 +4,18 @@ import { normalizePageData } from '@/utils/pageData'
 
 const baseUrl = '/business/crm/customers'
 
+function getNestedData(res: any) {
+  return res?.data?.data ?? res?.data ?? res
+}
+
+function normalizeListResult(res: any) {
+  const page = getNestedData(res) || {}
+  return {
+    total: Number(page.total || 0),
+    data: page.list || [],
+  }
+}
+
 export function getList(params) {
   return request({ url: `${baseUrl}/list`, method: 'get', params }).then(normalizePageData)
 }
@@ -51,6 +63,43 @@ export function grantCustomerViewAccess(data: {
   grantReason?: string;
 }) {
   return request.post('/business/crm/customers/grantViewAccess', data)
+}
+
+export function getAllocatedViewerList(customerId: string, params) {
+  return request.get(`${baseUrl}/${customerId}/viewers/allocatedList`, params).then(normalizeListResult)
+}
+
+export function getUnallocatedViewerList(customerId: string, params) {
+  return request.get(`${baseUrl}/${customerId}/viewers/unallocatedList`, params).then(normalizeListResult)
+}
+
+export function grantCustomerViewers(customerId: string, data: {
+  userIds: string[];
+  grantType?: 'permanent' | 'temporary';
+  startTime?: string;
+  endTime?: string;
+  canEdit?: string;
+  grantReason?: string;
+}) {
+  return request.post(`${baseUrl}/${customerId}/viewers/selectAll`, data)
+}
+
+export function cancelCustomerViewer(customerId: string, data: {
+  userId: string;
+  reason?: string;
+}) {
+  return request.put(`${baseUrl}/${customerId}/viewers/cancel`, data)
+}
+
+export function cancelCustomerViewers(customerId: string, data: {
+  userIds: string[] | string;
+  reason?: string;
+}) {
+  return request.put(`${baseUrl}/${customerId}/viewers/cancelAll`, data)
+}
+
+export function getCustomerViewerRecords(customerId: string, params) {
+  return request.get(`${baseUrl}/${customerId}/viewers/records`, params).then(normalizeListResult)
 }
 
 export function revokeCustomerViewAccess(data: {

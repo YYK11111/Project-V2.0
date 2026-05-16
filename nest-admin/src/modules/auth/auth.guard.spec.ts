@@ -1451,6 +1451,91 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("具备客户更新权限时放行批量客户查看授权接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/grantViewAccess",
+      method: "POST",
+      body: {
+        customerId: "customer-1",
+        userIds: ["user-2"],
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/update" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("具备客户更新权限时放行角色式新增客户查看授权接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/customer-1/viewers/selectAll",
+      method: "POST",
+      body: {
+        userIds: ["user-2"],
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/update" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("具备客户详情权限时放行客户授权记录接口", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/crm/customers/customer-1/viewers/records",
+      method: "GET",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/crm/customers/getOne" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("缺少客户更新权限时拒绝客户查看授权接口", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

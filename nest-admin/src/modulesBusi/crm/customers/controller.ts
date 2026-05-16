@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   Post,
+  Put,
   Req,
 } from "@nestjs/common";
 import { CustomersService } from "./service";
@@ -44,6 +45,25 @@ export class UpdateViewerStatusDto {
   customerId: string;
   viewerIds: string[];
   status: CustomerViewerStatus;
+}
+
+export class SelectCustomerViewersDto {
+  userIds: string[];
+  grantType?: CustomerViewerGrantType;
+  startTime?: string;
+  endTime?: string;
+  canEdit?: string;
+  grantReason?: string;
+}
+
+export class CancelCustomerViewerDto {
+  userId: string;
+  reason?: string;
+}
+
+export class CancelCustomerViewersDto {
+  userIds: string[] | string;
+  reason?: string;
 }
 
 @Controller("business/crm/customers")
@@ -161,6 +181,105 @@ export class CustomersController extends BaseController<
       req.user?.name,
       req.user?.permissions || [],
     );
+  }
+
+  @Get(":id/viewers/allocatedList")
+  async getAllocatedViewerList(
+    @Param("id") id: string,
+    @Query() query: QueryListDto,
+    @Req() req: any,
+  ) {
+    return this.service.allocatedViewerList(id, query, {
+      id: req.user?.id,
+      name: req.user?.name,
+      permissions: req.user?.permissions || [],
+    });
+  }
+
+  @Get(":id/viewers/unallocatedList")
+  async getUnallocatedViewerList(
+    @Param("id") id: string,
+    @Query() query: QueryListDto,
+    @Req() req: any,
+  ) {
+    return this.service.unallocatedViewerList(id, query, {
+      id: req.user?.id,
+      name: req.user?.name,
+      permissions: req.user?.permissions || [],
+    });
+  }
+
+  @Post(":id/viewers/selectAll")
+  async selectCustomerViewers(
+    @Param("id") id: string,
+    @Body() dto: SelectCustomerViewersDto,
+    @Req() req: any,
+  ) {
+    return this.service.selectCustomerViewers(
+      id,
+      {
+        userIds: dto.userIds,
+        grantType: dto.grantType,
+        startTime: dto.startTime ? new Date(dto.startTime) : undefined,
+        endTime: dto.endTime ? new Date(dto.endTime) : undefined,
+        canEdit: dto.canEdit,
+        grantReason: dto.grantReason,
+      },
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+    );
+  }
+
+  @Put(":id/viewers/cancel")
+  async cancelCustomerViewer(
+    @Param("id") id: string,
+    @Body() dto: CancelCustomerViewerDto,
+    @Req() req: any,
+  ) {
+    return this.service.cancelCustomerViewer(id, dto, {
+      id: req.user?.id,
+      name: req.user?.name,
+      permissions: req.user?.permissions || [],
+    });
+  }
+
+  @Put(":id/viewers/cancelAll")
+  async cancelCustomerViewers(
+    @Param("id") id: string,
+    @Body() dto: CancelCustomerViewersDto,
+    @Req() req: any,
+  ) {
+    const userIds = Array.isArray(dto.userIds)
+      ? dto.userIds
+      : String(dto.userIds || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    return this.service.cancelCustomerViewers(
+      id,
+      { userIds, reason: dto.reason },
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+    );
+  }
+
+  @Get(":id/viewers/records")
+  async getCustomerViewerRecords(
+    @Param("id") id: string,
+    @Query() query: QueryListDto,
+    @Req() req: any,
+  ) {
+    return this.service.viewerRecords(id, query, {
+      id: req.user?.id,
+      name: req.user?.name,
+      permissions: req.user?.permissions || [],
+    });
   }
 
   @Post("grantViewAccess")

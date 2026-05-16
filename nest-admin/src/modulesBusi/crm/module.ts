@@ -5,6 +5,7 @@ import { CustomersController } from "./customers/controller";
 import { CustomerViewerTimeoutService } from "./customers/customer-viewer-timeout.service";
 import { Customer } from "./customers/entity";
 import { CustomerViewer } from "./customers/entities/customer-viewer.entity";
+import { CustomerViewerRecord } from "./customers/entities/customer-viewer-record.entity";
 import { CustomerInteractionService } from "./interactions/service";
 import { CustomerInteractionsController } from "./interactions/controller";
 import { CustomerInteraction } from "./interactions/entity";
@@ -23,6 +24,7 @@ import { BusinessApprovalContextsModule } from "../approval-contexts/module";
     TypeOrmModule.forFeature([
       Customer,
       CustomerViewer,
+      CustomerViewerRecord,
       CustomerInteraction,
       SalesOpportunity,
       Contract,

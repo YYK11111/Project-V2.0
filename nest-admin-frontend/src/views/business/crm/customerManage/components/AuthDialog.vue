@@ -23,14 +23,22 @@ const visible = computed({
 const formRef = ref()
 const submitting = ref(false)
 
-const form = ref({
-  userIds: [],
-  grantType: 'permanent',
-  startTime: '',
-  endTime: '',
-  canEdit: false,
-  grantReason: ''
-})
+function createDefaultForm() {
+  return {
+    userIds: [],
+    grantType: 'permanent',
+    startTime: '',
+    endTime: '',
+    canEdit: false,
+    grantReason: ''
+  }
+}
+
+function normalizeCanEdit(value) {
+  return value === true || value === '1' || value === 1
+}
+
+const form = ref(createDefaultForm())
 
 const originalUserIds = ref([])
 const isTemporary = computed(() => form.value.grantType === 'temporary')
@@ -41,17 +49,19 @@ const rules = {
 
 watch(visible, async (val) => {
   if (val && props.customer?.id) {
-    form.value = {
-      userIds: [],
-      grantType: 'permanent',
-      startTime: '',
-      endTime: '',
-      canEdit: false,
-      grantReason: ''
-    }
+    form.value = createDefaultForm()
     const res = await getCustomerAuthUsers(props.customer.id)
     const list = res?.data?.data || res?.data || []
-    form.value.userIds = (Array.isArray(list) ? list : []).map((item) => item.userId).filter(Boolean)
+    const authList = Array.isArray(list) ? list : []
+    const firstAuth = authList[0] || {}
+    form.value = {
+      userIds: authList.map((item) => item.userId).filter(Boolean),
+      grantType: firstAuth.grantType || 'permanent',
+      startTime: firstAuth.startTime || '',
+      endTime: firstAuth.endTime || '',
+      canEdit: normalizeCanEdit(firstAuth.canEdit),
+      grantReason: firstAuth.grantReason || ''
+    }
     originalUserIds.value = [...form.value.userIds]
   }
 })
