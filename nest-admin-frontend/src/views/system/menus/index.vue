@@ -15,10 +15,11 @@ const canManageProtectedMenu = computed(() => checkPermi(['system/menus/managePr
 const activeView = ref('tree')
 const currentMenuId = ref('')
 const treeKeyword = ref('')
-const treeExpanded = ref(true)
+const treeExpanded = ref(false)
 const treeRef = ref()
 const dialogRef = ref()
 const menuDialogMode = ref('add')
+const menuDialogExpandedKeys = ref([])
 const isMenuDialogView = computed(() => menuDialogMode.value === 'view')
 const menuDialogTitle = computed(() => {
   return {
@@ -54,6 +55,21 @@ function findParentMenu(rows, targetId, parent = null) {
   return null
 }
 
+function collectExpandableMenuKeys(rows) {
+  const keys = []
+  ;(rows || []).forEach((row) => {
+    if (row.children?.length) {
+      keys.push(String(row.id))
+      keys.push(...collectExpandableMenuKeys(row.children))
+    }
+  })
+  return keys
+}
+
+function getUniqueKeys(keys) {
+  return [...new Set(keys.map((key) => String(key || '')).filter(Boolean))]
+}
+
 const menuTreeData = computed(() => trees.value[0]?.children || [])
 const filteredMenuTreeData = computed(() => {
   const filterByKeyword = (rows) => {
@@ -74,6 +90,11 @@ const filteredMenuTreeData = computed(() => {
 })
 const currentMenu = computed(() => findMenuById(menuTreeData.value, currentMenuId.value))
 const currentParentMenu = computed(() => findParentMenu(menuTreeData.value, currentMenuId.value))
+const defaultExpandedMenuKeys = computed(() => {
+  const normalizedKeyword = String(treeKeyword.value || '').trim()
+  if (!normalizedKeyword) return []
+  return getUniqueKeys(collectExpandableMenuKeys(filteredMenuTreeData.value))
+})
 
 function selectMenu(menu) {
   currentMenuId.value = String(menu?.id || '')
@@ -96,13 +117,32 @@ function setTreeExpanded(nodes, expanded) {
   })
 }
 
+function applyExpandedKeys(keys) {
+  nextTick(() => {
+    setTreeExpanded(menuTreeData.value, false)
+    ;(keys || []).forEach((id) => {
+      const currentNode = treeRef.value?.store?.nodesMap?.[id]
+      if (currentNode) currentNode.expanded = true
+    })
+  })
+}
+
+function applyDefaultTreeExpanded() {
+  applyExpandedKeys(defaultExpandedMenuKeys.value)
+}
+
 function toggleTreeExpanded() {
   treeExpanded.value = !treeExpanded.value
-  setTreeExpanded(filteredMenuTreeData.value, treeExpanded.value)
+  if (treeExpanded.value) {
+    setTreeExpanded(filteredMenuTreeData.value, true)
+    return
+  }
+  applyDefaultTreeExpanded()
 }
 
 function openMenuDialog(mode, data = {}) {
   menuDialogMode.value = mode
+  menuDialogExpandedKeys.value = []
   dialogRef.value?.action(JSON.parse(JSON.stringify(data)))
 }
 
@@ -114,9 +154,14 @@ function getTreesFun() {
   getTrees().then(({ data }) => {
     trees.value[0].children = data || []
     syncCurrentMenu(trees.value[0].children)
+    if (!treeExpanded.value) applyDefaultTreeExpanded()
   })
 }
 getTreesFun()
+
+watch(defaultExpandedMenuKeys, () => {
+  if (!treeExpanded.value) applyDefaultTreeExpanded()
+})
 </script>
 <template>
   <div class="menu-index-page">
@@ -150,7 +195,7 @@ getTreesFun()
               :data="filteredMenuTreeData"
               :props="{ label: 'name' }"
               :expand-on-click-node="false"
-              :default-expand-all="true"
+              :default-expanded-keys="defaultExpandedMenuKeys"
               @node-click="selectMenu">
               <template #default="{ node, data }">
                 <div class="menu-tree-node">
@@ -299,6 +344,7 @@ getTreesFun()
             check-strictly="true"
             :props="{ label: 'name' }"
             :disabled="isMenuDialogView"
+            :default-expanded-keys="menuDialogExpandedKeys"
             placeholder="选择上级菜单" />
         </el-form-item>
         <BaInput v-model="form.name" label="菜单名称" prop="name" :disabled="isMenuDialogView" />
