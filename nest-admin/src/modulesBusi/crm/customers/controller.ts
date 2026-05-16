@@ -16,10 +16,37 @@ import {
   customerLevelMap,
   customerStatusMap,
 } from "./entity";
+import {
+  CustomerViewerGrantType,
+  CustomerViewerStatus,
+} from "./entities/customer-viewer.entity";
 import { BaseController } from "src/common/BaseController";
 import { WorkflowIntegrationService } from "src/common/services/workflow-integration.service";
 
 @Controller("business/crm/customers")
+class GrantCustomerViewAccessDto {
+  customerId: string;
+  userIds: string[];
+  permissions?: string[];
+  grantType?: CustomerViewerGrantType;
+  startTime?: string;
+  endTime?: string;
+  canEdit?: string;
+  grantReason?: string;
+}
+
+class RevokeCustomerViewAccessDto {
+  customerId: string;
+  userId: string;
+  reason?: string;
+}
+
+class UpdateViewerStatusDto {
+  customerId: string;
+  viewerIds: string[];
+  status: CustomerViewerStatus;
+}
+
 export class CustomersController extends BaseController<
   Customer,
   CustomersService
@@ -133,6 +160,60 @@ export class CustomersController extends BaseController<
       req.user?.id,
       req.user?.name,
       req.user?.permissions || [],
+    );
+  }
+
+  @Post("grantViewAccess")
+  async grantCustomerViewAccess(
+    @Body() dto: GrantCustomerViewAccessDto,
+    @Req() req: any,
+  ) {
+    const operatorId = req?.user?.id || "system";
+    const operatorName = req?.user?.name || "system";
+    return this.customerService.grantCustomerViewAccess(
+      dto.customerId,
+      dto.userIds,
+      operatorId,
+      operatorName,
+      dto.permissions || [],
+      {
+        grantType: dto.grantType,
+        startTime: dto.startTime ? new Date(dto.startTime) : undefined,
+        endTime: dto.endTime ? new Date(dto.endTime) : undefined,
+        canEdit: dto.canEdit,
+        grantReason: dto.grantReason,
+      },
+    );
+  }
+
+  @Post("revokeViewAccess")
+  async revokeCustomerViewAccess(
+    @Body() dto: RevokeCustomerViewAccessDto,
+    @Req() req: any,
+  ) {
+    const operatorId = req?.user?.id || "system";
+    const operatorName = req?.user?.name || "system";
+    return this.customerService.revokeCustomerViewAccess(
+      dto.customerId,
+      dto.userId,
+      operatorId,
+      operatorName,
+      [],
+      { reason: dto.reason },
+    );
+  }
+
+  @Post("updateViewerStatus")
+  async updateViewerStatus(
+    @Body() dto: UpdateViewerStatusDto,
+    @Req() req: any,
+  ) {
+    const operatorId = req?.user?.id || "system";
+    return this.customerService.updateViewerStatus(
+      dto.customerId,
+      dto.viewerIds,
+      dto.status,
+      operatorId,
     );
   }
 }
