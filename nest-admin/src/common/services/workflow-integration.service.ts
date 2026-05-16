@@ -385,6 +385,8 @@ export class WorkflowIntegrationService {
       const isPendingCompletionApproval =
         task?.status === TaskStatus.pendingCompletionApproval &&
         String(task?.approvalStatus || "") === "1";
+      const isTaskApprovalInProgress =
+        String(task?.approvalStatus || "") === "1";
       if (isPendingCompletionApproval) {
         await this.taskRepository.update(taskId, {
           status:
@@ -398,7 +400,7 @@ export class WorkflowIntegrationService {
             ? { actualEndDate: this.getTodayDate() }
             : {}),
         } as any);
-      } else {
+      } else if (isTaskApprovalInProgress) {
         await this.taskRepository.update(taskId, {
           status:
             status === "completed"
@@ -410,6 +412,8 @@ export class WorkflowIntegrationService {
               ? "任务审批已通过，进入处理中"
               : "任务审批已驳回",
         } as any);
+      } else {
+        return task;
       }
     } else if (businessKey?.startsWith("ticket_")) {
       const ticketId = businessKey.replace("ticket_", "");
@@ -751,6 +755,12 @@ export class WorkflowIntegrationService {
   ): Promise<string> {
     const task = await this.taskRepository.findOne({ where: { id: taskId } });
     if (!task) throw new BadRequestException("任务不存在");
+    if (task.status !== TaskStatus.pending) {
+      throw new BadRequestException("当前任务状态不允许发起审批");
+    }
+    if (String(task.approvalStatus || "") === "1") {
+      throw new BadRequestException("当前任务已在审批中");
+    }
     await this.projectsService.assertExecutionObjectPermission(
       task.projectId,
       initiatorId,

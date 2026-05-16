@@ -212,6 +212,16 @@ export class TasksService extends BaseService<Task, TaskDto> {
     };
   }
 
+  private assertTaskStatusAllowed(
+    task: Task,
+    allowedStatuses: TaskStatus[],
+    message: string,
+  ) {
+    if (!allowedStatuses.includes(task.status)) {
+      throw new BadRequestException(message);
+    }
+  }
+
   private async ensureTaskCanManage(
     task: Task,
     operatorId: string,
@@ -730,12 +740,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       await this.getTaskPermissionContext(task, operatorId, permissions);
     return {
       canEdit: canManage,
-      canDelete:
-        Boolean(context?.canManageTasks) ||
-        Boolean(context?.isManager) ||
-        Boolean(context?.isDeliveryManager) ||
-        String(task.leaderId || "") === String(operatorId) ||
-        String(task.createUser || "") === String(operatorId),
+      canDelete: canManage,
       canManage,
       canExecute,
     };
@@ -744,6 +749,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
   async startTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
     await this.ensureTaskCanExecute(task, operatorId, permissions);
+    this.assertTaskStatusAllowed(
+      task,
+      [TaskStatus.pending],
+      "当前任务状态不允许开始",
+    );
     await this.ensureTaskCanStart(task);
     const payload: Partial<Task> = {
       status: TaskStatus.inProgress,
@@ -760,6 +770,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
   async pauseTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
     await this.ensureTaskCanManage(task, operatorId, permissions);
+    this.assertTaskStatusAllowed(
+      task,
+      [TaskStatus.inProgress],
+      "当前任务状态不允许暂缓",
+    );
     await this.repository.update(task.id, {
       status: TaskStatus.deferred,
     } as any);
@@ -770,6 +785,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
   async resumeTask(id: string, operatorId: string, permissions: string[] = []) {
     const task = await this.getTaskById(String(id));
     await this.ensureTaskCanExecute(task, operatorId, permissions);
+    this.assertTaskStatusAllowed(
+      task,
+      [TaskStatus.deferred],
+      "当前任务状态不允许恢复",
+    );
     await this.ensureTaskCanStart(task);
     await this.repository.update(task.id, {
       status: TaskStatus.inProgress,
@@ -785,6 +805,14 @@ export class TasksService extends BaseService<Task, TaskDto> {
   ) {
     const task = await this.getTaskById(String(id));
     await this.ensureTaskCanExecute(task, operatorId, permissions);
+    this.assertTaskStatusAllowed(
+      task,
+      [TaskStatus.inProgress],
+      "当前任务状态不允许提交完成审批",
+    );
+    if (String(task.approvalStatus || "") === "1") {
+      throw new BadRequestException("当前任务已在完成审批中");
+    }
     await this.repository.update(task.id, {
       status: TaskStatus.pendingCompletionApproval,
       approvalStatus: "1",
@@ -1301,19 +1329,8 @@ export class TasksService extends BaseService<Task, TaskDto> {
           "task",
         )
       : [];
-    const shouldUsePersonalTaskScope =
-      Boolean(_operatorId) &&
-      Array.isArray(visibleProjectIds) &&
-      !visibleProjectIds.length;
-    if (
-      visibleProjectIds &&
-      !visibleProjectIds.length &&
-      !shouldUsePersonalTaskScope
-    ) {
-      return { data: [], total: 0, _flag: true } as any;
-    }
     let executionVisibleProjectIds = visibleProjectIds;
-    if (_operatorId && visibleProjectIds && !shouldUsePersonalTaskScope) {
+    if (_operatorId && Array.isArray(visibleProjectIds)) {
       executionVisibleProjectIds = [];
       for (const id of visibleProjectIds) {
         try {
@@ -1327,9 +1344,6 @@ export class TasksService extends BaseService<Task, TaskDto> {
           // 访客角色不纳入执行对象可见范围
         }
       }
-      if (!executionVisibleProjectIds.length) {
-        return { data: [], total: 0, _flag: true } as any;
-      }
     }
     const taskQuery = this.repository
       .createQueryBuilder("task")
@@ -1338,37 +1352,32 @@ export class TasksService extends BaseService<Task, TaskDto> {
       .leftJoinAndSelect("task.milestone", "milestone")
       .leftJoinAndSelect("task.sprint", "sprint");
 
-    if (shouldUsePersonalTaskScope) {
-      const personalConditions = [
-        "task.leader_id = :operatorId",
-        "task.create_user = :operatorId",
-        "JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId))",
-      ];
-      const personalParams: Record<string, any> = {
-        operatorId: String(_operatorId),
-      };
-      if (approvalVisibleTaskIds?.length) {
-        personalConditions.push("task.id IN (:...approvalVisibleTaskIds)");
-        personalParams.approvalVisibleTaskIds = approvalVisibleTaskIds;
+    if (visibleProjectIds !== null) {
+      const visibilityConditions: string[] = [];
+      const visibilityParams: Record<string, any> = {};
+      if (executionVisibleProjectIds?.length) {
+        visibilityConditions.push("task.project_id IN (:...visibleProjectIds)");
+        visibilityParams.visibleProjectIds = executionVisibleProjectIds;
+      }
+      if (_operatorId) {
+        visibilityConditions.push(
+          "task.leader_id = :operatorId",
+          "task.create_user = :operatorId",
+          "JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId))",
+        );
+        visibilityParams.operatorId = String(_operatorId);
+        if (approvalVisibleTaskIds?.length) {
+          visibilityConditions.push("task.id IN (:...approvalVisibleTaskIds)");
+          visibilityParams.approvalVisibleTaskIds = approvalVisibleTaskIds;
+        }
+      }
+      if (!visibilityConditions.length) {
+        return { data: [], total: 0, _flag: true } as any;
       }
       taskQuery.andWhere(
-        `(${personalConditions.join(" OR ")})`,
-        personalParams,
+        `(${visibilityConditions.join(" OR ")})`,
+        visibilityParams,
       );
-    } else if (executionVisibleProjectIds) {
-      if (approvalVisibleTaskIds?.length) {
-        taskQuery.andWhere(
-          "(task.project_id IN (:...visibleProjectIds) OR task.id IN (:...approvalVisibleTaskIds))",
-          {
-            visibleProjectIds: executionVisibleProjectIds,
-            approvalVisibleTaskIds,
-          },
-        );
-      } else {
-        taskQuery.andWhere("task.project_id IN (:...visibleProjectIds)", {
-          visibleProjectIds: executionVisibleProjectIds,
-        });
-      }
     }
 
     if (name !== undefined && name !== "") {
@@ -1522,6 +1531,15 @@ export class TasksService extends BaseService<Task, TaskDto> {
     if (operatorId) {
       const task = await this.getTaskById(String(id));
       await this.ensureTaskCanExecute(task, operatorId, permissions);
+      this.assertTaskStatusAllowed(
+        task,
+        [
+          TaskStatus.inProgress,
+          TaskStatus.deferred,
+          TaskStatus.pendingCompletionApproval,
+        ],
+        "当前任务状态不允许更新进度",
+      );
     }
     return this.repository.update(id, { progress });
   }
@@ -1542,6 +1560,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       "3": [],
       "4": [],
       "5": [],
+      "6": [],
     };
 
     tasks.forEach((task) => {
@@ -1556,6 +1575,7 @@ export class TasksService extends BaseService<Task, TaskDto> {
       { status: "3", statusName: "已完成", tasks: statusMap["3"] },
       { status: "4", statusName: "已驳回", tasks: statusMap["4"] },
       { status: "5", statusName: "暂缓", tasks: statusMap["5"] },
+      { status: "6", statusName: "待完成审批", tasks: statusMap["6"] },
     ];
   }
 

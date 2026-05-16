@@ -33,9 +33,13 @@ const statusMap = computed(() => ({
   ...status.value,
   6: status.value?.['6'] || '待完成审批',
 }))
+const canUpdateCurrentTaskProgress = (row) =>
+  canTaskUpdateProgress.value &&
+  ['2', '5', '6'].includes(String(row.status || '')) &&
+  (row.canEdit !== false || row.canExecute !== false)
 
 function handleProgressChange(row) {
-  if (!canTaskUpdateProgress.value || (row.canEdit !== true && row.canExecute !== true)) return $sdk.msgWarning('当前操作没有权限')
+  if (!canUpdateCurrentTaskProgress(row)) return $sdk.msgWarning('当前操作没有权限')
   updateProgress(row.id, row.progress).then(() => {
     $sdk.msgSuccess('进度更新成功')
   })
@@ -90,11 +94,11 @@ function isRowAttentionNeeded(row) {
   return !row.commentCount || isReportStale(row)
 }
 
-const canSubmitTaskApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
-const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.canExecute === true
-const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.canManage === true
-const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.canManage === true
-const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.canExecute === true && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canSubmitTaskApproval = (row) => String(row.status || '') === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
+const canStartCurrentTask = (row) => String(row.status || '') === '1' && row.canExecute !== false
+const canPauseCurrentTask = (row) => String(row.status || '') === '2' && row.canManage !== false
+const canResumeCurrentTask = (row) => String(row.status || '') === '5' && row.canManage !== false
+const canSubmitCompletionCurrentTask = (row) => String(row.status || '') === '2' && row.canExecute !== false && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/taskManage/form') },
@@ -239,11 +243,11 @@ const getButtons = (row) => [
         </el-table-column>
         <el-table-column label="进度" prop="progress" width="180">
           <template #default="{ row }">
-            <el-slider
+              <el-slider
               v-model="row.progress"
               :max="100"
               :step="5"
-              :disabled="!canTaskUpdateProgress || (row.canEdit !== true && row.canExecute !== true)"
+              :disabled="!canUpdateCurrentTaskProgress(row)"
               style="width: 150px"
               @change="handleProgressChange(row)" />
           </template>

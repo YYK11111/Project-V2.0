@@ -92,6 +92,7 @@ describe('task form structure', () => {
 
     expect(source).toContain("['2', '3', '5', '6'].includes(String(form.value.status || ''))")
     expect(source).toContain("['2', '5', '6'].includes(String(form.value.status || ''))")
+    expect(source).toContain("const canSubmitCurrentApproval = computed(() => String(form.value.status || '') === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))")
   })
 
   it('执行权限仅用于已有任务', () => {

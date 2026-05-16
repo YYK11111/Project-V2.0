@@ -235,6 +235,8 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     repositories.task.findOne.mockResolvedValue({
       id: "task-1",
       projectId: "19",
+      status: TaskStatus.pending,
+      approvalStatus: "0",
       name: "需求确认",
     });
 
@@ -255,6 +257,23 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
         projectId: "19",
       }),
     );
+  });
+
+  it("仅允许待处理任务发起普通任务审批", async () => {
+    const { service, repositories, projectsService } = createService();
+    repositories.task.findOne.mockResolvedValue({
+      id: "task-1-invalid",
+      projectId: "19",
+      status: TaskStatus.inProgress,
+      approvalStatus: "0",
+    });
+    projectsService.assertExecutionObjectPermission.mockResolvedValue(
+      undefined,
+    );
+
+    await expect(
+      service.startTaskApproval("task-1-invalid", "u1"),
+    ).rejects.toThrow("当前任务状态不允许发起审批");
   });
 
   it("发起工单审批后创建归属项目的工单审批上下文", async () => {

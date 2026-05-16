@@ -158,6 +158,29 @@ describe("TasksService lifecycle actions", () => {
     );
   });
 
+  it("处理中任务不能再次开始", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-1-start-blocked",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: ["executor-1"],
+      status: TaskStatus.inProgress,
+      actualStartDate: "2026-05-15",
+    });
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+    });
+
+    await expect(
+      (service as any).startTask("task-1-start-blocked", "executor-1"),
+    ).rejects.toThrow("当前任务状态不允许开始");
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
   it("提交完成审批后进入待完成审批而不是直接已完成", async () => {
     const { service, repository, projectsService, messagesService } =
       createService();
@@ -217,6 +240,28 @@ describe("TasksService lifecycle actions", () => {
     await expect(
       service.updateProgress("task-4", 60, "viewer-1"),
     ).rejects.toThrow("当前无执行该任务的权限");
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("已完成任务不能更新进度", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-4-finished",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: ["executor-1"],
+      status: TaskStatus.completed,
+    });
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+    });
+
+    await expect(
+      service.updateProgress("task-4-finished", 60, "executor-1"),
+    ).rejects.toThrow("当前任务状态不允许更新进度");
     expect(repository.update).not.toHaveBeenCalled();
   });
 
@@ -283,6 +328,61 @@ describe("TasksService lifecycle actions", () => {
     );
   });
 
+  it("任务列表返回的删除权限与管理权限一致", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      taskCommentRepository,
+      timeLogRepository,
+      userRepository,
+    } = createService() as any;
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "task-1",
+            projectId: "project-1",
+            leaderId: "leader-1",
+            createUser: "creator-1",
+            executorIds: ["executor-1"],
+          },
+        ],
+        1,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue(null);
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: true,
+    });
+    userRepository.find.mockResolvedValue([]);
+    taskCommentRepository.query.mockResolvedValue([]);
+    timeLogRepository.query.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "lead-1",
+      _operatorPermissions: ["business/tasks/manageAll"],
+    });
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+        canManage: true,
+      }),
+    );
+  });
+
   it("完成审批驳回后回退到处理中", async () => {
     const { service, repository } = createService();
     const queueCompletionRejectedReminders = jest
@@ -313,6 +413,50 @@ describe("TasksService lifecycle actions", () => {
         approvalStatus: "1",
       }),
     );
+  });
+
+  it("暂缓任务不能在非处理中状态执行", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-5-pause-blocked",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: ["executor-1"],
+      status: TaskStatus.pending,
+    });
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+    });
+
+    await expect(
+      (service as any).pauseTask("task-5-pause-blocked", "leader-1"),
+    ).rejects.toThrow("当前任务状态不允许暂缓");
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("恢复任务只能从暂缓状态发起", async () => {
+    const { service, repository, projectsService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "task-6-resume-blocked",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      createUser: "creator-1",
+      executorIds: ["executor-1"],
+      status: TaskStatus.inProgress,
+    });
+    projectsService.getProjectPermissionContext.mockResolvedValue({
+      isManager: false,
+      isDeliveryManager: false,
+      isFunctionalLead: false,
+    });
+
+    await expect(
+      (service as any).resumeTask("task-6-resume-blocked", "executor-1"),
+    ).rejects.toThrow("当前任务状态不允许恢复");
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it("处理中任务延期时更新截止日期并保存延期记录", async () => {
@@ -1237,6 +1381,55 @@ describe("TasksService lifecycle actions", () => {
     expect(queryBuilder.andWhere).toHaveBeenCalledWith(
       "(task.leader_id = :operatorId OR task.create_user = :operatorId OR JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId)) OR task.id IN (:...approvalVisibleTaskIds))",
       { operatorId: "approver-1", approvalVisibleTaskIds: ["task-6"] },
+    );
+    expect(result.total).toBe(1);
+  });
+
+  it("项目可见范围被过滤后仍保留审批参与人可见任务", async () => {
+    const {
+      service,
+      repository,
+      projectsService,
+      taskCommentRepository,
+      timeLogRepository,
+      businessApprovalContextService,
+      userRepository,
+    } = createService();
+    const queryBuilder: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[{ id: "task-7" }], 1]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    projectsService.getVisibleProjectIdsForUser.mockResolvedValue([
+      "project-1",
+    ]);
+    projectsService.assertExecutionObjectPermission.mockRejectedValue(
+      new Error("访客不纳入执行对象可见范围"),
+    );
+    businessApprovalContextService.findVisibleBusinessIdsForUser.mockResolvedValue(
+      ["task-7"],
+    );
+    userRepository.find.mockResolvedValue([]);
+    taskCommentRepository.query.mockResolvedValue([]);
+    timeLogRepository.query.mockResolvedValue([]);
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "approver-1",
+      _operatorPermissions: ["business/tasks/access"],
+    } as any);
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(task.leader_id = :operatorId OR task.create_user = :operatorId OR JSON_CONTAINS(task.executor_ids, JSON_QUOTE(:operatorId)) OR task.id IN (:...approvalVisibleTaskIds))",
+      {
+        operatorId: "approver-1",
+        approvalVisibleTaskIds: ["task-7"],
+      },
     );
     expect(result.total).toBe(1);
   });
