@@ -54,4 +54,22 @@ describe('projectManage 链路路由一致性', () => {
     expect(sprintDetailSource).toContain("path: '/projectManage/userStoryManage/form'")
     expect(sprintDetailSource).toContain("query: { id: story.id, action: 'view' }")
   })
+
+  it('项目详情页新增 Sprint 使用的表单路由必须有常量隐藏路由兜底', () => {
+    const routesSource = readRoutesSource()
+    const routePaths = new Set(extractRoutePaths(routesSource))
+    const projectDetailSource = readProjectManageView('detail')
+
+    expect(projectDetailSource).toContain("createProjectScopedRecord('/sprintManage/form')")
+    expect(routePaths.has('/sprintManage/form')).toBe(true)
+  })
+
+  it('项目详情页新增变更使用的表单路由必须有常量隐藏路由兜底', () => {
+    const routesSource = readRoutesSource()
+    const routePaths = new Set(extractRoutePaths(routesSource))
+    const projectDetailSource = readProjectManageView('detail')
+
+    expect(projectDetailSource).toContain("path: '/changeManage/form'")
+    expect(routePaths.has('/changeManage/form')).toBe(true)
+  })
 })

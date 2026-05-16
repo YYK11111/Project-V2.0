@@ -154,6 +154,18 @@ export const constantRoutes = [
         meta: { title: '风险表单' },
       },
       {
+        path: '/sprintManage/form',
+        component: () => import('@/views/business/sprintManage/form.vue'),
+        name: 'SprintFormHidden',
+        meta: { title: 'Sprint表单' },
+      },
+      {
+        path: '/changeManage/form',
+        component: () => import('@/views/business/changeManage/form.vue'),
+        name: 'ChangeFormHidden',
+        meta: { title: '变更表单' },
+      },
+      {
         path: '/goLiveManage/form',
         component: () => import('@/views/business/goLiveManage/form.vue'),
         name: 'GoLiveFormHidden',

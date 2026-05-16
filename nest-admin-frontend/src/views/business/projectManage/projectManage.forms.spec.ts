@@ -6,6 +6,10 @@ function readBusinessView(relativePath: string) {
   return readFileSync(resolve(__dirname, '..', relativePath), 'utf-8')
 }
 
+function readBusinessFormStyle() {
+  return readFileSync(resolve(__dirname, '..', '..', '..', 'styles', 'business-form.scss'), 'utf-8')
+}
+
 function getStyleBlock(source: string, selector: string) {
   const styleSource = Array.from(source.matchAll(/<style[^>]*>(?<content>[\s\S]*?)<\/style>/g))
     .map((match) => match.groups?.content || '')
@@ -188,11 +192,20 @@ describe('项目链路表单结构整改守卫', () => {
     shellGuards.forEach(({ file, selector }) => {
       const source = readBusinessView(file)
       const shellBlock = getStyleBlock(source, selector)
+      const globalShellBlock = readBusinessFormStyle().match(/\.business-form-shell,\n\.business-form-page \.form-page-shell__content \{[\s\S]*?\}/)?.[0] || ''
 
-      expect(shellBlock).toContain('width: 100%;')
-      expect(shellBlock).toContain('max-width: 100%;')
-      expect(shellBlock).toContain('min-width: 0;')
-      expect(shellBlock).toContain('overflow-x: hidden;')
+      if (shellBlock) {
+        expect(shellBlock).toContain('width: 100%;')
+        expect(shellBlock).toContain('max-width: 100%;')
+        expect(shellBlock).toContain('min-width: 0;')
+        expect(shellBlock).toContain('overflow-x: hidden;')
+      } else {
+        expect(source).toContain('business-form-page')
+        expect(globalShellBlock).toContain('width: 100%;')
+        expect(globalShellBlock).toContain('max-width: 100%;')
+        expect(globalShellBlock).toContain('min-width: 0;')
+        expect(globalShellBlock).toContain('overflow-x: hidden;')
+      }
     })
   })
 
@@ -214,9 +227,16 @@ describe('项目链路表单结构整改守卫', () => {
     rowGuards.forEach(({ file, selector }) => {
       const source = readBusinessView(file)
       const rowBlock = getStyleBlock(source, selector)
+      const globalRowBlock = readBusinessFormStyle().match(/\.business-form \.el-row \{[\s\S]*?\}/)?.[0] || ''
 
-      expect(rowBlock).toContain('margin-left: 0 !important;')
-      expect(rowBlock).toContain('margin-right: 0 !important;')
+      if (rowBlock) {
+        expect(rowBlock).toContain('margin-left: 0 !important;')
+        expect(rowBlock).toContain('margin-right: 0 !important;')
+      } else {
+        expect(source).toContain('business-form')
+        expect(globalRowBlock).toContain('margin-left: 0 !important;')
+        expect(globalRowBlock).toContain('margin-right: 0 !important;')
+      }
     })
   })
 
