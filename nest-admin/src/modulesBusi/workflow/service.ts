@@ -54,6 +54,23 @@ import { WorkflowIntegrationService } from "../../common/services/workflow-integ
 import { hasModuleFullAccess } from "src/common/utils/business-list-permission";
 import { normalizePermissionKeys } from "src/common/utils/permission-key";
 
+type WorkflowInstanceListFilters = {
+  businessType?: string;
+  keyword?: string;
+  starterId?: string;
+  currentAssigneeId?: string;
+  handledUserId?: string;
+};
+
+const workflowHandledActions = [
+  TaskAction.APPROVE,
+  TaskAction.REJECT,
+  TaskAction.WITHDRAW,
+  TaskAction.TRANSFER,
+  TaskAction.SIGN,
+  TaskAction.CANCEL,
+];
+
 @Injectable()
 export class WorkflowService {
   private readonly businessStartLocks = new Map<string, Promise<void>>();
@@ -1971,6 +1988,84 @@ export class WorkflowService {
     );
   }
 
+  private normalizeInstanceListFilters(
+    filters: WorkflowInstanceListFilters = {},
+  ): WorkflowInstanceListFilters {
+    return {
+      businessType: String(filters.businessType || "").trim(),
+      keyword: String(filters.keyword || "").trim(),
+      starterId: String(filters.starterId || "").trim(),
+      currentAssigneeId: String(filters.currentAssigneeId || "").trim(),
+      handledUserId: String(filters.handledUserId || "").trim(),
+    };
+  }
+
+  private getInstanceListLimit(filters: WorkflowInstanceListFilters) {
+    return Object.values(filters).some(Boolean) ? 300 : 100;
+  }
+
+  private applyInstanceListFilters(
+    instanceQb: any,
+    filters: WorkflowInstanceListFilters,
+  ) {
+    if (filters.businessType) {
+      instanceQb.andWhere("instance.businessKey LIKE :businessTypePrefix", {
+        businessTypePrefix: `${filters.businessType}_%`,
+      });
+    }
+    if (filters.starterId) {
+      instanceQb.andWhere("instance.starterId = :starterId", {
+        starterId: filters.starterId,
+      });
+    }
+    if (filters.currentAssigneeId) {
+      instanceQb.andWhere(
+        [
+          "EXISTS (SELECT 1 FROM wf_task task",
+          "WHERE task.instance_id = instance.id",
+          "AND task.assignee_id = :currentAssigneeId",
+          "AND task.status = '1'",
+          "AND task.is_delete IS NULL)",
+        ].join(" "),
+        { currentAssigneeId: filters.currentAssigneeId },
+      );
+    }
+    if (filters.handledUserId) {
+      instanceQb.andWhere(
+        [
+          "EXISTS (SELECT 1 FROM wf_history history",
+          "WHERE history.instance_id = instance.id",
+          "AND history.operator_id = :handledUserId",
+          "AND history.action IN (:...handledActions)",
+          "AND history.is_delete IS NULL)",
+        ].join(" "),
+        {
+          handledUserId: filters.handledUserId,
+          handledActions: workflowHandledActions,
+        },
+      );
+    }
+  }
+
+  private filterInstancesByKeyword(items: any[], keyword?: string) {
+    const normalizedKeyword = String(keyword || "").trim();
+    if (!normalizedKeyword) return items;
+    return items
+      .filter((item) => {
+        const text = [
+          item.businessTitle,
+          item.businessCode,
+          item.businessKey,
+          item.definitionCode,
+          item.id,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return text.includes(normalizedKeyword);
+      })
+      .slice(0, 100);
+  }
+
   private async assertInstanceAccessible(
     instanceId: string,
     userId?: string,
@@ -2041,6 +2136,7 @@ export class WorkflowService {
     userId: string,
     status?: string,
     limit = 100,
+    filters: WorkflowInstanceListFilters = {},
   ): Promise<WorkflowInstance[]> {
     const instanceQb = this.instanceRepo
       .createQueryBuilder("instance")
@@ -2049,6 +2145,7 @@ export class WorkflowService {
     if (status) {
       instanceQb.andWhere("instance.status = :status", { status });
     }
+    this.applyInstanceListFilters(instanceQb, filters);
     return instanceQb
       .orderBy("instance.startTime", "DESC")
       .limit(limit)
@@ -2085,6 +2182,7 @@ export class WorkflowService {
   private async getRecentManageAllInstances(
     status?: string,
     limit = 100,
+    filters: WorkflowInstanceListFilters = {},
   ): Promise<WorkflowInstance[]> {
     const instanceQb = this.instanceRepo
       .createQueryBuilder("instance")
@@ -2096,6 +2194,7 @@ export class WorkflowService {
     if (status) {
       instanceQb.andWhere("instance.status = :status", { status });
     }
+    this.applyInstanceListFilters(instanceQb, filters);
     return instanceQb
       .orderBy("instance.startTime", "DESC")
       .limit(limit)
@@ -2110,17 +2209,24 @@ export class WorkflowService {
     status?: string,
     mode: "starter" | "participant" = "starter",
     permissions: string[] = [],
+    filters: WorkflowInstanceListFilters = {},
   ): Promise<any[]> {
+    const normalizedFilters = this.normalizeInstanceListFilters(filters);
+    const limit = this.getInstanceListLimit(normalizedFilters);
     let instances: WorkflowInstance[] = [];
 
     if (this.hasWorkflowManageAllPermission(permissions)) {
-      instances = await this.getRecentManageAllInstances(status);
+      instances = await this.getRecentManageAllInstances(
+        status,
+        limit,
+        normalizedFilters,
+      );
     } else if (mode === "participant" && userId) {
       const [starterInstances, taskInstanceIds, historyInstanceIds] =
         await Promise.all([
-          this.getRecentStarterInstances(userId, status),
-          this.getRecentParticipantInstanceIds(userId, "task"),
-          this.getRecentParticipantInstanceIds(userId, "history"),
+          this.getRecentStarterInstances(userId, status, limit),
+          this.getRecentParticipantInstanceIds(userId, "task", limit),
+          this.getRecentParticipantInstanceIds(userId, "history", limit),
         ]);
       const instanceIds = [
         ...new Set(
@@ -2141,7 +2247,8 @@ export class WorkflowService {
       if (status) {
         instanceQb.andWhere("instance.status = :status", { status });
       }
-      instances = (await instanceQb.limit(100).getMany()).sort(
+      this.applyInstanceListFilters(instanceQb, normalizedFilters);
+      instances = (await instanceQb.limit(limit).getMany()).sort(
         (a, b) =>
           new Date(b.startTime || 0).getTime() -
           new Date(a.startTime || 0).getTime(),
@@ -2155,18 +2262,20 @@ export class WorkflowService {
       if (status) {
         instanceQb.andWhere("instance.status = :status", { status });
       }
+      this.applyInstanceListFilters(instanceQb, normalizedFilters);
 
       instances = await instanceQb
         .orderBy("instance.startTime", "DESC")
-        .limit(100)
+        .limit(limit)
         .getMany();
     }
 
-    return Promise.all(
+    const list = await Promise.all(
       instances.map((instance) =>
         this.attachBusinessSummaryToInstance(instance),
       ),
     );
+    return this.filterInstancesByKeyword(list, normalizedFilters.keyword);
   }
 
   private async attachBusinessSummaryToTask(task: WorkflowTask): Promise<any> {

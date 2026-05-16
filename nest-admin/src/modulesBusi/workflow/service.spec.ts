@@ -621,6 +621,77 @@ describe("WorkflowService listInstances", () => {
     ).not.toHaveBeenCalled();
     expect(result).toEqual([{ id: "ins_9" }]);
   });
+
+  it("管理员权限访问实例列表时叠加业务对象、提交人和审批人筛选", async () => {
+    const { service, instanceQb } = createService();
+    instanceQb.getMany.mockResolvedValue([{ id: "ins_9" }]);
+
+    await service.listInstances("admin_1", "1", "participant", ["*"], {
+      businessType: "project",
+      starterId: "starter_1",
+      currentAssigneeId: "approver_1",
+      handledUserId: "handled_1",
+    });
+
+    expect(instanceQb.andWhere).toHaveBeenCalledWith(
+      "instance.businessKey LIKE :businessTypePrefix",
+      { businessTypePrefix: "project_%" },
+    );
+    expect(instanceQb.andWhere).toHaveBeenCalledWith(
+      "instance.starterId = :starterId",
+      { starterId: "starter_1" },
+    );
+    expect(instanceQb.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("task.assignee_id = :currentAssigneeId"),
+      { currentAssigneeId: "approver_1" },
+    );
+    const historyFilterCall = instanceQb.andWhere.mock.calls.find(
+      ([condition]) => String(condition).includes("history.operator_id"),
+    );
+    expect(historyFilterCall?.[0]).toContain(
+      "history.action IN (:...handledActions)",
+    );
+    expect(historyFilterCall?.[1]).toEqual({
+      handledUserId: "handled_1",
+      handledActions: ["1", "2", "3", "4", "5", "6"],
+    });
+    expect(historyFilterCall?.[1].handledActions).not.toContain("execute");
+  });
+
+  it("按业务标题筛选时在业务摘要补全后过滤结果", async () => {
+    const { service, instanceQb } = createService();
+    instanceQb.getMany.mockResolvedValue([
+      { id: "ins_1", businessKey: "project_1" },
+      { id: "ins_2", businessKey: "task_2" },
+    ]);
+    jest
+      .spyOn(service as any, "attachBusinessSummaryToInstance")
+      .mockImplementation(async (instance) => ({
+        ...instance,
+        businessTitle: instance.id === "ins_1" ? "项目标题A" : "任务标题B",
+        businessCode: instance.id === "ins_1" ? "PRJ-001" : "TASK-002",
+      }));
+
+    const result = await service.listInstances(
+      "admin_1",
+      "",
+      "participant",
+      ["*"],
+      {
+        keyword: "项目标题",
+      },
+    );
+
+    expect(instanceQb.limit).toHaveBeenCalledWith(300);
+    expect(result).toEqual([
+      {
+        id: "ins_1",
+        businessKey: "project_1",
+        businessTitle: "项目标题A",
+        businessCode: "PRJ-001",
+      },
+    ]);
+  });
 });
 
 describe("WorkflowService 会签状态机", () => {

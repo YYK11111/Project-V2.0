@@ -8,6 +8,7 @@ import WorkflowProgressView from '@/components/workflow/WorkflowProgressView.vue
 import WorkflowHistoryView from '@/components/workflow/WorkflowHistoryView.vue'
 import { useUserStore } from '@/stores/user'
 import TableOperation from '@/components/TableOperation.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
 
 const userStore = useUserStore()
@@ -21,6 +22,20 @@ const canWorkflowInstanceCancel = computed(() => checkPermi(['business/workflow/
 const canWorkflowInstanceWithdraw = computed(() => checkPermi(['business/workflow/instances/withdraw']))
 const canWorkflowInstanceCloseReturned = computed(() => checkPermi(['business/workflow/closeReturned']))
 const canWorkflowInstanceBatchOperate = computed(() => canWorkflowInstanceCancel.value || canWorkflowInstanceWithdraw.value || canWorkflowInstanceCloseReturned.value)
+
+const businessTypeOptions = [
+  { label: '项目', value: 'project' },
+  { label: '任务', value: 'task' },
+  { label: '工单', value: 'ticket' },
+  { label: '变更', value: 'change' },
+  { label: '客户', value: 'customer' },
+  { label: '上线单', value: 'goLive' },
+  { label: '验收单', value: 'acceptance' },
+  { label: '运维交接单', value: 'handover' },
+  { label: '互动', value: 'interaction' },
+  { label: '商机', value: 'opportunity' },
+  { label: '合同', value: 'contract' },
+]
 
 const getButtons = (row: any) => [
   canWorkflowInstanceGetOne.value ? { key: 'detail', label: '详情', onClick: () => viewDetail(row) } : null,
@@ -74,20 +89,7 @@ const loadInstanceDetail = async (instanceId: string) => {
 }
 
 const getBusinessTypeLabel = (type: string) => {
-  const map: Record<string, string> = {
-    project: '项目',
-    task: '任务',
-    ticket: '工单',
-    change: '变更',
-    customer: '客户',
-    goLive: '上线单',
-    acceptance: '验收单',
-    handover: '运维交接单',
-    interaction: '互动',
-    opportunity: '商机',
-    contract: '合同',
-  }
-  return map[type] || type || '-'
+  return businessTypeOptions.find((item) => item.value === type)?.label || type || '-'
 }
 
 const getBusinessObjectId = (businessKey: string) => {
@@ -144,13 +146,32 @@ onMounted(async () => {
   <div class="workflow-instance-index-page">
     <RequestChartTable ref="rctRef" class="workflow-instance-index-panel business-list-panel" :params="params" :request="api.getWorkflowInstances" :is-selection="true">
       <template #query="{ query }">
-        <BaSelect v-model="query.mode" label="查看范围" prop="mode">
-          <el-option label="我参与的" value="participant" />
-          <el-option label="我发起的" value="starter" />
-        </BaSelect>
-        <BaSelect v-model="query.status" label="状态" prop="status" isAll>
-          <el-option label="进行中" value="1" /><el-option label="已完成" value="2" /><el-option label="已取消" value="3" />
-        </BaSelect>
+        <div class="query-sections">
+          <div class="query-section query-section--primary">
+            <div class="query-grid">
+              <BaSelect v-model="query.mode" label="查看范围" prop="mode">
+                <el-option label="我参与的" value="participant" />
+                <el-option label="我发起的" value="starter" />
+              </BaSelect>
+              <BaSelect v-model="query.status" label="状态" prop="status" isAll>
+                <el-option label="进行中" value="1" /><el-option label="已完成" value="2" /><el-option label="已取消" value="3" />
+              </BaSelect>
+              <BaSelect v-model="query.businessType" label="业务对象" prop="businessType" isAll>
+                <el-option v-for="item in businessTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </BaSelect>
+              <BaInput v-model="query.keyword" label="业务标题" prop="keyword" />
+              <el-form-item label="提交人" prop="starterId">
+                <UserSelect v-model="query.starterId" placeholder="请选择提交人" clearable />
+              </el-form-item>
+              <el-form-item label="当前审批人" prop="currentAssigneeId">
+                <UserSelect v-model="query.currentAssigneeId" placeholder="请选择当前审批人" clearable />
+              </el-form-item>
+              <el-form-item label="已审批人" prop="handledUserId">
+                <UserSelect v-model="query.handledUserId" placeholder="请选择已审批人" clearable />
+              </el-form-item>
+            </div>
+          </div>
+        </div>
       </template>
       <template #operation="{ selectedIds }">
         <div class="workflow-instance-index-operation">
@@ -306,4 +327,13 @@ onMounted(async () => {
 .instance-title-cell__title { color: var(--el-text-color-primary); }
 .instance-title-cell__code { font-size: 12px; color: var(--el-text-color-secondary); }
 .instance-meta-id { color: var(--el-text-color-secondary); }
+.query-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 20px; align-items: start; width: 100%; }
+.query-grid :deep(.el-form-item) { display: flex; width: 100%; margin-bottom: 0; }
+.query-grid :deep(.el-form-item__content) { flex: 1; min-width: 0; }
+.query-grid :deep(.el-select),
+.query-grid :deep(.el-input),
+.query-grid :deep(.user-select) { width: 100%; flex: 1; }
+@media (max-width: 1200px) { .query-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .query-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 768px) { .query-grid { grid-template-columns: 1fr; } }
 </style>

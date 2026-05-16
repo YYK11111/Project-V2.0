@@ -115,23 +115,39 @@ describe("WorkflowController", () => {
     );
   });
 
-  it("获取实例列表时透传服务端认证用户 ID 与权限", async () => {
+  it("获取实例列表时透传服务端认证用户 ID、权限和筛选条件", async () => {
     const controller = new WorkflowController(
       workflowService as any,
       businessFieldService,
     );
     workflowService.listInstances.mockResolvedValue([]);
 
-    await controller.listInstances("1", "participant", {
-      user: { id: "admin-user-id" },
-      permissions: ["business/workflow/instances/manageAll"],
-    } as any);
+    await controller.listInstances(
+      "1",
+      "participant",
+      "project",
+      "项目标题",
+      "starter-1",
+      "current-1",
+      "handled-1",
+      {
+        user: { id: "admin-user-id" },
+        permissions: ["business/workflow/instances/manageAll"],
+      } as any,
+    );
 
     expect(workflowService.listInstances).toHaveBeenCalledWith(
       "admin-user-id",
       "1",
       "participant",
       ["business/workflow/instances/manageAll"],
+      {
+        businessType: "project",
+        keyword: "项目标题",
+        starterId: "starter-1",
+        currentAssigneeId: "current-1",
+        handledUserId: "handled-1",
+      },
     );
   });
 

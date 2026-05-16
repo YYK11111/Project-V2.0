@@ -413,7 +413,7 @@ export class WorkflowIntegrationService {
               : "任务审批已驳回",
         } as any);
       } else {
-        return task;
+        return;
       }
     } else if (businessKey?.startsWith("ticket_")) {
       const ticketId = businessKey.replace("ticket_", "");

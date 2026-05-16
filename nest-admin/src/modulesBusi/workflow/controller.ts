@@ -128,6 +128,11 @@ export class WorkflowController {
   async listInstances(
     @Query("status") status?: string,
     @Query("mode") mode?: "starter" | "participant",
+    @Query("businessType") businessType?: string,
+    @Query("keyword") keyword?: string,
+    @Query("starterId") starterId?: string,
+    @Query("currentAssigneeId") currentAssigneeId?: string,
+    @Query("handledUserId") handledUserId?: string,
     @Req() req?,
   ) {
     return this.workflowService.listInstances(
@@ -135,6 +140,13 @@ export class WorkflowController {
       status,
       mode || "starter",
       this.getCurrentPermissions(req),
+      {
+        businessType,
+        keyword,
+        starterId,
+        currentAssigneeId,
+        handledUserId,
+      },
     );
   }
 

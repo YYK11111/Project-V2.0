@@ -86,6 +86,22 @@ describe("WorkflowIntegrationService 任务完成审批回调", () => {
       }),
     );
   });
+
+  it("普通任务回调不应返回任务实体", async () => {
+    const { service, taskRepository } = createService();
+    taskRepository.findOne.mockResolvedValue({
+      id: "task-3",
+      status: TaskStatus.pending,
+      approvalStatus: "0",
+    });
+
+    await expect(
+      service.handleWorkflowCallback("", "completed", {
+        businessKey: "task_task-3",
+      }),
+    ).resolves.toBeUndefined();
+    expect(taskRepository.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("WorkflowIntegrationService 审批发起权限", () => {

@@ -8,6 +8,18 @@ function readInstancesSource() {
 }
 
 describe('workflow 实例详情可视化守卫', () => {
+  it('实例列表提供业务和人员筛选，并使用局部 query-grid 布局', () => {
+    const source = readInstancesSource()
+
+    expect(source).toContain("import UserSelect from '@/components/UserSelect.vue'")
+    expect(source).toContain('class="query-grid"')
+    expect(source).toContain('v-model="query.businessType" label="业务对象" prop="businessType"')
+    expect(source).toContain('v-model="query.keyword" label="业务标题" prop="keyword"')
+    expect(source).toContain('v-model="query.starterId" placeholder="请选择提交人"')
+    expect(source).toContain('v-model="query.currentAssigneeId" placeholder="请选择当前审批人"')
+    expect(source).toContain('v-model="query.handledUserId" placeholder="请选择已审批人"')
+  })
+
   it('详情默认展示审批组件同款流程图并加载历史和任务数据', () => {
     const source = readInstancesSource()
 
