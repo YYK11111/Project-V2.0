@@ -7,7 +7,7 @@ function readSource() {
 }
 
 function getSectionBlock(source: string, title: string) {
-  const match = source.match(new RegExp(`<section class="section-card">[\\s\\S]*?<div class="section-title">${title}</div>[\\s\\S]*?<\\/section>`))
+  const match = source.match(new RegExp(`<section class="business-form-section">[\\s\\S]*?<div class="business-form-section__title">${title}</div>[\\s\\S]*?<\\/section>`))
   return match?.[0] || ''
 }
 
@@ -27,7 +27,7 @@ function getSalesIdWatchBlock(source: string) {
 }
 
 function getFooterActionsBlock(source: string) {
-  const match = source.match(/<el-form-item class="footer-actions">[\s\S]*?<\/el-form-item>/)
+  const match = source.match(/<template #footer>[\s\S]*?<\/template>/)
   return match?.[0] || ''
 }
 
@@ -63,6 +63,20 @@ describe('customer form approval contract', () => {
   const handleSubmitApprovalBlock = getHandleSubmitApprovalBlock(source)
   const descriptionFormItemBlock = getFormItemBlock(customerAttributeSection, '客户描述')
 
+  it('客户表单样式接入统一业务表单体系', () => {
+    expect(source).toContain('<FormPageShell class="business-form-page customer-form-page">')
+    expect(source).toContain('class="Gcard business-form-shell customer-form-shell"')
+    expect(source).toContain('class="business-form-header"')
+    expect(source).toContain('<div class="business-form-sections">')
+    expect(source).toContain('<section class="business-form-section">')
+    expect(source).toContain('class="business-form-section__header"')
+    expect(source).toContain('class="business-form-fields"')
+    expect(source).toContain('class="business-workflow-section"')
+    expect(source).not.toContain('customer-section-fields')
+    expect(source).not.toContain('workflow-panel-section')
+    expect(source).not.toContain('class="section-card"')
+  })
+
   it('新增客户默认带出当前用户部门并联动销售负责人所属部门', () => {
     expect(initialFormBlock).toMatch(/deptId\s*:\s*currentUserDeptId\.value/)
     expect(defaultFormBlock).toMatch(/deptId\s*:\s*currentUserDeptId\.value/)
@@ -93,9 +107,9 @@ describe('customer form approval contract', () => {
   })
 
   it('提交审批权限判断与按钮展示一致', () => {
-    expect(handleSubmitApprovalBlock).toMatch(/if\s*\(\(isEdit\.value\s*&&\s*!canCustomerUpdate\.value\)\s*\|\|\s*\(!isEdit\.value\s*&&\s*!canCustomerAdd\.value\)\)\s*return\s*\$sdk\.msgWarning\('当前操作没有权限'\)/)
+    expect(handleSubmitApprovalBlock).toMatch(/if\s*\(\(isEdit\.value\s*&&\s*!canManageCurrentCustomer\.value\)\s*\|\|\s*\(!isEdit\.value\s*&&\s*!canCustomerAdd\.value\)\)\s*\{?\s*return\s*\$sdk\.msgWarning\('当前操作没有权限'\)/)
     expect(source).toContain("const canSubmitApprovalAction = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))")
-    expect(footerActionsBlock).toMatch(/<el-button\s+v-if="!isReadonly && \(isEdit \? canCustomerUpdate : canCustomerAdd\) && canSubmitApprovalAction"\s+type="warning"\s+@click="handleSubmitApproval">提交<\/el-button>/)
+    expect(footerActionsBlock).toMatch(/<el-button\s+v-if="!isReadonly && \(isEdit \? canManageCurrentCustomer : canCustomerAdd\) && canSubmitApprovalAction"\s+type="warning"\s+@click="handleSubmitApproval">提交<\/el-button>/)
     expect(handleSubmitApprovalBlock).toMatch(/if\s*\(!canCloseReturnedInstance\.value\s*&&\s*!canSubmitApprovalAction\.value\)\s*\{?[\s\S]*?\$sdk\.msgWarning\('当前状态不允许提交审批'\)/)
   })
 

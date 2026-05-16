@@ -73,9 +73,14 @@ const workflowTaskId = computed(() => String(route.query.taskId || ''))
 const workflowInstanceId = computed(() => String(route.query.instanceId || ''))
 const fromWorkflow = computed(() => route.query.fromWorkflow === '1')
 const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId.value)
-const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canCustomerAdd = computed(() => checkPermi(['business/crm/customers/add']))
 const canCustomerUpdate = computed(() => checkPermi(['business/crm/customers/update']))
+const canManageCurrentCustomer = computed(() => (
+  !hasCustomerId.value
+    ? canCustomerAdd.value
+    : canCustomerUpdate.value || form.value?.permissionContext?.canEdit === true
+))
+const isReadonly = computed(() => isView.value || isWorkflowReadonly.value || (hasCustomerId.value && !canManageCurrentCustomer.value))
 const canSubmitApprovalAction = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canSubmitCurrentApproval = computed(() => canSubmitApprovalAction.value)
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
@@ -202,7 +207,7 @@ function persistCustomer(api) {
 }
 
 function submit() {
-  if ((isEdit.value && !canCustomerUpdate.value) || (!isEdit.value && !canCustomerAdd.value)) {
+  if ((isEdit.value && !canManageCurrentCustomer.value) || (!isEdit.value && !canCustomerAdd.value)) {
     return $sdk.msgWarning('当前操作没有权限')
   }
   formRef.value.validate((valid) => {
@@ -223,7 +228,7 @@ function cancel() {
 }
 
 async function handleSubmitApproval() {
-  if ((isEdit.value && !canCustomerUpdate.value) || (!isEdit.value && !canCustomerAdd.value)) return $sdk.msgWarning('当前操作没有权限')
+  if ((isEdit.value && !canManageCurrentCustomer.value) || (!isEdit.value && !canCustomerAdd.value)) return $sdk.msgWarning('当前操作没有权限')
   if (!canCloseReturnedInstance.value && !canSubmitApprovalAction.value) {
     return $sdk.msgWarning('当前状态不允许提交审批')
   }
@@ -261,7 +266,7 @@ async function handleCloseReturnedInstance() {
 }
 
 function goToEdit() {
-  if (!route.query.id) return
+  if (!route.query.id || !canManageCurrentCustomer.value) return $sdk.msgWarning('当前操作没有权限')
   router.push({ path: '/crm/customerManage/form', query: { id: route.query.id } })
 }
 
@@ -271,10 +276,10 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <FormPageShell class="customer-form-page">
-    <div class="Gcard customer-form-shell">
-    <div class="customer-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '客户详情' : isEdit ? '编辑客户' : '新增客户'">
+  <FormPageShell class="business-form-page customer-form-page">
+    <div class="Gcard business-form-shell customer-form-shell">
+    <div>
+      <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '客户详情' : isEdit ? '编辑客户' : '新增客户'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
@@ -292,24 +297,24 @@ function scrollToWorkflowPanel() {
     >
       <template #default>
         <div class="top-alert-actions">
-          <el-button v-if="isView" type="primary" size="small" @click="goToEdit">去编辑</el-button>
+          <el-button v-if="isView && canManageCurrentCustomer" type="primary" size="small" @click="goToEdit">去编辑</el-button>
           <el-button v-if="isEdit && canCustomerUpdate && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </div>
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" class="business-form" style="max-width: 1000px">
-      <div class="customer-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="140px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护客户名称、简称、类型和统一社会信用代码，先把主数据基础信息建立完整。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护客户名称、简称、类型和统一社会信用代码，先把主数据基础信息建立完整。</div>
           </div>
         </div>
 
-        <div class="customer-section-fields">
+        <div class="business-form-fields">
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="客户名称" prop="name">
@@ -364,15 +369,15 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">联系与归属</div>
-            <div class="section-desc">维护联系人、联系电话、联系邮箱以及销售负责人和所属部门。</div>
+            <div class="business-form-section__title">联系与归属</div>
+            <div class="business-form-section__desc">维护联系人、联系电话、联系邮箱以及销售负责人和所属部门。</div>
           </div>
         </div>
 
-        <div class="customer-section-fields">
+        <div class="business-form-fields">
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="联系人" prop="contactPerson">
@@ -454,15 +459,15 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">客户属性与说明</div>
-            <div class="section-desc">维护客户等级、状态、客户价值和客户描述，便于后续销售与运营判断。</div>
+            <div class="business-form-section__title">客户属性与说明</div>
+            <div class="business-form-section__desc">维护客户等级、状态、客户价值和客户描述，便于后续销售与运营判断。</div>
           </div>
         </div>
 
-        <div class="customer-section-fields">
+        <div class="business-form-fields business-form-fields--content">
 
       <el-form-item label="客户描述" prop="description">
         <ViewRichText v-if="isReadonly" :html="form.description" />
@@ -474,8 +479,8 @@ function scrollToWorkflowPanel() {
       </div>
     </el-form>
 
-    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-      <div class="workflow-panel-section__header">审批操作区</div>
+    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="business-workflow-section">
+      <div class="business-workflow-section__header">审批操作区</div>
       <WorkflowApprovalPanel
         :task-id="workflowTaskId"
         :instance-id="workflowInstanceId"
@@ -485,116 +490,17 @@ function scrollToWorkflowPanel() {
     </div>
     </div>
     <template #footer>
-      <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd)" type="primary" @click="submit">暂存</el-button>
+      <el-button v-if="!isReadonly && (isEdit ? canManageCurrentCustomer : canCustomerAdd)" type="primary" @click="submit">暂存</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-      <el-button v-if="!isReadonly && (isEdit ? canCustomerUpdate : canCustomerAdd) && canSubmitApprovalAction" type="warning" @click="handleSubmitApproval">提交</el-button>
+      <el-button v-if="!isReadonly && (isEdit ? canManageCurrentCustomer : canCustomerAdd) && canSubmitApprovalAction" type="warning" @click="handleSubmitApproval">提交</el-button>
     </template>
   </FormPageShell>
 </template>
 
 <style lang="scss" scoped>
-.customer-form-page {
-  min-height: 100%;
-}
-
-.customer-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.customer-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.customer-form-shell__top {
-  margin-bottom: 20px;
-}
-
-.customer-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.customer-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.customer-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.customer-form-page :deep(.el-form-item__label) {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.workflow-panel-section {
-  margin-top: 20px;
-  max-width: 1000px;
-  padding-top: 20px;
-  border-top: 1px solid var(--el-border-color-light);
-}
-
-.workflow-panel-section__header {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-}
-
 .top-alert-actions {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-}
-
-.footer-actions :deep(.el-form-item__content) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.footer-actions :deep(.el-button) {
-  min-width: 112px;
-}
-
-.footer-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
-}
-
-@media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>
