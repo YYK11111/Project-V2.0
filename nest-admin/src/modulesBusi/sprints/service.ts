@@ -9,6 +9,7 @@ import { CreateSprintDto } from "./dto";
 import { Task, TaskStatus } from "../tasks/entity";
 import { User } from "src/modules/users/entities/user.entity";
 import { ProjectExecutionPermissionService } from "../projects/project-execution-permission.service";
+import { appendProjectOperationPermissions } from "src/common/utils/project-operation-permission";
 
 @Injectable()
 export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
@@ -188,7 +189,17 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
       relations: ["project", "scrumMaster", "owner"],
       order: { sort: "ASC", startDate: "DESC" },
     };
-    return this.listBy(queryOrm, query);
+    const result = await this.listBy(queryOrm, query);
+    if (_operatorId) {
+      await appendProjectOperationPermissions(
+        result,
+        this.projectExecutionPermissionService,
+        String(_operatorId),
+        Array.isArray(_operatorPermissions) ? _operatorPermissions : [],
+        "business/sprints/manageAll",
+      );
+    }
+    return result;
   }
 
   async getBurndown(sprintId: string): Promise<any> {

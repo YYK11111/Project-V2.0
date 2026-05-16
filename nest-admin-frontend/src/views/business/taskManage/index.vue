@@ -1,13 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { CaretBottom } from '@element-plus/icons-vue'
 import { getList, getStatus, getPriority, del, updateProgress, submitApproval, startTask, pauseTask, resumeTask, submitCompletionApproval } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { sourceTypeMap } from '../projectManage/fieldMaps'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
-const params = ref({})
+const route = useRoute()
+const params = ref({
+  projectId: route.query.projectId || '',
+})
 
 const status = ref({})
 getStatus().then(({ data }) => (status.value = data))
@@ -21,6 +26,9 @@ const showAdvanced = ref(false)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskDelete = computed(() => checkPermi(['business/tasks/delete']))
 const canTaskUpdateProgress = computed(() => checkPermi(['business/tasks/updateProgress']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canTaskCreate = computed(() => canCreateProjectScopedRecord(canTaskAdd.value, 'canManageTasks'))
+const canTaskBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canTaskDelete.value, 'canManageTasks'))
 const statusMap = computed(() => ({
   ...status.value,
   6: status.value?.['6'] || '待完成审批',
@@ -154,9 +162,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="task-index-operation">
           <div class="task-index-operation__left">
-            <el-button v-if="canTaskAdd" type="primary" @click="rctRef.goRoute(null, '/taskManage/form')">新增任务</el-button>
+            <el-button v-if="canTaskCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/taskManage/form')">新增任务</el-button>
           </div>
-          <el-button v-if="canTaskDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canTaskBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

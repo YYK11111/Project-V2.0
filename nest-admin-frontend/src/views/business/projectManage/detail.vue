@@ -9,7 +9,8 @@ import { getKnowledgeTypes } from '@/views/content/articleManage/api'
 import { getList as getCustomerList } from '@/views/business/crm/customerManage/api'
 import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 import { phaseMap } from './fieldMaps'
-import ChartPie from '@/components/ChartPie.vue'
+import ProjectHeroActions from './components/ProjectHeroActions.vue'
+import ProjectOverviewCharts from './components/ProjectOverviewCharts.vue'
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
@@ -870,18 +871,17 @@ function getProjectApprovalText(project) {
       </div>
 
       <div class="project-hero__side">
-        <div v-if="!isProjectVisitor" class="hero-action-card">
-          <div class="hero-action-card__title">快捷发起</div>
-          <div class="hero-action-card__desc">从项目上下文直接发起核心业务动作，把任务、风险、变更、工单、Sprint 和知识收口到同一个工作台。</div>
-          <div class="hero-action-card__grid">
-            <el-button v-if="canAddTaskInProject" @click="createProjectScopedRecord('/taskManage/form')">新增任务</el-button>
-            <el-button v-if="canAddRiskInProject" @click="createProjectScopedRecord('/projectManage/riskManage/form')">新增风险</el-button>
-            <el-button v-if="canAddChangeInProject" @click="createProjectScopedRecord('/changeManage/form')">新增变更</el-button>
-            <el-button v-if="canAddTicketInProject" @click="createProjectScopedRecord('/ticketManage/form')">新增工单</el-button>
-            <el-button v-if="canAddSprintInProject" @click="createProjectScopedRecord('/sprintManage/form')">新增 Sprint</el-button>
-            <el-button v-if="canAddKnowledgeInProject" type="primary" @click="goToProjectKnowledgeCreate">新增知识</el-button>
-          </div>
-        </div>
+        <ProjectHeroActions
+          v-if="!isProjectVisitor"
+          :can-add-task="canAddTaskInProject"
+          :can-add-risk="canAddRiskInProject"
+          :can-add-change="canAddChangeInProject"
+          :can-add-ticket="canAddTicketInProject"
+          :can-add-sprint="canAddSprintInProject"
+          :can-add-knowledge="canAddKnowledgeInProject"
+          @create-record="createProjectScopedRecord"
+          @create-knowledge="goToProjectKnowledgeCreate"
+        />
 
         <div class="hero-stat-card">
           <div class="hero-stat-card__label">预算</div>
@@ -1031,31 +1031,14 @@ function getProjectApprovalText(project) {
           </el-card>
         </div>
 
-        <el-row v-if="!isProjectVisitor && hasOverviewCharts" :gutter="20" class="mt20">
-          <el-col :xs="24" :lg="8">
-            <el-card shadow="hover" class="panel-card chart-card">
-              <template #header>任务状态分布</template>
-              <ChartPie :key="`task-${activeTab}`" :series="taskStatusChartData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" @slice-click="handleChartSliceClick('tasks', $event.name === '已逾期' ? 'overdue' : $event.name === '处理中' ? 'inProgress' : $event.name === '待处理' ? 'all' : 'all')" />
-            </el-card>
-          </el-col>
-          <el-col :xs="24" :lg="8">
-            <el-card shadow="hover" class="panel-card chart-card">
-              <template #header>缺陷严重度分布</template>
-              <ChartPie :key="`ticket-${activeTab}`" :series="ticketSeverityChartData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" @slice-click="handleChartSliceClick('tickets', $event.name === '严重' ? 'critical' : 'open')" />
-            </el-card>
-          </el-col>
-          <el-col :xs="24" :lg="8">
-            <el-card shadow="hover" class="panel-card chart-card">
-              <template #header>风险等级分布</template>
-              <ChartPie :key="`risk-${activeTab}`" :series="riskLevelChartData" :option="{ legend: { y: '84%' }, series: { radius: ['42%', '68%'] } }" @slice-click="handleChartSliceClick('risks', ['高', '严重'].includes($event.name) ? 'high' : 'active')" />
-            </el-card>
-          </el-col>
-        </el-row>
-
-        <el-card v-else shadow="hover" class="mt20 panel-card overview-empty-card">
-          <template #header>统计分布</template>
-          <div class="overview-empty-card__content">当前项目还没有足够的任务、缺陷或风险数据可用于生成分布图。</div>
-        </el-card>
+        <ProjectOverviewCharts
+          :is-project-visitor="isProjectVisitor"
+          :has-overview-charts="hasOverviewCharts"
+          :task-status-chart-data="taskStatusChartData"
+          :ticket-severity-chart-data="ticketSeverityChartData"
+          :risk-level-chart-data="riskLevelChartData"
+          @chart-slice-click="handleChartSliceClick"
+        />
 
         <el-row :gutter="20" class="mt20">
           <el-col :xs="24" :lg="12">
@@ -1215,7 +1198,7 @@ function getProjectApprovalText(project) {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="交付焦点" name="focus">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="交付焦点" name="focus">
         <div class="focus-board">
           <el-card shadow="hover" class="focus-card focus-card--alert">
             <template #header>
@@ -1297,7 +1280,7 @@ function getProjectApprovalText(project) {
         </div>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="计划" name="plan">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="计划" name="plan">
         <div class="tab-summary-grid">
           <div class="tab-summary-card"><span>关键里程碑</span><strong>{{ executionPlanSummary.milestones }}</strong></div>
           <div class="tab-summary-card"><span>Sprint 数量</span><strong>{{ executionPlanSummary.sprints }}</strong></div>
@@ -1584,7 +1567,7 @@ function getProjectApprovalText(project) {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="任务" name="tasks">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="任务" name="tasks">
         <div v-if="taskFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { overdue: '已逾期任务', dueSoon: '即将到期任务', inProgress: '处理中任务' }[taskFilter] || '任务' }}</span>
           <el-button link type="primary" @click="clearTabFilter('tasks')">查看全部</el-button>
@@ -1649,7 +1632,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="缺陷" name="tickets">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="缺陷" name="tickets">
         <div v-if="ticketFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { open: '未解决缺陷', critical: '严重缺陷', unassigned: '待分配缺陷' }[ticketFilter] || '缺陷' }}</span>
           <el-button link type="primary" @click="clearTabFilter('tickets')">查看全部</el-button>
@@ -1706,7 +1689,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="里程碑" name="milestones">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="里程碑" name="milestones">
         <div v-if="milestoneFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { dueSoon: '即将到期里程碑', overdue: '已超期里程碑', delayed: '已延期里程碑' }[milestoneFilter] || '里程碑' }}</span>
           <el-button link type="primary" @click="clearTabFilter('milestones')">查看全部</el-button>
@@ -1793,7 +1776,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="风险" name="risks">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="风险" name="risks">
         <div v-if="riskFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { active: '活跃风险', high: '高风险事项', overdue: '已超期风险', unassigned: '待分配风险' }[riskFilter] || '风险' }}</span>
           <el-button link type="primary" @click="clearTabFilter('risks')">查看全部</el-button>
@@ -1852,7 +1835,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="变更" name="changes">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="变更" name="changes">
         <div v-if="changeFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { pending: '待审批变更', highImpact: '高影响变更', implemented: '已实施变更' }[changeFilter] || '变更' }}</span>
           <el-button link type="primary" @click="clearTabFilter('changes')">查看全部</el-button>
@@ -1903,7 +1886,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor" label="Sprint" name="sprints">
+      <el-tab-pane v-if="!isProjectVisitor" lazy label="Sprint" name="sprints">
         <div v-if="sprintFilter !== 'all'" class="tab-filter-tip">
           <span>当前已聚焦：{{ { active: '进行中 Sprint', planning: '计划中 Sprint', dueSoon: '临近结束 Sprint' }[sprintFilter] || 'Sprint' }}</span>
           <el-button link type="primary" @click="clearTabFilter('sprints')">查看全部</el-button>
@@ -1957,7 +1940,7 @@ function getProjectApprovalText(project) {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane v-if="canViewGroup('projectKnowledge')" label="知识" name="knowledge">
+      <el-tab-pane v-if="canViewGroup('projectKnowledge')" lazy label="知识" name="knowledge">
         <div class="tab-summary-grid">
           <div class="tab-summary-card"><span>知识总数</span><strong>{{ projectKnowledgeSummary.total || 0 }}</strong></div>
           <div class="tab-summary-card"><span>FAQ</span><strong>{{ projectKnowledgeSummary.faq || 0 }}</strong></div>
@@ -2004,7 +1987,7 @@ function getProjectApprovalText(project) {
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane v-if="!isProjectVisitor && canViewGroup('projectClosure')" label="结项" name="closure">
+      <el-tab-pane v-if="!isProjectVisitor && canViewGroup('projectClosure')" lazy label="结项" name="closure">
         <div class="tab-summary-grid">
           <div class="tab-summary-card"><span>验收日期</span><strong>{{ project.acceptanceDate || '-' }}</strong></div>
           <div class="tab-summary-card"><span>验收说明</span><strong>{{ project.closeSummary ? '已补齐' : '待补齐' }}</strong></div>
@@ -2149,37 +2132,6 @@ function getProjectApprovalText(project) {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.hero-action-card {
-  padding: 16px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--el-bg-color) 88%, var(--el-fill-color-extra-light));
-}
-
-.hero-action-card__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.hero-action-card__desc {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.hero-action-card__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.hero-action-card__grid :deep(.el-button) {
-  margin-left: 0;
 }
 
 .hero-stat-card {
@@ -2353,19 +2305,6 @@ function getProjectApprovalText(project) {
 
 .panel-card {
   border-radius: 14px;
-}
-
-.chart-card :deep(.chart) {
-  min-width: 100%;
-  min-height: 280px;
-}
-
-.overview-empty-card__content {
-  min-height: 72px;
-  display: flex;
-  align-items: center;
-  color: var(--el-text-color-secondary);
-  line-height: 1.7;
 }
 
 .plan-intro-card {
@@ -3167,7 +3106,6 @@ function getProjectApprovalText(project) {
   }
 
   .project-alert-grid,
-  .hero-action-card__grid,
   .closure-grid,
   .health-dimension-grid,
   .plan-deviation-grid,
@@ -3192,7 +3130,6 @@ function getProjectApprovalText(project) {
   .focus-grid,
   .focus-board,
   .project-alert-grid,
-  .hero-action-card__grid,
   .closure-grid,
   .health-dimension-grid,
   .plan-deviation-grid,

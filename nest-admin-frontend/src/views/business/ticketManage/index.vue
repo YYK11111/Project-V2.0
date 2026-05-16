@@ -1,14 +1,18 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getList, getType, getStatus, del, publishKnowledge, submitApproval } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const router = useRouter()
-const params = ref({})
+const route = useRoute()
+const params = ref({
+  projectId: route.query.projectId || '',
+})
 
 const type = ref({})
 getType().then(({ data }) => (type.value = data))
@@ -20,6 +24,9 @@ const rctRef = ref()
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
 const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canTicketCreate = computed(() => canCreateProjectScopedRecord(canTicketAdd.value, 'canManageTasks'))
+const canTicketBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canTicketDelete.value, 'canManageTasks'))
 
 async function handleSubmitApproval(row) {
   if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
@@ -105,10 +112,10 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="ticket-index-operation">
           <div class="ticket-index-operation__left">
-            <el-button v-if="canTicketAdd" type="primary" @click="rctRef.goRoute(null, '/ticketManage/form')">新增工单</el-button>
+            <el-button v-if="canTicketCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/ticketManage/form')">新增工单</el-button>
             <el-button @click="exportTicketList">导出</el-button>
           </div>
-          <el-button v-if="canTicketDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canTicketBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

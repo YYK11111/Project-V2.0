@@ -9,6 +9,7 @@ import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const router = useRouter()
 const route = useRoute()
@@ -31,6 +32,9 @@ const rctRef = ref()
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskDelete = computed(() => checkPermi(['business/risks/delete']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canRiskCreate = computed(() => canCreateProjectScopedRecord(canRiskAdd.value, 'canManageRisks'))
+const canRiskBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canRiskDelete.value, 'canManageRisks'))
 
 const columns = [
   { prop: 'name', label: '风险名称', minWidth: 150 },
@@ -52,8 +56,8 @@ function getFormPath() {
 }
 
 const handleAdd = () => {
-  if (!canRiskAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(getFormPath())
+  if (!canRiskCreate.value) return $sdk.msgWarning('当前操作没有权限')
+  router.push({ path: getFormPath(), query: getProjectScopedCreateQuery() || {} })
 }
 
 const handleEdit = (row) => {
@@ -210,10 +214,10 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="risk-index-operation">
           <div class="risk-index-operation__left">
-            <el-button v-if="canRiskAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button v-if="canRiskCreate" type="primary" @click="handleAdd">新增</el-button>
             <el-button @click="exportRiskList">导出</el-button>
           </div>
-          <el-button v-if="canRiskDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canRiskBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

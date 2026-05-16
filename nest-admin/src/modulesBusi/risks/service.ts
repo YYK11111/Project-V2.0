@@ -392,7 +392,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
 
   async publishToKnowledge(
     id: string,
-    currentUser: { id?: string; name?: string } = {},
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
   ) {
     const risk = await this.getOne({ id });
     if (!risk) throw new Error("风险不存在");
@@ -485,7 +485,7 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
 
   async convertToTask(
     id: string,
-    currentUser: { id?: string; name?: string } = {},
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
   ) {
     const risk = await this.getOne({ id });
     if (!risk) throw new Error("风险不存在");
@@ -505,7 +505,9 @@ export class RisksService extends BaseService<Risk, CreateRiskDto> {
       createUser: currentUser.name || "system",
       _operatorId: currentUser.id,
       _operatorName: currentUser.name,
-      _operatorPermissions: [],
+      _operatorPermissions: Array.isArray(currentUser.permissions)
+        ? currentUser.permissions
+        : [],
     } as any);
     const task = Array.isArray(result) ? result[0] : result;
     await this.repository.update(id, {

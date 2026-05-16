@@ -8,6 +8,8 @@ import WorkflowApprovalPanel from '@/components/workflow/WorkflowApprovalPanel.v
 import ViewEntity from '@/components/view/ViewEntity.vue'
 import ViewField from '@/components/view/ViewField.vue'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { checkPermi } from '@/utils/permission'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +37,13 @@ const form = ref({
   workflowInstanceId: '',
   currentNodeName: '',
 })
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const canHandoverAdd = computed(() => checkPermi(['business/handover-records/add']))
+const canHandoverUpdate = computed(() => checkPermi(['business/handover-records/update']))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveHandover = computed(() => !isReadonly.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canHandoverUpdate.value, 'canManageDelivery')
+  : canWriteProjectScopedRecord(canHandoverAdd.value, 'canManageDelivery')))
 
 const rules = {
   title: [{ required: true, message: '请输入交接单标题', trigger: 'blur' }],
@@ -60,6 +69,7 @@ watch(() => route.query.id, () => {
 }, { immediate: true })
 
 function submit() {
+  if (!canSaveHandover.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (!valid) return
     const api = isEdit.value ? update : save
@@ -180,7 +190,7 @@ function scrollToWorkflowPanel() {
     </el-form>
     <template #footer>
       <el-button v-if="!isReadonly && isEdit" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      <el-button type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveHandover" type="primary" @click="submit">提交</el-button>
       <el-button @click="$router.back()">取消</el-button>
     </template>
   </FormPageShell>

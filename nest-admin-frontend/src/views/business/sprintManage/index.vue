@@ -7,6 +7,7 @@ import RequestChartTable from '@/components/RequestChartTable.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,20 +33,22 @@ const columns = [
 ]
 
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
-const canSprintUpdate = computed(() => checkPermi(['business/sprints/update']))
 const canSprintDelete = computed(() => checkPermi(['business/sprints/delete']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canSprintCreate = computed(() => canCreateProjectScopedRecord(canSprintAdd.value, 'canManageExecution'))
+const canSprintBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canSprintDelete.value, 'canManageExecution'))
 
 function getFormPath() {
   return `${route.path.replace(/\/$/, '')}/form`
 }
 
 const handleAdd = () => {
-  if (!canSprintAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(getFormPath())
+  if (!canSprintCreate.value) return $sdk.msgWarning('当前操作没有权限')
+  router.push({ path: getFormPath(), query: getProjectScopedCreateQuery() || {} })
 }
 
 const handleEdit = (row) => {
-  if (!canSprintUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
   router.push(`${getFormPath()}?id=${row.id}`)
 }
 
@@ -54,7 +57,7 @@ const handleView = (row) => {
 }
 
 const handleDel = async (row) => {
-  if (!canSprintDelete.value) return $sdk.msgWarning('当前操作没有权限')
+  if (row.canDelete !== true) return $sdk.msgWarning('当前操作没有权限')
   await $sdk.confirm('确定要删除该Sprint吗？')
   await del(row.id)
   $sdk.msgSuccess('删除成功')
@@ -106,8 +109,8 @@ watch(
 
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => handleView(row) },
-  canSprintUpdate.value ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
-  canSprintDelete.value ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
+  row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => handleEdit(row) } : null,
+  row.canDelete === true ? { key: 'delete', label: '删除', danger: true, onClick: () => handleDel(row) } : null,
 ]
 </script>
 
@@ -149,10 +152,10 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="sprint-index-operation">
           <div class="sprint-index-operation__left">
-            <el-button v-if="canSprintAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button v-if="canSprintCreate" type="primary" @click="handleAdd">新增</el-button>
             <el-button @click="exportSprintList">导出</el-button>
           </div>
-          <el-button v-if="canSprintDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canSprintBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

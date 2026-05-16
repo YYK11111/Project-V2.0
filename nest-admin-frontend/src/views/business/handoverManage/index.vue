@@ -1,13 +1,21 @@
 <script setup>
+import { useRoute } from 'vue-router'
 import { getList, del, getStatuses } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
+const route = useRoute()
 const rctRef = ref()
-const params = ref({})
+const params = ref({
+  projectId: route.query.projectId || '',
+})
 const statusMap = ref({})
 const canHandoverAdd = computed(() => checkPermi(['business/handover-records/add']))
 const canHandoverDelete = computed(() => checkPermi(['business/handover-records/delete']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canHandoverCreate = computed(() => canCreateProjectScopedRecord(canHandoverAdd.value, 'canManageDelivery'))
+const canHandoverBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canHandoverDelete.value, 'canManageDelivery'))
 
 getStatuses().then(({ data }) => {
   statusMap.value = data || {}
@@ -40,9 +48,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="handover-index-operation">
           <div class="handover-index-operation__left">
-            <el-button v-if="canHandoverAdd" type="primary" @click="rctRef.goRoute(null, '/handoverManage/form')">新增运维交接单</el-button>
+            <el-button v-if="canHandoverCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/handoverManage/form')">新增运维交接单</el-button>
           </div>
-          <el-button v-if="canHandoverDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canHandoverBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

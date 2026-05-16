@@ -14,6 +14,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,6 +56,11 @@ const hasSprintId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canSprintAdd = computed(() => checkPermi(['business/sprints/add']))
 const canSprintUpdate = computed(() => checkPermi(['business/sprints/update']))
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveSprint = computed(() => !isView.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canSprintUpdate.value, 'canManageExecution')
+  : canWriteProjectScopedRecord(canSprintAdd.value, 'canManageExecution')))
 const sprintTasks = ref([])
 const sprintImpactTips = computed(() => {
   return sprintTasks.value.filter((task) => {
@@ -122,9 +128,7 @@ watch(() => [form.value.startDate, form.value.endDate], () => {
 })
 
 function submit() {
-  if ((isEdit.value && !canSprintUpdate.value) || (!isEdit.value && !canSprintAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
+  if (!canSaveSprint.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -287,7 +291,7 @@ function cancel() {
       </div>
     </el-form>
     <template #footer>
-      <el-button v-if="!isView && (isEdit ? canSprintUpdate : canSprintAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveSprint" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">取消</el-button>
     </template>
   </FormPageShell>

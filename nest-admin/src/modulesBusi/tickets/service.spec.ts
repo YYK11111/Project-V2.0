@@ -163,6 +163,7 @@ describe("TicketsService convert to task", () => {
     const result = await service.convertToTask("tk1", {
       id: "u2",
       name: "tester",
+      permissions: ["business/tasks/add"],
     });
 
     expect(tasksService.add).toHaveBeenCalledWith(
@@ -170,6 +171,7 @@ describe("TicketsService convert to task", () => {
         projectId: "p1",
         sourceType: "ticket",
         sourceId: "tk1",
+        _operatorPermissions: ["business/tasks/add"],
       }),
     );
     expect(result.taskId).toBe("t2");

@@ -14,6 +14,7 @@ import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,6 +55,11 @@ const hasMilestoneId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
 const canMilestoneUpdate = computed(() => checkPermi(['business/milestones/update']))
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveMilestone = computed(() => !isView.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canMilestoneUpdate.value, 'canManagePlan')
+  : canWriteProjectScopedRecord(canMilestoneAdd.value, 'canManagePlan')))
 const taskSummary = computed(() => form.value.taskSummary || { total: 0, completed: 0, inProgress: 0, pending: 0, completionRate: 0 })
 const linkedTasks = computed(() => form.value.tasks || [])
 const affectedTasks = ref([])
@@ -147,9 +153,7 @@ function handleCloseTag(index) {
 }
 
 function submit() {
-  if ((isEdit.value && !canMilestoneUpdate.value) || (!isEdit.value && !canMilestoneAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
+  if (!canSaveMilestone.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -356,7 +360,7 @@ function cancel() {
       </div>
     </el-form>
     <template #footer>
-      <el-button v-if="!isView && (isEdit ? canMilestoneUpdate : canMilestoneAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveMilestone" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">取消</el-button>
     </template>
   </FormPageShell>

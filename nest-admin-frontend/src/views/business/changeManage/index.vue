@@ -7,6 +7,7 @@ import RequestChartTable from '@/components/RequestChartTable.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const router = useRouter()
 const route = useRoute()
@@ -25,6 +26,9 @@ const rctRef = ref()
 const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeDelete = computed(() => checkPermi(['business/changes/delete']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canChangeCreate = computed(() => canCreateProjectScopedRecord(canChangeAdd.value, 'canManageChanges'))
+const canChangeBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canChangeDelete.value, 'canManageChanges'))
 
 const columns = [
   { prop: 'title', label: '变更标题', minWidth: 150 },
@@ -41,8 +45,8 @@ function getFormPath() {
 }
 
 const handleAdd = () => {
-  if (!canChangeAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(getFormPath())
+  if (!canChangeCreate.value) return $sdk.msgWarning('当前操作没有权限')
+  router.push({ path: getFormPath(), query: getProjectScopedCreateQuery() || {} })
 }
 
 const handleEdit = (row) => {
@@ -185,10 +189,10 @@ watch(
       <template #operation="{ selectedIds }">
         <div class="change-index-operation">
           <div class="change-index-operation__left">
-            <el-button v-if="canChangeAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button v-if="canChangeCreate" type="primary" @click="handleAdd">新增</el-button>
             <el-button @click="exportChangeList">导出</el-button>
           </div>
-          <el-button v-if="canChangeDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canChangeBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

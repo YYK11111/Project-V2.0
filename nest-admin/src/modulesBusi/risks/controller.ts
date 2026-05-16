@@ -56,6 +56,7 @@ export class RisksController extends BaseController<Risk, RisksService> {
     return this.service.publishToKnowledge(id, {
       id: req.user?.id,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
     });
   }
 
@@ -64,6 +65,7 @@ export class RisksController extends BaseController<Risk, RisksService> {
     return this.service.convertToTask(id, {
       id: req.user?.id,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
     });
   }
 }

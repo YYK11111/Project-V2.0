@@ -20,6 +20,7 @@ import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import { getList as getMilestoneList } from '@/views/business/milestoneManage/api'
 import { getList as getSprintList } from '@/views/business/sprintManage/api'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,6 +68,11 @@ const canChangeAdd = computed(() => checkPermi(['business/changes/add']))
 const canChangeUpdate = computed(() => checkPermi(['business/changes/update']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const canEditCurrentChange = computed(() => !hasChangeId.value || form.value?.canEdit !== false)
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveChange = computed(() => !isReadonly.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canChangeUpdate.value, 'canManageChanges') && canEditCurrentChange.value
+  : canWriteProjectScopedRecord(canChangeAdd.value, 'canManageChanges')))
 const canSubmitCurrentApproval = computed(() => form.value.status === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
@@ -150,21 +156,21 @@ function reloadCurrent() {
 }
 
 async function handleApprove() {
-  if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveChange.value) return $sdk.msgWarning('当前操作没有权限')
   await approve(route.query.id, { comment: form.value.approvalComment || '同意' })
   $sdk.msgSuccess('审批通过')
   router.back()
 }
 
 async function handleReject() {
-  if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveChange.value) return $sdk.msgWarning('当前操作没有权限')
   await reject(route.query.id, { comment: form.value.approvalComment || '不同意' })
   $sdk.msgSuccess('已驳回')
   router.back()
 }
 
 async function handleSubmitApproval() {
-  if (!canChangeUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveChange.value) return $sdk.msgWarning('当前操作没有权限')
   if (canCloseReturnedInstance.value) {
     await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     $sdk.msgSuccess('重新提交审批成功')
@@ -267,12 +273,7 @@ function goToEdit() {
 }
 
 function submit() {
-  if (isReadonly.value || (isEdit.value && !canChangeUpdate.value) || (!isEdit.value && !canChangeAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
-  if (hasChangeId.value && !canEditCurrentChange.value) {
-    return $sdk.msgWarning('当前无编辑该变更的权限')
-  }
+  if (!canSaveChange.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -325,7 +326,7 @@ function scrollToWorkflowPanel() {
       <template #default>
         <div class="top-alert-actions">
           <el-button v-if="isView" type="primary" size="small" @click="goToEdit">去编辑</el-button>
-          <el-button v-if="isEdit && canChangeUpdate && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
+          <el-button v-if="isEdit && canSaveChange && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
           <el-button v-if="canCloseReturnedInstance" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </div>
       </template>
@@ -581,11 +582,11 @@ function scrollToWorkflowPanel() {
     </div>
     </div>
     <template #footer>
-      <el-button v-if="!isReadonly && (isEdit ? canChangeUpdate : canChangeAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveChange" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
-      <el-button v-if="!isReadonly && isEdit && canChangeUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      <el-button v-if="!isWorkflowReadonly && isEdit && canChangeUpdate && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
-      <el-button v-if="!isWorkflowReadonly && isEdit && canChangeUpdate && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
+      <el-button v-if="isEdit && canSaveChange && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="!isWorkflowReadonly && isEdit && canSaveChange && form.status === '2'" type="success" @click="handleApprove">批准</el-button>
+      <el-button v-if="!isWorkflowReadonly && isEdit && canSaveChange && form.status === '2'" type="danger" @click="handleReject">驳回</el-button>
     </template>
   </FormPageShell>
 </template>

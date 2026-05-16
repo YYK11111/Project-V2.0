@@ -457,7 +457,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
 
   async publishToKnowledge(
     id: string,
-    currentUser: { id?: string; name?: string } = {},
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
   ) {
     const ticket = await this.getOne({ id });
     if (!ticket) throw new Error("工单不存在");
@@ -613,7 +613,7 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
 
   async convertToTask(
     id: string,
-    currentUser: { id?: string; name?: string } = {},
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
   ) {
     const ticket = await this.getOne({ id });
     if (!ticket) throw new Error("工单不存在");
@@ -635,7 +635,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       createUser: currentUser.name || "system",
       _operatorId: currentUser.id,
       _operatorName: currentUser.name,
-      _operatorPermissions: [],
+      _operatorPermissions: Array.isArray(currentUser.permissions)
+        ? currentUser.permissions
+        : [],
     } as any);
     const task = Array.isArray(result) ? result[0] : result;
     await this.repository.update(id, {

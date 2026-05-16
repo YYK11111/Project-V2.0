@@ -19,6 +19,7 @@ import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -89,8 +90,17 @@ const isWorkflowReadonly = computed(() => fromWorkflow.value && !!workflowTaskId
 const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
 const canTicketUpdate = computed(() => checkPermi(['business/tickets/update']))
+const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const canEditCurrentTicket = computed(() => !hasTicketId.value || form.value?.canEdit !== false)
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canManageTicketRecord = computed(() => hasTicketId.value && canWriteProjectScopedRecord(canTicketUpdate.value, 'canManageTasks') && canEditCurrentTicket.value)
+const canPublishTicketKnowledge = computed(() => canArticleAdd.value && canManageTicketRecord.value)
+const canConvertTicketToTask = computed(() => canManageTicketRecord.value && canWriteProjectScopedRecord(canTaskAdd.value, 'canManageTasks'))
+const canSaveTicket = computed(() => !isReadonly.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canTicketUpdate.value, 'canManageTasks') && canEditCurrentTicket.value
+  : canWriteProjectScopedRecord(canTicketAdd.value, 'canManageTasks')))
 const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId && form.value.approvalStatus === '3' && String(form.value.currentNodeName || '').includes('退回发起人'))
 const workflowPanelRef = ref()
 const hasTicketId = computed(() => !!route.query.id)
@@ -152,12 +162,7 @@ function reloadCurrent() {
 }
 
 function submit() {
-  if (isReadonly.value || (isEdit.value && !canTicketUpdate.value) || (!isEdit.value && !canTicketAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
-  if (hasTicketId.value && !canEditCurrentTicket.value) {
-    return $sdk.msgWarning('当前无编辑该工单的权限')
-  }
+  if (!canSaveTicket.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -178,7 +183,7 @@ function cancel() {
 }
 
 async function handleSubmitApproval() {
-  if (!canTicketUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveTicket.value) return $sdk.msgWarning('当前操作没有权限')
   if (canCloseReturnedInstance.value) {
     await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     $sdk.msgSuccess('重新提交审批成功')
@@ -193,7 +198,7 @@ async function handleSubmitApproval() {
 
 async function handlePublishKnowledge() {
   if (!route.query.id) return
-  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canPublishTicketKnowledge.value) return $sdk.msgWarning('当前操作没有权限')
   await confirmRepublishIfNeeded({ articleId: form.value?.knowledgeArticleId, entityLabel: '工单' })
   await publishKnowledge(route.query.id)
   $sdk.msgSuccess('工单已沉淀到知识中心')
@@ -202,6 +207,7 @@ async function handlePublishKnowledge() {
 
 async function handleConvertToTask() {
   if (!route.query.id) return
+  if (!canConvertTicketToTask.value) return $sdk.msgWarning('当前操作没有权限')
   const res = await convertToTask(route.query.id)
   const taskId = res?.data?.taskId || res?.taskId
   $sdk.msgSuccess('工单已转为任务')
@@ -228,6 +234,7 @@ function goToEdit() {
 }
 
 function handleCreateFaqTemplate() {
+  if (!canPublishTicketKnowledge.value) return $sdk.msgWarning('当前操作没有权限')
   if (!form.value.projectId) return $sdk.msgWarning('请先关联所属项目后再创建 FAQ 模板')
   router.push({ path: '/content/aev', query: { projectId: form.value.projectId, template: 'faq' } })
 }
@@ -247,10 +254,10 @@ function scrollToWorkflowPanel() {
     <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '工单详情' : isEdit ? '编辑工单' : '新增工单'">
       <template #extra>
         <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
-        <el-button v-if="canArticleAdd && canEditCurrentTicket" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
+        <el-button v-if="canPublishTicketKnowledge" @click="handleCreateFaqTemplate">新建 FAQ 模板</el-button>
         <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
-        <el-button v-if="route.query.id && canArticleAdd && canEditCurrentTicket" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
-        <el-button v-if="route.query.id && canEditCurrentTicket" type="warning" plain @click="handleConvertToTask">转任务</el-button>
+        <el-button v-if="canPublishTicketKnowledge" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+        <el-button v-if="canConvertTicketToTask" type="warning" plain @click="handleConvertToTask">转任务</el-button>
         <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" @click="handleCloseReturnedInstance">结束退回实例</el-button>
       </template>
     </el-page-header>
@@ -266,7 +273,7 @@ function scrollToWorkflowPanel() {
       <template #default>
         <div class="top-alert-actions">
           <el-button v-if="route.query.action === 'view' && canEditCurrentTicket" type="primary" size="small" @click="goToEdit">去编辑</el-button>
-          <el-button v-if="isEdit && canTicketUpdate && canEditCurrentTicket && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
+          <el-button v-if="isEdit && canSaveTicket && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
           <el-button v-if="canCloseReturnedInstance && canEditCurrentTicket" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
         </div>
       </template>
@@ -485,8 +492,8 @@ function scrollToWorkflowPanel() {
       </div>
     </el-form>
     <template #footer>
-      <el-button v-if="!isReadonly && isEdit && canTicketUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
-      <el-button v-if="!isReadonly && (isEdit ? canTicketUpdate : canTicketAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="isEdit && canSaveTicket && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="canSaveTicket" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
     </template>
 

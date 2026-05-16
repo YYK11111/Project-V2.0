@@ -120,8 +120,48 @@ describe('projectManage 详情页治理守卫', () => {
     const source = readDetailSource()
 
     expect(source).toContain("if (isProjectVisitor.value && ['focus', 'plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'closure'].includes(tab))")
-    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" label="交付焦点" name="focus">')
-    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" label="缺陷" name="tickets">')
-    expect(source).toContain('<el-row v-if="!isProjectVisitor && hasOverviewCharts"')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="交付焦点" name="focus">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="缺陷" name="tickets">')
+    expect(source).toContain(':is-project-visitor="isProjectVisitor"')
+    expect(source).toContain(':has-overview-charts="hasOverviewCharts"')
+  })
+
+  it('项目详情页重页签按需渲染且图表不随页签切换重建', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="交付焦点" name="focus">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="计划" name="plan">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="任务" name="tasks">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="缺陷" name="tickets">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="里程碑" name="milestones">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="风险" name="risks">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="变更" name="changes">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor" lazy label="Sprint" name="sprints">')
+    expect(source).toContain('<el-tab-pane v-if="canViewGroup(\'projectKnowledge\')" lazy label="知识" name="knowledge">')
+    expect(source).toContain('<el-tab-pane v-if="!isProjectVisitor && canViewGroup(\'projectClosure\')" lazy label="结项" name="closure">')
+    expect(source).not.toContain(':key="`task-${activeTab}`"')
+    expect(source).not.toContain(':key="`ticket-${activeTab}`"')
+    expect(source).not.toContain(':key="`risk-${activeTab}`"')
+  })
+
+  it('概览图表区应拆分为独立组件，避免详情页继续堆叠图表模板', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain("import ProjectOverviewCharts from './components/ProjectOverviewCharts.vue'")
+    expect(source).toContain('<ProjectOverviewCharts')
+    expect(source).toContain('@chart-slice-click="handleChartSliceClick"')
+    expect(source).not.toContain("import ChartPie from '@/components/ChartPie.vue'")
+    expect(source).not.toContain('<ChartPie')
+  })
+
+  it('顶部快捷发起应拆分并收敛为常用动作加更多操作', () => {
+    const source = readDetailSource()
+
+    expect(source).toContain("import ProjectHeroActions from './components/ProjectHeroActions.vue'")
+    expect(source).toContain('<ProjectHeroActions')
+    expect(source).toContain('@create-record="createProjectScopedRecord"')
+    expect(source).toContain('@create-knowledge="goToProjectKnowledgeCreate"')
+    expect(source).not.toContain('hero-action-card__grid')
+    expect(source).not.toContain('从项目上下文直接发起核心业务动作')
   })
 })

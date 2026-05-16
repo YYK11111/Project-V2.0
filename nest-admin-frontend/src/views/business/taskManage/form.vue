@@ -27,6 +27,7 @@ import ViewUserList from '@/components/view/ViewUserList.vue'
 import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,6 +109,11 @@ const isReadonly = computed(() => isView.value || isWorkflowReadonly.value)
 const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canTaskUpdate = computed(() => checkPermi(['business/tasks/update']))
 const canEditCurrentTask = computed(() => !hasTaskId.value || form.value?.canEdit !== false)
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveTask = computed(() => !isReadonly.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canTaskUpdate.value, 'canManageTasks') && canEditCurrentTask.value
+  : canWriteProjectScopedRecord(canTaskAdd.value, 'canManageTasks')))
 const canExecuteCurrentTask = computed(() => hasTaskId.value && form.value?.canExecute !== false)
 const canStartTask = computed(() => hasTaskId.value && canExecuteCurrentTask.value && String(form.value.status || '') === '1')
 const canPauseTask = computed(() => hasTaskId.value && form.value?.canManage !== false && String(form.value.status || '') === '2')
@@ -386,8 +392,7 @@ watch(() => form.value.projectId, () => {
 })
 
 async function handleAddDependency() {
-  const hasPermission = hasTaskId.value ? canTaskUpdate.value : canTaskAdd.value
-  if (isReadonly.value || !hasPermission) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveTask.value) return $sdk.msgWarning('当前操作没有权限')
   if (!newDependencyId.value) return
   try {
     if (hasTaskId.value) {
@@ -405,8 +410,7 @@ async function handleAddDependency() {
 }
 
 async function handleRemoveDependency(depId) {
-  const hasPermission = hasTaskId.value ? canTaskUpdate.value : canTaskAdd.value
-  if (isReadonly.value || !hasPermission) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveTask.value) return $sdk.msgWarning('当前操作没有权限')
   try {
     if (hasTaskId.value) {
       await removeDependency(route.query.id, depId)
@@ -566,12 +570,7 @@ function reloadCurrent() {
 }
 
 function submit() {
-  if (isReadonly.value || (isEdit.value && !canTaskUpdate.value) || (!isEdit.value && !canTaskAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
-  if (hasTaskId.value && !canEditCurrentTask.value) {
-    return $sdk.msgWarning('当前无编辑该任务的权限')
-  }
+  if (!canSaveTask.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -597,7 +596,7 @@ function cancel() {
 }
 
 async function handleSubmitApproval() {
-  if (!canTaskUpdate.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canSaveTask.value) return $sdk.msgWarning('当前操作没有权限')
   if (canCloseReturnedInstance.value) {
     await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     $sdk.msgSuccess('重新提交审批成功')
@@ -712,7 +711,7 @@ watch(hasTaskId, (value) => {
         <template #default>
           <div class="top-alert-actions">
             <el-button v-if="route.query.action === 'view' && canEditCurrentTask" type="primary" size="small" @click="goToEdit">去编辑</el-button>
-            <el-button v-if="isEdit && canTaskUpdate && canEditCurrentTask && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
+            <el-button v-if="isEdit && canSaveTask && canSubmitCurrentApproval" type="warning" size="small" @click="handleSubmitApproval">重新提交审批</el-button>
             <el-button v-if="canCloseReturnedInstance && canEditCurrentTask" type="danger" size="small" @click="handleCloseReturnedInstance">结束退回实例</el-button>
           </div>
         </template>
@@ -1108,7 +1107,7 @@ watch(hasTaskId, (value) => {
           </el-select>
           <template #footer>
             <el-button @click="showDependencyDialog = false">取消</el-button>
-            <el-button v-if="(hasTaskId ? canTaskUpdate : canTaskAdd) && !isReadonly" type="primary" @click="handleAddDependency">确定</el-button>
+            <el-button v-if="canSaveTask" type="primary" @click="handleAddDependency">确定</el-button>
           </template>
         </el-dialog>
         </div>
@@ -1130,8 +1129,8 @@ watch(hasTaskId, (value) => {
     </div>
 
     <template #footer>
-      <el-button v-if="!isReadonly && (isEdit ? canTaskUpdate : canTaskAdd)" type="primary" @click="submit">暂存</el-button>
-      <el-button v-if="!isReadonly && isEdit && canTaskUpdate && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="canSaveTask" type="primary" @click="submit">暂存</el-button>
+      <el-button v-if="isEdit && canSaveTask && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
       <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
       <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>

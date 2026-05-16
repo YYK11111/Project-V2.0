@@ -81,6 +81,7 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
     return this.service.publishToKnowledge(id, {
       id: req.user?.id,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
     });
   }
 
@@ -89,6 +90,7 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
     return this.service.convertToTask(id, {
       id: req.user?.id,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
     });
   }
 }

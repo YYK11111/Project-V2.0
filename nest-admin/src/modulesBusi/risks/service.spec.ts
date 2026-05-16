@@ -158,6 +158,7 @@ describe("RisksService convert to task", () => {
     const result = await service.convertToTask("r1", {
       id: "u1",
       name: "tester",
+      permissions: ["business/tasks/add"],
     });
 
     expect(tasksService.add).toHaveBeenCalledWith(
@@ -165,6 +166,7 @@ describe("RisksService convert to task", () => {
         projectId: "p1",
         sourceType: "risk",
         sourceId: "r1",
+        _operatorPermissions: ["business/tasks/add"],
       }),
     );
     expect(result.taskId).toBe("t1");

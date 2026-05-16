@@ -1,13 +1,21 @@
 <script setup>
+import { useRoute } from 'vue-router'
 import { getList, del, getResults } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
+const route = useRoute()
 const rctRef = ref()
-const params = ref({})
+const params = ref({
+  projectId: route.query.projectId || '',
+})
 const resultMap = ref({})
 const canAcceptanceAdd = computed(() => checkPermi(['business/acceptance-records/add']))
 const canAcceptanceDelete = computed(() => checkPermi(['business/acceptance-records/delete']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canAcceptanceCreate = computed(() => canCreateProjectScopedRecord(canAcceptanceAdd.value, 'canManageDelivery'))
+const canAcceptanceBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canAcceptanceDelete.value, 'canManageDelivery'))
 
 getResults().then(({ data }) => {
   resultMap.value = data || {}
@@ -40,9 +48,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="acceptance-index-operation">
           <div class="acceptance-index-operation__left">
-            <el-button v-if="canAcceptanceAdd" type="primary" @click="rctRef.goRoute(null, '/acceptanceManage/form')">新增验收单</el-button>
+            <el-button v-if="canAcceptanceCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/acceptanceManage/form')">新增验收单</el-button>
           </div>
-          <el-button v-if="canAcceptanceDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canAcceptanceBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

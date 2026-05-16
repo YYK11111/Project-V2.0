@@ -14,6 +14,7 @@ import { checkPermi } from '@/utils/permission'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 import FormPageShell from '@/components/FormPageShell.vue'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,8 +55,17 @@ const hasRiskId = computed(() => !!route.query.id)
 const isEdit = computed(() => !!route.query.id && !isView.value)
 const canRiskAdd = computed(() => checkPermi(['business/risks/add']))
 const canRiskUpdate = computed(() => checkPermi(['business/risks/update']))
+const canTaskAdd = computed(() => checkPermi(['business/tasks/add']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const canEditCurrentRisk = computed(() => !hasRiskId.value || form.value?.canEdit !== false)
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canManageRiskRecord = computed(() => hasRiskId.value && canWriteProjectScopedRecord(canRiskUpdate.value, 'canManageRisks') && canEditCurrentRisk.value)
+const canPublishRiskKnowledge = computed(() => canArticleAdd.value && canManageRiskRecord.value)
+const canConvertRiskToTask = computed(() => canManageRiskRecord.value && canWriteProjectScopedRecord(canTaskAdd.value, 'canManageTasks'))
+const canSaveRisk = computed(() => !isView.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canRiskUpdate.value, 'canManageRisks') && canEditCurrentRisk.value
+  : canWriteProjectScopedRecord(canRiskAdd.value, 'canManageRisks')))
 
 const isRiskFormRoute = useCurrentRouteGuard(route, '/riskManage/form')
 
@@ -99,12 +109,7 @@ watch(
 )
 
 function submit() {
-  if ((isEdit.value && !canRiskUpdate.value) || (!isEdit.value && !canRiskAdd.value)) {
-    return $sdk.msgWarning('当前操作没有权限')
-  }
-  if (hasRiskId.value && !canEditCurrentRisk.value) {
-    return $sdk.msgWarning('当前无编辑该风险的权限')
-  }
+  if (!canSaveRisk.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
@@ -122,7 +127,7 @@ function cancel() {
 
 async function handlePublishKnowledge() {
   if (!route.query.id) return
-  if (!canArticleAdd.value) return $sdk.msgWarning('当前操作没有权限')
+  if (!canPublishRiskKnowledge.value) return $sdk.msgWarning('当前操作没有权限')
   await confirmRepublishIfNeeded({ articleId: form.value?.knowledgeArticleId, entityLabel: '风险' })
   await publishKnowledge(route.query.id)
   $sdk.msgSuccess('风险案例已沉淀到知识中心')
@@ -131,6 +136,7 @@ async function handlePublishKnowledge() {
 
 async function handleConvertToTask() {
   if (!route.query.id) return
+  if (!canConvertRiskToTask.value) return $sdk.msgWarning('当前操作没有权限')
   const res = await convertToTask(route.query.id)
   const taskId = res?.data?.taskId || res?.taskId
   $sdk.msgSuccess('风险已转为任务')
@@ -150,8 +156,8 @@ async function handleConvertToTask() {
     <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? '风险详情' : isEdit ? '编辑风险' : '新增风险'">
       <template #extra>
         <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
-        <el-button v-if="route.query.id && canArticleAdd && canEditCurrentRisk" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
-        <el-button v-if="route.query.id && canEditCurrentRisk" type="warning" plain @click="handleConvertToTask">转任务</el-button>
+        <el-button v-if="canPublishRiskKnowledge" type="primary" plain @click="handlePublishKnowledge">{{ form.knowledgeArticleId ? '重新沉淀' : '转知识' }}</el-button>
+        <el-button v-if="canConvertRiskToTask" type="warning" plain @click="handleConvertToTask">转任务</el-button>
       </template>
     </el-page-header>
 
@@ -273,7 +279,7 @@ async function handleConvertToTask() {
       </div>
     </el-form>
     <template #footer>
-      <el-button v-if="!isView && (isEdit ? canRiskUpdate : canRiskAdd)" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveRisk" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">取消</el-button>
     </template>
   </FormPageShell>

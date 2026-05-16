@@ -1,13 +1,21 @@
 <script setup>
+import { useRoute } from 'vue-router'
 import { getList, del, getStatuses } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
+const route = useRoute()
 const rctRef = ref()
-const params = ref({})
+const params = ref({
+  projectId: route.query.projectId || '',
+})
 const statusMap = ref({})
 const canGoLiveAdd = computed(() => checkPermi(['business/go-live-records/add']))
 const canGoLiveDelete = computed(() => checkPermi(['business/go-live-records/delete']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canGoLiveCreate = computed(() => canCreateProjectScopedRecord(canGoLiveAdd.value, 'canManageDelivery'))
+const canGoLiveBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canGoLiveDelete.value, 'canManageDelivery'))
 
 getStatuses().then(({ data }) => {
   statusMap.value = data || {}
@@ -40,9 +48,9 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="go-live-index-operation">
           <div class="go-live-index-operation__left">
-            <el-button v-if="canGoLiveAdd" type="primary" @click="rctRef.goRoute(null, '/goLiveManage/form')">新增上线单</el-button>
+            <el-button v-if="canGoLiveCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/goLiveManage/form')">新增上线单</el-button>
           </div>
-          <el-button v-if="canGoLiveDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canGoLiveBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

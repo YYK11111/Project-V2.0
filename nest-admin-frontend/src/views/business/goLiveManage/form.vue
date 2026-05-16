@@ -14,6 +14,8 @@ import ViewFileList from '@/components/view/ViewFileList.vue'
 import ViewRichText from '@/components/view/ViewRichText.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
+import { checkPermi } from '@/utils/permission'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,6 +47,13 @@ const form = ref({
   workflowInstanceId: '',
   currentNodeName: '',
 })
+const formProjectId = computed(() => String(form.value.projectId || route.query.projectId || ''))
+const canGoLiveAdd = computed(() => checkPermi(['business/go-live-records/add']))
+const canGoLiveUpdate = computed(() => checkPermi(['business/go-live-records/update']))
+const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProjectId)
+const canSaveGoLive = computed(() => !isReadonly.value && (isEdit.value
+  ? canWriteProjectScopedRecord(canGoLiveUpdate.value, 'canManageDelivery')
+  : canWriteProjectScopedRecord(canGoLiveAdd.value, 'canManageDelivery')))
 
 const rules = {
   title: [{ required: true, message: '请输入上线标题', trigger: 'blur' }],
@@ -74,6 +83,7 @@ watch(() => route.query.id, () => {
 }, { immediate: true })
 
 function submit() {
+  if (!canSaveGoLive.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (!valid) return
     const api = isEdit.value ? update : save
@@ -225,7 +235,7 @@ function scrollToWorkflowPanel() {
       <el-button v-if="canStartGoLive" type="success" @click="handleStartGoLive">开始上线</el-button>
       <el-button v-if="canConfirmGoLiveResult" type="success" @click="handleConfirmSuccess">确认上线成功</el-button>
       <el-button v-if="canConfirmGoLiveResult" type="danger" @click="handleConfirmRollback">确认回退</el-button>
-      <el-button v-if="!isReadonly" type="primary" @click="submit">提交</el-button>
+      <el-button v-if="canSaveGoLive" type="primary" @click="submit">提交</el-button>
       <el-button @click="$router.back()">取消</el-button>
     </template>
   </FormPageShell>

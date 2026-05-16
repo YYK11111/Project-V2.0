@@ -7,6 +7,7 @@ import RequestChartTable from '@/components/RequestChartTable.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
+import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,14 +35,17 @@ const columns = [
 
 const canMilestoneAdd = computed(() => checkPermi(['business/milestones/add']))
 const canMilestoneDelete = computed(() => checkPermi(['business/milestones/delete']))
+const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
+const canMilestoneCreate = computed(() => canCreateProjectScopedRecord(canMilestoneAdd.value, 'canManagePlan'))
+const canMilestoneBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canMilestoneDelete.value, 'canManagePlan'))
 
 function getFormPath() {
   return `${route.path.replace(/\/$/, '')}/form`
 }
 
 const handleAdd = () => {
-  if (!canMilestoneAdd.value) return $sdk.msgWarning('当前操作没有权限')
-  router.push(getFormPath())
+  if (!canMilestoneCreate.value) return $sdk.msgWarning('当前操作没有权限')
+  router.push({ path: getFormPath(), query: getProjectScopedCreateQuery() || {} })
 }
 
 const handleEdit = (row) => {
@@ -177,10 +181,10 @@ const getButtons = (row) => [
       <template #operation="{ selectedIds }">
         <div class="milestone-index-operation">
           <div class="milestone-index-operation__left">
-            <el-button v-if="canMilestoneAdd" type="primary" @click="handleAdd">新增</el-button>
+            <el-button v-if="canMilestoneCreate" type="primary" @click="handleAdd">新增</el-button>
             <el-button @click="exportMilestoneList">导出</el-button>
           </div>
-          <el-button v-if="canMilestoneDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
+          <el-button v-if="canMilestoneBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
         </div>
       </template>
 

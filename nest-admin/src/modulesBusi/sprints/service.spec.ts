@@ -150,6 +150,46 @@ describe("SprintsService completeSprint guards", () => {
     );
   });
 
+  it("列表返回当前用户对 Sprint 所属项目的行级操作权限", async () => {
+    const repository = {
+      findAndCount: jest
+        .fn()
+        .mockResolvedValue([[{ id: "s1", projectId: "p1" }], 1]),
+    };
+    const taskRepository = { find: jest.fn() };
+    const projectExecutionPermissionService = {
+      getVisibleProjectIds: jest.fn().mockResolvedValue(["p1"]),
+      assertWritableProject: jest.fn().mockResolvedValue({}),
+    };
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+      projectExecutionPermissionService as any,
+    );
+
+    const result = await service.list({
+      pageNum: 1,
+      pageSize: 10,
+      _operatorId: "u1",
+      _operatorPermissions: ["business/sprints/access"],
+    } as any);
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        canEdit: true,
+        canDelete: true,
+      }),
+    );
+    expect(
+      projectExecutionPermissionService.assertWritableProject,
+    ).toHaveBeenCalledWith(
+      "p1",
+      "u1",
+      ["business/sprints/access"],
+      "business/sprints/manageAll",
+    );
+  });
+
   it("详情要求当前用户具备项目执行对象权限", async () => {
     const repository = {
       findOne: jest.fn().mockResolvedValue({
