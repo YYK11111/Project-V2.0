@@ -170,7 +170,7 @@ export class CustomersController extends BaseController<
   ) {
     const operatorId = req?.user?.id || "system";
     const operatorName = req?.user?.name || "system";
-    return this.customerService.grantCustomerViewAccess(
+    return this.service.grantCustomerViewAccess(
       dto.customerId,
       dto.userIds,
       operatorId,
