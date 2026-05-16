@@ -60,13 +60,17 @@ describe('system configs structure', () => {
     expect(source).toContain('userId: testUserId.value || undefined')
     expect(source).toContain('testFeishuNotify')
     expect(source).toContain('diagnoseFeishuNotify')
-    expect(source).toContain('飞书配置自检')
+    expect(source).toContain('飞书审批集成自检')
     expect(source).toContain('diagnoseFeishu')
     expect(source).toContain('diagnoseResult')
     expect(source).toContain('自检结果')
     expect(source).toContain('feishu-diagnose-result__data')
     expect(source).toContain('formatDiagnoseData')
     expect(source).toContain('callbackUrl')
+    expect(source).toContain('copyDiagnoseValue')
+    expect(source).toContain('复制')
+    expect(source).toContain('复制回调地址')
+    expect(source).toContain('复制审批免登录链接')
   })
 
   it('系统配置暂时不提供字段组权限配置功能', () => {

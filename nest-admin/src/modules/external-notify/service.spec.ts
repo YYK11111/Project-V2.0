@@ -27,6 +27,8 @@ describe("ExternalNotifyService", () => {
       save: jest.fn(async (data) => data),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
       find: jest.fn().mockResolvedValue(options.logs || []),
+      findOne: jest.fn().mockResolvedValue(options.log || null),
+      count: jest.fn().mockResolvedValue(options.count || 0),
     };
     const userRepository = {
       findOne: jest.fn().mockResolvedValue(options.user || null),
@@ -430,7 +432,7 @@ describe("ExternalNotifyService", () => {
   });
 
   it("飞书配置自检返回 token、用户匹配、用户详情和卡片发送结果", async () => {
-    const { service, feishuProvider, externalAccountsService } = createService({
+    const { service, feishuProvider, externalAccountsService, logRepository } = createService({
       user: { id: "1", email: "u1@example.com", phone: "13800138000" },
       account: {
         userId: "1",
@@ -448,8 +450,10 @@ describe("ExternalNotifyService", () => {
       feishuUserDetail: {
         user_id: "ou_1",
         open_id: "open_1",
+        union_id: "union_1",
         name: "用户1",
       },
+      sendResponse: { code: 0, data: { message_id: "om_diagnose_1" } },
     });
     feishuProvider.getTenantAccessToken = jest
       .fn()
@@ -502,6 +506,15 @@ describe("ExternalNotifyService", () => {
           }),
         }),
         expect.objectContaining({ key: "cardSend", success: true }),
+        expect.objectContaining({
+          key: "diagnoseLog",
+          success: true,
+          data: expect.objectContaining({
+            notificationId: expect.stringMatching(/^ntf_/),
+            messageId: expect.stringMatching(/^diagnose_/),
+            externalMessageId: "om_diagnose_1",
+          }),
+        }),
       ]),
     );
     expect(externalAccountsService.getActiveAccount).toHaveBeenCalledWith(
@@ -517,6 +530,70 @@ describe("ExternalNotifyService", () => {
           "https://admin.example.com/api/auth/feishu/login?redirect=https%3A%2F%2Fadmin.example.com%2FprojectManage%2Fapproval%3FfromWorkflow%3D1%26source%3Ddiagnose",
       }),
       expect.any(Object),
+    );
+    expect(logRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "feishu",
+        operationType: "send_card",
+        templateKey: "workflowTodo",
+        messageId: expect.stringMatching(/^diagnose_/),
+        externalMessageId: "om_diagnose_1",
+        sendStatus: ExternalMessageSendStatus.succeeded,
+      }),
+    );
+  });
+
+  it("飞书审批集成自检在机器人能力未启用时返回明确处理建议并记录失败日志", async () => {
+    const { service, feishuProvider, logRepository } = createService({
+      user: { id: "1", email: "u1@example.com", phone: "13800138000" },
+      account: {
+        userId: "1",
+        externalUserId: "ou_1",
+        openId: "open_1",
+        unionId: "union_1",
+      },
+      feishuUsers: [{ user_id: "ou_1", email: "u1@example.com" }],
+      feishuUserDetail: {
+        user_id: "ou_1",
+        open_id: "open_1",
+        union_id: "union_1",
+        name: "用户1",
+      },
+    });
+    feishuProvider.getTenantAccessToken = jest
+      .fn()
+      .mockResolvedValue("tenant-token");
+    feishuProvider.sendText.mockRejectedValue(
+      new Error("发送飞书消息失败：Bot ability is not activated.（code: 230006，status: 400）"),
+    );
+
+    const result = await service.diagnoseFeishuConfig("1");
+
+    expect(result.success).toBe(false);
+    expect(result.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "cardSend",
+          success: false,
+          data: expect.objectContaining({
+            errorCode: "230006",
+            suggestion: "请在飞书开放平台启用机器人能力，并确认应用已发布到目标企业后重试。",
+          }),
+        }),
+        expect.objectContaining({
+          key: "diagnoseLog",
+          success: true,
+        }),
+      ]),
+    );
+    expect(logRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "feishu",
+        operationType: "send_card",
+        templateKey: "workflowTodo",
+        sendStatus: ExternalMessageSendStatus.failed,
+        errorMessage: expect.stringContaining("230006"),
+      }),
     );
   });
 
@@ -793,5 +870,101 @@ describe("ExternalNotifyService", () => {
       ]),
       expect.objectContaining({ isDelete: "1" }),
     );
+  });
+
+  it("按统一消息ID追踪系统内消息、飞书发送和卡片回写日志", async () => {
+    const { service, logRepository } = createService({
+      logs: [
+        {
+          id: "1",
+          platform: "system",
+          operationType: "create_message",
+          messageId: "msg-1",
+          createTime: "2026-05-16 10:00:00",
+        },
+        {
+          id: "2",
+          platform: "feishu",
+          operationType: "send_card",
+          messageId: "msg-1",
+          externalMessageId: "om_1",
+          createTime: "2026-05-16 10:00:01",
+        },
+        {
+          id: "3",
+          platform: "feishu",
+          operationType: "update_card_status",
+          messageId: "msg-1",
+          sendStatus: ExternalMessageSendStatus.succeeded,
+          createTime: "2026-05-16 10:00:02",
+        },
+      ],
+    });
+
+    const result = await service.getMessageTrace("msg-1");
+
+    expect(logRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          messageId: "msg-1",
+          isDelete: null,
+        }),
+        order: { createTime: "ASC" },
+      }),
+    );
+    expect(result).toEqual({
+      messageId: "msg-1",
+      total: 3,
+      logs: expect.arrayContaining([
+        expect.objectContaining({ platform: "system", operationType: "create_message" }),
+        expect.objectContaining({ platform: "feishu", operationType: "send_card" }),
+        expect.objectContaining({ platform: "feishu", operationType: "update_card_status" }),
+      ]),
+    });
+  });
+
+  it("返回飞书卡片状态补偿任务的待处理数量和最近失败原因", async () => {
+    const { service, logRepository } = createService({
+      count: 2,
+      log: {
+        id: "retry-2",
+        messageId: "msg-2",
+        errorMessage: "更新飞书卡片状态失败",
+        lastRetryTime: "2026-05-16 10:03:00",
+      },
+    });
+
+    const result = await service.getFeishuCompensationStatus();
+
+    expect(logRepository.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          platform: "feishu",
+          operationType: "update_card_status",
+          templateKey: "workflowTodoStatus",
+          sendStatus: ExternalMessageSendStatus.pending,
+          isDelete: null,
+        }),
+      }),
+    );
+    expect(logRepository.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          platform: "feishu",
+          operationType: "update_card_status",
+          templateKey: "workflowTodoStatus",
+          sendStatus: ExternalMessageSendStatus.failed,
+          isDelete: null,
+        }),
+        order: { lastRetryTime: "DESC", createTime: "DESC" },
+      }),
+    );
+    expect(result).toEqual({
+      pendingCount: 2,
+      latestFailedLog: expect.objectContaining({
+        messageId: "msg-2",
+        errorMessage: "更新飞书卡片状态失败",
+      }),
+    });
   });
 });

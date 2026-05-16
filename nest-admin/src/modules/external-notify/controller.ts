@@ -12,6 +12,18 @@ export class ExternalNotifyController {
     return this.service.listLogs(query);
   }
 
+  @Get("logs/trace/:messageId")
+  @Permission("system/externalNotifyLogs/list")
+  traceLogs(@Param("messageId") messageId: string) {
+    return this.service.getMessageTrace(messageId);
+  }
+
+  @Get("feishu/compensation-status")
+  @Permission("system/externalNotifyLogs/list")
+  feishuCompensationStatus() {
+    return this.service.getFeishuCompensationStatus();
+  }
+
   @Post("feishu/test")
   @Permission("system/configs/update")
   testFeishu(@Req() req: any, @Body() body: any) {

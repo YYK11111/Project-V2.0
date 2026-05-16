@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // @ts-nocheck
 import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { diagnoseFeishuNotify, getList, save, testFeishuNotify } from './api'
 import { checkPermi } from '@/utils/permission'
 import { useAppStore } from '@/stores/app'
@@ -179,8 +180,17 @@ function diagnoseFeishu() {
     })
 }
 
+async function copyDiagnoseValue(value) {
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(String(value))
+    ElMessage.success('已复制')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制')
+  }
+}
+
 function formatDiagnoseData(data) {
-  // callbackUrl 是飞书后台安全设置需要复制的关键字段。
   return Object.entries(data || {})
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => ({ key, value: String(value) }))
@@ -345,8 +355,8 @@ function formatDiagnoseData(data) {
                   <div class="external-notify-test-row__label">测试用户</div>
                   <UserSelect v-model="testUserId" placeholder="默认当前登录用户，可选其他用户" clearable :disabled="isConfigReadonly" />
                 </div>
-                <div class="external-notify-test-row__actions">
-                  <el-button v-if="canConfigUpdate" :loading="diagnoseLoading" @click="diagnoseFeishu">飞书配置自检</el-button>
+              <div class="external-notify-test-row__actions">
+                  <el-button v-if="canConfigUpdate" :loading="diagnoseLoading" @click="diagnoseFeishu">飞书审批集成自检</el-button>
                   <el-button v-if="canConfigUpdate" @click="testFeishu">发送测试消息</el-button>
                 </div>
               </div>
@@ -363,6 +373,24 @@ function formatDiagnoseData(data) {
                       <div v-for="item in formatDiagnoseData(step.data)" :key="item.key" class="feishu-diagnose-result__data-item">
                         <span class="feishu-diagnose-result__data-key">{{ item.key }}</span>
                         <span class="feishu-diagnose-result__data-value">{{ item.value }}</span>
+                      </div>
+                      <div class="feishu-diagnose-result__actions">
+                        <el-button
+                          v-if="step.data?.callbackUrl"
+                          text
+                          type="primary"
+                          @click="copyDiagnoseValue(step.data.callbackUrl)"
+                        >
+                          复制回调地址
+                        </el-button>
+                        <el-button
+                          v-if="step.data?.loginUrl"
+                          text
+                          type="primary"
+                          @click="copyDiagnoseValue(step.data.loginUrl)"
+                        >
+                          复制审批免登录链接
+                        </el-button>
                       </div>
                     </div>
                   </div>

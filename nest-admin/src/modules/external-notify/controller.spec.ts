@@ -4,6 +4,8 @@ describe("ExternalNotifyController", () => {
   it("发送飞书测试消息给当前用户", async () => {
     const service = {
       listLogs: jest.fn(),
+      getMessageTrace: jest.fn(),
+      getFeishuCompensationStatus: jest.fn(),
       diagnoseFeishuConfig: jest.fn(),
       sendFeishuTestMessage: jest.fn().mockResolvedValue({ success: true }),
       syncFeishuAccount: jest.fn(),
@@ -20,6 +22,8 @@ describe("ExternalNotifyController", () => {
   it("同步单个用户飞书映射", async () => {
     const service = {
       listLogs: jest.fn(),
+      getMessageTrace: jest.fn(),
+      getFeishuCompensationStatus: jest.fn(),
       diagnoseFeishuConfig: jest.fn(),
       sendFeishuTestMessage: jest.fn(),
       syncFeishuAccount: jest
@@ -38,6 +42,8 @@ describe("ExternalNotifyController", () => {
   it("查询外部通知发送日志", async () => {
     const service = {
       listLogs: jest.fn().mockResolvedValue({ data: [], total: 0 }),
+      getMessageTrace: jest.fn(),
+      getFeishuCompensationStatus: jest.fn(),
       diagnoseFeishuConfig: jest.fn(),
       sendFeishuTestMessage: jest.fn(),
       syncFeishuAccount: jest.fn(),
@@ -54,9 +60,52 @@ describe("ExternalNotifyController", () => {
     });
   });
 
+  it("按统一消息ID查询外部通知追踪日志", async () => {
+    const service = {
+      listLogs: jest.fn(),
+      getMessageTrace: jest
+        .fn()
+        .mockResolvedValue({ messageId: "msg-1", logs: [] }),
+      getFeishuCompensationStatus: jest.fn(),
+      diagnoseFeishuConfig: jest.fn(),
+      sendFeishuTestMessage: jest.fn(),
+      syncFeishuAccount: jest.fn(),
+      syncFeishuAccounts: jest.fn(),
+    };
+    const controller = new ExternalNotifyController(service as any);
+
+    await expect(controller.traceLogs("msg-1")).resolves.toEqual({
+      messageId: "msg-1",
+      logs: [],
+    });
+    expect(service.getMessageTrace).toHaveBeenCalledWith("msg-1");
+  });
+
+  it("查询飞书卡片状态补偿概览", async () => {
+    const service = {
+      listLogs: jest.fn(),
+      getMessageTrace: jest.fn(),
+      getFeishuCompensationStatus: jest
+        .fn()
+        .mockResolvedValue({ pendingCount: 1 }),
+      diagnoseFeishuConfig: jest.fn(),
+      sendFeishuTestMessage: jest.fn(),
+      syncFeishuAccount: jest.fn(),
+      syncFeishuAccounts: jest.fn(),
+    };
+    const controller = new ExternalNotifyController(service as any);
+
+    await expect(controller.feishuCompensationStatus()).resolves.toEqual({
+      pendingCount: 1,
+    });
+    expect(service.getFeishuCompensationStatus).toHaveBeenCalledWith();
+  });
+
   it("执行飞书配置自检", async () => {
     const service = {
       listLogs: jest.fn(),
+      getMessageTrace: jest.fn(),
+      getFeishuCompensationStatus: jest.fn(),
       diagnoseFeishuConfig: jest
         .fn()
         .mockResolvedValue({ success: true, steps: [] }),

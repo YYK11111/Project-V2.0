@@ -786,33 +786,71 @@ export class ExternalNotifyService {
       },
     );
 
+    const diagnoseNotificationId = this.generateNotificationId();
+    const diagnoseMessageId = `diagnose_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    const diagnoseMessage = {
+      notificationId: diagnoseNotificationId,
+      messageId: diagnoseMessageId,
+      receiverId: String(userId),
+      templateKey: "workflowTodo",
+      title: "飞书配置自检",
+      content: "这是一条飞书配置自检卡片，用于验证机器人消息能力。",
+      linkUrl: approvalLoginUrl || "https://open.feishu.cn",
+      extraData: {
+        businessLabel: "系统配置",
+        nodeName: "飞书配置自检",
+        starterName: "系统",
+      },
+      sourceType: "system_config",
+      sourceId: "feishu_diagnose",
+      messageType: "diagnose",
+    };
     try {
-      await this.feishuProvider.sendText(
+      const response = await this.feishuProvider.sendText(
         {
           externalUserId: matchedUser.user_id,
         } as any,
-        {
-          receiverId: String(userId),
-          templateKey: "workflowTodo",
-          title: "飞书配置自检",
-          content: "这是一条飞书配置自检卡片，用于验证机器人消息能力。",
-          linkUrl: approvalLoginUrl || "https://open.feishu.cn",
-          extraData: {
-            businessLabel: "系统配置",
-            nodeName: "飞书配置自检",
-            starterName: "系统",
-          },
-        },
+        diagnoseMessage,
         config,
       );
+      await this.saveLog(
+        "feishu",
+        { externalUserId: matchedUser.user_id } as any,
+        diagnoseMessage,
+        {
+          sendStatus: ExternalMessageSendStatus.succeeded,
+          responsePayload: response,
+        },
+      );
       addStep("cardSend", "卡片发送", true, "飞书卡片发送成功");
+      addStep("diagnoseLog", "自检日志", true, "飞书自检发送日志已记录", {
+        notificationId: diagnoseNotificationId,
+        messageId: diagnoseMessageId,
+        externalMessageId: this.getFeishuMessageId(response),
+      });
     } catch (error) {
+      await this.saveLog(
+        "feishu",
+        { externalUserId: matchedUser.user_id } as any,
+        diagnoseMessage,
+        {
+          sendStatus: ExternalMessageSendStatus.failed,
+          errorMessage: error?.message || "飞书卡片发送失败",
+        },
+      );
       addStep(
         "cardSend",
         "卡片发送",
         false,
         error?.message || "飞书卡片发送失败",
+        this.buildFeishuErrorSuggestion(error),
       );
+      addStep("diagnoseLog", "自检日志", true, "飞书自检失败日志已记录", {
+        notificationId: diagnoseNotificationId,
+        messageId: diagnoseMessageId,
+      });
     }
 
     return {
@@ -964,6 +1002,51 @@ export class ExternalNotifyService {
     return { data, total, _flag: true };
   }
 
+  async getMessageTrace(messageId: string) {
+    const normalizedMessageId = String(messageId || "").trim();
+    if (!normalizedMessageId) {
+      return { messageId: "", total: 0, logs: [] };
+    }
+    const logs = await this.logRepository.find({
+      where: {
+        messageId: normalizedMessageId,
+        isDelete: null as any,
+      } as any,
+      order: { createTime: "ASC" as any },
+    });
+    return {
+      messageId: normalizedMessageId,
+      total: logs.length,
+      logs,
+    };
+  }
+
+  async getFeishuCompensationStatus() {
+    const commonWhere = {
+      platform: "feishu",
+      operationType: "update_card_status",
+      templateKey: "workflowTodoStatus",
+      isDelete: null as any,
+    };
+    const pendingCount = await this.logRepository.count({
+      where: {
+        ...commonWhere,
+        sendStatus: ExternalMessageSendStatus.pending,
+      } as any,
+    });
+    const latestFailedLog = await this.logRepository.findOne({
+      where: {
+        ...commonWhere,
+        sendStatus: ExternalMessageSendStatus.failed,
+      } as any,
+      order: { lastRetryTime: "DESC" as any, createTime: "DESC" as any },
+    });
+    return {
+      pendingCount,
+      latestFailedLog,
+    };
+  }
+
   private pickMatchedFeishuUser(
     users: any[],
     query: { email?: string; mobile?: string },
@@ -982,5 +1065,33 @@ export class ExternalNotifyService {
       ) ||
       users[0]
     );
+  }
+
+  private buildFeishuErrorSuggestion(error: any) {
+    const message = String(error?.message || "");
+    if (message.includes("230006")) {
+      return {
+        errorCode: "230006",
+        suggestion:
+          "请在飞书开放平台启用机器人能力，并确认应用已发布到目标企业后重试。",
+      };
+    }
+    if (message.includes("20029")) {
+      return {
+        errorCode: "20029",
+        suggestion:
+          "请在飞书开放平台的开发配置 → 安全设置 → 重定向 URL 中添加系统自检展示的 callbackUrl。",
+      };
+    }
+    if (message.includes("99992360")) {
+      return {
+        errorCode: "99992360",
+        suggestion:
+          "请重新同步外部账号映射，确认外部用户 ID 为飞书 UserID，且 OpenID、UnionID 已保存。",
+      };
+    }
+    return {
+      suggestion: "请根据飞书返回错误检查应用权限、机器人能力和用户账号映射。",
+    };
   }
 }
