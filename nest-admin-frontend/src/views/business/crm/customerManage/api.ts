@@ -51,3 +51,32 @@ export function revokeCustomerViewAccess(id, userId) {
 export function getCustomerAuthUsers(id) {
   return request({ url: `${baseUrl}/${id}/auth-users`, method: 'get' })
 }
+
+export const grantCustomerViewAccess = (data: {
+  customerId: string;
+  userIds: string[];
+  permissions?: string[];
+  grantType?: 'permanent' | 'temporary';
+  startTime?: string;
+  endTime?: string;
+  canEdit?: string;
+  grantReason?: string;
+}) => {
+  return request.post('/business/crm/customers/grantViewAccess', data)
+}
+
+export const revokeCustomerViewAccess = (data: {
+  customerId: string;
+  userId: string;
+  reason?: string;
+}) => {
+  return request.post('/business/crm/customers/revokeViewAccess', data)
+}
+
+export const updateViewerStatus = (data: {
+  customerId: string;
+  viewerIds: string[];
+  status: 'enabled' | 'disabled';
+}) => {
+  return request.post('/business/crm/customers/updateViewerStatus', data)
+}
