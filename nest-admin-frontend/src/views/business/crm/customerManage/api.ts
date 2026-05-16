@@ -40,19 +40,7 @@ export function submitApproval(id) {
   return request({ url: `${baseUrl}/${id}/submit-approval`, method: 'post' })
 }
 
-export function grantCustomerViewAccess(id, userIds) {
-  return request({ url: `${baseUrl}/${id}/auth`, method: 'post', data: { userIds } })
-}
-
-export function revokeCustomerViewAccess(id, userId) {
-  return request({ url: `${baseUrl}/${id}/auth/${userId}`, method: 'delete' })
-}
-
-export function getCustomerAuthUsers(id) {
-  return request({ url: `${baseUrl}/${id}/auth-users`, method: 'get' })
-}
-
-export const grantCustomerViewAccess = (data: {
+export function grantCustomerViewAccess(data: {
   customerId: string;
   userIds: string[];
   permissions?: string[];
@@ -61,16 +49,20 @@ export const grantCustomerViewAccess = (data: {
   endTime?: string;
   canEdit?: string;
   grantReason?: string;
-}) => {
+}) {
   return request.post('/business/crm/customers/grantViewAccess', data)
 }
 
-export const revokeCustomerViewAccess = (data: {
+export function revokeCustomerViewAccess(data: {
   customerId: string;
   userId: string;
   reason?: string;
-}) => {
+}) {
   return request.post('/business/crm/customers/revokeViewAccess', data)
+}
+
+export function getCustomerAuthUsers(id) {
+  return request({ url: `${baseUrl}/${id}/auth-users`, method: 'get' })
 }
 
 export const updateViewerStatus = (data: {
