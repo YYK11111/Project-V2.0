@@ -171,7 +171,7 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="milestone-form-page milestone-form-shell">
+  <FormPageShell class="business-form-page milestone-form-page">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="hasMilestoneId">当前里程碑已关联任务</span>
@@ -179,17 +179,17 @@ function cancel() {
 
     <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? '里程碑详情' : isEdit ? '编辑里程碑' : '新增里程碑'" />
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
-      <div class="milestone-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护里程碑名称、项目归属、责任人和计划时间，让关键交付节点边界清楚可见。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护里程碑名称、项目归属、责任人和计划时间，让关键交付节点边界清楚可见。</div>
           </div>
         </div>
 
-        <div class="milestone-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="里程碑名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入里程碑名称" maxlength="100" show-word-limit />
@@ -265,15 +265,15 @@ function cancel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">交付物与附件</div>
-            <div class="section-desc">统一维护交付物清单、里程碑附件和补充说明，方便后续执行对齐。</div>
+            <div class="business-form-section__title">交付物与附件</div>
+            <div class="business-form-section__desc">统一维护交付物清单、里程碑附件和补充说明，方便后续执行对齐。</div>
           </div>
         </div>
 
-        <div class="milestone-section-fields">
+        <div class="business-form-fields">
 
       <el-form-item label="交付物清单">
         <div v-if="!isView">
@@ -304,11 +304,11 @@ function cancel() {
       </section>
 
       <template v-if="hasMilestoneId">
-        <section class="section-card">
-          <div class="section-header">
+        <section class="business-form-section">
+          <div class="business-form-section__header">
             <div>
-              <div class="section-title">任务概况</div>
-              <div class="section-desc">查看关联任务数量、完成率和当前时间状态，辅助评估里程碑推进情况。</div>
+              <div class="business-form-section__title">任务概况</div>
+              <div class="business-form-section__desc">查看关联任务数量、完成率和当前时间状态，辅助评估里程碑推进情况。</div>
             </div>
           </div>
         <el-divider content-position="left">任务概况</el-divider>
@@ -367,58 +367,7 @@ function cancel() {
 </template>
 
 <style scoped>
-.milestone-form-page {
-  min-height: 100%;
-}
-
-.milestone-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.milestone-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.milestone-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.milestone-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.milestone-form-page :deep(.el-form-item__label) {
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -467,10 +416,6 @@ function cancel() {
 }
 
 @media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
-
   .milestone-summary-grid {
     grid-template-columns: 1fr;
   }

@@ -146,7 +146,7 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="sprint-form-page sprint-form-shell">
+  <FormPageShell class="business-form-page sprint-form-page">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="hasSprintId">当前 Sprint 已关联任务</span>
@@ -154,17 +154,17 @@ function cancel() {
 
     <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? 'Sprint详情' : isEdit ? '编辑Sprint' : '新增Sprint'" />
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
-      <div class="sprint-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护 Sprint 名称、归属项目、状态和时间范围，先把执行边界建立清楚。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护 Sprint 名称、归属项目、状态和时间范围，先把执行边界建立清楚。</div>
           </div>
         </div>
 
-        <div class="sprint-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="Sprint名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入Sprint名称" maxlength="100" show-word-limit />
@@ -219,15 +219,15 @@ function cancel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">执行指标与附件</div>
-            <div class="section-desc">统一查看变更提示、故事点和任务数统计，并维护 Sprint 附件。</div>
+            <div class="business-form-section__title">执行指标与附件</div>
+            <div class="business-form-section__desc">统一查看变更提示、故事点和任务数统计，并维护 Sprint 附件。</div>
           </div>
         </div>
 
-        <div class="sprint-section-fields">
+        <div class="business-form-fields">
 
       <el-alert
         v-if="sprintImpactTips.length && !isView"
@@ -298,63 +298,7 @@ function cancel() {
 </template>
 
 <style scoped>
-.sprint-form-page {
-  min-height: 100%;
-}
-
-.sprint-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.sprint-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.sprint-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.sprint-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.sprint-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.sprint-form-page :deep(.el-form-item__label) {
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -373,8 +317,5 @@ function cancel() {
 }
 
 @media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>

@@ -295,10 +295,10 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <FormPageShell class="change-form-page">
-    <div class="Gcard change-form-shell">
-    <div class="change-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
+  <FormPageShell class="business-form-page change-form-page">
+    <div class="Gcard business-form-shell change-form-shell">
+    <div>
+      <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '变更详情' : isEdit ? '编辑变更' : '新增变更'">
         <template #extra>
           <el-button v-if="fromWorkflow && workflowTaskId" @click="scrollToWorkflowPanel">跳转审批区</el-button>
           <el-button v-if="form.knowledgeArticleId" type="primary" plain @click="router.push({ path: '/content/articleManage/view', query: { id: form.knowledgeArticleId } })">查看知识</el-button>
@@ -332,16 +332,16 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
-      <div class="change-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护变更标题、归属项目、类型、影响程度和状态，先把变更基本上下文建立清楚。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护变更标题、归属项目、类型、影响程度和状态，先把变更基本上下文建立清楚。</div>
           </div>
         </div>
-        <div class="change-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="变更标题" prop="title">
         <ViewField v-if="isReadonly" :value="form.title" />
         <el-input v-else v-model="form.title" placeholder="请输入变更标题" maxlength="200" show-word-limit />
@@ -390,14 +390,14 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <section v-if="hasChangeId" class="section-card">
-        <div class="section-header">
+      <section v-if="hasChangeId" class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">计划影响与处理</div>
-            <div class="section-desc">查看整体处理状态、分项处理记录和确认历史，确保计划影响闭环可追踪。</div>
+            <div class="business-form-section__title">计划影响与处理</div>
+            <div class="business-form-section__desc">查看整体处理状态、分项处理记录和确认历史，确保计划影响闭环可追踪。</div>
           </div>
         </div>
-        <div class="change-section-fields">
+        <div class="business-form-fields">
 
       <el-form-item label="计划影响处理" v-if="hasChangeId">
         <ViewTagField :text="String(form.planImpactConfirmed || '0') === '1' ? '已确认处理' : '待确认处理'" :type="String(form.planImpactConfirmed || '0') === '1' ? 'success' : 'warning'" />
@@ -449,14 +449,14 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">变更分析</div>
-            <div class="section-desc">补充变更原因、影响分析和成本进度影响，便于评估实施范围与风险。</div>
+            <div class="business-form-section__title">变更分析</div>
+            <div class="business-form-section__desc">补充变更原因、影响分析和成本进度影响，便于评估实施范围与风险。</div>
           </div>
         </div>
-        <div class="change-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="变更原因">
         <ViewField v-if="isReadonly" :value="form.reason" />
         <el-input v-else v-model="form.reason" type="textarea" :rows="2" placeholder="请输入变更原因" />
@@ -532,14 +532,14 @@ function scrollToWorkflowPanel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">审批与附件</div>
-            <div class="section-desc">维护申请人、审批人、审批意见和变更附件，统一沉淀支撑材料。</div>
+            <div class="business-form-section__title">审批与附件</div>
+            <div class="business-form-section__desc">维护申请人、审批人、审批意见和变更附件，统一沉淀支撑材料。</div>
           </div>
         </div>
-        <div class="change-section-fields">
+        <div class="business-form-fields">
 
       <el-form-item label="申请人">
         <ViewUser v-if="isReadonly" :user="form.requester" />
@@ -571,8 +571,8 @@ function scrollToWorkflowPanel() {
       </div>
     </el-form>
 
-    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-      <div class="workflow-panel-section__header">审批操作区</div>
+    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="business-workflow-section">
+      <div class="business-workflow-section__header">审批操作区</div>
       <WorkflowApprovalPanel
         :task-id="workflowTaskId"
         :instance-id="workflowInstanceId"
@@ -592,83 +592,9 @@ function scrollToWorkflowPanel() {
 </template>
 
 <style lang="scss" scoped>
-.change-form-page {
-  min-height: 100%;
-}
-
-.change-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.change-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.change-form-shell__top {
-  margin-bottom: 20px;
-}
-
-.change-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.change-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.change-form-page :deep(.el-form-item__label) {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.change-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.workflow-panel-section {
-  margin-top: 20px;
-  max-width: 800px;
-  padding-top: 20px;
-  border-top: 1px solid var(--el-border-color-light);
-}
-
-.workflow-panel-section__header {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
 }
 
 .top-alert-actions {
@@ -751,8 +677,5 @@ function scrollToWorkflowPanel() {
 }
 
 @media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>

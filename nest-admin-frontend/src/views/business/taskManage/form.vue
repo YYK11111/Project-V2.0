@@ -693,13 +693,13 @@ watch(hasTaskId, (value) => {
 </script>
 
 <template>
-  <FormPageShell class="task-form-page">
+  <FormPageShell class="business-form-page task-form-page">
     <template #footerMeta>
       <span>{{ pageStatusText }}</span>
       <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
     </template>
 
-    <div class="Gcard task-form-shell">
+    <div class="Gcard business-form-shell task-form-shell">
       <el-alert
         v-if="isEdit && form.approvalStatus === '3'"
         :title="String(form.currentNodeName || '').includes('退回发起人') ? '该任务审批已退回发起人，可修改后重新提交，或直接结束退回实例。' : '该任务审批已驳回，请根据意见调整后重新提交。'"

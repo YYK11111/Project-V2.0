@@ -147,7 +147,7 @@ async function handleConvertToTask() {
 </script>
 
 <template>
-  <FormPageShell class="risk-form-page risk-form-shell">
+  <FormPageShell class="business-form-page risk-form-page">
     <template #footerMeta>
       <span>{{ isView ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="form.knowledgeArticleId">已沉淀知识</span>
@@ -161,16 +161,16 @@ async function handleConvertToTask() {
       </template>
     </el-page-header>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px; --FormItemContentMaxWidth: 100%;">
-      <div class="risk-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护风险名称、归属项目、等级状态和责任人，先把风险上下文建立完整。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护风险名称、归属项目、等级状态和责任人，先把风险上下文建立完整。</div>
           </div>
         </div>
-        <div class="risk-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="风险名称" prop="name">
         <ViewField v-if="isView" :value="form.name" />
         <el-input v-else v-model="form.name" placeholder="请输入风险名称" maxlength="200" show-word-limit />
@@ -223,14 +223,14 @@ async function handleConvertToTask() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">风险分析</div>
-            <div class="section-desc">补充风险描述、应对措施和影响程度，便于后续跟踪与处理。</div>
+            <div class="business-form-section__title">风险分析</div>
+            <div class="business-form-section__desc">补充风险描述、应对措施和影响程度，便于后续跟踪与处理。</div>
           </div>
         </div>
-        <div class="risk-section-fields">
+        <div class="business-form-fields">
 
       <el-form-item label="风险描述">
         <ViewField v-if="isView" :value="form.description" />
@@ -249,14 +249,14 @@ async function handleConvertToTask() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">关联信息与附件</div>
-            <div class="section-desc">统一查看关联任务、附件材料和排序信息，减少处理过程中的信息缺口。</div>
+            <div class="business-form-section__title">关联信息与附件</div>
+            <div class="business-form-section__desc">统一查看关联任务、附件材料和排序信息，减少处理过程中的信息缺口。</div>
           </div>
         </div>
-        <div class="risk-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="风险附件">
         <ViewFileList v-if="isView" :files="form.attachments || []" />
         <Upload v-else v-model:fileList="form.attachments" type="file" multiple />
@@ -286,58 +286,7 @@ async function handleConvertToTask() {
 </template>
 
 <style lang="scss" scoped>
-.risk-form-page {
-  min-height: 100%;
-}
-
-.risk-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.risk-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.risk-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.risk-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.risk-form-page :deep(.el-form-item__label) {
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }

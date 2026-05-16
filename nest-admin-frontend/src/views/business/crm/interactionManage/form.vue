@@ -102,23 +102,23 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="interaction-form-page">
-    <div class="Gcard interaction-form-shell">
-    <div class="interaction-form-shell__top">
-      <el-page-header @back="$router.back()" :title="isReadonly ? '互动记录详情' : isEdit ? '编辑互动记录' : '新增互动记录'" />
+  <FormPageShell class="business-form-page interaction-form-page">
+    <div class="Gcard business-form-shell interaction-form-shell">
+    <div>
+      <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '互动记录详情' : isEdit ? '编辑互动记录' : '新增互动记录'" />
     </div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 800px">
-      <div class="interaction-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护客户、互动类型和互动时间，先把跟进上下文建立完整。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护客户、互动类型和互动时间，先把跟进上下文建立完整。</div>
           </div>
         </div>
 
-        <div class="interaction-section-fields">
+        <div class="business-form-fields">
       <el-form-item label="客户" prop="customerId">
         <ViewEntity v-if="isReadonly" :title="form.customer?.name" :subtitle="form.customer?.code" />
         <el-select v-else v-model="form.customerId" placeholder="请选择客户" filterable style="width: 100%">
@@ -151,11 +151,11 @@ function cancel() {
         </div>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">跟进内容</div>
-            <div class="section-desc">记录本次客户沟通、拜访或会议的关键信息，便于后续持续跟进。</div>
+            <div class="business-form-section__title">跟进内容</div>
+            <div class="business-form-section__desc">记录本次客户沟通、拜访或会议的关键信息，便于后续持续跟进。</div>
           </div>
         </div>
 
@@ -172,15 +172,15 @@ function cancel() {
         </el-form-item>
       </section>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">跟进安排与附件</div>
-            <div class="section-desc">统一维护互动人、下次跟进时间和相关附件材料，便于形成连续跟进记录。</div>
+            <div class="business-form-section__title">跟进安排与附件</div>
+            <div class="business-form-section__desc">统一维护互动人、下次跟进时间和相关附件材料，便于形成连续跟进记录。</div>
           </div>
         </div>
 
-        <div class="interaction-section-fields">
+        <div class="business-form-fields">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="互动人" prop="operatorName">
@@ -220,67 +220,7 @@ function cancel() {
 </template>
 
 <style lang="scss" scoped>
-.interaction-form-page {
-  min-height: 100%;
-}
-
-.interaction-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.interaction-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.interaction-form-shell__top {
-  margin-bottom: 20px;
-}
-
-.interaction-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.interaction-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.interaction-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.interaction-form-page :deep(.el-form-item__label) {
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -300,8 +240,5 @@ function cancel() {
 }
 
 @media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>

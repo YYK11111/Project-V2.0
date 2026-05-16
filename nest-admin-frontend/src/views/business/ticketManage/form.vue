@@ -245,7 +245,7 @@ function scrollToWorkflowPanel() {
 </script>
 
 <template>
-  <FormPageShell class="ticket-form-page ticket-form-shell">
+  <FormPageShell class="business-form-page ticket-form-page">
     <template #footerMeta>
       <span>{{ isReadonly ? '查看模式' : isEdit ? '编辑模式' : '新建模式' }}</span>
       <span v-if="fromWorkflow && workflowTaskId">当前来源于流程审批</span>
@@ -279,17 +279,17 @@ function scrollToWorkflowPanel() {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 900px; --FormItemContentMaxWidth: 100%;">
-      <div class="ticket-sections">
-      <section class="section-card">
-        <div class="section-header">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+      <div class="business-form-sections">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">基本信息</div>
-            <div class="section-desc">维护工单标题、类型、归属项目、处理人与优先级，先把问题上下文建立完整。</div>
+            <div class="business-form-section__title">基本信息</div>
+            <div class="business-form-section__desc">维护工单标题、类型、归属项目、处理人与优先级，先把问题上下文建立完整。</div>
           </div>
         </div>
 
-        <div class="ticket-section-fields">
+        <div class="business-form-fields">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="工单标题" prop="title">
@@ -418,15 +418,15 @@ function scrollToWorkflowPanel() {
 
       <!-- 缺陷相关字段 -->
       <template v-if="form.type === '1'">
-        <section class="section-card">
-          <div class="section-header">
+        <section class="business-form-section">
+          <div class="business-form-section__header">
             <div>
-              <div class="section-title">缺陷分析</div>
-              <div class="section-desc">补充复现步骤、期望与实际结果，以及根因分析和解决方案。</div>
+              <div class="business-form-section__title">缺陷分析</div>
+              <div class="business-form-section__desc">补充复现步骤、期望与实际结果，以及根因分析和解决方案。</div>
             </div>
           </div>
 
-          <div class="ticket-section-fields">
+          <div class="business-form-fields business-form-fields--content">
         <el-divider content-position="left">缺陷详细信息</el-divider>
 
         <el-form-item label="重现步骤">
@@ -475,11 +475,11 @@ function scrollToWorkflowPanel() {
         </section>
       </template>
 
-      <section class="section-card">
-        <div class="section-header">
+      <section class="business-form-section">
+        <div class="business-form-section__header">
           <div>
-            <div class="section-title">附件</div>
-            <div class="section-desc">统一维护工单截图、日志和其它支撑材料，方便排查与沉淀。</div>
+            <div class="business-form-section__title">附件</div>
+            <div class="business-form-section__desc">统一维护工单截图、日志和其它支撑材料，方便排查与沉淀。</div>
           </div>
         </div>
 
@@ -497,8 +497,8 @@ function scrollToWorkflowPanel() {
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
     </template>
 
-    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="workflow-panel-section">
-      <div class="workflow-panel-section__header">审批操作区</div>
+    <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="business-workflow-section">
+      <div class="business-workflow-section__header">审批操作区</div>
       <WorkflowApprovalPanel
         :task-id="workflowTaskId"
         :instance-id="workflowInstanceId"
@@ -510,95 +510,19 @@ function scrollToWorkflowPanel() {
 </template>
 
 <style lang="scss" scoped>
-.ticket-form-page {
-  min-height: 100%;
-}
-
-.ticket-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.ticket-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.ticket-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.ticket-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-:deep(.el-form-item__label) {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.ticket-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-:deep(.el-divider__text) {
+.business-form-page :deep(.el-divider__text) {
   font-weight: bold;
   color: var(--el-color-primary);
-}
-
-.workflow-panel-section {
-  margin-top: 20px;
-  max-width: 900px;
-  padding-top: 20px;
-  border-top: 1px solid var(--el-border-color-light);
-}
-
-.workflow-panel-section__header {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
 }
 
 .top-alert-actions {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-}
-
-@media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>

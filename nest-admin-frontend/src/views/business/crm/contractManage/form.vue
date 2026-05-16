@@ -116,23 +116,23 @@ function cancel() {
 </script>
 
 <template>
-  <FormPageShell class="contract-form-page">
-    <div class="Gcard contract-form-shell">
-      <div class="contract-form-shell__top">
-        <el-page-header @back="$router.back()" :title="isReadonly ? '合同详情' : isEdit ? '编辑合同' : '新增合同'" />
+  <FormPageShell class="business-form-page contract-form-page">
+    <div class="Gcard business-form-shell contract-form-shell">
+      <div>
+        <el-page-header class="business-form-header" @back="$router.back()" :title="isReadonly ? '合同详情' : isEdit ? '编辑合同' : '新增合同'" />
       </div>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form" style="max-width: 900px">
-        <div class="contract-sections">
-          <section class="section-card">
-            <div class="section-header">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form">
+        <div class="business-form-sections">
+          <section class="business-form-section">
+            <div class="business-form-section__header">
               <div>
-                <div class="section-title">基本信息</div>
-                <div class="section-desc">维护合同名称、编号、客户和负责人，先把合同主信息建立完整。</div>
+                <div class="business-form-section__title">基本信息</div>
+                <div class="business-form-section__desc">维护合同名称、编号、客户和负责人，先把合同主信息建立完整。</div>
               </div>
             </div>
 
-            <div class="contract-section-fields">
+            <div class="business-form-fields">
               <el-row :gutter="20">
                 <el-col :span="12">
                   <el-form-item label="合同名称" prop="name">
@@ -167,15 +167,15 @@ function cancel() {
             </div>
           </section>
 
-          <section class="section-card">
-            <div class="section-header">
+          <section class="business-form-section">
+            <div class="business-form-section__header">
               <div>
-                <div class="section-title">金额与周期</div>
-                <div class="section-desc">统一维护合同金额、回款金额和合同生效周期，便于后续回款与项目联动。</div>
+                <div class="business-form-section__title">金额与周期</div>
+                <div class="business-form-section__desc">统一维护合同金额、回款金额和合同生效周期，便于后续回款与项目联动。</div>
               </div>
             </div>
 
-            <div class="contract-section-fields">
+            <div class="business-form-fields">
               <el-row :gutter="20">
                 <el-col :span="12">
                   <el-form-item label="合同金额(元)" prop="amount">
@@ -232,15 +232,15 @@ function cancel() {
             </div>
           </section>
 
-          <section class="section-card">
-            <div class="section-header">
+          <section class="business-form-section">
+            <div class="business-form-section__header">
               <div>
-                <div class="section-title">状态与关联</div>
-                <div class="section-desc">统一查看合同状态和关联项目，便于后续项目落地与执行跟踪。</div>
+                <div class="business-form-section__title">状态与关联</div>
+                <div class="business-form-section__desc">统一查看合同状态和关联项目，便于后续项目落地与执行跟踪。</div>
               </div>
             </div>
 
-            <div class="contract-section-fields">
+            <div class="business-form-fields">
               <el-form-item label="合同状态" prop="status">
                 <ViewTagField v-if="isReadonly" :text="contractStatuses[form.status]" :type="form.status === '1' ? 'success' : form.status === '2' ? 'warning' : form.status === '3' ? 'danger' : 'info'" />
                 <el-select v-else v-model="form.status" placeholder="请选择合同状态" style="width: 300px">
@@ -255,15 +255,15 @@ function cancel() {
             </div>
           </section>
 
-          <section class="section-card">
-            <div class="section-header">
+          <section class="business-form-section">
+            <div class="business-form-section__header">
               <div>
-                <div class="section-title">合同文件与备注</div>
-                <div class="section-desc">统一管理合同文件与补充备注，保持文件上传体验和其它表单一致。</div>
+                <div class="business-form-section__title">合同文件与备注</div>
+                <div class="business-form-section__desc">统一管理合同文件与补充备注，保持文件上传体验和其它表单一致。</div>
               </div>
             </div>
 
-            <div class="contract-section-fields">
+            <div class="business-form-fields business-form-fields--content">
               <el-form-item label="合同文件" prop="contractFile">
                 <template v-if="isReadonly">
                   <ViewFileList v-if="form.contractFile" :files="[{ name: '合同文件', url: form.contractFile }]" />
@@ -297,67 +297,7 @@ function cancel() {
 </template>
 
 <style lang="scss" scoped>
-.contract-form-page {
-  min-height: 100%;
-}
-
-.contract-form-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.contract-form-page :deep(.el-row) {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.contract-form-shell__top {
-  margin-bottom: 20px;
-}
-
-.contract-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-card {
-  padding: 22px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-bg-color);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-}
-
-.contract-section-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.contract-form-page :deep(.el-form-item) {
-  margin: 0 !important;
-}
-
-.contract-form-page :deep(.el-form-item__label) {
+.business-form-page :deep(.el-form-item__label) {
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -377,8 +317,5 @@ function cancel() {
 }
 
 @media (max-width: 768px) {
-  .section-card {
-    padding: 18px;
-  }
 }
 </style>

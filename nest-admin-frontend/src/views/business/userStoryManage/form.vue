@@ -172,17 +172,17 @@ async function handleCreateTaskFromStory() {
 </script>
 
 <template>
-  <FormPageShell class="story-form-page">
-    <div class="Gcard story-form-shell">
+  <FormPageShell class="business-form-page story-form-page">
+    <div class="Gcard business-form-shell story-form-shell">
       <div class="story-form-shell__top">
-        <el-page-header @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'">
+        <el-page-header class="business-form-header" @back="$router.back()" :title="isView ? '用户故事详情' : isEdit ? '编辑用户故事' : '新增用户故事'">
           <template #extra>
             <el-button v-if="hasStoryId" type="primary" @click="handleCreateTaskFromStory">从故事创建任务</el-button>
           </template>
         </el-page-header>
       </div>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="story-form">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="business-form story-form">
         <div class="story-form-sections">
           <section class="section-card section-card--basic">
             <div class="section-header km-section-header">

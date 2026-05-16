@@ -10,6 +10,16 @@
   overflow-x: hidden;
 }
 
+.business-form-shell {
+  container-type: inline-size;
+  container-name: business-form-shell;
+}
+
+.business-form-page .business-form-shell {
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
 .business-form-header,
 .business-form-shell__top {
   margin-bottom: 20px;
@@ -18,28 +28,44 @@
 .business-form {
   width: 100%;
   max-width: none !important;
+  overflow-x: hidden;
+  box-sizing: border-box;
   --FormItemContentMaxWidth: 100%;
 }
 
 .business-form .el-row {
   margin-left: 0 !important;
   margin-right: 0 !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.business-form .el-col {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .business-form-sections {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .business-form-section {
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   padding: 22px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 14px;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .business-form-section__header {
@@ -67,6 +93,11 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .business-form-fields--content {
@@ -77,6 +108,39 @@
 .business-form-fields .el-form-item,
 .business-form-section .el-form-item {
   margin: 0 !important;
+}
+
+.business-form .el-form-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.business-form .el-form-item__content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.business-form .section-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.business-form .el-input,
+.business-form .el-select,
+.business-form .el-input-number,
+.business-form .user-select,
+.business-form .Editor,
+.business-form .ql-toolbar,
+.business-form .quillEditor {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.business-form .ql-toolbar {
+  overflow-x: auto;
 }
 
 .business-form-page .el-form-item__label {
@@ -119,6 +183,59 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+}
+
+@mixin compact-business-form {
+  .business-form .el-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .business-form .el-col {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+
+  .business-form .el-col.is-guttered {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .business-form .el-form-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .business-form .el-form-item__label {
+    width: auto !important;
+    max-width: 100%;
+    padding: 0 0 6px;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .business-form .el-form-item__content {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .business-form-fields {
+    gap: 18px;
+  }
+
+  .business-form-sections {
+    gap: 18px;
+  }
+}
+
+@container business-form-shell (max-width: 1024px) {
+  @include compact-business-form;
+}
+
+@media (max-width: 1024px) {
+  @include compact-business-form;
 }
 
 @media (max-width: 768px) {

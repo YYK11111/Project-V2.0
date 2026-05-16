@@ -32,9 +32,11 @@ function updateFooterStyle() {
   const element = shellRef.value
   if (!element) return
   const rect = element.getBoundingClientRect()
+  const left = Math.max(rect.left, 12)
+  const availableWidth = Math.max(window.innerWidth - left - 12, 0)
   footerStyle.value = {
-    left: `${Math.max(rect.left, 12)}px`,
-    width: `${Math.max(rect.width, 0)}px`,
+    left: `${left}px`,
+    width: `${Math.min(Math.max(rect.width, 0), availableWidth)}px`,
     bottom: `${props.footerBottom}px`,
   }
 }
