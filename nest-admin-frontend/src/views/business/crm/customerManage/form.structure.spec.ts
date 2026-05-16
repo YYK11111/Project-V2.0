@@ -29,4 +29,24 @@ describe('customer form structure', () => {
     expect(source).toContain('form.value = { ...data }')
     expect(source).not.toContain('form.value = { ...data, salesId: currentUserId.value }')
   })
+
+  it('客户表单不在页面脚本里声明响应式断点', () => {
+    const source = readSource()
+
+    expect(source).not.toContain('viewportWidth')
+    expect(source).not.toContain('formLabelPosition')
+    expect(source).not.toContain('isCompactScreen')
+    expect(source).not.toContain(':label-position="formLabelPosition"')
+    expect(source).not.toContain('window.addEventListener(\'resize\', updateViewportWidth)')
+    expect(source).not.toContain('window.removeEventListener(\'resize\', updateViewportWidth)')
+  })
+
+  it('已有客户表单应展示关联业务记录', () => {
+    const source = readSource()
+
+    expect(source).toContain("import CustomerRelatedRecords from './components/CustomerRelatedRecords.vue'")
+    expect(source).toContain('<CustomerRelatedRecords')
+    expect(source).toContain('v-if="hasCustomerId"')
+    expect(source).toContain(':customer-id="String(route.query.id || \'\')"')
+  })
 })

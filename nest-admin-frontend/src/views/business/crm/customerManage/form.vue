@@ -14,6 +14,7 @@ import ViewField from '@/components/view/ViewField.vue'
 import ViewTagField from '@/components/view/ViewTagField.vue'
 import ViewUser from '@/components/view/ViewUser.vue'
 import FormPageShell from '@/components/FormPageShell.vue'
+import CustomerRelatedRecords from './components/CustomerRelatedRecords.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 
@@ -478,6 +479,11 @@ function scrollToWorkflowPanel() {
 
       </div>
     </el-form>
+
+    <CustomerRelatedRecords
+      v-if="hasCustomerId"
+      :customer-id="String(route.query.id || '')"
+    />
 
     <div v-if="fromWorkflow && workflowTaskId" ref="workflowPanelRef" class="business-workflow-section">
       <div class="business-workflow-section__header">审批操作区</div>
