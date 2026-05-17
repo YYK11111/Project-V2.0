@@ -12,9 +12,9 @@ describe("ArticleChunkEmbeddingsService", () => {
         model: "text-embedding-3-small",
         vectors: [[0.12, 0.34, 0.56]],
       }),
-      getDefaultEmbeddingModel: jest.fn().mockReturnValue(
-        "text-embedding-3-small",
-      ),
+      getDefaultEmbeddingModel: jest
+        .fn()
+        .mockReturnValue("text-embedding-3-small"),
     };
     const service = new ArticleChunkEmbeddingsService(
       repository as never,
@@ -28,9 +28,10 @@ describe("ArticleChunkEmbeddingsService", () => {
 
     const first = await service.embedTexts(["项目复盘风险"]);
 
-    expect(customAiService.embedTexts).toHaveBeenCalledWith([
-      "项目复盘风险",
-    ], "text-embedding-3-small");
+    expect(customAiService.embedTexts).toHaveBeenCalledWith(
+      ["项目复盘风险"],
+      "text-embedding-3-small",
+    );
     expect(first).toEqual({
       model: "text-embedding-3-small",
       vectors: [[0.12, 0.34, 0.56]],
@@ -87,5 +88,29 @@ describe("ArticleChunkEmbeddingsService", () => {
     );
     expect(result.status).toBe("ready");
     expect(result.count).toBe(1);
+  });
+
+  it("embedding 失败时不删除旧向量记录", async () => {
+    const { service, repository, customAiService } = createService();
+    customAiService.embedTexts.mockRejectedValueOnce(
+      new Error("embedding failed"),
+    );
+
+    await expect(
+      service.rebuildArticleChunkEmbeddings({
+        articleId: "article-1",
+        embeddingVersion: 2,
+        chunks: [
+          {
+            id: "article-1:1:1",
+            order: 1,
+            title: "风险总结",
+            text: "风险处理过程",
+          },
+        ],
+      }),
+    ).rejects.toThrow("embedding failed");
+    expect(repository.delete).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
   });
 });

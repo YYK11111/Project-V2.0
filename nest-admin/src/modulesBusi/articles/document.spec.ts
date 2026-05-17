@@ -831,6 +831,34 @@ describe("ArticlesService document guards", () => {
     );
   });
 
+  it("无 contentChunks 时 AI 检索 fallback 片段返回稳定 chunkId", () => {
+    const { service } = createService();
+
+    const items = (service as never).buildAiRetrieveItems(
+      {
+        id: "article-1",
+        title: "项目复盘",
+        contentVersion: 3,
+        contentText: "完整正文",
+        summary: "摘要",
+        desc: "摘要",
+        catalog: null,
+        tags: [],
+        retrievalWeight: 1,
+        aiPreferred: "0",
+        authorityLevel: "0",
+        embeddingStatus: "ready",
+        embeddingVersion: 3,
+        visibilityType: "public",
+        updateTime: new Date().toISOString(),
+      },
+      "项目复盘",
+    );
+
+    expect(items).toHaveLength(1);
+    expect(items[0].chunkId).toBe("article-1:3:0");
+  });
+
   it("无查看权限时列表脱敏应清空 contentJson 和切片", async () => {
     const { service } = createService();
     jest

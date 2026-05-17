@@ -36,14 +36,15 @@ export class ArticleChunkEmbeddingsService {
     chunks: ArticleChunkEmbeddingInput[];
   }) {
     const chunks = input.chunks || [];
-    await this.repository.delete({ articleId: input.articleId });
     if (!chunks.length) {
+      await this.repository.delete({ articleId: input.articleId });
       return { status: ArticleChunkEmbeddingStatus.ready, count: 0 };
     }
 
     const embedResult = await this.embedTexts(
       chunks.map((chunk) => chunk.text || ""),
     );
+    await this.repository.delete({ articleId: input.articleId });
     const vectors = embedResult.vectors || [];
     const records = chunks.map(
       (chunk, index) =>

@@ -12,10 +12,7 @@ export class KnowledgeQaService {
     private readonly customAiService: CustomAiService,
   ) {}
 
-  async ask(
-    query: KnowledgeQaAskDto,
-    currentUser?: Record<string, any>,
-  ) {
+  async ask(query: KnowledgeQaAskDto, currentUser?: Record<string, any>) {
     const startedAt = Date.now();
     const question = String(query.question || "").trim();
     const limit = Math.min(Math.max(Number(query.limit || 5), 1), 5);
@@ -33,30 +30,48 @@ export class KnowledgeQaService {
         this.customAiService.getDefaultEmbeddingModel(),
       );
     } catch (error) {
-      throw new InternalServerErrorException({
-        code: "KNOWLEDGE_QA_EMBEDDING_FAILED",
-        message: "知识问答向量生成失败，请稍后重试",
-      });
+      this.throwQaError(
+        "KNOWLEDGE_QA_EMBEDDING_FAILED",
+        "知识问答向量生成失败，请稍后重试",
+      );
     }
     const queryVector = queryEmbeddingResult.vectors?.[0] || [];
 
-    const retrieval = await this.articlesService.retrieveForAi(
-      {
-        keyword: question,
-        limit: candidateLimit,
-        catalogId: query.catalogId,
-        knowledgeType: query.knowledgeType,
-      } as any,
-      currentUser,
-    );
+    let retrieval;
+    try {
+      retrieval = await this.articlesService.retrieveForAi(
+        {
+          keyword: question,
+          limit: candidateLimit,
+          catalogId: query.catalogId,
+          knowledgeType: query.knowledgeType,
+        } as any,
+        currentUser,
+      );
+    } catch (error) {
+      this.throwQaError(
+        "KNOWLEDGE_QA_RETRIEVE_FAILED",
+        "知识问答候选召回失败，请稍后重试",
+      );
+    }
     const matchedChunks = Array.isArray(retrieval?.data) ? retrieval.data : [];
     if (!matchedChunks.length) {
       return this.buildEmptyAnswer(model, startedAt);
     }
 
-    const articleIds = [...new Set(matchedChunks.map((item) => item.articleId))];
-    const chunkEmbeddings =
-      await this.articleChunkEmbeddingsService.findByArticles(articleIds);
+    const articleIds = [
+      ...new Set(matchedChunks.map((item) => item.articleId)),
+    ];
+    let chunkEmbeddings;
+    try {
+      chunkEmbeddings =
+        await this.articleChunkEmbeddingsService.findByArticles(articleIds);
+    } catch (error) {
+      this.throwQaError(
+        "KNOWLEDGE_QA_REFERENCE_LOAD_FAILED",
+        "知识问答引用加载失败，请稍后重试",
+      );
+    }
     const chunkEmbeddingMap = new Map(
       chunkEmbeddings.map((item) => [
         this.getChunkLookupKey(item.articleId, item.chunkOrder),
@@ -116,10 +131,10 @@ export class KnowledgeQaService {
         ],
       });
     } catch (error) {
-      throw new InternalServerErrorException({
-        code: "KNOWLEDGE_QA_CHAT_FAILED",
-        message: "知识问答生成失败，请稍后重试",
-      });
+      this.throwQaError(
+        "KNOWLEDGE_QA_CHAT_FAILED",
+        "知识问答生成失败，请稍后重试",
+      );
     }
     const answer =
       response?.choices?.[0]?.message?.content ||
@@ -149,10 +164,18 @@ export class KnowledgeQaService {
   }
 
   async embedPreview(query: KnowledgeQaEmbedPreviewDto) {
-    const embeddingResult = await this.customAiService.embedTexts(
-      [String(query.text || "")],
-      this.customAiService.getDefaultEmbeddingModel(),
-    );
+    let embeddingResult;
+    try {
+      embeddingResult = await this.customAiService.embedTexts(
+        [String(query.text || "")],
+        this.customAiService.getDefaultEmbeddingModel(),
+      );
+    } catch (error) {
+      this.throwQaError(
+        "KNOWLEDGE_QA_EMBED_PREVIEW_FAILED",
+        "知识问答向量预览失败，请稍后重试",
+      );
+    }
     return {
       provider: "openai-compatible",
       model:
@@ -164,15 +187,14 @@ export class KnowledgeQaService {
 
   private buildPrompt(question: string, chunks: any[]) {
     const context = chunks
-      .map(
-        (item, index) =>
-          [
-            `片段 ${index + 1}`,
-            `标题：${item.articleTitle}`,
-            `分类：${item.catalog?.name || "-"}`,
-            `片段序号：${item.chunkOrder}`,
-            `内容：${item.chunkText || item.chunkSummary || ""}`,
-          ].join("\n"),
+      .map((item, index) =>
+        [
+          `片段 ${index + 1}`,
+          `标题：${item.articleTitle}`,
+          `分类：${item.catalog?.name || "-"}`,
+          `片段序号：${item.chunkOrder}`,
+          `内容：${item.chunkText || item.chunkSummary || ""}`,
+        ].join("\n"),
       )
       .join("\n\n");
     return `问题：${question}\n\n候选知识：\n${context}`;
@@ -180,8 +202,7 @@ export class KnowledgeQaService {
 
   private buildEmptyAnswer(model: string, startedAt: number) {
     return {
-      answer:
-        "当前知识库中没有找到足够信息，请换个问法或补充更多上下文。",
+      answer: "当前知识库中没有找到足够信息，请换个问法或补充更多上下文。",
       references: [],
       matchedChunks: [],
       model,
@@ -205,6 +226,14 @@ export class KnowledgeQaService {
     const divisor = Math.sqrt(leftNorm) * Math.sqrt(rightNorm) || 1;
     return Number((dot / divisor).toFixed(6));
   }
+
+  private throwQaError(code: string, message: string): never {
+    throw new InternalServerErrorException({
+      code,
+      message,
+    });
+  }
+
   private getChunkLookupKey(articleId: string, chunkOrder: number) {
     return `${articleId || ""}:${Number(chunkOrder || 0)}`;
   }
