@@ -2,10 +2,19 @@ import { ArticleChunkEmbeddingsService } from "./service";
 
 describe("ArticleChunkEmbeddingsService", () => {
   function createService() {
+    const transactionManager = {
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
     const repository = {
       delete: jest.fn().mockResolvedValue({ affected: 0 }),
       save: jest.fn().mockImplementation(async (value) => value),
       find: jest.fn().mockResolvedValue([]),
+      manager: {
+        transaction: jest
+          .fn()
+          .mockImplementation(async (handler) => handler(transactionManager)),
+      },
     };
     const customAiService = {
       embedTexts: jest.fn().mockResolvedValue({
@@ -20,7 +29,7 @@ describe("ArticleChunkEmbeddingsService", () => {
       repository as never,
       customAiService as never,
     );
-    return { service, repository, customAiService };
+    return { service, repository, customAiService, transactionManager };
   }
 
   it("调用 OpenAI 兼容 embedding 生成向量", async () => {
@@ -51,7 +60,7 @@ describe("ArticleChunkEmbeddingsService", () => {
   });
 
   it("按文章切片重建 embedding 记录", async () => {
-    const { service, repository } = createService();
+    const { service, repository, transactionManager } = createService();
 
     const result = await service.rebuildArticleChunkEmbeddings({
       articleId: "article-1",
@@ -68,8 +77,14 @@ describe("ArticleChunkEmbeddingsService", () => {
       ],
     });
 
-    expect(repository.delete).toHaveBeenCalledWith({ articleId: "article-1" });
-    expect(repository.save).toHaveBeenCalledWith(
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.delete).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        articleId: "article-1",
+      },
+    );
+    expect(transactionManager.save).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           articleId: "article-1",
@@ -91,7 +106,8 @@ describe("ArticleChunkEmbeddingsService", () => {
   });
 
   it("embedding 失败时不删除旧向量记录", async () => {
-    const { service, repository, customAiService } = createService();
+    const { service, repository, customAiService, transactionManager } =
+      createService();
     customAiService.embedTexts.mockRejectedValueOnce(
       new Error("embedding failed"),
     );
@@ -110,6 +126,40 @@ describe("ArticleChunkEmbeddingsService", () => {
         ],
       }),
     ).rejects.toThrow("embedding failed");
+    expect(repository.delete).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
+    expect(transactionManager.delete).not.toHaveBeenCalled();
+    expect(transactionManager.save).not.toHaveBeenCalled();
+  });
+
+  it("持久化失败时通过事务避免删除后留下空窗", async () => {
+    const { service, repository, transactionManager } = createService();
+    transactionManager.save.mockRejectedValueOnce(new Error("save failed"));
+
+    await expect(
+      service.rebuildArticleChunkEmbeddings({
+        articleId: "article-1",
+        embeddingVersion: 2,
+        chunks: [
+          {
+            id: "article-1:1:1",
+            order: 1,
+            title: "风险总结",
+            text: "风险处理过程",
+          },
+        ],
+      }),
+    ).rejects.toThrow("save failed");
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.delete).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        articleId: "article-1",
+      },
+    );
+    expect(transactionManager.save).toHaveBeenCalled();
     expect(repository.delete).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });

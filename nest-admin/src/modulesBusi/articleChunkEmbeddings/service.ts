@@ -44,7 +44,6 @@ export class ArticleChunkEmbeddingsService {
     const embedResult = await this.embedTexts(
       chunks.map((chunk) => chunk.text || ""),
     );
-    await this.repository.delete({ articleId: input.articleId });
     const vectors = embedResult.vectors || [];
     const records = chunks.map(
       (chunk, index) =>
@@ -66,7 +65,12 @@ export class ArticleChunkEmbeddingsService {
           errorMessage: "",
         }),
     );
-    await this.repository.save(records);
+    await this.repository.manager.transaction(async (manager) => {
+      await manager.delete(ArticleChunkEmbedding, {
+        articleId: input.articleId,
+      });
+      await manager.save(records);
+    });
     return { status: ArticleChunkEmbeddingStatus.ready, count: records.length };
   }
 
