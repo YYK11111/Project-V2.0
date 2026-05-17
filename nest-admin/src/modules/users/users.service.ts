@@ -244,6 +244,7 @@ export class UsersService extends BaseService<User, CreateUserDto> {
   async getOptions(
     query: QueryListDto & {
       keyword?: string;
+      includeAll?: string | boolean;
       _operatorId?: string;
       _operatorDeptId?: string;
       _operatorPermissions?: string[];
@@ -284,12 +285,16 @@ export class UsersService extends BaseService<User, CreateUserDto> {
       );
     }
 
-    await this.applyUserDataScope(qb, {
-      id: query._operatorId,
-      deptId: query._operatorDeptId,
-      permissions: query._operatorPermissions,
-      roles: query._operatorRoles,
-    });
+    const includeAll =
+      query?.includeAll === true || String(query?.includeAll || "") === "1";
+    if (!includeAll) {
+      await this.applyUserDataScope(qb, {
+        id: query._operatorId,
+        deptId: query._operatorDeptId,
+        permissions: query._operatorPermissions,
+        roles: query._operatorRoles,
+      });
+    }
 
     const data = await qb
       .orderBy("User.nickname", "ASC")

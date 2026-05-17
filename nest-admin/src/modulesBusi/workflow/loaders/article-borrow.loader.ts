@@ -22,7 +22,12 @@ export class ArticleBorrowLoader implements BusinessDataLoader {
     const id = businessKey.replace("articleBorrow_", "");
     const borrow = await this.borrowRepo.findOne({
       where: { id },
-      relations: ["article", "article.catalog", "applicant"],
+      relations: [
+        "article",
+        "article.catalog",
+        "article.catalog.managers",
+        "applicant",
+      ],
     });
 
     if (!borrow) {
@@ -52,7 +57,9 @@ export class ArticleBorrowLoader implements BusinessDataLoader {
           ? {
               id: borrow.article.catalog.id,
               name: borrow.article.catalog.name,
-              managerUserIds: borrow.article.catalog.managerUserIds || [],
+              managerUserIds: (borrow.article.catalog.managers || [])
+                .map((item) => item.userId)
+                .filter(Boolean),
             }
           : null,
         applicant: borrow.applicant

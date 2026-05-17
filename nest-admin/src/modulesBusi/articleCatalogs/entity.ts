@@ -9,6 +9,7 @@ import { BoolNum } from "src/common/type/base";
 import { JoinColumn, OneToMany, Tree, TreeChildren, TreeParent } from "typeorm";
 import { Article } from "../articles/entity";
 import { VisibilityType } from "../articles/constants";
+import { ArticleCatalogManager } from "../articleCatalogManagers/entity";
 
 // 目录
 @Tree("closure-table")
@@ -49,6 +50,9 @@ export class ArticleCatalog extends BaseEntity {
 
   @OneToMany((type) => Article, (article) => article.catalog)
   article: Article[];
+
+  @OneToMany(() => ArticleCatalogManager, (manager) => manager.catalog)
+  managers: ArticleCatalogManager[];
 
   @BaseColumn({
     type: "simple-array",

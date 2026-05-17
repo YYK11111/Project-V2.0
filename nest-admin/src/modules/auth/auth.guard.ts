@@ -620,6 +620,21 @@ export class AuthGuard implements CanActivate {
         "business/articles/retrieveForAi",
       ],
       [
+        "POST",
+        /^business\/articles\/rebuildChunks\/[^/]+$/,
+        "content/articles/aiOperate",
+      ],
+      [
+        "POST",
+        /^business\/articles\/rebuildEmbeddings\/[^/]+$/,
+        "content/articles/aiOperate",
+      ],
+      [
+        "POST",
+        /^business\/articles\/search-records$/,
+        "business/articles/home",
+      ],
+      [
         "GET",
         /^business\/articles\/getOne\/[^/]+$/,
         "business/articles/getOne",
@@ -641,6 +656,19 @@ export class AuthGuard implements CanActivate {
         "GET",
         /^business\/articleCatalogs\/getTrees$/,
         "business/articleCatalogs/list",
+      ],
+      [
+        "POST",
+        /^business\/articleCatalogs\/save$/,
+        (req) =>
+          req.body?.id
+            ? "business/articleCatalogs/update"
+            : "business/articleCatalogs/add",
+      ],
+      [
+        "DELETE",
+        /^business\/articleCatalogs\/del\/[^/]+$/,
+        "business/articleCatalogs/delete",
       ],
       ["GET", /^business\/article-tags\/list$/, "business/articleTags/list"],
       [

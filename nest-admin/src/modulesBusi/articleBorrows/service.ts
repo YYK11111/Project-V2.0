@@ -34,11 +34,8 @@ export class ArticleBorrowsService {
       .createQueryBuilder("borrow")
       .where("borrow.articleId = :articleId", { articleId })
       .andWhere("borrow.userId = :userId", { userId })
-      .andWhere("borrow.status IN (:...statuses)", {
-        statuses: [
-          KnowledgeBorrowStatus.active,
-          KnowledgeBorrowStatus.approved,
-        ],
+      .andWhere("borrow.status = :status", {
+        status: KnowledgeBorrowStatus.active,
       })
       .andWhere(
         "(borrow.borrowStartTime IS NULL OR borrow.borrowStartTime <= :now)",
@@ -132,46 +129,35 @@ export class ArticleBorrowsService {
     query: QueryListDto,
     currentUser: Record<string, any>,
   ): Promise<ResponseListDto<ArticleBorrow>> {
-    const rows = await this.borrowRepo.find({
-      relations: ["article", "article.catalog", "applicant"],
-      order: { createTime: "DESC" as any },
-    });
+    const qb = this.borrowRepo
+      .createQueryBuilder("borrow")
+      .leftJoinAndSelect("borrow.article", "article")
+      .leftJoinAndSelect("article.catalog", "catalog")
+      .leftJoinAndSelect("catalog.managers", "catalogManager")
+      .leftJoinAndSelect("borrow.applicant", "applicant")
+      .where("borrow.is_delete IS NULL");
     const canViewAll = this.hasGlobalAccess(currentUser);
     const keyword = String(query.keyword || "").trim();
     const status = String((query as any).status || "").trim();
-    const data = rows.filter((item) => {
-      const managerUserIds = item.article?.catalog?.managerUserIds || [];
-      const canApprove =
-        canViewAll || managerUserIds.includes(String(currentUser.id));
-      if (!canApprove) return false;
-      if (status && item.status !== status) return false;
-      if (keyword) {
-        const text = [
-          item.article?.title,
-          item.article?.catalog?.name,
-          item.applicant?.name,
-          item.applicant?.nickname,
-          item.applyReason,
-        ]
-          .filter(Boolean)
-          .join(" ");
-        if (!text.includes(keyword)) {
-          return false;
-        }
-      }
-      return true;
-    });
-    const pageNum = Number(query.pageNum || 1);
-    const pageSize = Number(query.pageSize || 10);
-    const list = data.slice((pageNum - 1) * pageSize, pageNum * pageSize);
-    return {
-      total: data.length,
-      data: list,
-      list,
-      rows: list,
-      pageNum,
-      pageSize,
-    } as any;
+
+    if (!canViewAll) {
+      qb.andWhere("catalogManager.userId = :managerUserId", {
+        managerUserId: String(currentUser.id),
+      });
+    }
+    if (status) {
+      qb.andWhere("borrow.status = :status", { status });
+    }
+    if (keyword) {
+      qb.andWhere(
+        "(article.title LIKE :keyword OR catalog.name LIKE :keyword OR applicant.name LIKE :keyword OR applicant.nickname LIKE :keyword OR borrow.applyReason LIKE :keyword)",
+        { keyword: `%${keyword}%` },
+      );
+    }
+
+    qb.distinct(true);
+    qb.orderBy("borrow.createTime", "DESC");
+    return this.listByQuery(qb, query);
   }
 
   async approve(
@@ -181,7 +167,7 @@ export class ArticleBorrowsService {
   ) {
     const row = await this.borrowRepo.findOne({
       where: { id: id as any },
-      relations: ["article", "article.catalog"],
+      relations: ["article", "article.catalog", "article.catalog.managers"],
     });
     if (!row) throw new Error("借阅记录不存在");
     this.ensureCanApprove(row, currentUser);
@@ -239,7 +225,7 @@ export class ArticleBorrowsService {
   ) {
     const row = await this.borrowRepo.findOne({
       where: { id: id as any },
-      relations: ["article", "article.catalog"],
+      relations: ["article", "article.catalog", "article.catalog.managers"],
     });
     if (!row) throw new Error("借阅记录不存在");
     this.ensureCanApprove(row, currentUser);
@@ -256,7 +242,7 @@ export class ArticleBorrowsService {
   async revoke(id: string, currentUser: Record<string, any>) {
     const row = await this.borrowRepo.findOne({
       where: { id: id as any },
-      relations: ["article", "article.catalog"],
+      relations: ["article", "article.catalog", "article.catalog.managers"],
     });
     if (!row) throw new Error("借阅记录不存在");
     this.ensureCanApprove(row, currentUser);
@@ -322,13 +308,23 @@ export class ArticleBorrowsService {
     row: ArticleBorrow,
     currentUser: Record<string, any>,
   ) {
-    const managerUserIds = row.article?.catalog?.managerUserIds || [];
+    const managerUserIds = this.getCatalogManagerUserIds(row.article?.catalog);
     if (
       !this.hasGlobalAccess(currentUser) &&
       !managerUserIds.includes(String(currentUser.id))
     ) {
       throw new ForbiddenException("当前无审批权限");
     }
+  }
+
+  private getCatalogManagerUserIds(catalog?: Record<string, any>) {
+    return [
+      ...new Set([
+        ...((catalog?.managers || []) as Array<{ userId?: string }>).map(
+          (item) => String(item.userId || ""),
+        ),
+      ]),
+    ];
   }
 
   private scheduleExpire(id: string, borrowEndTime: string) {
@@ -338,14 +334,7 @@ export class ArticleBorrowsService {
       borrowEndTime,
       async () => {
         const row = await this.borrowRepo.findOne({ where: { id: id as any } });
-        if (
-          !row ||
-          ![
-            KnowledgeBorrowStatus.active,
-            KnowledgeBorrowStatus.approved,
-          ].includes(row.status)
-        )
-          return;
+        if (!row || row.status !== KnowledgeBorrowStatus.active) return;
         row.status = KnowledgeBorrowStatus.expired;
         await this.borrowRepo.save(row);
       },
@@ -414,11 +403,8 @@ export class ArticleBorrowsService {
 
         const rows = await this.borrowRepo
           .createQueryBuilder("borrow")
-          .where("borrow.status IN (:...statuses)", {
-            statuses: [
-              KnowledgeBorrowStatus.active,
-              KnowledgeBorrowStatus.approved,
-            ],
+          .where("borrow.status = :status", {
+            status: KnowledgeBorrowStatus.active,
           })
           .andWhere("borrow.borrowEndTime IS NOT NULL")
           .andWhere("borrow.borrowEndTime < :now", { now })

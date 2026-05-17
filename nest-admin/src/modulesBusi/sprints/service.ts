@@ -409,6 +409,16 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
     };
   }
 
+  private normalizeNullableUserFields(dto: SaveDto<CreateSprintDto>) {
+    const normalizedDto = dto as any;
+    for (const key of ["ownerId", "scrumMasterId"]) {
+      if (normalizedDto[key] === "") {
+        normalizedDto[key] = null;
+      }
+    }
+    return normalizedDto;
+  }
+
   async getOne(query, isError = true): Promise<any | null> {
     const { _operatorId, _operatorPermissions, ...where } = query as any;
     const sprint = await super.getOne(
@@ -436,16 +446,19 @@ export class SprintsService extends BaseService<Sprint, CreateSprintDto> {
   }
 
   async save(dto: SaveDto<CreateSprintDto>) {
+    this.normalizeNullableUserFields(dto);
     await this.assertSprintProjectPermissionForDto(dto);
     return super.save(dto as any);
   }
 
   async add(dto: SaveDto<CreateSprintDto>) {
+    this.normalizeNullableUserFields(dto);
     await this.assertSprintProjectPermissionForDto(dto);
     return super.add(dto as any);
   }
 
   async update(dto: SaveDto<CreateSprintDto>) {
+    this.normalizeNullableUserFields(dto);
     await this.assertSprintProjectPermissionForDto(dto);
     return super.update(dto as any);
   }

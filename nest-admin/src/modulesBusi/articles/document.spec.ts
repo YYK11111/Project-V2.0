@@ -250,6 +250,9 @@ describe("ArticlesService document guards", () => {
         count: 1,
       }),
     };
+    const borrowService = {
+      hasActiveBorrow: jest.fn().mockResolvedValue(false),
+    };
 
     const service = new ArticlesService(
       repository as never,
@@ -262,6 +265,7 @@ describe("ArticlesService document guards", () => {
       { recordKeyword: jest.fn(), getHotKeywords: jest.fn() } as never,
       { deleteTimeout: jest.fn(), addTimeout: jest.fn() } as never,
       embeddingService as never,
+      borrowService as never,
     );
 
     jest
@@ -271,7 +275,7 @@ describe("ArticlesService document guards", () => {
       )
       .mockResolvedValue(undefined);
 
-    return { service, repository, embeddingService };
+    return { service, repository, embeddingService, borrowService };
   };
 
   it("提取 Isle JSON 嵌套节点纯文本并按块分隔", () => {
@@ -578,12 +582,66 @@ describe("ArticlesService document guards", () => {
       new Error("mock failed"),
     );
 
-    await expect(service.rebuildEmbeddings("article-embed-2")).rejects.toThrow(
-      "mock failed",
-    );
+    await expect(
+      service.rebuildEmbeddings("article-embed-2", {
+        id: "admin",
+        permissions: ["*"],
+      }),
+    ).rejects.toThrow("mock failed");
     expect(repository.update).toHaveBeenCalledWith("article-embed-2", {
       embeddingStatus: "failed",
     });
+  });
+
+  it("无编辑权限时禁止手动重建向量", async () => {
+    const { service, embeddingService } = createService();
+    jest.spyOn(service as never, "getOne" as never).mockResolvedValue({
+      id: "article-embed-3",
+      catalogId: "catalog-1",
+      visibilityType: "public",
+      contentChunks: [{ id: "c1", order: 1, title: "片段", text: "正文" }],
+      embeddingVersion: 1,
+      catalog: { id: "catalog-1" },
+    });
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({ canEdit: false, canDelete: false });
+
+    await expect(
+      service.rebuildEmbeddings("article-embed-3", {
+        id: "user-1",
+        permissions: [],
+      }),
+    ).rejects.toThrow("当前无重建向量权限");
+    expect(
+      embeddingService.rebuildArticleChunkEmbeddings,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("具备 AI 运营权限时允许手动重建向量", async () => {
+    const { service, embeddingService } = createService();
+    jest.spyOn(service as never, "getOne" as never).mockResolvedValue({
+      id: "article-embed-4",
+      catalogId: "catalog-1",
+      visibilityType: "public",
+      contentChunks: [{ id: "c1", order: 1, title: "片段", text: "正文" }],
+      embeddingVersion: 1,
+      catalog: { id: "catalog-1" },
+    });
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({ canEdit: false, canDelete: false });
+
+    const result = await service.rebuildEmbeddings("article-embed-4", {
+      id: "user-1",
+      permissions: ["content/articles/aiOperate"],
+    });
+
+    expect(result.status).toBe("ready");
+    expect(embeddingService.rebuildArticleChunkEmbeddings).toHaveBeenCalled();
   });
 
   it("结构化切片会限制过长内容长度", () => {
@@ -671,16 +729,10 @@ describe("ArticlesService document guards", () => {
       embeddingVersion: 1,
       tags: [],
     });
-    jest
-      .spyOn(service as never, "checkArticleAccess" as never)
-      .mockReturnValue({ hasAccess: true });
-    jest
-      .spyOn(service as never, "getCurrentUserRoleIds" as never)
-      .mockResolvedValue([]);
-
     const result = await service.rebuildChunks("article-1", {
       id: "user-1",
       name: "tester",
+      permissions: ["content/articles/aiOperate"],
     });
 
     expect(repository.save).toHaveBeenCalledWith(
@@ -692,6 +744,47 @@ describe("ArticlesService document guards", () => {
       }),
     );
     expect(result.contentText).toBe("从 JSON 重建切片");
+  });
+
+  it("仅有查看权限但无编辑或 AI 运营权限时禁止重建切片", async () => {
+    const { service, repository, embeddingService } = createService();
+    jest.spyOn(service as never, "getOne" as never).mockResolvedValue({
+      id: "article-1",
+      title: "知识卡片",
+      catalogId: "catalog-1",
+      visibilityType: "public",
+      contentStatus: "ready",
+      contentJson: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "从 JSON 重建切片" }],
+          },
+        ],
+      },
+      contentChunks: [],
+      embeddingVersion: 1,
+      catalog: { id: "catalog-1" },
+      tags: [],
+    });
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({ canEdit: false, canDelete: false });
+
+    await expect(
+      service.rebuildChunks("article-1", {
+        id: "user-1",
+        permissions: [],
+      }),
+    ).rejects.toThrow("当前无重建切片权限");
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(
+      embeddingService.rebuildArticleChunkEmbeddings,
+    ).not.toHaveBeenCalled();
   });
 
   it("AI 检索评分返回字段命中和运营加权明细", () => {
@@ -785,5 +878,143 @@ describe("ArticlesService document guards", () => {
     expect(maskedArticle.contentJson).toBeNull();
     expect(maskedArticle.contentText).toBe("");
     expect(maskedArticle.contentChunks).toEqual([]);
+  });
+
+  it("有效借阅用户可以查看受限知识详情", async () => {
+    const { service, repository, borrowService } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "article-1",
+      title: "受限知识",
+      catalogId: "catalog-1",
+      visibilityType: "specified",
+      visibleUserIds: ["u2"],
+      visibleRoleIds: [],
+      catalog: {
+        id: "catalog-1",
+        allowBorrow: "1",
+      },
+    });
+    borrowService.hasActiveBorrow.mockResolvedValue(true);
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getProjectKnowledgeContext" as never)
+      .mockResolvedValue(null);
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({
+        canEdit: false,
+        canDelete: false,
+      });
+
+    const result = await service.getOneForAccess("article-1", {
+      id: "u1",
+      permissions: [],
+    });
+
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessSource).toBe("borrow");
+    expect(borrowService.hasActiveBorrow).toHaveBeenCalledWith(
+      "article-1",
+      "u1",
+    );
+  });
+
+  it("项目成员在详情页与列表保持同一访问口径", async () => {
+    const { service, repository } = createService();
+    repository.findOne.mockResolvedValue({
+      id: "article-1",
+      title: "项目知识",
+      catalogId: "catalog-1",
+      visibilityType: "specified",
+      visibleUserIds: [],
+      visibleRoleIds: [],
+      catalog: {
+        id: "catalog-1",
+        allowBorrow: "0",
+      },
+    });
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getProjectKnowledgeContext" as never)
+      .mockResolvedValue({
+        isMember: true,
+        isManager: false,
+        isVisitor: false,
+      });
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({
+        canEdit: false,
+        canDelete: false,
+      });
+
+    const result = await service.getOneForAccess("article-1", {
+      id: "u1",
+      permissions: [],
+    });
+
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessSource).toBe("projectMember");
+  });
+
+  it("AI 检索等待权限脱敏后返回可访问切片", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([
+        {
+          id: "article-1",
+          title: "项目复盘知识",
+          summary: "复盘摘要",
+          catalogId: "catalog-1",
+          visibilityType: "public",
+          contentChunks: [
+            {
+              order: 1,
+              title: "复盘结论",
+              headingPath: ["复盘"],
+              text: "项目复盘风险处理",
+              summary: "项目复盘风险处理",
+              tokenEstimate: 10,
+            },
+          ],
+          retrievalWeight: 1,
+          aiPreferred: "0",
+          authorityLevel: "0",
+        },
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({
+        canEdit: false,
+        canDelete: false,
+      });
+
+    const result = await service.retrieveForAi(
+      { keyword: "项目复盘", limit: 5 },
+      { id: "u1", permissions: [] },
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        articleId: "article-1",
+        chunkTitle: "复盘结论",
+      }),
+    );
   });
 });

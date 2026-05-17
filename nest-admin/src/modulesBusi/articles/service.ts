@@ -27,6 +27,7 @@ import {
   validateDocumentSchemaVersion,
 } from "./document.validator";
 import { ArticleChunkEmbeddingsService } from "../articleChunkEmbeddings/service";
+import { ArticleBorrowsService } from "../articleBorrows/service";
 
 @Injectable()
 export class ArticlesService extends BaseService<Article, ArticleDto> {
@@ -44,6 +45,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     private articleSearchRecordsService: ArticleSearchRecordsService,
     private tasksService: TasksService,
     private articleChunkEmbeddingsService: ArticleChunkEmbeddingsService,
+    private articleBorrowsService?: ArticleBorrowsService,
   ) {
     super(Article, repository);
   }
@@ -162,8 +164,21 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     return res;
   }
 
-  async rebuildEmbeddings(id: string) {
-    const article = await this.getOne({ where: { id } });
+  async rebuildEmbeddings(id: string, currentUser?: Record<string, any>) {
+    const article = await this.getOne({
+      where: { id },
+      relations: ["catalog", "author", "maintainer", "tags"],
+    });
+    const currentUserId = currentUser?.id ? String(currentUser.id) : "";
+    if (
+      !(await this.canOperateArticleAi(
+        article,
+        currentUserId,
+        currentUser?.permissions || [],
+      ))
+    ) {
+      throw new Error("当前无重建向量权限");
+    }
     try {
       const result =
         await this.articleChunkEmbeddingsService.rebuildArticleChunkEmbeddings({
@@ -326,27 +341,22 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     const roleIds = currentUserId
       ? await this.getCurrentUserRoleIds(currentUserId)
       : [];
-    const access = this.checkArticleAccess(
+    const maskedArticle = await this.maskArticleForCurrentUser(
       article,
       currentUserId,
       roleIds,
       this.hasGlobalAccess(currentUser),
     );
-    if (!access.hasAccess) {
+    if (!maskedArticle.hasAccess) {
       const error: any = new Error("当前知识无访问权限");
       error.status = 403;
       error.code = "KNOWLEDGE_FORBIDDEN";
-      error.canBorrow = access.canBorrow;
+      error.canBorrow = maskedArticle.canBorrow;
       error.catalogId = article.catalogId;
       error.articleId = article.id;
       throw error;
     }
-    return this.maskArticleForCurrentUser(
-      article,
-      currentUserId,
-      roleIds,
-      this.hasGlobalAccess(currentUser),
-    );
+    return maskedArticle;
   }
 
   async retrieveForAi(
@@ -400,16 +410,19 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       .addOrderBy("article.updateTime", "DESC")
       .take(limit * 3)
       .getMany();
-    const data = list
-      .map((article) =>
-        this.maskArticleForCurrentUser(
-          article,
-          currentUserId,
-          roleIds,
-          canViewAll,
+    const accessibleArticles = (
+      await Promise.all(
+        list.map((article) =>
+          this.maskArticleForCurrentUser(
+            article,
+            currentUserId,
+            roleIds,
+            canViewAll,
+          ),
         ),
       )
-      .filter((article: any) => article.hasAccess)
+    ).filter((article: any) => article.hasAccess);
+    const data = accessibleArticles
       .flatMap((article: any) => this.buildAiRetrieveItems(article, keyword))
       .sort((left, right) => {
         if (right.score !== left.score) {
@@ -927,16 +940,13 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       relations: ["catalog", "author", "maintainer", "tags"],
     });
     const currentUserId = currentUser?.id ? String(currentUser.id) : "";
-    const roleIds = currentUserId
-      ? await this.getCurrentUserRoleIds(currentUserId)
-      : [];
-    const access = this.checkArticleAccess(
-      article,
-      currentUserId,
-      roleIds,
-      this.hasGlobalAccess(currentUser),
-    );
-    if (!access.hasAccess) {
+    if (
+      !(await this.canOperateArticleAi(
+        article,
+        currentUserId,
+        currentUser?.permissions || [],
+      ))
+    ) {
       throw new Error("当前无重建切片权限");
     }
     article.contentText =
@@ -1162,6 +1172,13 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     return permissions.includes("*");
   }
 
+  private hasAiOperateAccess(permissions: string[] = []) {
+    return (
+      permissions.includes("*") ||
+      permissions.includes("content/articles/aiOperate")
+    );
+  }
+
   private async getProjectKnowledgeContext(
     catalogId: string,
     currentUserId: string,
@@ -1238,6 +1255,22 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     };
   }
 
+  private async canOperateArticleAi(
+    article: Article,
+    currentUserId: string,
+    permissions: string[] = [],
+  ) {
+    if (this.hasAiOperateAccess(permissions)) {
+      return true;
+    }
+    const articlePermissions = await this.getArticlePermissions(
+      article,
+      currentUserId,
+      permissions,
+    );
+    return articlePermissions.canEdit;
+  }
+
   private checkArticleAccess(
     article: Article,
     currentUserId: string,
@@ -1311,7 +1344,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
     };
   }
 
-  private async maskArticleForCurrentUser(
+  private async getArticleAccess(
     article: Article,
     currentUserId: string,
     roleIds: string[],
@@ -1323,28 +1356,63 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       roleIds,
       canViewAll,
     );
+    if (access.hasAccess) {
+      return access;
+    }
+
     const projectContext = currentUserId
       ? await this.getProjectKnowledgeContext(article.catalogId, currentUserId)
       : null;
+    if (projectContext?.isMember) {
+      return {
+        hasAccess: true,
+        canBorrow: false,
+        isRestricted: false,
+        accessSource: projectContext.isVisitor
+          ? "projectVisitor"
+          : "projectMember",
+      };
+    }
+
+    const hasActiveBorrow =
+      Boolean(currentUserId) &&
+      Boolean(article.id) &&
+      Boolean(
+        await this.articleBorrowsService?.hasActiveBorrow(
+          String(article.id),
+          currentUserId,
+        ),
+      );
+    if (hasActiveBorrow) {
+      return {
+        hasAccess: true,
+        canBorrow: false,
+        isRestricted: false,
+        accessSource: "borrow",
+      };
+    }
+
+    return access;
+  }
+
+  private async maskArticleForCurrentUser(
+    article: Article,
+    currentUserId: string,
+    roleIds: string[],
+    canViewAll = false,
+  ) {
+    const access = await this.getArticleAccess(
+      article,
+      currentUserId,
+      roleIds,
+      canViewAll,
+    );
     const permissions = await this.getArticlePermissions(
       article,
       currentUserId,
     );
-    if (access.hasAccess || projectContext?.isMember) {
-      return Object.assign(
-        article,
-        access.hasAccess
-          ? access
-          : {
-              hasAccess: true,
-              canBorrow: false,
-              isRestricted: false,
-              accessSource: projectContext?.isVisitor
-                ? "projectVisitor"
-                : "projectMember",
-            },
-        permissions,
-      );
+    if (access.hasAccess) {
+      return Object.assign(article, access, permissions);
     }
     return Object.assign(article, {
       ...access,

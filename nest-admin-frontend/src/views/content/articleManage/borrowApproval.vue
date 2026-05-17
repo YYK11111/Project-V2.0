@@ -16,7 +16,6 @@ const statusMap = {
   pending: '审批中',
   waitingStart: '等待开始',
   active: '借阅中',
-  approved: '已通过',
   rejected: '已拒绝',
   expired: '已到期',
   revoked: '已撤销',
@@ -26,7 +25,6 @@ const statusTypeMap = {
   pending: 'warning',
   waitingStart: 'warning',
   active: 'success',
-  approved: 'success',
   rejected: 'danger',
   expired: 'info',
   revoked: 'info',
@@ -52,7 +50,6 @@ function refreshList() {
         <div class="borrow-approval-statuses__item"><el-tag type="warning" size="small">审批中</el-tag></div>
         <div class="borrow-approval-statuses__item"><el-tag type="warning" size="small">等待开始</el-tag></div>
         <div class="borrow-approval-statuses__item"><el-tag type="success" size="small">借阅中</el-tag></div>
-        <div class="borrow-approval-statuses__item"><el-tag type="success" size="small">已通过</el-tag></div>
         <div class="borrow-approval-statuses__item"><el-tag type="danger" size="small">已拒绝</el-tag></div>
       </div>
     </div>

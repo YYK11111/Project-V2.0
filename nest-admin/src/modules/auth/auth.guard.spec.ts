@@ -1226,6 +1226,111 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("知识分类保存接口按新增和更新权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articleCatalogs/save",
+      method: "POST",
+      body: { id: "catalog-1" },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/articleCatalogs/update" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("知识分类删除接口使用分类删除权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articleCatalogs/del/catalog-1",
+      method: "DELETE",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/articleCatalogs/delete" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("知识运营重建接口使用 AI 运营权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articles/rebuildEmbeddings/article-1",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "content/articles/aiOperate" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("知识搜索记录接口使用知识首页权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/articles/search-records",
+      method: "POST",
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/articles/home" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("验收单提交审批接口使用验收单提交审批权限控制", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

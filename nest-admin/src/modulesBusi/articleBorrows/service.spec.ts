@@ -6,6 +6,7 @@ describe("ArticleBorrowsService 工作流借阅申请", () => {
   const createService = () => {
     const borrowRepo = {
       findOne: jest.fn(),
+      find: jest.fn(),
       save: jest.fn(async (payload) => ({
         ...payload,
         id: payload.id || "borrow-1",
@@ -122,6 +123,85 @@ describe("ArticleBorrowsService 工作流借阅申请", () => {
         approvalStatus: "1",
         currentNodeName: "借阅审批中",
       }),
+    );
+  });
+
+  it("审批列表应在数据库查询层过滤审批人、状态、关键词并分页", async () => {
+    const { service, borrowRepo } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      distinct: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "borrow-1",
+            status: KnowledgeBorrowStatus.pending,
+            article: {
+              title: "交付方案",
+              catalog: { managers: [{ userId: "u-manager" }] },
+            },
+          },
+        ],
+        1,
+      ]),
+    };
+    borrowRepo.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    const result = await service.listPending(
+      {
+        pageNum: 2,
+        pageSize: 5,
+        keyword: "交付",
+        status: KnowledgeBorrowStatus.pending,
+      } as any,
+      { id: "u-manager", permissions: [] },
+    );
+
+    expect(borrowRepo.find).not.toHaveBeenCalled();
+    expect(queryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+      "catalog.managers",
+      "catalogManager",
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "catalogManager.userId = :managerUserId",
+      { managerUserId: "u-manager" },
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "borrow.status = :status",
+      {
+        status: KnowledgeBorrowStatus.pending,
+      },
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "(article.title LIKE :keyword OR catalog.name LIKE :keyword OR applicant.name LIKE :keyword OR applicant.nickname LIKE :keyword OR borrow.applyReason LIKE :keyword)",
+      { keyword: "%交付%" },
+    );
+    expect(queryBuilder.distinct).toHaveBeenCalledWith(true);
+    expect(queryBuilder.skip).toHaveBeenCalledWith(5);
+    expect(queryBuilder.take).toHaveBeenCalledWith(5);
+    expect(result.total).toBe(1);
+    expect(result.list).toHaveLength(1);
+  });
+
+  it("已通过旧状态不应继续作为有效借阅授权", async () => {
+    const { service, borrowRepo } = createService();
+    const queryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    borrowRepo.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    await service.hasActiveBorrow("article-1", "u1");
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      "borrow.status = :status",
+      { status: KnowledgeBorrowStatus.active },
     );
   });
 });

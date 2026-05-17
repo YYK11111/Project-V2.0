@@ -13,6 +13,12 @@ const canArticleBorrowMy = computed(() => checkPermi(['business/articleBorrows/m
 const canArticleBorrowPending = computed(() => checkPermi(['business/articleBorrows/pending']))
 const canAiDebug = computed(() => checkPermi(['content/articles/aiDebug']))
 const canAiOperate = computed(() => checkPermi(['content/articles/aiOperate']))
+const canCatalogAdd = computed(() => checkPermi(['business/articleCatalogs/add']))
+const canCatalogUpdate = computed(() => checkPermi(['business/articleCatalogs/update']))
+const canCatalogDelete = computed(() => checkPermi(['business/articleCatalogs/delete']))
+const canArticleTagAdd = computed(() => checkPermi(['business/articleTags/add']))
+const canArticleTagUpdate = computed(() => checkPermi(['business/articleTags/update']))
+const canArticleTagDelete = computed(() => checkPermi(['business/articleTags/delete']))
 const activeTab = ref('articles')
 
 const status = ref([])
@@ -327,7 +333,7 @@ catalog.getTrees()
               <div class="knowledge-panel__title km-panel__title">分类治理</div>
               <div class="knowledge-panel__desc km-panel__desc">维护知识目录结构、分类管理员和默认可见范围。</div>
             </div>
-            <el-button type="primary" plain @click="catalog.add({ id: '0' })">
+            <el-button v-if="canCatalogAdd" type="primary" plain @click="catalog.add({ id: '0' })">
               <el-icon-plus class="mr6"></el-icon-plus>
               新增分类
             </el-button>
@@ -346,9 +352,9 @@ catalog.getTrees()
               <div class="knowledge-catalog-tree__node">
                 <div class="knowledge-catalog-tree__label">{{ node.label }}</div>
                 <div class="knowledge-catalog-tree__actions">
-                  <el-icon-plus class="hoverColor" @click.stop="catalog.add(data)" title="新增"></el-icon-plus>
-                  <el-icon-EditPen class="hoverColor" @click.stop="catalog.edit(data)" title="编辑"></el-icon-EditPen>
-                  <el-icon-delete class="hoverColor" @click.stop="catalog.del(data, node)" title="删除"></el-icon-delete>
+                  <el-icon-plus v-if="canCatalogAdd" class="hoverColor" @click.stop="catalog.add(data)" title="新增"></el-icon-plus>
+                  <el-icon-EditPen v-if="canCatalogUpdate" class="hoverColor" @click.stop="catalog.edit(data)" title="编辑"></el-icon-EditPen>
+                  <el-icon-delete v-if="canCatalogDelete" class="hoverColor" @click.stop="catalog.del(data, node)" title="删除"></el-icon-delete>
                 </div>
               </div>
             </template>
@@ -363,7 +369,7 @@ catalog.getTrees()
               <div class="knowledge-panel__title km-panel__title">标签治理</div>
               <div class="knowledge-panel__desc km-panel__desc">收敛高频主题标签，避免语义重复与命名混乱。</div>
             </div>
-            <el-button type="primary" plain @click="openTagDialog()">
+            <el-button v-if="canArticleTagAdd" type="primary" plain @click="openTagDialog()">
               <el-icon-plus class="mr6"></el-icon-plus>
               新增标签
             </el-button>
@@ -375,8 +381,8 @@ catalog.getTrees()
                 <span v-if="item.remark" class="tag-panel__remark">{{ item.remark }}</span>
               </div>
               <div class="tag-panel__actions">
-                <el-icon-edit-pen class="hoverColor" @click="openTagDialog(item)" />
-                <el-icon-delete class="hoverColor" @click="removeTag(item)" />
+                <el-icon-edit-pen v-if="canArticleTagUpdate" class="hoverColor" @click="openTagDialog(item)" />
+                <el-icon-delete v-if="canArticleTagDelete" class="hoverColor" @click="removeTag(item)" />
               </div>
             </div>
           </div>

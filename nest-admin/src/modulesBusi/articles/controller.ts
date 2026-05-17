@@ -48,8 +48,8 @@ export class ArticlesController extends BaseController<
   }
 
   @Post("rebuildEmbeddings/:id")
-  rebuildEmbeddings(@Param("id") id: string) {
-    return this.service.rebuildEmbeddings(id);
+  rebuildEmbeddings(@Param("id") id: string, @Req() req) {
+    return this.service.rebuildEmbeddings(id, req.user);
   }
 
   @Get("retrieveForAi")

@@ -2,6 +2,35 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { SprintsService } from "./service";
 
 describe("SprintsService completeSprint guards", () => {
+  it("保存 Sprint 时会把空负责人ID归一为 null", async () => {
+    const repository = {
+      findOne: jest.fn(),
+      save: jest.fn().mockImplementation(async (data) => data),
+    };
+    const taskRepository = { find: jest.fn() };
+    const projectExecutionPermissionService = {
+      assertWritableProject: jest.fn(),
+    };
+    const service = new SprintsService(
+      repository as any,
+      taskRepository as any,
+      projectExecutionPermissionService as any,
+    );
+
+    await service.save({
+      name: "Sprint A",
+      projectId: "p1",
+      ownerId: "",
+      _operatorId: "u1",
+    } as any);
+
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: null,
+      }),
+    );
+  });
+
   it("未完成任务存在时不允许直接完成 Sprint", async () => {
     const repository = {
       findOne: jest.fn(),

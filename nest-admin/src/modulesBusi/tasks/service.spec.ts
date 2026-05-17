@@ -124,6 +124,29 @@ describe("TasksService lifecycle actions", () => {
     };
   };
 
+  it("保存任务时会把空里程碑ID归一为 null", async () => {
+    const { service, repository, projectsService } = createService();
+    const queueAssignmentReminders = jest
+      .spyOn(service as any, "queueAssignmentReminders")
+      .mockResolvedValue(undefined);
+    projectsService.assertProjectNotArchived.mockResolvedValue(undefined);
+
+    await service.save({
+      name: "任务A",
+      projectId: "project-1",
+      leaderId: "leader-1",
+      milestoneId: "",
+      code: "TSK-TEST-0001",
+    } as any);
+
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        milestoneId: null,
+      }),
+    );
+    expect(queueAssignmentReminders).toHaveBeenCalled();
+  });
+
   it("经办人可以开始任务且写入实际开始日期", async () => {
     const { service, repository, projectsService } = createService();
     const queueStartedReminders = jest

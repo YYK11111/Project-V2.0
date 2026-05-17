@@ -18,7 +18,7 @@ describe("ArticleBorrowLoader", () => {
           catalog: {
             id: "catalog-1",
             name: "项目知识",
-            managerUserIds: ["manager-1"],
+            managers: [{ userId: "manager-1" }],
           },
         },
         applicant: {
@@ -35,7 +35,12 @@ describe("ArticleBorrowLoader", () => {
 
     expect(borrowRepo.findOne).toHaveBeenCalledWith({
       where: { id: "borrow-1" },
-      relations: ["article", "article.catalog", "applicant"],
+      relations: [
+        "article",
+        "article.catalog",
+        "article.catalog.managers",
+        "applicant",
+      ],
     });
     expect(result).toEqual(
       expect.objectContaining({

@@ -93,6 +93,42 @@ describe("UsersService", () => {
     expect(JSON.stringify(result)).not.toContain("zhangsan@example.com");
   });
 
+  it("人员选项在 includeAll=1 时不按当前用户数据权限范围过滤", async () => {
+    const getMany = jest.fn().mockResolvedValue([]);
+    const qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany,
+    };
+    usersRepository.createQueryBuilder.mockReturnValue(qb);
+    const service = createService();
+
+    await service.getOptions({
+      pageNum: 1,
+      pageSize: 100,
+      includeAll: "1",
+      _operatorId: "user-1",
+      _operatorDeptId: "dept-1",
+      _operatorPermissions: [],
+      _operatorRoles: [
+        {
+          permissionKey: "normal",
+          dataPermissionType: "self",
+          isActive: "1",
+        },
+      ],
+    } as any);
+
+    expect(qb.andWhere).not.toHaveBeenCalledWith(
+      "User.id = :currentUserId",
+      expect.any(Object),
+    );
+  });
+
   it("用户列表应按当前用户数据权限范围过滤到本人", async () => {
     const getManyAndCount = jest.fn().mockResolvedValue([
       [

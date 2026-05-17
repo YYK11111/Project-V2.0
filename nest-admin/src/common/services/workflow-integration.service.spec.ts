@@ -275,6 +275,40 @@ describe("WorkflowIntegrationService 审批发起权限", () => {
     );
   });
 
+  it("任务负责人即使不在项目执行对象范围内也可发起任务审批", async () => {
+    const { service, repositories, approvalContextService, projectsService } =
+      createService();
+    repositories.task.findOne.mockResolvedValue({
+      id: "task-1-owner",
+      projectId: "19",
+      status: TaskStatus.pending,
+      approvalStatus: "0",
+      leaderId: "u1",
+      createUser: "other-user",
+      name: "需求确认",
+    });
+    projectsService.assertExecutionObjectPermission.mockRejectedValue(
+      new Error("当前操作没有权限"),
+    );
+
+    await service.startTaskApproval("task-1-owner", "u1");
+
+    expect(approvalContextService.createFromWorkflowStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessType: "task",
+        businessId: "task-1-owner",
+        starterId: "u1",
+      }),
+    );
+    expect(repositories.task.update).toHaveBeenCalledWith(
+      "task-1-owner",
+      expect.objectContaining({
+        approvalStatus: "1",
+        currentNodeName: "任务审批中",
+      }),
+    );
+  });
+
   it("仅允许待处理任务发起普通任务审批", async () => {
     const { service, repositories, projectsService } = createService();
     repositories.task.findOne.mockResolvedValue({

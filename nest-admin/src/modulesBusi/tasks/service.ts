@@ -927,6 +927,11 @@ export class TasksService extends BaseService<Task, TaskDto> {
   private normalizeTaskPayload(
     dto: SaveDto<TaskDto> & { attachments?: string[] },
   ) {
+    for (const key of ["sprintId", "milestoneId", "leaderId", "parentId"]) {
+      if ((dto as any)[key] === "") {
+        (dto as any)[key] = null;
+      }
+    }
     if (typeof dto.executorIds === "string" && !dto.executorIds) {
       dto.executorIds = [] as any;
     }

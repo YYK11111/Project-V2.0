@@ -77,6 +77,24 @@ export class WorkflowIntegrationService {
     );
   }
 
+  private async assertTaskApprovalPermission(
+    task: Pick<Task, "projectId" | "leaderId" | "createUser">,
+    initiatorId: string,
+  ) {
+    try {
+      await this.projectsService.assertExecutionObjectPermission(
+        task.projectId,
+        initiatorId,
+      );
+    } catch (error) {
+      const isTaskOwner =
+        String(task.leaderId || "") === String(initiatorId || "") ||
+        String(task.createUser || "") === String(initiatorId || "");
+      if (isTaskOwner) return;
+      throw error;
+    }
+  }
+
   async startProjectApproval(
     projectId: string,
     initiatorId: string,
@@ -761,10 +779,7 @@ export class WorkflowIntegrationService {
     if (String(task.approvalStatus || "") === "1") {
       throw new BadRequestException("当前任务已在审批中");
     }
-    await this.projectsService.assertExecutionObjectPermission(
-      task.projectId,
-      initiatorId,
-    );
+    await this.assertTaskApprovalPermission(task, initiatorId);
 
     const instance = await this.workflowService.startBusinessWorkflow(
       {

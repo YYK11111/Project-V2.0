@@ -25,4 +25,21 @@ describe('articleManage 后台管理列表治理守卫', () => {
     expect(source).toContain('向量重建成功')
     expect(source).toContain('重建向量')
   })
+
+  it('分类和标签治理操作应按权限显示', () => {
+    const source = readArticleManageView()
+
+    expect(source).toContain("checkPermi(['business/articleCatalogs/add'])")
+    expect(source).toContain("checkPermi(['business/articleCatalogs/update'])")
+    expect(source).toContain("checkPermi(['business/articleCatalogs/delete'])")
+    expect(source).toContain("checkPermi(['business/articleTags/add'])")
+    expect(source).toContain("checkPermi(['business/articleTags/update'])")
+    expect(source).toContain("checkPermi(['business/articleTags/delete'])")
+    expect(source).toContain('v-if="canCatalogAdd"')
+    expect(source).toContain('v-if="canCatalogUpdate"')
+    expect(source).toContain('v-if="canCatalogDelete"')
+    expect(source).toContain('v-if="canArticleTagAdd"')
+    expect(source).toContain('v-if="canArticleTagUpdate"')
+    expect(source).toContain('v-if="canArticleTagDelete"')
+  })
 })
