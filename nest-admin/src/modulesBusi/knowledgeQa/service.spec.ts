@@ -9,7 +9,6 @@ describe("KnowledgeQaService", () => {
           {
             articleId: "article-1",
             articleTitle: "项目复盘",
-            chunkId: "article-1:1:1",
             chunkOrder: 1,
             chunkTitle: "风险总结",
             chunkText: "风险处理过程",
@@ -22,6 +21,9 @@ describe("KnowledgeQaService", () => {
             retrievalWeight: 2,
             aiPreferred: "1",
             authorityLevel: "1",
+            scoreBreakdown: {
+              keywordScore: 8,
+            },
             matchedTerms: ["风险"],
             matchedFields: ["title"],
           },
@@ -50,6 +52,7 @@ describe("KnowledgeQaService", () => {
       chatNoStream: jest.fn().mockResolvedValue({
         choices: [{ message: { content: "答案" } }],
       }),
+      getDefaultChatModel: jest.fn().mockReturnValue("gpt-5.4"),
       getDefaultModel: jest.fn().mockReturnValue("gpt-5.4"),
       getDefaultEmbeddingModel: jest
         .fn()
@@ -145,5 +148,20 @@ describe("KnowledgeQaService", () => {
     expect(result.matchedChunks).toEqual([]);
     expect(result.answer).toContain("当前知识库中没有找到足够信息");
     expect(customAiService.chatNoStream).not.toHaveBeenCalled();
+  });
+
+  it("问答结果在 retrieveForAi 未返回 chunkId 时回填真实 chunkId", async () => {
+    const { service } = createService();
+
+    const result = await service.ask(
+      {
+        question: "风险怎么处理",
+        limit: 3,
+      },
+      undefined,
+    );
+
+    expect(result.references[0].chunkId).toBe("article-1:1:1");
+    expect(result.matchedChunks[0].chunkId).toBe("article-1:1:1");
   });
 });
