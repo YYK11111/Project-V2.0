@@ -1383,6 +1383,64 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
   });
 
+  it("知识问答接口使用知识首页权限控制", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/knowledge-qa/ask",
+      method: "POST",
+      body: {
+        question: "上线失败如何回滚",
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "business/articles/home" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
+  it("embedding 预览接口允许 aiDebug 权限访问", async () => {
+    const guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      reflector as unknown as Reflector,
+      redisService as any,
+      rolesService as any,
+    );
+    const request: Record<string, any> = {
+      headers: {
+        cookie: "admin_session=header.payload.signature",
+      },
+      path: "/api/business/knowledge-qa/embed-preview",
+      method: "POST",
+      body: {
+        text: "项目复盘风险",
+      },
+    };
+
+    jwtService.verifyAsync.mockResolvedValue({
+      permissions: [],
+      id: "user_1",
+    });
+    rolesService.getUserMenus.mockResolvedValue([
+      { permissionKey: "content/articles/aiDebug" },
+    ]);
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+  });
+
   it("验收单提交审批接口使用验收单提交审批权限控制", async () => {
     const guard = new AuthGuard(
       jwtService as unknown as JwtService,

@@ -34,5 +34,6 @@ import { ArticleChunkEmbeddingsModule } from "../articleChunkEmbeddings/module";
   ],
   controllers: [ArticlesController],
   providers: [ArticlesService],
+  exports: [ArticlesService],
 })
 export class ArticlesModule {}

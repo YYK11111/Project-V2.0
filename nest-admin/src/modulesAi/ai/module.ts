@@ -10,5 +10,6 @@ import { CustomAiService } from "./custom-ai";
   imports: [TypeOrmModule.forFeature([Ai]), HttpModule],
   controllers: [AiController],
   providers: [AiService, CustomAiService],
+  exports: [AiService, CustomAiService],
 })
 export class AiModule {}

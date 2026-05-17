@@ -15,16 +15,29 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
 }
 
+export interface EmbeddingRequest {
+  model: string;
+  input: string[];
+}
+
+export interface EmbeddingResponse {
+  model: string;
+  vectors: number[][];
+}
+
 @Injectable()
 export class CustomAiService {
   private baseUrl: string;
   private apiKey: string;
   private defaultModel: string;
+  private defaultEmbeddingModel: string;
 
   constructor() {
     this.baseUrl = config.customAi?.baseUrl || "";
     this.apiKey = config.customAi?.apiKey || "";
     this.defaultModel = config.customAi?.defaultModel || "gpt-5.1";
+    this.defaultEmbeddingModel =
+      config.customAi?.defaultEmbeddingModel || "text-embedding-3-small";
   }
 
   getModels() {
@@ -33,6 +46,10 @@ export class CustomAiService {
 
   getDefaultModel() {
     return this.defaultModel;
+  }
+
+  getDefaultEmbeddingModel() {
+    return this.defaultEmbeddingModel;
   }
 
   async chat(request: ChatCompletionRequest) {
@@ -75,5 +92,36 @@ export class CustomAiService {
     );
 
     return response.data;
+  }
+
+  async embed(request: EmbeddingRequest) {
+    if (!this.baseUrl || !this.apiKey) {
+      throw new Error("Custom AI not configured");
+    }
+
+    const response = await axios.post(
+      `${this.baseUrl}/embeddings`,
+      request,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      },
+    );
+
+    return response.data;
+  }
+
+  async embedTexts(texts: string[], model?: string) {
+    const response = await this.embed({
+      model: model || this.getDefaultEmbeddingModel(),
+      input: texts,
+    });
+    const embeddings = Array.isArray(response?.data) ? response.data : [];
+    return {
+      model: response?.model || model || this.getDefaultEmbeddingModel(),
+      vectors: embeddings.map((item) => item.embedding || []),
+    } as EmbeddingResponse;
   }
 }

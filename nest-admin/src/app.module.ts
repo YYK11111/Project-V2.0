@@ -42,6 +42,7 @@ import { AcceptanceRecordsModule } from "./modulesBusi/acceptance-records/module
 import { HandoverRecordsModule } from "./modulesBusi/handover-records/module";
 import { SystemScheduledJobsModule } from "./modules/systemScheduledJobs/module";
 import { BusinessApprovalContextsModule } from "./modulesBusi/approval-contexts/module";
+import { KnowledgeQaModule } from "./modulesBusi/knowledgeQa/module";
 
 @Dependencies(DataSource)
 @Module({
@@ -85,6 +86,7 @@ import { BusinessApprovalContextsModule } from "./modulesBusi/approval-contexts/
     AcceptanceRecordsModule,
     HandoverRecordsModule,
     BusinessApprovalContextsModule,
+    KnowledgeQaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

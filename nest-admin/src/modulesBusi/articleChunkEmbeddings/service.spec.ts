@@ -7,19 +7,46 @@ describe("ArticleChunkEmbeddingsService", () => {
       save: jest.fn().mockImplementation(async (value) => value),
       find: jest.fn().mockResolvedValue([]),
     };
-    const service = new ArticleChunkEmbeddingsService(repository as never);
-    return { service, repository };
+    const customAiService = {
+      embedTexts: jest.fn().mockResolvedValue({
+        model: "text-embedding-3-small",
+        vectors: [[0.12, 0.34, 0.56]],
+      }),
+      getDefaultEmbeddingModel: jest.fn().mockReturnValue(
+        "text-embedding-3-small",
+      ),
+    };
+    const service = new ArticleChunkEmbeddingsService(
+      repository as never,
+      customAiService as never,
+    );
+    return { service, repository, customAiService };
   }
 
-  it("为相同文本生成稳定 mock 向量", async () => {
-    const { service } = createService();
+  it("调用 OpenAI 兼容 embedding 生成向量", async () => {
+    const { service, customAiService } = createService();
 
     const first = await service.embedTexts(["项目复盘风险"]);
-    const second = await service.embedTexts(["项目复盘风险"]);
 
-    expect(first).toEqual(second);
-    expect(first[0]).toHaveLength(16);
-    expect(first[0].every((item) => typeof item === "number")).toBe(true);
+    expect(customAiService.embedTexts).toHaveBeenCalledWith([
+      "项目复盘风险",
+    ], "text-embedding-3-small");
+    expect(first).toEqual({
+      model: "text-embedding-3-small",
+      vectors: [[0.12, 0.34, 0.56]],
+    });
+  });
+
+  it("按文章查询切片向量", async () => {
+    const { service, repository } = createService();
+
+    await service.findByArticles(["article-1", "article-2"]);
+
+    expect(repository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: [{ articleId: "article-1" }, { articleId: "article-2" }],
+      }),
+    );
   });
 
   it("按文章切片重建 embedding 记录", async () => {
@@ -50,8 +77,8 @@ describe("ArticleChunkEmbeddingsService", () => {
           chunkTitle: "风险总结",
           headingPath: ["项目复盘", "风险总结"],
           tokenEstimate: 8,
-          embeddingProvider: "mock",
-          embeddingModel: "mock-hash-16",
+          embeddingProvider: "openai-compatible",
+          embeddingModel: "text-embedding-3-small",
           embeddingVersion: 2,
           status: "ready",
           errorMessage: "",

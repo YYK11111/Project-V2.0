@@ -667,6 +667,12 @@ export class AuthGuard implements CanActivate {
         /^business\/articles\/search-records$/,
         "business/articles/home",
       ],
+      ["POST", /^business\/knowledge-qa\/ask$/, "business/articles/home"],
+      [
+        "POST",
+        /^business\/knowledge-qa\/embed-preview$/,
+        "content/articles/aiDebug",
+      ],
       [
         "GET",
         /^business\/articles\/getOne\/[^/]+$/,
