@@ -82,6 +82,14 @@ const confirmScopeLoading = ref(false)
 const taskOptions = ref([])
 const milestoneOptions = ref([])
 const sprintOptions = ref([])
+const changeApprovalRequirements = [
+  '变更原因',
+  '变更描述',
+  '影响分析',
+]
+const impactedTaskName = computed(() => form.value.impactedTask?.name || taskOptions.value.find((item) => String(item.id) === String(form.value.impactedTaskId || ''))?.name || '-')
+const impactedMilestoneName = computed(() => form.value.impactedMilestone?.name || milestoneOptions.value.find((item) => String(item.id) === String(form.value.impactedMilestoneId || ''))?.name || '-')
+const impactedSprintName = computed(() => form.value.impactedSprint?.name || sprintOptions.value.find((item) => String(item.id) === String(form.value.impactedSprintId || ''))?.name || '-')
 
 const isChangeFormRoute = useCurrentRouteGuard(route, '/changeManage/form')
 
@@ -178,6 +186,9 @@ async function handleSubmitApproval() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     return
   }
+  if (!form.value.reason?.trim()) return $sdk.msgWarning('提交审批前，请补齐变更原因')
+  if (!form.value.description?.trim()) return $sdk.msgWarning('提交审批前，请补齐变更描述')
+  if (!form.value.impactAnalysis?.trim()) return $sdk.msgWarning('提交审批前，请补齐影响分析')
   await submitApproval(route.query.id)
   $sdk.msgSuccess('提交审批成功')
   router.back()
@@ -432,7 +443,7 @@ function scrollToWorkflowPanel() {
         <div class="change-impact-history">
           <div v-for="item in form.confirmHistory" :key="item.id" class="change-impact-history__item">
             <div class="change-impact-history__title">{{ { overall: '整体确认', milestone: '里程碑处理', sprint: 'Sprint 处理', task: '任务处理' }[item.scope] || item.scope }}</div>
-            <div class="change-impact-history__meta">{{ item.confirmedAt || item.createTime || '-' }} / {{ item.operatorName || item.operatorId || '-' }}</div>
+            <div class="change-impact-history__meta">{{ item.confirmedAt || item.createTime || '-' }} / {{ item.operatorName || '-' }}</div>
             <div v-if="item.remark" class="change-impact-history__remark">{{ item.remark }}</div>
           </div>
         </div>
@@ -457,6 +468,21 @@ function scrollToWorkflowPanel() {
           </div>
         </div>
         <div class="business-form-fields">
+      <el-alert
+        v-if="!isReadonly"
+        title="提交审批前必填"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb-16"
+      >
+        <template #default>
+          <ul class="phase-required-list">
+            <li v-for="item in changeApprovalRequirements" :key="item">{{ item }}</li>
+          </ul>
+        </template>
+      </el-alert>
+
       <el-form-item label="变更原因">
         <ViewField v-if="isReadonly" :value="form.reason" />
         <el-input v-else v-model="form.reason" type="textarea" :rows="2" placeholder="请输入变更原因" />
@@ -490,7 +516,7 @@ function scrollToWorkflowPanel() {
       <el-row :gutter="20">
         <el-col :span="8">
           <el-form-item label="影响任务">
-            <ViewField v-if="isReadonly" :value="form.impactedTaskId" />
+            <ViewField v-if="isReadonly" :value="impactedTaskName" />
             <el-select v-else v-model="form.impactedTaskId" placeholder="请选择任务" style="width: 100%" clearable>
               <el-option v-for="item in taskOptions" :key="item.id" :label="item.name" :value="item.id" />
             </el-select>
@@ -498,7 +524,7 @@ function scrollToWorkflowPanel() {
         </el-col>
         <el-col :span="8">
           <el-form-item label="影响里程碑">
-            <ViewField v-if="isReadonly" :value="form.impactedMilestoneId" />
+            <ViewField v-if="isReadonly" :value="impactedMilestoneName" />
             <el-select v-else v-model="form.impactedMilestoneId" placeholder="请选择里程碑" style="width: 100%" clearable>
               <el-option v-for="item in milestoneOptions" :key="item.id" :label="item.name" :value="item.id" />
             </el-select>
@@ -506,7 +532,7 @@ function scrollToWorkflowPanel() {
         </el-col>
         <el-col :span="8">
           <el-form-item label="影响Sprint">
-            <ViewField v-if="isReadonly" :value="form.impactedSprintId" />
+            <ViewField v-if="isReadonly" :value="impactedSprintName" />
             <el-select v-else v-model="form.impactedSprintId" placeholder="请选择Sprint" style="width: 100%" clearable>
               <el-option v-for="item in sprintOptions" :key="item.id" :label="item.name" :value="item.id" />
             </el-select>
@@ -674,6 +700,16 @@ function scrollToWorkflowPanel() {
   font-size: 13px;
   line-height: 1.7;
   color: var(--el-text-color-regular);
+}
+
+.phase-required-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--el-text-color-regular);
+}
+
+.phase-required-list li + li {
+  margin-top: 4px;
 }
 
 @media (max-width: 768px) {

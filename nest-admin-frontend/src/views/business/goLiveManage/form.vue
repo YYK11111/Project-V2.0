@@ -54,6 +54,12 @@ const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProje
 const canSaveGoLive = computed(() => !isReadonly.value && (isEdit.value
   ? canWriteProjectScopedRecord(canGoLiveUpdate.value, 'canManageDelivery')
   : canWriteProjectScopedRecord(canGoLiveAdd.value, 'canManageDelivery')))
+const goLiveApprovalRequirements = [
+  '计划上线日期',
+  '负责人',
+  '检查项摘要',
+  '回退预案',
+]
 
 const rules = {
   title: [{ required: true, message: '请输入上线标题', trigger: 'blur' }],
@@ -129,6 +135,10 @@ function handleConfirmRollback() {
 
 function handleSubmitApproval() {
   if (!route.query.id) return $sdk.msgWarning('请先保存上线单后再提交审批')
+  if (!form.value.plannedGoLiveTime) return $sdk.msgWarning('提交审批前，请补齐计划上线日期')
+  if (!form.value.ownerId) return $sdk.msgWarning('提交审批前，请补齐负责人')
+  if (!String(form.value.checklistSummary || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim()) return $sdk.msgWarning('提交审批前，请补齐检查项摘要')
+  if (!String(form.value.rollbackPlan || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim()) return $sdk.msgWarning('提交审批前，请补齐回退预案')
   const request = String(form.value.currentNodeName || '').includes('退回发起人') && form.value.workflowInstanceId
     ? resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     : submitApproval(route.query.id)
@@ -209,6 +219,20 @@ function scrollToWorkflowPanel() {
           </div>
 
           <div class="business-form-fields business-form-fields--content">
+            <el-alert
+              v-if="!isReadonly"
+              title="提交审批前必填"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="mb-16"
+            >
+              <template #default>
+                <ul class="phase-required-list">
+                  <li v-for="item in goLiveApprovalRequirements" :key="item">{{ item }}</li>
+                </ul>
+              </template>
+            </el-alert>
             <el-form-item label="检查项摘要">
               <ViewRichText v-if="isReadonly" :html="form.checklistSummary" />
               <Editor v-else v-model="form.checklistSummary" style="min-height: 220px" placeholder="请输入检查项摘要" />
@@ -247,5 +271,15 @@ function scrollToWorkflowPanel() {
   max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+.phase-required-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--el-text-color-regular);
+}
+
+.phase-required-list li + li {
+  margin-top: 4px;
 }
 </style>

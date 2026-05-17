@@ -215,6 +215,18 @@ const isMobileScreen = computed(() => viewportWidth.value < 768)
 const isTabletScreen = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1024)
 const isCompactScreen = computed(() => viewportWidth.value < 1024)
 const formLabelPosition = computed(() => (isCompactScreen.value ? 'top' : 'right'))
+const projectApprovalRequirements = [
+  '计划开始时间、计划结束时间',
+  '主要交付物',
+  '范围边界',
+  '里程碑至少 1 条，且每条都要补齐名称和计划完成日期',
+]
+const projectClosureRequirements = [
+  '验收说明',
+  '交付清单',
+  '项目复盘',
+  '至少新增 1 条上线记录和 1 条通过验收记录',
+]
 const saveLoading = ref(false)
 const approvalLoading = ref(false)
 const fieldPermissionResult = ref(null)
@@ -1019,6 +1031,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <el-alert
+            v-if="!isView"
+            title="提交立项审批前必填"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="phase-required-alert"
+          >
+            <template #default>
+              <ul class="phase-required-list">
+                <li v-for="item in projectApprovalRequirements" :key="item">{{ item }}</li>
+              </ul>
+            </template>
+          </el-alert>
+
           <div class="project-baseline-plan-grid">
             <el-form-item label="主要交付物" prop="baselineDeliverables" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
               <ViewField v-if="isView" :value="form.baselineDeliverables" />
@@ -1216,6 +1243,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <el-alert
+            v-if="!isView"
+            title="提交结项审批前必填"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="phase-required-alert"
+          >
+            <template #default>
+              <ul class="phase-required-list">
+                <li v-for="item in projectClosureRequirements" :key="item">{{ item }}</li>
+              </ul>
+            </template>
+          </el-alert>
+
           <div class="project-baseline-plan-grid">
             <el-form-item label="验收日期" class="project-baseline-plan-grid__item">
               <ViewField v-if="isView" :value="form.acceptanceDate" />
@@ -1331,6 +1373,20 @@ onBeforeUnmount(() => {
 }
 
 .section-card--table .table-wrapper {
+  margin-top: 4px;
+}
+
+.phase-required-alert {
+  margin-bottom: 18px;
+}
+
+.phase-required-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--el-text-color-regular);
+}
+
+.phase-required-list li + li {
   margin-top: 4px;
 }
 

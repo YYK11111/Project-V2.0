@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import UserSelect from './UserSelect.vue'
+import { getOptions as getUserOptions } from '@/views/system/users/api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 
 vi.mock('@/views/system/users/api', () => ({
   getOptions: vi.fn().mockResolvedValue({
@@ -20,12 +22,28 @@ vi.mock('@/views/system/users/api', () => ({
 }))
 
 vi.mock('@/views/system/depts/api', () => ({
-  getOptions: vi.fn().mockResolvedValue({ data: [] }),
+  getTrees: vi.fn().mockResolvedValue({
+    data: [
+      {
+        id: 'dept-1',
+        name: '研发部',
+        children: [
+          {
+            id: 'dept-1-1',
+            name: '平台组',
+          },
+        ],
+      },
+    ],
+  }),
 }))
 
 function readUserSelectSource() {
   return readFileSync(resolve(__dirname, 'UserSelect.vue'), 'utf-8')
 }
+
+const mockedGetUserOptions = vi.mocked(getUserOptions)
+const mockedGetDeptTrees = vi.mocked(getDeptTrees)
 
 describe('UserSelect 多选弹窗结构守卫', () => {
   it('多选人员使用弹窗选择器并在字段内部展示结果', () => {
@@ -36,6 +54,13 @@ describe('UserSelect 多选弹窗结构守卫', () => {
     expect(source).toContain('已选人员')
     expect(source).toContain('confirmSelection')
     expect(source).toContain('selected-user-overflow')
+    expect(source).toContain('el-tree')
+    expect(source).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))')
+    expect(source).toContain('user-select-dialog__selected')
+    expect(source).toContain('selectedDeptId')
+    expect(source).toContain('deptSearchKeyword')
+    expect(source).toContain('默认包含下级部门')
+    expect(source).toContain('normalizeDeptTreeResponse')
     expect(source).not.toContain('selected-user-preview')
   })
 
@@ -49,9 +74,9 @@ describe('UserSelect 多选弹窗结构守卫', () => {
     expect(source).toContain('选择人员')
     expect(source).toContain('confirmSelection')
     expect(source).toContain('selectPendingUser')
-    expect(source).not.toContain('<el-select\n      class="user-select"')
+    expect(source).toContain('handleDeptNodeClick')
     expect(source).toContain('getOptions as getUserOptions')
-    expect(source).toContain('getOptions as getDeptOptions')
+    expect(source).toContain('getTrees as getDeptTrees')
   })
 
   it('分页结构用户列表也能选择并确认回填', async () => {
@@ -72,9 +97,13 @@ describe('UserSelect 多选弹窗结构守卫', () => {
             emits: ['close'],
             template: '<div v-if="modelValue" class="el-dialog"><slot /><slot name="footer" /></div>',
           },
-          ElInput: { template: '<input />' },
-          ElSelect: { template: '<select><slot /></select>' },
-          ElOption: { template: '<option><slot /></option>' },
+          ElInput: {
+            props: ['modelValue', 'size'],
+            template: '<input class="el-input-stub" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value); $emit(\'input\', $event.target.value)" @clear="$emit(\'clear\')" />',
+          },
+          ElTree: {
+            template: '<button type="button" class="el-tree-stub" @click="$emit(\'node-click\', { id: \'dept-1\', name: \'研发部\' })"><slot /></button>',
+          },
         },
       },
     })
@@ -93,6 +122,36 @@ describe('UserSelect 多选弹窗结构守卫', () => {
     expect(updateEvents[updateEvents.length - 1]).toEqual(['user-1'])
   })
 
+  it('人员选择器请求全部人员选项而不附带数据权限过滤', async () => {
+    mount(UserSelect, {
+      props: {
+        modelValue: '',
+        placeholder: '请选择负责人',
+      },
+      global: {
+        directives: {
+          loading: {},
+        },
+        stubs: {
+          ElAvatar: { template: '<span class="el-avatar"><slot /></span>' },
+          ElButton: { template: '<button type="button"><slot /></button>' },
+          ElDialog: { template: '<div></div>' },
+          ElInput: { props: ['modelValue', 'size'], template: '<input />' },
+          ElTree: { template: '<div></div>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(mockedGetUserOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeAll: '1',
+      }),
+    )
+    expect(mockedGetDeptTrees).toHaveBeenCalled()
+  })
+
   it('单选未选择时字段内直接显示占位内容', async () => {
     const wrapper = mount(UserSelect, {
       props: {
@@ -107,9 +166,8 @@ describe('UserSelect 多选弹窗结构守卫', () => {
           ElAvatar: { template: '<span class="el-avatar"><slot /></span>' },
           ElButton: { template: '<button type="button"><slot /></button>' },
           ElDialog: { template: '<div></div>' },
-          ElInput: { template: '<input />' },
-          ElSelect: { template: '<select><slot /></select>' },
-          ElOption: { template: '<option><slot /></option>' },
+          ElInput: { props: ['modelValue', 'size'], template: '<input />' },
+          ElTree: { template: '<div></div>' },
         },
       },
     })
@@ -138,9 +196,8 @@ describe('UserSelect 多选弹窗结构守卫', () => {
             props: ['modelValue'],
             template: '<div v-if="modelValue" class="dialog-open-flag"><slot /><slot name="footer" /></div>',
           },
-          ElInput: { template: '<input />' },
-          ElSelect: { template: '<select><slot /></select>' },
-          ElOption: { template: '<option><slot /></option>' },
+          ElInput: { props: ['modelValue', 'size'], template: '<input />' },
+          ElTree: { template: '<div></div>' },
         },
       },
     })
@@ -176,5 +233,53 @@ describe('UserSelect 多选弹窗结构守卫', () => {
     expect(source).toContain('.user-select-dialog__selected-item :deep(.el-avatar) {')
     expect(source).toContain('width: 24px;')
     expect(source).toContain('height: 24px;')
+  })
+
+  it('切换部门后不会清空已选人员，并会带上部门条件重新请求', async () => {
+    const wrapper = mount(UserSelect, {
+      props: {
+        modelValue: '',
+        placeholder: '请选择负责人',
+      },
+      global: {
+        directives: {
+          loading: {},
+        },
+        stubs: {
+          ElAvatar: { template: '<span class="el-avatar"><slot /></span>' },
+          ElButton: { template: '<button type="button" @click="$emit(\'click\')"><slot /></button>' },
+          ElDialog: {
+            props: ['modelValue'],
+            emits: ['close'],
+            template: '<div v-if="modelValue" class="el-dialog"><slot /><slot name="footer" /></div>',
+          },
+          ElInput: {
+            props: ['modelValue', 'size'],
+            template: '<input class="el-input-stub" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value); $emit(\'input\', $event.target.value)" @clear="$emit(\'clear\')" />',
+          },
+          ElTree: {
+            template: '<button type="button" class="el-tree-stub" @click="$emit(\'node-click\', { id: \'dept-1\', name: \'研发部\' })"><slot /></button>',
+          },
+        },
+      },
+    })
+
+    await flushPromises()
+    await wrapper.find('.user-select-field').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.user-select-dialog__user').trigger('click')
+    expect(wrapper.findAll('.user-select-dialog__selected-item')).toHaveLength(1)
+
+    await wrapper.find('.el-tree-stub').trigger('click')
+    await flushPromises()
+
+    expect(mockedGetUserOptions).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        includeAll: '1',
+        deptId: 'dept-1',
+      }),
+    )
+    expect(wrapper.findAll('.user-select-dialog__selected-item')).toHaveLength(1)
   })
 })

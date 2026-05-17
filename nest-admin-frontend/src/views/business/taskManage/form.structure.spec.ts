@@ -77,13 +77,14 @@ describe('task form structure', () => {
     expect(source).toContain('newDependencyId')
     expect(source).toContain('const pendingDependencies = ref([])')
     expect(source).toContain('const currentDependencies = computed(() => hasTaskId.value ? dependencies.value : pendingDependencies.value)')
-    expect(source).toContain('await Promise.all(pendingDependencies.value.map((dependencyId) => addDependency(createdTaskId, dependencyId)))')
+    expect(source).toContain('await Promise.all(pendingDependencies.value.map((dependencyId) => addDependency(savedTaskId, dependencyId)))')
   })
 
   it('保存任务后不直接读取嵌套 transport data', () => {
     const source = readSource()
 
-    expect(source).toContain("const createdTaskId = String(res?.id || '')")
+    expect(source).toContain('async function persistTask(api) {')
+    expect(source).toContain("const savedTaskId = String(savedTask?.id || route.query.id || '')")
     expect(source.includes(['res?', 'data?', 'data?', 'id'].join('.'))).toBe(false)
   })
 
@@ -93,6 +94,20 @@ describe('task form structure', () => {
     expect(source).toContain("['2', '3', '5', '6'].includes(String(form.value.status || ''))")
     expect(source).toContain("['2', '5', '6'].includes(String(form.value.status || ''))")
     expect(source).toContain("const canSubmitCurrentApproval = computed(() => String(form.value.status || '') === '1' && !['1', '2'].includes(String(form.value.approvalStatus || '0')))")
+  })
+
+  it('新建任务可直接发起审批，提交前先保存任务', () => {
+    const source = readSource()
+
+    expect(source).toContain('async function persistTask(api) {')
+    expect(source).toContain('if (!isEdit.value && pendingDependencies.value.length) {')
+    expect(source).toContain('async function handleSubmitApproval() {')
+    expect(source).toContain('formRef.value.validate(async (valid) => {')
+    expect(source).toContain('const api = isEdit.value ? update : save')
+    expect(source).toContain('const savedTaskId = await persistTask(api)')
+    expect(source).toContain('await submitApproval(savedTaskId)')
+    expect(source).toContain('<el-button v-if="canSaveTask && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>')
+    expect(source).not.toContain('<el-button v-if="isEdit && canSaveTask && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>')
   })
 
   it('执行权限仅用于已有任务', () => {

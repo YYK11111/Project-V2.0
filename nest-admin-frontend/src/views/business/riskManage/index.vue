@@ -5,6 +5,7 @@ import { getList, getStatus, getLevel, getCategory, resolve, del, publishKnowled
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
 import RiskMatrix from '@/components/RiskMatrix.vue'
+import ProjectSelect from '@/components/ProjectSelect.vue'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
@@ -179,9 +180,7 @@ const getButtons = (row) => [
             <div class="query-grid">
               <div class="query-select-item">
                 <div class="query-select-label">所属项目</div>
-                <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
-                  <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-                </el-select>
+                <ProjectSelect v-model="query.projectId" placeholder="请选择所属项目" />
               </div>
               <div class="query-select-item">
                 <div class="query-select-label">状态</div>

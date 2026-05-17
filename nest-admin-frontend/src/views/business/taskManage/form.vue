@@ -28,6 +28,7 @@ import FormPageShell from '@/components/FormPageShell.vue'
 import { checkPermi } from '@/utils/permission'
 import { useCurrentRouteGuard } from '@/utils/useCurrentRouteGuard'
 import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
+import { sourceTypeMap } from '../projectManage/fieldMaps'
 
 const route = useRoute()
 const router = useRouter()
@@ -175,6 +176,7 @@ const canAddTimeLog = computed(() => canCreateTimeLog.value)
 const currentDependencies = computed(() => hasTaskId.value ? dependencies.value : pendingDependencies.value)
 const sourceStoryTitle = computed(() => String(route.query.sourceStoryTitle || form.value.sourceEntity?.title || form.value.sourceEntity?.name || ''))
 const sourceEntity = ref(null)
+const canShowSourceType = computed(() => !!form.value.sourceType && (!!sourceEntity.value || !isReadonly.value))
 
 function getDisplayUserName(user: any, fallback?: string) {
   return user?.nickname || user?.name || fallback || '-'
@@ -569,23 +571,33 @@ function reloadCurrent() {
   return loadTask()
 }
 
+async function persistTask(api) {
+  const savedTask = await api(form.value)
+  const savedTaskId = String(savedTask?.id || route.query.id || '')
+  if (!savedTaskId) {
+    throw new Error('任务保存成功，但未获取到任务ID')
+  }
+  if (!isEdit.value && pendingDependencies.value.length) {
+    await Promise.all(pendingDependencies.value.map((dependencyId) => addDependency(savedTaskId, dependencyId)))
+  }
+  pendingDependencies.value = []
+  return savedTaskId
+}
+
 function submit() {
   if (!canSaveTask.value) return $sdk.msgWarning('当前操作没有权限')
   formRef.value.validate((valid) => {
     if (valid) {
       const api = isEdit.value ? update : save
-      api(form.value).then(async (res) => {
-        const createdTaskId = String(res?.id || '')
-        if (!isEdit.value && pendingDependencies.value.length && createdTaskId) {
-          await Promise.all(pendingDependencies.value.map((dependencyId) => addDependency(createdTaskId, dependencyId)))
-        }
-        pendingDependencies.value = []
+      persistTask(api).then(async () => {
         $sdk.msgSuccess(isEdit.value ? '修改成功' : '新增成功')
         if (isEdit.value) {
           router.back()
         } else {
           router.push('/taskManage/index')
         }
+      }).catch((error) => {
+        $sdk.msgError(error?.message || '任务保存失败')
       })
     }
   })
@@ -604,9 +616,18 @@ async function handleSubmitApproval() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     return
   }
-  await submitApproval(route.query.id)
-  $sdk.msgSuccess('提交审批成功')
-  router.back()
+  formRef.value.validate(async (valid) => {
+    if (!valid) return
+    try {
+      const api = isEdit.value ? update : save
+      const savedTaskId = await persistTask(api)
+      await submitApproval(savedTaskId)
+      $sdk.msgSuccess('提交审批成功')
+      router.back()
+    } catch (error) {
+      $sdk.msgError(error?.message || '提交审批失败')
+    }
+  })
 }
 
 async function handleCloseReturnedInstance() {
@@ -889,21 +910,10 @@ watch(hasTaskId, (value) => {
         </el-row>
 
         <el-row :gutter="20" class="task-info-row task-info-row--last">
-          <el-col :xs="24" :sm="12">
+          <el-col v-if="canShowSourceType" :xs="24" :sm="24">
             <el-form-item label="来源类型">
               <ViewField v-if="isReadonly" :value="sourceTypeMap[form.sourceType] || form.sourceType" />
-              <el-select v-else v-model="form.sourceType" placeholder="请选择来源类型" style="width: 100%" clearable>
-                <el-option label="用户故事" value="story" />
-                <el-option label="基线" value="baseline" />
-                <el-option label="变更" value="change" />
-                <el-option label="临时" value="adhoc" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="来源对象ID">
-              <ViewField v-if="isReadonly" :value="form.sourceId" />
-              <el-input v-else v-model="form.sourceId" placeholder="请输入来源对象ID" />
+              <ViewField v-else :value="sourceTypeMap[form.sourceType] || form.sourceType" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -1130,7 +1140,7 @@ watch(hasTaskId, (value) => {
 
     <template #footer>
       <el-button v-if="canSaveTask" type="primary" @click="submit">暂存</el-button>
-      <el-button v-if="isEdit && canSaveTask && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
+      <el-button v-if="canSaveTask && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
       <el-button v-if="canStartTask" type="success" plain @click="handleStartTask">开始任务</el-button>
       <el-button v-if="canPauseTask" type="warning" plain @click="handlePauseTask">暂停任务</el-button>

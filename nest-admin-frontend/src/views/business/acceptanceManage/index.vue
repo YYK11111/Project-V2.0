@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router'
 import { getList, del, getResults } from './api'
 import TableOperation from '@/components/TableOperation.vue'
+import ProjectSelect from '@/components/ProjectSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
 
@@ -36,7 +37,7 @@ const getButtons = (row) => [
           <div class="query-section query-section--primary">
             <div class="query-grid">
               <BaInput v-model="query.title" label="验收标题" prop="title" />
-              <BaInput v-model="query.projectId" label="项目ID" prop="projectId" />
+              <ProjectSelect v-model="query.projectId" placeholder="请选择所属项目" />
               <BaSelect v-model="query.result" label="结果" prop="result">
                 <el-option v-for="(label, key) in resultMap" :key="key" :label="label" :value="key" />
               </BaSelect>
@@ -57,7 +58,9 @@ const getButtons = (row) => [
       <template #table>
         <el-table-column type="index" label="序号" width="70" />
         <el-table-column label="验收标题" prop="title" min-width="180" />
-        <el-table-column label="项目ID" prop="projectId" width="180" />
+        <el-table-column label="所属项目" width="180">
+          <template #default="{ row }">{{ row.project?.name || row.projectName || '-' }}</template>
+        </el-table-column>
         <el-table-column label="验收日期" prop="acceptanceDate" width="140" />
         <el-table-column label="客户验收人" prop="customerApprover" width="140" />
         <el-table-column label="结果" width="120">

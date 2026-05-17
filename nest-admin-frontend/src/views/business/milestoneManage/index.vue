@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, del } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
+import ProjectSelect from '@/components/ProjectSelect.vue'
 import UserSelect from '@/components/UserSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
@@ -128,9 +129,7 @@ const getButtons = (row) => [
             <div class="query-grid">
               <div class="query-select-item">
                 <div class="query-select-label">所属项目</div>
-                <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
-                  <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
-                </el-select>
+                <ProjectSelect v-model="query.projectId" placeholder="请选择所属项目" />
               </div>
               <div class="query-select-item">
                 <div class="query-select-label">责任人</div>

@@ -43,6 +43,11 @@ const { canWriteProjectScopedRecord } = useProjectScopedActions(route, formProje
 const canSaveAcceptance = computed(() => !isReadonly.value && (isEdit.value
   ? canWriteProjectScopedRecord(canAcceptanceUpdate.value, 'canManageDelivery')
   : canWriteProjectScopedRecord(canAcceptanceAdd.value, 'canManageDelivery')))
+const acceptanceApprovalRequirements = [
+  '验收日期',
+  '验收范围',
+  '验收结果',
+]
 
 const rules = {
   title: [{ required: true, message: '请输入验收标题', trigger: 'blur' }],
@@ -81,6 +86,9 @@ function submit() {
 
 function handleSubmitApproval() {
   if (!route.query.id) return $sdk.msgWarning('请先保存验收单后再提交审批')
+  if (!form.value.acceptanceDate) return $sdk.msgWarning('提交审批前，请补齐验收日期')
+  if (!form.value.acceptanceScope?.trim()) return $sdk.msgWarning('提交审批前，请补齐验收范围')
+  if (String(form.value.result || '1') === '1') return $sdk.msgWarning('提交审批前，请先明确验收结果')
   const request = String(form.value.currentNodeName || '').includes('退回发起人') && form.value.workflowInstanceId
     ? resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     : submitApproval(route.query.id)
@@ -162,6 +170,20 @@ function scrollToWorkflowPanel() {
           </div>
 
           <div class="business-form-fields business-form-fields--content">
+            <el-alert
+              v-if="!isReadonly"
+              title="提交审批前必填"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="mb-16"
+            >
+              <template #default>
+                <ul class="phase-required-list">
+                  <li v-for="item in acceptanceApprovalRequirements" :key="item">{{ item }}</li>
+                </ul>
+              </template>
+            </el-alert>
             <el-form-item label="验收范围">
               <ViewField v-if="isReadonly" :value="form.acceptanceScope" />
               <el-input v-else v-model="form.acceptanceScope" type="textarea" :rows="3" placeholder="请输入验收范围" />
@@ -197,5 +219,15 @@ function scrollToWorkflowPanel() {
   max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+.phase-required-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--el-text-color-regular);
+}
+
+.phase-required-list li + li {
+  margin-top: 4px;
 }
 </style>

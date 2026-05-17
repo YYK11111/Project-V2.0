@@ -10,6 +10,10 @@ function readBusinessFormStyle() {
   return readFileSync(resolve(__dirname, '..', '..', '..', 'styles', 'business-form.scss'), 'utf-8')
 }
 
+function readElementUiStyle() {
+  return readFileSync(resolve(__dirname, '..', '..', '..', 'styles', 'element-ui.scss'), 'utf-8')
+}
+
 function getStyleBlock(source: string, selector: string) {
   const styleSource = Array.from(source.matchAll(/<style[^>]*>(?<content>[\s\S]*?)<\/style>/g))
     .map((match) => match.groups?.content || '')
@@ -26,6 +30,12 @@ function getStyleBlock(source: string, selector: string) {
 }
 
 describe('项目链路表单结构整改守卫', () => {
+  it('全局 Element Plus 必填星号不应再被统一隐藏', () => {
+    const source = readElementUiStyle()
+
+    expect(source).not.toMatch(/\.el-form-item\.is-required:not\(\.is-no-asterisk\)\s*>\s*\.el-form-item__label:before\s*\{[\s\S]*?display:\s*none;/)
+  })
+
   it('目标表单页不再保留 Hero 结构', () => {
     const files = [
       'projectManage/form.vue',
@@ -265,5 +275,23 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).not.toContain('<el-form-item label="开始时间" prop="startDate">')
     expect(source).not.toContain('<el-form-item label="结束时间" prop="endDate">')
     expect(source).not.toContain('v-if="canViewGroup(\'projectPlan\') && !isDraftCreateLikeMode"')
+  })
+
+  it('工单表单应把工单内容纳入前端必填校验', () => {
+    const source = readBusinessView('ticketManage/form.vue')
+
+    expect(source).toContain('function validateTicketContent')
+    expect(source).toContain("content: [{ required: true, validator: validateTicketContent, trigger: 'blur' }],")
+    expect(source).toContain("new Error('请输入工单内容')")
+    expect(source).toContain('prop="content"')
+  })
+
+  it('项目表单应显式展示立项与结项阶段性必填说明', () => {
+    const source = readBusinessView('projectManage/form.vue')
+
+    expect(source).toContain('提交立项审批前必填')
+    expect(source).toContain('里程碑至少 1 条，且每条都要补齐名称和计划完成日期')
+    expect(source).toContain('提交结项审批前必填')
+    expect(source).toContain('至少新增 1 条上线记录和 1 条通过验收记录')
   })
 })

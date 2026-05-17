@@ -1,7 +1,7 @@
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { getOptions as getUserOptions } from '@/views/system/users/api'
-import { getOptions as getDeptOptions } from '@/views/system/depts/api'
+import { getTrees as getDeptTrees } from '@/views/system/depts/api'
 
 const props = defineProps({
   modelValue: {
@@ -34,12 +34,14 @@ const emit = defineEmits(['update:modelValue', 'change'])
 
 const loading = ref(false)
 const userList = ref([])
-const deptList = ref([])
-const searchDept = ref('')
-const selectedUserMap = ref({})
+const deptTree = ref([])
+const deptTreeRef = ref()
 const dialogVisible = ref(false)
 const pendingValue = ref([])
 const searchKeyword = ref('')
+const deptSearchKeyword = ref('')
+const selectedDeptId = ref('')
+const selectedUserMap = ref({})
 let searchTimer = 0
 
 function getDisplayName(user) {
@@ -77,6 +79,43 @@ function normalizeListResponse(res) {
   return page.list || page.rows || page.data || []
 }
 
+function normalizeDeptTreeResponse(res) {
+  const list = normalizeListResponse(res)
+  if (!Array.isArray(list) || !list.length) return []
+  if (list.some((item) => Array.isArray(item?.children) && item.children.length)) {
+    return list.map((item) => ({
+      ...item,
+      id: String(item.id ?? ''),
+      parentId: String(item.parentId ?? '0'),
+      children: normalizeDeptTreeResponse({ data: item.children }),
+    }))
+  }
+
+  const nodeMap = new Map()
+  const tree = []
+
+  list.forEach((item) => {
+    const id = String(item.id ?? '')
+    nodeMap.set(id, {
+      ...item,
+      id,
+      parentId: String(item.parentId ?? '0'),
+      children: [],
+    })
+  })
+
+  nodeMap.forEach((node) => {
+    const parentId = String(node.parentId ?? '0')
+    if (!parentId || parentId === '0' || !nodeMap.has(parentId)) {
+      tree.push(node)
+      return
+    }
+    nodeMap.get(parentId).children.push(node)
+  })
+
+  return tree
+}
+
 function getSelectedUser(value) {
   if (!value) return null
   return selectedUserMap.value[value] || userList.value.find((user) => user.id === value) || { id: value, name: String(value) }
@@ -88,9 +127,7 @@ const selectedValues = computed(() => {
 })
 
 const fieldUsers = computed(() => selectedValues.value.map((value) => ({ value, user: getSelectedUser(value) })).filter((item) => item.value))
-
 const pendingUsers = computed(() => pendingValue.value.map((value) => ({ value, user: getSelectedUser(value) })).filter((item) => item.value))
-
 const visibleFieldUsers = computed(() => fieldUsers.value.slice(0, 3))
 const hiddenFieldUserCount = computed(() => Math.max(fieldUsers.value.length - visibleFieldUsers.value.length, 0))
 
@@ -99,14 +136,17 @@ function loadUserList(keywords = '') {
   const query = {
     pageNum: 1,
     pageSize: 100,
+    includeAll: '1',
   }
 
-  if (keywords) {
-    query.name = keywords
+  const keyword = String(keywords || '').trim()
+  if (keyword) {
+    query.keyword = keyword
+    query.name = keyword
   }
 
-  if (props.filterDept && searchDept.value) {
-    query.deptId = searchDept.value
+  if (selectedDeptId.value) {
+    query.deptId = selectedDeptId.value
   }
 
   getUserOptions(query)
@@ -120,9 +160,27 @@ function loadUserList(keywords = '') {
 }
 
 function loadDeptList() {
-  getDeptOptions({ pageNum: 1, pageSize: 1000 }).then((res) => {
-    deptList.value = normalizeListResponse(res)
+  getDeptTrees({ pageNum: 1, pageSize: 1000 }).then((res) => {
+    deptTree.value = normalizeDeptTreeResponse(res)
   })
+}
+
+function filterDeptNode(keyword, data) {
+  const text = String(keyword || '').trim().toLowerCase()
+  if (!text) return true
+  return String(data?.name || '').toLowerCase().includes(text)
+}
+
+function handleDeptSearch(keyword) {
+  deptSearchKeyword.value = keyword || ''
+  nextTick(() => {
+    deptTreeRef.value?.filter?.(deptSearchKeyword.value)
+  })
+}
+
+function handleDeptNodeClick(node) {
+  selectedDeptId.value = node?.id || ''
+  loadUserList(searchKeyword.value)
 }
 
 function handleSearch(query) {
@@ -133,24 +191,32 @@ function handleSearch(query) {
   }, 250)
 }
 
-function handleDeptChange() {
-  loadUserList(searchKeyword.value)
-}
-
 function handleChange(value) {
   emit('update:modelValue', value)
   emit('change', value)
 }
 
-function handleClear() {
-  emit('update:modelValue', undefined)
-  emit('change', undefined)
+function handleClear(event) {
+  event?.stopPropagation?.()
+  if (props.disabled) return
+  const nextValue = props.multiple ? [] : undefined
+  emit('update:modelValue', nextValue)
+  emit('change', nextValue)
 }
 
-function handleVisibleChange(visible) {
-  if (visible) {
-    loadUserList()
+function openDialog() {
+  if (props.disabled) return
+  pendingValue.value = [...selectedValues.value]
+  dialogVisible.value = true
+  loadUserList(searchKeyword.value)
+  if (!deptTree.value.length) {
+    loadDeptList()
   }
+}
+
+function closeDialog() {
+  dialogVisible.value = false
+  pendingValue.value = [...selectedValues.value]
 }
 
 function isUserSelected(id) {
@@ -159,18 +225,6 @@ function isUserSelected(id) {
 
 function getFieldClass() {
   return props.multiple ? 'user-select user-select-field user-select-multiple-field' : 'user-select user-select-field'
-}
-
-function openDialog() {
-  if (props.disabled) return
-  pendingValue.value = [...selectedValues.value]
-  dialogVisible.value = true
-  loadUserList(searchKeyword.value)
-}
-
-function closeDialog() {
-  dialogVisible.value = false
-  pendingValue.value = [...selectedValues.value]
 }
 
 function togglePendingUser(user) {
@@ -199,39 +253,30 @@ function clearPendingUsers() {
   pendingValue.value = []
 }
 
-function clearSelectedUsers(event) {
-  event?.stopPropagation?.()
-  if (props.disabled) return
-  const nextValue = props.multiple ? [] : undefined
-  emit('update:modelValue', nextValue)
-  emit('change', nextValue)
-}
-
 function confirmSelection() {
   const nextValue = props.multiple ? [...pendingValue.value] : pendingValue.value[0]
-  emit('update:modelValue', nextValue)
-  emit('change', nextValue)
+  handleChange(nextValue)
   dialogVisible.value = false
 }
 
 loadUserList()
-if (props.filterDept) {
-  loadDeptList()
-}
+loadDeptList()
 
 watch(
   () => props.modelValue,
   () => {
-    if (props.multiple) {
-      pendingValue.value = [...selectedValues.value]
-      return
-    }
     pendingValue.value = [...selectedValues.value]
     nextTick(() => {
-      loadUserList()
+      if (!dialogVisible.value) {
+        loadUserList(searchKeyword.value)
+      }
     })
   },
 )
+
+onBeforeUnmount(() => {
+  window.clearTimeout(searchTimer)
+})
 </script>
 
 <template>
@@ -246,36 +291,75 @@ watch(
       <span v-if="hiddenFieldUserCount" class="selected-user-overflow">+{{ hiddenFieldUserCount }}</span>
     </div>
     <span v-else class="user-select-multiple-field__placeholder">{{ placeholder }}</span>
-    <button v-if="clearable && fieldUsers.length && !disabled" class="user-select-multiple-field__clear" type="button" @click="clearSelectedUsers">×</button>
+    <button v-if="clearable && fieldUsers.length && !disabled" class="user-select-multiple-field__clear" type="button" @click="handleClear">×</button>
     <span class="user-select-multiple-field__suffix">选择</span>
   </div>
 
-  <el-dialog v-model="dialogVisible" title="选择人员" width="820px" append-to-body @close="closeDialog">
+  <el-dialog v-model="dialogVisible" title="选择人员" width="1200px" align-center append-to-body @close="closeDialog">
     <div class="user-select-dialog">
-      <aside class="user-select-dialog__dept">
-        <div class="user-select-dialog__title">部门</div>
-        <el-select v-if="filterDept" v-model="searchDept" placeholder="筛选部门" clearable filterable size="small" @change="handleDeptChange">
-          <el-option v-for="dept in deptList" :key="dept.id" :label="dept.name" :value="dept.id" />
-        </el-select>
-        <div v-else class="user-select-dialog__hint">当前显示全部人员</div>
-      </aside>
+      <div class="user-select-dialog__toolbar">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索姓名 / 昵称 / 账号"
+          clearable
+          @input="handleSearch"
+          @clear="handleSearch('')"
+        />
+        <span class="user-select-dialog__badge">默认包含下级部门</span>
+      </div>
 
-      <section class="user-select-dialog__users">
-        <el-input v-model="searchKeyword" placeholder="搜索姓名 / 账号" clearable @input="handleSearch" />
-        <div v-loading="loading" class="user-select-dialog__list">
-          <button v-for="user in userList" :key="user.id" type="button" class="user-select-dialog__user" :class="{ 'is-selected': isUserSelected(user.id) }" @click="selectPendingUser(user)">
-            <el-avatar :size="28" :src="user.avatar || undefined">
-              {{ getAvatarText(user) }}
-            </el-avatar>
-            <span class="user-select-dialog__user-main">
-              <span class="user-name">{{ getDisplayName(user) }}</span>
-              <span v-if="getSubLabel(user)" class="user-sub">{{ getSubLabel(user) }}</span>
-            </span>
-            <span v-if="isUserSelected(user.id)" class="user-select-dialog__check">已选</span>
-          </button>
-          <div v-if="!loading && !userList.length" class="empty-text">暂无数据</div>
-        </div>
-      </section>
+      <div class="user-select-dialog__body">
+        <aside class="user-select-dialog__dept">
+          <div class="user-select-dialog__title">部门</div>
+          <el-input
+            v-model="deptSearchKeyword"
+            placeholder="搜索部门"
+            clearable
+            size="small"
+            @input="handleDeptSearch"
+            @clear="handleDeptSearch('')"
+          />
+          <el-tree
+            ref="deptTreeRef"
+            class="user-select-dialog__dept-tree"
+            :data="deptTree"
+            node-key="id"
+            :props="{ label: 'name', children: 'children' }"
+            :filter-node-method="filterDeptNode"
+            :current-node-key="selectedDeptId"
+            highlight-current
+            default-expand-all
+            @node-click="handleDeptNodeClick"
+          />
+          <div v-if="!deptTree.length" class="empty-text">暂无部门数据</div>
+        </aside>
+
+        <section class="user-select-dialog__users">
+          <div class="user-select-dialog__title">
+            <span>人员</span>
+          </div>
+          <div v-loading="loading" class="user-select-dialog__list">
+            <button
+              v-for="user in userList"
+              :key="user.id"
+              type="button"
+              class="user-select-dialog__user"
+              :class="{ 'is-selected': isUserSelected(user.id) }"
+              @click="selectPendingUser(user)"
+            >
+              <el-avatar :size="28" :src="user.avatar || undefined">
+                {{ getAvatarText(user) }}
+              </el-avatar>
+              <span class="user-select-dialog__user-main">
+                <span class="user-name">{{ getDisplayName(user) }}</span>
+                <span v-if="getSubLabel(user)" class="user-sub">{{ getSubLabel(user) }}</span>
+              </span>
+              <span v-if="isUserSelected(user.id)" class="user-select-dialog__check">已选</span>
+            </button>
+            <div v-if="!loading && !userList.length" class="empty-text">暂无数据</div>
+          </div>
+        </section>
+      </div>
 
       <aside class="user-select-dialog__selected">
         <div class="user-select-dialog__selected-head">
@@ -387,24 +471,71 @@ watch(
 }
 
 .user-select-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: min(78vh, 760px);
+  min-height: 560px;
+  overflow: hidden;
+}
+
+.user-select-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-select-dialog__badge {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.user-select-dialog__body {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 220px;
-  min-height: 420px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
 }
 
 .user-select-dialog__dept,
+.user-select-dialog__users,
 .user-select-dialog__selected {
+  min-width: 0;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+}
+
+.user-select-dialog__dept,
+.user-select-dialog__users {
   padding: 12px;
-  background: var(--el-fill-color-extra-light);
+}
+
+.user-select-dialog__dept {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-select-dialog__dept-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .user-select-dialog__users {
-  padding: 12px;
-  border-left: 1px solid var(--el-border-color-lighter);
-  border-right: 1px solid var(--el-border-color-lighter);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .user-select-dialog__title,
@@ -412,23 +543,25 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
   font-weight: 600;
 }
 
 .user-select-dialog__hint,
-.user-sub {
+.user-sub,
+.empty-text {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
 
 .user-select-dialog__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 360px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 12px;
+  min-height: 0;
+  max-height: 420px;
   overflow: auto;
+  align-content: start;
 }
 
 .user-select-dialog__user {
@@ -436,8 +569,9 @@ watch(
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 60px;
   margin-left: 0;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
   background: var(--el-bg-color);
@@ -450,8 +584,7 @@ watch(
   background: var(--el-color-primary-light-9);
 }
 
-.user-select-dialog__user-main,
-.user-main {
+.user-select-dialog__user-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -464,11 +597,16 @@ watch(
   font-size: 12px;
 }
 
+.user-select-dialog__selected {
+  padding: 12px;
+  flex: none;
+}
+
 .user-select-dialog__selected-list {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
-  max-height: 370px;
+  max-height: 140px;
   overflow: auto;
 }
 
@@ -505,13 +643,6 @@ watch(
   margin-left: 0;
 }
 
-.user-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-}
-
 .user-name {
   font-weight: 500;
   color: var(--el-text-color-primary);
@@ -519,21 +650,7 @@ watch(
 }
 
 .empty-text {
-  padding: 20px;
+  padding: 16px 0;
   text-align: center;
-  color: var(--el-text-color-secondary);
-}
-
-.user-selected-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-  line-height: 1;
-}
-
-.user-selected-text {
-  font-size: 13px;
 }
 </style>

@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { getList, getStatus, getType, approve, reject, del, publishKnowledge, submitApproval } from './api'
 import { getList as getProjectList } from '../projectManage/api'
 import RequestChartTable from '@/components/RequestChartTable.vue'
+import ProjectSelect from '@/components/ProjectSelect.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
@@ -158,9 +159,7 @@ watch(
             <div class="query-grid">
               <div class="query-select-item">
                 <div class="query-select-label">所属项目</div>
-                <el-select v-model="query.projectId" placeholder="请选择所属项目" clearable>
-                  <el-option v-for="(v, k) in projectMap" :key="k" :label="v" :value="k" />
-                </el-select>
+                <ProjectSelect v-model="query.projectId" placeholder="请选择所属项目" />
               </div>
               <div class="query-select-item">
                 <div class="query-select-label">状态</div>

@@ -48,10 +48,24 @@ const form = ref({
   fixedInVersion: '',
 })
 
+function validateTicketContent(_rule, value, callback) {
+  const plainText = String(value || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
+
+  if (!plainText) {
+    callback(new Error('请输入工单内容'))
+    return
+  }
+  callback()
+}
+
 const rules = {
   title: [{ required: true, message: '请输入工单标题', trigger: 'blur' }],
   projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
   submitterId: [{ required: true, message: '请选择提交人', trigger: 'change' }],
+  content: [{ required: true, validator: validateTicketContent, trigger: 'blur' }],
 }
 
 const status = ref({})

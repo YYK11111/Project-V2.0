@@ -357,7 +357,7 @@ watch(
         <el-row :gutter="20" class="summary-row summary-row--last">
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="发起人">
-              <ViewField :value="workflowInstance?.starterName || workflowInstance?.starterId || '-'
+              <ViewField :value="workflowInstance?.starterName || '-'
               " />
             </el-form-item>
           </el-col>
