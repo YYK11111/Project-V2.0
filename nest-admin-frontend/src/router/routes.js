@@ -232,6 +232,12 @@ export const constantRoutes = [
         meta: { title: 'AI检索调试' },
       },
       {
+        path: '/content/articleManage/knowledgeQa',
+        component: () => import('@/views/content/articleManage/knowledgeQa.vue'),
+        name: 'KnowledgeQaHidden',
+        meta: { title: '知识问答' },
+      },
+      {
         path: '/content/articleManage/detail',
         component: () => import('@/views/content/articleManage/detail.vue'),
         name: 'ArticleDetailHidden',

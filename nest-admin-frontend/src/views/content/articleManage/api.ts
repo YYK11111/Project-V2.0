@@ -33,6 +33,7 @@ export const createSearchRecord = (data) => request.post(`${serve}/search-record
 export const retrieveForAi = (params) => get(`${serve}/retrieveForAi`, params)
 export const rebuildArticleChunks = (id) => request.post(`${serve}/rebuildChunks/${id}`)
 export const rebuildArticleEmbeddings = (id) => request.post(`${serve}/rebuildEmbeddings/${id}`)
+export const askKnowledgeQa = (data) => request.post(`${window.sysConfig.serves.business}/knowledge-qa/ask`, data)
 
 const tagServe = window.sysConfig.serves.business + '/article-tags'
 const tagBase = baseApi(tagServe)
