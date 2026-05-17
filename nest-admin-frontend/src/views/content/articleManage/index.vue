@@ -214,6 +214,7 @@ catalog.getTrees()
         <template #operation="{ selectedIds }">
           <div class="knowledge-manage-actions">
             <el-button @click="$router.push('/content/articleManage/home')">知识首页</el-button>
+            <el-button @click="$router.push('/content/articleManage/knowledgeQa')">知识问答</el-button>
             <el-button v-if="canAiDebug" @click="$router.push('/content/articleManage/aiRetrieveDebug')">AI检索调试</el-button>
             <el-button @click="exportArticleList">导出</el-button>
             <el-button v-if="canArticleAdd" type="primary" @click="rctRef.goRoute(null, '/content/aev')">新增</el-button>
