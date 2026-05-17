@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ArticlesService } from "../articles/service";
 import { ArticleChunkEmbeddingsService } from "../articleChunkEmbeddings/service";
 import { CustomAiService } from "src/modulesAi/ai/custom-ai";
@@ -19,22 +19,31 @@ export class KnowledgeQaService {
     const startedAt = Date.now();
     const question = String(query.question || "").trim();
     const limit = Math.min(Math.max(Number(query.limit || 5), 1), 5);
+    const candidateLimit = Math.min(limit * 3, 15);
     const model = this.customAiService.getDefaultChatModel();
 
     if (!question) {
       return this.buildEmptyAnswer(model, startedAt);
     }
 
-    const queryEmbeddingResult = await this.customAiService.embedTexts(
-      [question],
-      this.customAiService.getDefaultEmbeddingModel(),
-    );
+    let queryEmbeddingResult;
+    try {
+      queryEmbeddingResult = await this.customAiService.embedTexts(
+        [question],
+        this.customAiService.getDefaultEmbeddingModel(),
+      );
+    } catch (error) {
+      throw new InternalServerErrorException({
+        code: "KNOWLEDGE_QA_EMBEDDING_FAILED",
+        message: "知识问答向量生成失败，请稍后重试",
+      });
+    }
     const queryVector = queryEmbeddingResult.vectors?.[0] || [];
 
     const retrieval = await this.articlesService.retrieveForAi(
       {
         keyword: question,
-        limit,
+        limit: candidateLimit,
         catalogId: query.catalogId,
         knowledgeType: query.knowledgeType,
       } as any,
@@ -80,10 +89,7 @@ export class KnowledgeQaService {
         );
         return {
           ...item,
-          chunkId:
-            item.chunkId ||
-            embeddingRecord?.chunkId ||
-            this.getChunkLookupKey(item.articleId, item.chunkOrder),
+          chunkId: item.chunkId || embeddingRecord?.chunkId,
           score: finalScore,
         };
       })
@@ -95,18 +101,26 @@ export class KnowledgeQaService {
     }
 
     const prompt = this.buildPrompt(question, rankedChunks);
-    const response = await this.customAiService.chatNoStream({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "你是企业知识库问答助手。只能基于提供的知识片段回答，不知道就明确说明当前知识不足，不得编造事实。",
-        },
-        { role: "user", content: question },
-        { role: "system", content: prompt },
-      ],
-    });
+    let response;
+    try {
+      response = await this.customAiService.chatNoStream({
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是企业知识库问答助手。只能基于提供的知识片段回答，不知道就明确说明当前知识不足，不得编造事实。",
+          },
+          { role: "user", content: question },
+          { role: "system", content: prompt },
+        ],
+      });
+    } catch (error) {
+      throw new InternalServerErrorException({
+        code: "KNOWLEDGE_QA_CHAT_FAILED",
+        message: "知识问答生成失败，请稍后重试",
+      });
+    }
     const answer =
       response?.choices?.[0]?.message?.content ||
       response?.choices?.[0]?.delta?.content ||
@@ -117,7 +131,7 @@ export class KnowledgeQaService {
       references: rankedChunks.map((item) => ({
         articleId: item.articleId,
         articleTitle: item.articleTitle,
-        chunkId: item.chunkId,
+        chunkId: item.chunkId || null,
         chunkOrder: item.chunkOrder,
         chunkTitle: item.chunkTitle,
         chunkSummary: item.chunkSummary,
@@ -125,9 +139,7 @@ export class KnowledgeQaService {
         score: item.score,
       })),
       matchedChunks: rankedChunks.map((item) => ({
-        chunkId:
-          item.chunkId ||
-          this.getChunkLookupKey(item.articleId, item.chunkOrder),
+        chunkId: item.chunkId || null,
         chunkText: item.chunkText,
         score: item.score,
       })),
@@ -194,7 +206,6 @@ export class KnowledgeQaService {
     const divisor = Math.sqrt(leftNorm) * Math.sqrt(rightNorm) || 1;
     return Number((dot / divisor).toFixed(6));
   }
-
   private getChunkLookupKey(articleId: string, chunkOrder: number) {
     return `${articleId || ""}:${Number(chunkOrder || 0)}`;
   }

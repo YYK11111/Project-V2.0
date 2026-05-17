@@ -80,7 +80,7 @@ describe("KnowledgeQaService", () => {
     expect(articlesService.retrieveForAi).toHaveBeenCalledWith(
       expect.objectContaining({
         keyword: "风险怎么处理",
-        limit: 3,
+        limit: 9,
       }),
       undefined,
     );
@@ -163,5 +163,45 @@ describe("KnowledgeQaService", () => {
 
     expect(result.references[0].chunkId).toBe("article-1:1:1");
     expect(result.matchedChunks[0].chunkId).toBe("article-1:1:1");
+  });
+
+  it("embedding 失败时返回明确错误码", async () => {
+    const { service, customAiService } = createService();
+    customAiService.embedTexts.mockRejectedValueOnce(new Error("embedding failed"));
+
+    await expect(
+      service.ask(
+        {
+          question: "风险怎么处理",
+        },
+        undefined,
+      ),
+    ).rejects.toMatchObject(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: "KNOWLEDGE_QA_EMBEDDING_FAILED",
+        }),
+      }),
+    );
+  });
+
+  it("chat 失败时返回明确错误码", async () => {
+    const { service, customAiService } = createService();
+    customAiService.chatNoStream.mockRejectedValueOnce(new Error("chat failed"));
+
+    await expect(
+      service.ask(
+        {
+          question: "风险怎么处理",
+        },
+        undefined,
+      ),
+    ).rejects.toMatchObject(
+      expect.objectContaining({
+        response: expect.objectContaining({
+          code: "KNOWLEDGE_QA_CHAT_FAILED",
+        }),
+      }),
+    );
   });
 });

@@ -869,10 +869,11 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
         chunk,
         keyword,
       );
-      return [
+        return [
         {
           articleId: article.id,
           articleTitle: article.title,
+          chunkId: chunk.id,
           articleSummary: article.summary || article.desc || "",
           catalog: article.catalog
             ? { id: article.catalog.id, name: article.catalog.name }
@@ -912,6 +913,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       return {
         articleId: article.id,
         articleTitle: article.title,
+        chunkId: chunk.id,
         articleSummary: article.summary || article.desc || "",
         catalog: article.catalog
           ? { id: article.catalog.id, name: article.catalog.name }
