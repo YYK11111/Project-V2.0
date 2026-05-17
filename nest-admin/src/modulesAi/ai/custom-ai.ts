@@ -29,13 +29,16 @@ export interface EmbeddingResponse {
 export class CustomAiService {
   private baseUrl: string;
   private apiKey: string;
-  private defaultModel: string;
+  private defaultChatModel: string;
   private defaultEmbeddingModel: string;
 
   constructor() {
     this.baseUrl = config.customAi?.baseUrl || "";
     this.apiKey = config.customAi?.apiKey || "";
-    this.defaultModel = config.customAi?.defaultModel || "gpt-5.1";
+    this.defaultChatModel =
+      config.customAi?.defaultChatModel ||
+      config.customAi?.defaultModel ||
+      "gpt-5.1";
     this.defaultEmbeddingModel =
       config.customAi?.defaultEmbeddingModel || "text-embedding-3-small";
   }
@@ -45,7 +48,11 @@ export class CustomAiService {
   }
 
   getDefaultModel() {
-    return this.defaultModel;
+    return this.getDefaultChatModel();
+  }
+
+  getDefaultChatModel() {
+    return this.defaultChatModel;
   }
 
   getDefaultEmbeddingModel() {

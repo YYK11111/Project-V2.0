@@ -19,7 +19,7 @@ export class KnowledgeQaService {
     const startedAt = Date.now();
     const question = String(query.question || "").trim();
     const limit = Math.min(Math.max(Number(query.limit || 5), 1), 5);
-    const model = this.customAiService.getDefaultModel();
+    const model = this.customAiService.getDefaultChatModel();
 
     if (!question) {
       return this.buildEmptyAnswer(model, startedAt);
@@ -63,24 +63,27 @@ export class KnowledgeQaService {
           queryVector,
           embeddingRecord?.embeddingVector || [],
         );
-        const keywordScore = Number(item.score || 0);
-        const retrievalWeightBonus =
-          Number(item.retrievalWeight || 0) * 0.1;
+        const keywordScore = Number(item.scoreBreakdown?.keywordScore ?? 0);
+        const retrievalWeightBonus = Number(item.retrievalWeight || 0);
         const authorityOrAiPreferredBonus =
           String(item.authorityLevel || "0") === "1" ||
           String(item.aiPreferred || "0") === "1"
-            ? 0.05
+            ? 1
             : 0;
         const finalScore = Number(
           (
             cosineScore * 0.7 +
             keywordScore * 0.15 +
-            retrievalWeightBonus +
-            authorityOrAiPreferredBonus
+            retrievalWeightBonus * 0.1 +
+            authorityOrAiPreferredBonus * 0.05
           ).toFixed(6),
         );
         return {
           ...item,
+          chunkId:
+            item.chunkId ||
+            embeddingRecord?.chunkId ||
+            this.getChunkLookupKey(item.articleId, item.chunkOrder),
           score: finalScore,
         };
       })
