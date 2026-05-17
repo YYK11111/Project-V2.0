@@ -1,8 +1,32 @@
 import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ArticlesService } from "../articles/service";
 import { ArticleChunkEmbeddingsService } from "../articleChunkEmbeddings/service";
+import { ArticleChunkEmbedding } from "../articleChunkEmbeddings/entity";
 import { CustomAiService } from "src/modulesAi/ai/custom-ai";
 import { KnowledgeQaAskDto, KnowledgeQaEmbedPreviewDto } from "./dto";
+
+type KnowledgeQaCatalog = {
+  id?: string;
+  name?: string;
+};
+
+type KnowledgeQaRetrievedChunk = {
+  articleId: string;
+  articleTitle: string;
+  chunkId?: string | null;
+  chunkOrder: number;
+  chunkTitle?: string;
+  chunkText?: string;
+  chunkSummary?: string;
+  catalog?: KnowledgeQaCatalog | null;
+  score?: number;
+  scoreBreakdown?: {
+    keywordScore?: number;
+  };
+  retrievalWeight?: number | string;
+  aiPreferred?: number | string;
+  authorityLevel?: number | string;
+};
 
 @Injectable()
 export class KnowledgeQaService {
@@ -54,15 +78,19 @@ export class KnowledgeQaService {
         "知识问答候选召回失败，请稍后重试",
       );
     }
-    const matchedChunks = Array.isArray(retrieval?.data) ? retrieval.data : [];
+    const matchedChunks: KnowledgeQaRetrievedChunk[] = Array.isArray(
+      retrieval?.data,
+    )
+      ? retrieval.data
+      : [];
     if (!matchedChunks.length) {
       return this.buildEmptyAnswer(model, startedAt);
     }
 
     const articleIds = [
-      ...new Set(matchedChunks.map((item) => item.articleId)),
+      ...new Set(matchedChunks.map((item) => item.articleId).filter(Boolean)),
     ];
-    let chunkEmbeddings;
+    let chunkEmbeddings: ArticleChunkEmbedding[] = [];
     try {
       chunkEmbeddings =
         await this.articleChunkEmbeddingsService.findByArticles(articleIds);
