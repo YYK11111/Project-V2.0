@@ -12,5 +12,9 @@ describe('ticket api contract', () => {
 
     expect(source).toContain("import { normalizePageData } from '@/utils/pageData'")
     expect(source).toContain('.then(normalizePageData)')
+    expect(source).toContain("export function dispatchTicket(id, data)")
+    expect(source).toContain("export function batchDispatchTickets(ids, data)")
+    expect(source).toContain("export function verifyPass(id, data)")
+    expect(source).toContain("export function reopenTicket(id, data)")
   })
 })

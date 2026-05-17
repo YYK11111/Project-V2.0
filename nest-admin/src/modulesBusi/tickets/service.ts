@@ -2,10 +2,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindManyOptions, In, Like, Repository } from "typeorm";
 import { Ticket, TicketType, TicketStatus } from "./entity";
+import { TicketActionLog } from "./entities/ticket-action-log.entity";
 import { QueryListDto, ResponseListDto } from "src/common/dto";
 import { BaseService } from "src/common/BaseService";
 import { TicketDto } from "./dto";
@@ -29,6 +31,9 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
     private readonly sysFileService: SysFileService,
     private readonly projectsService: ProjectsService,
     private readonly tasksService: TasksService,
+    @Optional()
+    @InjectRepository(TicketActionLog)
+    private readonly actionLogRepository?: Repository<TicketActionLog>,
   ) {
     super(Ticket, repository);
   }
@@ -89,17 +94,23 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       ] as any,
     });
     if (!ticket) throw new NotFoundException("工单不存在");
-    const context = await this.projectsService.assertProjectPermission(
-      ticket.projectId,
-      operatorId,
-      "view",
-      operatorPermissions,
-    );
+    const context = this.projectsService.assertProjectPermission
+      ? await this.projectsService.assertProjectPermission(
+          ticket.projectId,
+          operatorId,
+          "view",
+          operatorPermissions,
+        )
+      : await this.projectsService.getProjectPermissionContext(
+          ticket.projectId,
+          operatorId,
+          operatorPermissions,
+        );
     const canEdit =
-      context.canManageTasks ||
-      context.isManager ||
-      context.isDeliveryManager ||
-      context.isFunctionalLead ||
+      Boolean(context?.canManageTasks) ||
+      Boolean(context?.isManager) ||
+      Boolean(context?.isDeliveryManager) ||
+      Boolean(context?.isFunctionalLead) ||
       String(ticket.handlerId || "") === String(operatorId) ||
       String(ticket.submitterId || "") === String(operatorId) ||
       String(ticket.createUser || "") === String(operatorId);
@@ -134,6 +145,79 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       if (this.isPersonalReadableTicket(ticket, operatorId)) return;
       throw error;
     }
+  }
+
+  private getOperatorPermissions(
+    currentUser: {
+      permissions?: string[];
+    } = {},
+  ) {
+    return Array.isArray(currentUser.permissions)
+      ? currentUser.permissions
+      : [];
+  }
+
+  private async loadTicketForAction(
+    ticketId: string,
+    currentUser: { id?: string; permissions?: string[] } = {},
+  ) {
+    const ticket = await this.getOne({
+      id: ticketId,
+      _operatorId: currentUser.id,
+      _operatorPermissions: this.getOperatorPermissions(currentUser),
+    } as any);
+    if (!ticket) {
+      throw new NotFoundException("工单不存在");
+    }
+    return ticket as Ticket;
+  }
+
+  private getTicketActionName(actionType: string) {
+    return (
+      {
+        dispatch: "分派",
+        transfer: "转派",
+        finish: "提交待验证",
+        verify_pass: "验证通过",
+        verify_reject: "验证退回",
+        reopen: "重开",
+      }[actionType] || actionType
+    );
+  }
+
+  private async saveTicketActionLog(
+    ticketId: string,
+    actionType: string,
+    currentUser: { id?: string; name?: string } = {},
+    payload: Record<string, any> = {},
+  ) {
+    if (!this.actionLogRepository) return;
+    await this.actionLogRepository.save(
+      new TicketActionLog({
+        ticketId: String(ticketId),
+        actionType,
+        actionName: payload.actionName || this.getTicketActionName(actionType),
+        fromStatus: payload.fromStatus ?? null,
+        toStatus: payload.toStatus ?? null,
+        operatorId: String(currentUser.id || ""),
+        operatorName: String(currentUser.name || ""),
+        remark: payload.remark || "",
+        detail: payload.detail || null,
+        createUser: String(currentUser.name || "系统"),
+        updateUser: String(currentUser.name || "系统"),
+      }),
+    );
+  }
+
+  private async assertTicketActionPermission(
+    ticketId: string,
+    currentUser: { id?: string; permissions?: string[] } = {},
+  ) {
+    await this.assertTicketEditPermission(
+      ticketId,
+      String(currentUser.id || ""),
+      this.getOperatorPermissions(currentUser),
+    );
   }
 
   private normalizeTicketPayload(
@@ -411,6 +495,220 @@ export class TicketsService extends BaseService<Ticket, TicketDto> {
       submitter: this.mapUserSummary(ticket.submitter),
       handler: this.mapUserSummary(ticket.handler),
     };
+  }
+
+  async dispatchTicket(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { handlerId?: string; remark?: string } = {},
+  ) {
+    const ticket = await this.loadTicketForAction(ticketId, currentUser);
+    await this.assertTicketActionPermission(ticketId, currentUser);
+    if (String(ticket.status || "") !== TicketStatus.pending) {
+      throw new Error("仅待分派状态的工单支持分派");
+    }
+    const handlerId = String(payload.handlerId || "").trim();
+    if (!handlerId) {
+      throw new Error("请选择处理人");
+    }
+    await this.repository.update(ticketId, {
+      handlerId,
+      status: TicketStatus.inProgress,
+      currentNodeName: "已分派，处理中",
+      updateUser: String(currentUser.name || ""),
+    } as any);
+    await this.saveTicketActionLog(ticketId, "dispatch", currentUser, {
+      fromStatus: ticket.status,
+      toStatus: TicketStatus.inProgress,
+      remark: payload.remark || "",
+      detail: { handlerId },
+    });
+    return { success: true };
+  }
+
+  async transferTicket(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { handlerId?: string; remark?: string } = {},
+  ) {
+    const ticket = await this.loadTicketForAction(ticketId, currentUser);
+    await this.assertTicketActionPermission(ticketId, currentUser);
+    if (String(ticket.status || "") !== TicketStatus.inProgress) {
+      throw new Error("仅处理中状态的工单支持转派");
+    }
+    const handlerId = String(payload.handlerId || "").trim();
+    if (!handlerId) {
+      throw new Error("请选择处理人");
+    }
+    await this.repository.update(ticketId, {
+      handlerId,
+      updateUser: String(currentUser.name || ""),
+    } as any);
+    await this.saveTicketActionLog(ticketId, "transfer", currentUser, {
+      fromStatus: ticket.status,
+      toStatus: ticket.status,
+      remark: payload.remark || "",
+      detail: { handlerId },
+    });
+    return { success: true };
+  }
+
+  async batchDispatchTickets(
+    ids: string[] | string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { handlerId?: string; remark?: string } = {},
+  ) {
+    const idList = Array.isArray(ids)
+      ? ids.map((item) => String(item)).filter(Boolean)
+      : String(ids || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    const successIds: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+
+    for (const ticketId of idList) {
+      try {
+        await this.dispatchTicket(ticketId, currentUser, payload);
+        successIds.push(ticketId);
+      } catch (error) {
+        failed.push({
+          id: ticketId,
+          reason: error?.message || "分派失败",
+        });
+      }
+    }
+
+    return {
+      successCount: successIds.length,
+      failedCount: failed.length,
+      successIds,
+      failed,
+    };
+  }
+
+  async submitForVerification(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { remark?: string } = {},
+  ) {
+    const ticket = await this.loadTicketForAction(ticketId, currentUser);
+    await this.assertTicketActionPermission(ticketId, currentUser);
+    if (String(ticket.status || "") !== TicketStatus.inProgress) {
+      throw new Error("仅处理中状态的工单可提交待验证");
+    }
+    await this.repository.update(ticketId, {
+      status: TicketStatus.resolved,
+      currentNodeName: "待验证",
+      updateUser: String(currentUser.name || ""),
+    } as any);
+    await this.saveTicketActionLog(ticketId, "finish", currentUser, {
+      fromStatus: ticket.status,
+      toStatus: TicketStatus.resolved,
+      remark: payload.remark || "",
+    });
+    return { success: true };
+  }
+
+  async finishTicket(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { remark?: string } = {},
+  ) {
+    return this.submitForVerification(ticketId, currentUser, payload);
+  }
+
+  async verifyTicket(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { passed?: boolean; remark?: string } = {},
+  ) {
+    const passed = payload.passed !== false;
+    const ticket = await this.loadTicketForAction(ticketId, currentUser);
+    await this.assertTicketActionPermission(ticketId, currentUser);
+    if (String(ticket.status || "") !== TicketStatus.resolved) {
+      throw new Error("仅待验证状态的工单可执行验证");
+    }
+    await this.repository.update(ticketId, {
+      status: passed ? TicketStatus.closed : TicketStatus.inProgress,
+      currentNodeName: passed ? "已关闭" : "验证退回，处理中",
+      updateUser: String(currentUser.name || ""),
+    } as any);
+    await this.saveTicketActionLog(
+      ticketId,
+      passed ? "verify_pass" : "verify_reject",
+      currentUser,
+      {
+        fromStatus: ticket.status,
+        toStatus: passed ? TicketStatus.closed : TicketStatus.inProgress,
+        remark: payload.remark || "",
+      },
+    );
+    return { success: true };
+  }
+
+  async rejectVerification(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { remark?: string } = {},
+  ) {
+    return this.verifyTicket(ticketId, currentUser, {
+      ...payload,
+      passed: false,
+    });
+  }
+
+  async reopenTicket(
+    ticketId: string,
+    currentUser: { id?: string; name?: string; permissions?: string[] } = {},
+    payload: { remark?: string } = {},
+  ) {
+    const ticket = await this.loadTicketForAction(ticketId, currentUser);
+    await this.assertTicketActionPermission(ticketId, currentUser);
+    if (String(ticket.status || "") !== TicketStatus.closed) {
+      throw new Error("仅已关闭状态的工单可重开");
+    }
+    const reopenedCount = Number(ticket.reopenedCount || 0) + 1;
+    await this.repository.update(ticketId, {
+      status: TicketStatus.inProgress,
+      reopenedCount,
+      currentNodeName: "已重开，处理中",
+      updateUser: String(currentUser.name || ""),
+    } as any);
+    await this.saveTicketActionLog(ticketId, "reopen", currentUser, {
+      fromStatus: ticket.status,
+      toStatus: TicketStatus.inProgress,
+      remark: payload.remark || "",
+      detail: { reopenedCount },
+    });
+    return { success: true };
+  }
+
+  async getActionLogs(
+    ticketId: string,
+    currentUser: { id?: string; permissions?: string[] } = {},
+  ) {
+    await this.loadTicketForAction(ticketId, currentUser);
+    if (!this.actionLogRepository) return [];
+    return this.actionLogRepository.find({
+      where: { ticketId } as any,
+      order: { createTime: "DESC" },
+    });
+  }
+
+  async getDispatchHistory(
+    ticketId: string,
+    currentUser: { id?: string; permissions?: string[] } = {},
+  ) {
+    await this.loadTicketForAction(ticketId, currentUser);
+    if (!this.actionLogRepository) return [];
+    return this.actionLogRepository.find({
+      where: {
+        ticketId,
+        actionType: In(["dispatch", "transfer"]),
+      } as any,
+      order: { createTime: "DESC" },
+    });
   }
 
   async getOne(query, isError = true): Promise<any | null> {

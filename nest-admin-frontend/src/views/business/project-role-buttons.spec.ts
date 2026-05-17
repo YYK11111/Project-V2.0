@@ -113,6 +113,8 @@ describe('项目相关列表按钮权限守卫', () => {
     expect(taskSource).toContain("row.canDelete === true ? { key: 'delete'")
     expect(taskSource).not.toContain('canTaskUpdate.value && row.canEdit')
     expect(ticketSource).toContain("row.canEdit === true ? { key: 'edit'")
+    expect(ticketSource).toContain("row.canEdit === true && row.status === '1' ? { key: 'dispatch'")
+    expect(ticketSource).toContain("row.canEdit === true && row.status === '2' ? { key: 'transfer'")
     expect(ticketSource).toContain("row.canEdit === true && canSubmitTicketApproval(row)")
     expect(ticketSource).toContain("row.canDelete === true ? { key: 'delete'")
     expect(ticketSource).not.toContain('canTicketUpdate.value && row.canEdit')

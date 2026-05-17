@@ -77,7 +77,7 @@ const displayPlanEndDate = computed(() => project.value?.planEndDate || project.
 const displayActualStartDate = computed(() => project.value?.actualStartDate || '')
 const displayActualEndDate = computed(() => project.value?.actualEndDate || '')
 const completedTaskStatuses = ['3']
-const resolvedTicketStatuses = ['3', '4']
+const resolvedTicketStatuses = ['4']
 const closedRiskStatuses = ['4', '5']
 const dueSoonDays = 7
 const validTabs = new Set(['overview', 'focus', 'plan', 'tasks', 'tickets', 'milestones', 'risks', 'changes', 'sprints', 'knowledge', 'closure'])
@@ -1329,7 +1329,7 @@ function getProjectApprovalText(project) {
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <ViewTagField :text="statusMap[row.status] || '-'" :type="row.status === '3' ? 'success' : row.status === '2' ? 'warning' : 'info'" />
+              <ViewTagField :text="statusMap[row.status] || '-'" :type="row.status === '4' ? 'success' : row.status === '3' ? 'warning' : row.status === '2' ? 'primary' : 'info'" />
             </template>
           </el-table-column>
           <el-table-column label="优先级" width="100">
@@ -1397,7 +1397,7 @@ function getProjectApprovalText(project) {
           </el-table-column>
           <el-table-column prop="status" label="状态" width="100">
             <template #default="{ row }">
-              <ViewTagField :text="statusMap[row.status] || '-'" :type="row.status === '3' ? 'success' : row.status === '2' ? 'warning' : 'danger'" />
+              <ViewTagField :text="statusMap[row.status] || '-'" :type="row.status === '4' ? 'success' : row.status === '3' ? 'warning' : row.status === '2' ? 'primary' : 'info'" />
             </template>
           </el-table-column>
           <el-table-column label="处理人" min-width="140">

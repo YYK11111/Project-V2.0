@@ -1925,7 +1925,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
       where: { projectId: id },
     });
     const resolvedTickets = await this.ticketRepository.count({
-      where: { projectId: id, status: TicketStatus.resolved },
+      where: { projectId: id, status: TicketStatus.closed },
     });
 
     const knowledgeSummary = await this.getKnowledgeSummary(project);
@@ -2019,7 +2019,7 @@ export class ProjectsService extends BaseService<Project, ProjectDto> {
     const isTaskCompleted = (task: Task) =>
       [TaskStatus.completed, TaskStatus.rejected].includes(task.status);
     const isTicketResolved = (ticket: Ticket) =>
-      [TicketStatus.resolved, TicketStatus.closed].includes(ticket.status);
+      [TicketStatus.closed].includes(ticket.status);
     const isRiskClosed = (risk: Risk) =>
       [RiskStatus.resolved, RiskStatus.closed].includes(risk.status);
 

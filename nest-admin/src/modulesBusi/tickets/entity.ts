@@ -27,9 +27,9 @@ export enum TicketStatus {
 }
 
 export const ticketStatusMap = {
-  [TicketStatus.pending]: "待处理",
+  [TicketStatus.pending]: "待分派",
   [TicketStatus.inProgress]: "处理中",
-  [TicketStatus.resolved]: "已解决",
+  [TicketStatus.resolved]: "待验证",
   [TicketStatus.closed]: "已关闭",
 };
 

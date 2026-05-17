@@ -60,9 +60,9 @@ const businessSceneOptions = {
 }
 
 const statusOptions = [
-  { label: '待处理', value: '1' },
+  { label: '待分派', value: '1' },
   { label: '处理中', value: '2' },
-  { label: '已解决', value: '3' },
+  { label: '待验证', value: '3' },
   { label: '已关闭', value: '4' },
   { label: '草稿', value: '1' },
   { label: '审批中', value: '2' },

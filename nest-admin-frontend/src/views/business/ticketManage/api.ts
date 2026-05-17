@@ -66,3 +66,39 @@ export function publishKnowledge(id) {
 export function convertToTask(id) {
   return request({ url: `${baseUrl}/${id}/convert-to-task`, method: 'post' })
 }
+
+export function dispatchTicket(id, data) {
+  return request({ url: `${baseUrl}/${id}/dispatch`, method: 'post', data })
+}
+
+export function batchDispatchTickets(ids, data) {
+  return request({ url: `${baseUrl}/batch-dispatch`, method: 'post', data: { ids, ...data } })
+}
+
+export function transferTicket(id, data) {
+  return request({ url: `${baseUrl}/${id}/transfer`, method: 'post', data })
+}
+
+export function finishTicket(id, data) {
+  return request({ url: `${baseUrl}/${id}/finish`, method: 'post', data })
+}
+
+export function verifyPass(id, data) {
+  return request({ url: `${baseUrl}/${id}/verify-pass`, method: 'post', data })
+}
+
+export function verifyReject(id, data) {
+  return request({ url: `${baseUrl}/${id}/verify-reject`, method: 'post', data })
+}
+
+export function reopenTicket(id, data) {
+  return request({ url: `${baseUrl}/${id}/reopen`, method: 'post', data })
+}
+
+export function getActionLogs(id) {
+  return request({ url: `${baseUrl}/${id}/action-logs`, method: 'get' })
+}
+
+export function getDispatchHistory(id) {
+  return request({ url: `${baseUrl}/${id}/dispatch-history`, method: 'get' })
+}

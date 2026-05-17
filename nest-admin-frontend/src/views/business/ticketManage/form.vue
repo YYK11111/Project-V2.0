@@ -1,6 +1,25 @@
 <script setup>
 import { watch } from 'vue'
-import { getOne, save, update, getStatus, getPriority, getType, getSeverity, getRootCauseCategory, publishKnowledge, submitApproval, convertToTask } from './api'
+import {
+  getOne,
+  save,
+  update,
+  getStatus,
+  getPriority,
+  getType,
+  getSeverity,
+  getRootCauseCategory,
+  publishKnowledge,
+  submitApproval,
+  convertToTask,
+  dispatchTicket,
+  transferTicket,
+  finishTicket,
+  verifyPass,
+  verifyReject,
+  reopenTicket,
+  getActionLogs,
+} from './api'
 import { getList as getTaskList } from '@/views/business/taskManage/api'
 import { ElMessageBox } from 'element-plus'
 import { closeReturnedWorkflowInstance, resubmitReturnedWorkflowInstance } from '@/views/business/workflow/api'
@@ -119,6 +138,17 @@ const canCloseReturnedInstance = computed(() => form.value.workflowInstanceId &&
 const workflowPanelRef = ref()
 const hasTicketId = computed(() => !!route.query.id)
 const normalizedAttachments = computed(() => Array.isArray(form.value.attachments) ? form.value.attachments : [])
+const actionLogs = ref([])
+const actionDialogVisible = ref(false)
+const actionDialogType = ref('')
+const actionDialogLoading = ref(false)
+const actionDialogForm = ref({
+  handlerId: '',
+})
+const actionDialogTitleMap = {
+  dispatch: '分派工单',
+  transfer: '转派工单',
+}
 
 const isTicketFormRoute = useCurrentRouteGuard(route, '/ticketManage/form')
 
@@ -152,6 +182,7 @@ async function loadTicket() {
       ...defaultForm(),
       projectId: String(route.query.projectId || ''),
     }
+    actionLogs.value = []
     return
   }
   const { data } = await getOne(route.query.id)
@@ -160,6 +191,94 @@ async function loadTicket() {
     severity: data.severity || '3',
     rootCauseCategory: data.rootCauseCategory || '',
   }
+  loadActionLogs()
+}
+
+async function loadActionLogs() {
+  if (!route.query.id) {
+    actionLogs.value = []
+    return
+  }
+  const { data } = await getActionLogs(route.query.id)
+  actionLogs.value = Array.isArray(data) ? data : []
+}
+
+function openActionDialog(type) {
+  actionDialogType.value = type
+  actionDialogForm.value = {
+    handlerId: String(form.value.handlerId || ''),
+  }
+  actionDialogVisible.value = true
+}
+
+function closeActionDialog() {
+  actionDialogVisible.value = false
+  actionDialogLoading.value = false
+}
+
+async function submitActionDialog() {
+  if (!route.query.id) return
+  if (!actionDialogForm.value.handlerId) {
+    return $sdk.msgWarning('请选择处理人')
+  }
+  actionDialogLoading.value = true
+  try {
+    const api = actionDialogType.value === 'dispatch' ? dispatchTicket : transferTicket
+    await api(route.query.id, {
+      handlerId: actionDialogForm.value.handlerId,
+    })
+    $sdk.msgSuccess(actionDialogType.value === 'dispatch' ? '分派成功' : '转派成功')
+    closeActionDialog()
+    reloadCurrent()
+  } finally {
+    actionDialogLoading.value = false
+  }
+}
+
+async function handleFinishTicket() {
+  if (!route.query.id) return
+  if (!canManageTicketRecord.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确定将工单提交为待验证吗？')
+  await finishTicket(route.query.id)
+  $sdk.msgSuccess('已提交待验证')
+  reloadCurrent()
+}
+
+async function handleVerifyPassTicket() {
+  if (!route.query.id) return
+  if (!canManageTicketRecord.value) return $sdk.msgWarning('当前操作没有权限')
+  await $sdk.confirm('确认验证通过并关闭工单吗？')
+  await verifyPass(route.query.id)
+  $sdk.msgSuccess('验证通过，工单已关闭')
+  reloadCurrent()
+}
+
+async function handleVerifyRejectTicket() {
+  if (!route.query.id) return
+  if (!canManageTicketRecord.value) return $sdk.msgWarning('当前操作没有权限')
+  const { value } = await ElMessageBox.prompt('请输入退回原因（选填）', '验证退回', {
+    confirmButtonText: '确认退回',
+    cancelButtonText: '取消',
+    inputPlaceholder: '请输入退回原因',
+    inputType: 'textarea',
+  })
+  await verifyReject(route.query.id, { remark: value || '' })
+  $sdk.msgSuccess('已退回处理中')
+  reloadCurrent()
+}
+
+async function handleReopenTicket() {
+  if (!route.query.id) return
+  if (!canManageTicketRecord.value) return $sdk.msgWarning('当前操作没有权限')
+  const { value } = await ElMessageBox.prompt('请输入重开原因（选填）', '重开工单', {
+    confirmButtonText: '确认重开',
+    cancelButtonText: '取消',
+    inputPlaceholder: '请输入重开原因',
+    inputType: 'textarea',
+  })
+  await reopenTicket(route.query.id, { remark: value || '' })
+  $sdk.msgSuccess('工单已重开')
+  reloadCurrent()
 }
 
 watch(
@@ -231,7 +350,7 @@ async function handleConvertToTask() {
 }
 
 async function handleCloseReturnedInstance() {
-  const { value } = await ElMessageBox.prompt('结束后实例将进入已取消状态，业务对象将同步更新为最终驳回态。', '结束退回实例', {
+  const { value } = await ElMessageBox.prompt('结束后实例将进入已取消状态，工单主状态不再随审批流自动变更。', '结束退回实例', {
     confirmButtonText: '确认结束',
     cancelButtonText: '取消',
     inputPlaceholder: '请输入结束原因（选填）',
@@ -371,7 +490,7 @@ function scrollToWorkflowPanel() {
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="状态" prop="status">
-              <ViewTagField v-if="isReadonly" :text="status[form.status]" :type="form.status === '3' ? 'success' : form.status === '2' ? 'warning' : form.status === '4' ? 'info' : 'danger'" />
+              <ViewTagField v-if="isReadonly" :text="status[form.status]" :type="form.status === '4' ? 'success' : form.status === '3' ? 'warning' : form.status === '2' ? 'primary' : 'info'" />
               <el-select v-else v-model="form.status" placeholder="请选择状态" style="width: 100%">
                <el-option v-for="(value, key) in status" :key="key" :label="value" :value="key" />
              </el-select>
@@ -397,7 +516,7 @@ function scrollToWorkflowPanel() {
 
       <el-alert
         v-if="isEdit && form.approvalStatus === '2'"
-        title="该工单审批已通过，当前业务状态应进入处理中。"
+        title="该工单审批已通过，可继续按工单主流程处理。"
         type="success"
         :closable="false"
         show-icon
@@ -503,9 +622,42 @@ function scrollToWorkflowPanel() {
         </el-form-item>
       </section>
 
+      <section v-if="hasTicketId" class="business-form-section">
+        <div class="business-form-section__header">
+          <div>
+            <div class="business-form-section__title">操作记录</div>
+            <div class="business-form-section__desc">记录分派、转派、验证、关闭、重开等关键动作，便于追溯工单流转。</div>
+          </div>
+        </div>
+
+        <el-timeline v-if="actionLogs.length">
+          <el-timeline-item
+            v-for="log in actionLogs"
+            :key="log.id"
+            :timestamp="log.createTime"
+            :type="log.toStatus === '4' ? 'success' : log.toStatus === '3' ? 'warning' : 'primary'"
+          >
+            <div class="ticket-action-log">
+              <div class="ticket-action-log__title">
+                <strong>{{ log.actionName }}</strong>
+                <span>{{ log.operatorName || '-' }}</span>
+              </div>
+              <div class="ticket-action-log__desc" v-if="log.remark">{{ log.remark }}</div>
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-else description="暂无操作记录" />
+      </section>
+
       </div>
     </el-form>
     <template #footer>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '1'" type="primary" @click="openActionDialog('dispatch')">分派</el-button>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '2'" @click="openActionDialog('transfer')">转派</el-button>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '2'" type="warning" @click="handleFinishTicket">提交待验证</el-button>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '3'" type="success" @click="handleVerifyPassTicket">验证通过</el-button>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '3'" type="warning" @click="handleVerifyRejectTicket">验证退回</el-button>
+      <el-button v-if="hasTicketId && canManageTicketRecord && form.status === '4'" type="danger" @click="handleReopenTicket">重开</el-button>
       <el-button v-if="isEdit && canSaveTicket && canSubmitCurrentApproval" type="warning" @click="handleSubmitApproval">提交审批</el-button>
       <el-button v-if="canSaveTicket" type="primary" @click="submit">提交</el-button>
       <el-button @click="cancel">{{ isReadonly ? '返回' : '取消' }}</el-button>
@@ -520,6 +672,18 @@ function scrollToWorkflowPanel() {
         @approved="reloadCurrent"
       />
     </div>
+
+    <el-dialog v-model="actionDialogVisible" :title="actionDialogTitleMap[actionDialogType] || '工单动作'" width="520px" @closed="closeActionDialog">
+      <el-form label-width="90px">
+        <el-form-item label="处理人" v-if="['dispatch', 'transfer'].includes(actionDialogType)">
+          <UserSelect v-model="actionDialogForm.handlerId" placeholder="请选择处理人" clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeActionDialog">取消</el-button>
+        <el-button type="primary" :loading="actionDialogLoading" @click="submitActionDialog">确认</el-button>
+      </template>
+    </el-dialog>
     </FormPageShell>
 </template>
 

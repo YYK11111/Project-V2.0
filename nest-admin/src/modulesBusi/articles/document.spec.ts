@@ -880,6 +880,126 @@ describe("ArticlesService document guards", () => {
     expect(maskedArticle.contentChunks).toEqual([]);
   });
 
+  it("知识列表保留受限知识发现入口但必须脱敏正文", async () => {
+    const { service, repository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([
+        [
+          {
+            id: "public-article",
+            title: "公开知识",
+            catalogId: "catalog-1",
+            visibilityType: "public",
+            summary: "公开摘要",
+            contentText: "公开正文",
+            contentChunks: [{ order: 1, text: "公开正文" }],
+          },
+          {
+            id: "restricted-article",
+            title: "受限知识",
+            catalogId: "catalog-1",
+            visibilityType: "specified",
+            visibleUserIds: ["other-user"],
+            visibleRoleIds: [],
+            summary: "机密摘要",
+            content: "<p>机密正文</p>",
+            contentText: "机密正文",
+            contentChunks: [{ order: 1, text: "机密正文" }],
+            catalog: { id: "catalog-1", allowBorrow: "1" },
+          },
+        ],
+        2,
+      ]),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    jest
+      .spyOn(service as never, "getCurrentUserRoleIds" as never)
+      .mockResolvedValue([]);
+    jest
+      .spyOn(service as never, "getProjectKnowledgeContext" as never)
+      .mockResolvedValue(null);
+    jest
+      .spyOn(service as never, "getArticlePermissions" as never)
+      .mockResolvedValue({ canEdit: false, canDelete: false });
+
+    const result = await service.list({ pageNum: 1, pageSize: 10 } as any, {
+      id: "user-1",
+      permissions: [],
+    });
+
+    expect(result.total).toBe(2);
+    const restricted = result.list.find(
+      (item: any) => item.id === "restricted-article",
+    ) as any;
+    expect(restricted).toEqual(
+      expect.objectContaining({
+        hasAccess: false,
+        canBorrow: true,
+        summary: "当前知识受限，暂无查看权限",
+        content: "",
+        contentText: "",
+        contentChunks: [],
+      }),
+    );
+  });
+
+  it("知识首页只推荐当前用户可直接访问的知识", async () => {
+    const { service } = createService();
+    const restrictedTop = {
+      id: "restricted-top",
+      title: "受限置顶",
+      hasAccess: false,
+      isTop: "1",
+    };
+    const accessibleTop = {
+      id: "accessible-top",
+      title: "可读置顶",
+      hasAccess: true,
+      isTop: "1",
+    };
+    const accessibleHot = {
+      id: "accessible-hot",
+      title: "可读热点",
+      hasAccess: true,
+    };
+    const accessibleLatest = {
+      id: "accessible-latest",
+      title: "可读最新",
+      hasAccess: true,
+    };
+    jest
+      .spyOn(service, "list")
+      .mockResolvedValueOnce({
+        list: [restrictedTop, accessibleTop],
+      } as any)
+      .mockResolvedValueOnce({
+        list: [{ id: "restricted-hot", hasAccess: false }, accessibleHot],
+      } as any)
+      .mockResolvedValueOnce({
+        list: [{ id: "restricted-latest", hasAccess: false }, accessibleLatest],
+      } as any);
+    jest
+      .spyOn(service as never, "getHotCatalogs" as never)
+      .mockResolvedValue([]);
+    jest.spyOn(service, "getHotKeywords").mockResolvedValue([]);
+
+    const result = await service.getHomeData({
+      id: "user-1",
+      permissions: [],
+    });
+
+    expect(result.topArticles).toEqual([accessibleTop]);
+    expect(result.hotArticles).toEqual([accessibleHot]);
+    expect(result.latestArticles).toEqual([accessibleLatest]);
+  });
+
   it("有效借阅用户可以查看受限知识详情", async () => {
     const { service, repository, borrowService } = createService();
     repository.findOne.mockResolvedValue({

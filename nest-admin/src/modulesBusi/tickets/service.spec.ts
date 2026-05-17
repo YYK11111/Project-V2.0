@@ -176,4 +176,293 @@ describe("TicketsService convert to task", () => {
     );
     expect(result.taskId).toBe("t2");
   });
+
+  it("分派工单后应进入处理中并记录动作日志", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        projectId: "project-1",
+        status: "1",
+        handlerId: null,
+        submitterId: "submitter-1",
+        createUser: "creator-1",
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const actionLogRepository = {
+      save: jest.fn().mockResolvedValue({ id: "log-1" }),
+    };
+    const projectsService = {
+      assertExecutionObjectPermission: jest.fn().mockResolvedValue(true),
+      getProjectPermissionContext: jest.fn().mockResolvedValue({
+        canManageTasks: true,
+        isManager: true,
+        isDeliveryManager: false,
+        isFunctionalLead: false,
+      }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      projectsService as any,
+      {} as any,
+      actionLogRepository as any,
+    );
+
+    await (service as any).dispatchTicket(
+      "ticket-1",
+      {
+        id: "admin-1",
+        name: "管理员",
+        permissions: ["business/tickets/update"],
+      },
+      {
+        handlerId: "handler-2",
+      },
+    );
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "ticket-1",
+      expect.objectContaining({
+        handlerId: "handler-2",
+        status: "2",
+      }),
+    );
+    expect(actionLogRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticketId: "ticket-1",
+        actionType: "dispatch",
+      }),
+    );
+  });
+
+  it("提交待验证后应把工单状态流转为待验证", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        projectId: "project-1",
+        status: "2",
+        handlerId: "handler-1",
+        submitterId: "submitter-1",
+        createUser: "creator-1",
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const actionLogRepository = {
+      save: jest.fn().mockResolvedValue({ id: "log-1" }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {
+        assertExecutionObjectPermission: jest.fn().mockResolvedValue(true),
+        getProjectPermissionContext: jest.fn().mockResolvedValue({
+          canManageTasks: true,
+          isManager: true,
+          isDeliveryManager: false,
+          isFunctionalLead: false,
+        }),
+      } as any,
+      {} as any,
+      actionLogRepository as any,
+    );
+
+    await (service as any).submitForVerification("ticket-1", {
+      id: "handler-1",
+      name: "处理人",
+      permissions: ["business/tickets/update"],
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "ticket-1",
+      expect.objectContaining({
+        status: "3",
+      }),
+    );
+    expect(actionLogRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticketId: "ticket-1",
+        actionType: "finish",
+      }),
+    );
+  });
+
+  it("验证通过后应把工单状态流转为已关闭，验证退回应回到处理中", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        projectId: "project-1",
+        status: "3",
+        handlerId: "handler-1",
+        submitterId: "submitter-1",
+        createUser: "creator-1",
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const actionLogRepository = {
+      save: jest.fn().mockResolvedValue({ id: "log-1" }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {
+        assertExecutionObjectPermission: jest.fn().mockResolvedValue(true),
+        getProjectPermissionContext: jest.fn().mockResolvedValue({
+          canManageTasks: true,
+          isManager: true,
+          isDeliveryManager: false,
+          isFunctionalLead: false,
+        }),
+      } as any,
+      {} as any,
+      actionLogRepository as any,
+    );
+
+    await (service as any).verifyTicket("ticket-1", {
+      passed: true,
+      id: "submitter-1",
+      name: "提交人",
+      permissions: ["business/tickets/update"],
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "ticket-1",
+      expect.objectContaining({
+        status: "4",
+      }),
+    );
+
+    await (service as any).rejectVerification("ticket-1", {
+      reason: "还要补充截图",
+      id: "submitter-1",
+      name: "提交人",
+      permissions: ["business/tickets/update"],
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "ticket-1",
+      expect.objectContaining({
+        status: "2",
+      }),
+    );
+  });
+
+  it("已关闭工单重开后应回到处理中并累加重开次数", async () => {
+    const repository = {
+      findOne: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        projectId: "project-1",
+        status: "4",
+        reopenedCount: 1,
+        handlerId: "handler-1",
+        submitterId: "submitter-1",
+        createUser: "creator-1",
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const actionLogRepository = {
+      save: jest.fn().mockResolvedValue({ id: "log-1" }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {
+        assertExecutionObjectPermission: jest.fn().mockResolvedValue(true),
+        getProjectPermissionContext: jest.fn().mockResolvedValue({
+          canManageTasks: true,
+          isManager: true,
+          isDeliveryManager: false,
+          isFunctionalLead: false,
+        }),
+      } as any,
+      {} as any,
+      actionLogRepository as any,
+    );
+
+    await (service as any).reopenTicket("ticket-1", {
+      id: "submitter-1",
+      name: "提交人",
+      permissions: ["business/tickets/update"],
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(
+      "ticket-1",
+      expect.objectContaining({
+        status: "2",
+        reopenedCount: 2,
+      }),
+    );
+  });
+
+  it("批量分派应返回成功和失败明细", async () => {
+    const repository = {
+      findOne: jest
+        .fn()
+        .mockResolvedValueOnce({
+          id: "ticket-1",
+          projectId: "project-1",
+          status: "1",
+          handlerId: null,
+          submitterId: "submitter-1",
+          createUser: "creator-1",
+        })
+        .mockResolvedValueOnce({
+          id: "ticket-2",
+          projectId: "project-1",
+          status: "2",
+          handlerId: "handler-1",
+          submitterId: "submitter-1",
+          createUser: "creator-1",
+        }),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const actionLogRepository = {
+      save: jest.fn().mockResolvedValue({ id: "log-1" }),
+    };
+    const service = new TicketsService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {
+        assertExecutionObjectPermission: jest.fn().mockResolvedValue(true),
+        getProjectPermissionContext: jest.fn().mockResolvedValue({
+          canManageTasks: true,
+          isManager: true,
+          isDeliveryManager: false,
+          isFunctionalLead: false,
+        }),
+      } as any,
+      {} as any,
+      actionLogRepository as any,
+    );
+
+    const result = await (service as any).batchDispatchTickets(
+      ["ticket-1", "ticket-2"],
+      {
+        id: "admin-1",
+        name: "管理员",
+        permissions: ["business/tickets/update"],
+      },
+      {
+        handlerId: "handler-2",
+      },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        successCount: 1,
+        failedCount: 1,
+        successIds: ["ticket-1"],
+      }),
+    );
+    expect(result.failed[0]).toEqual(
+      expect.objectContaining({
+        id: "ticket-2",
+      }),
+    );
+  });
 });

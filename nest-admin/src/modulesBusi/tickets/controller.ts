@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Param, Query, Post, Req } from "@nestjs/common";
 import { TicketsService } from "./service";
 import { QueryListDto } from "src/common/dto";
 import {
@@ -90,6 +90,121 @@ export class TicketsController extends BaseController<Ticket, TicketsService> {
     return this.service.convertToTask(id, {
       id: req.user?.id,
       name: req.user?.name,
+      permissions: req.user?.permissions || [],
+    });
+  }
+
+  @Post(":id/dispatch")
+  async dispatch(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.service.dispatchTicket(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Post("batch-dispatch")
+  async batchDispatch(@Body() body: any, @Req() req: any) {
+    return this.service.batchDispatchTickets(
+      body.ids || [],
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Post(":id/transfer")
+  async transfer(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.service.transferTicket(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Post(":id/finish")
+  async finish(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.service.submitForVerification(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Post(":id/verify-pass")
+  async verifyPass(
+    @Param("id") id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.service.verifyTicket(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      { ...body, passed: true },
+    );
+  }
+
+  @Post(":id/verify-reject")
+  async verifyReject(
+    @Param("id") id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.service.rejectVerification(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Post(":id/reopen")
+  async reopen(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.service.reopenTicket(
+      id,
+      {
+        id: req.user?.id,
+        name: req.user?.name,
+        permissions: req.user?.permissions || [],
+      },
+      body,
+    );
+  }
+
+  @Get(":id/action-logs")
+  async getActionLogs(@Param("id") id: string, @Req() req: any) {
+    return this.service.getActionLogs(id, {
+      id: req.user?.id,
+      permissions: req.user?.permissions || [],
+    });
+  }
+
+  @Get(":id/dispatch-history")
+  async getDispatchHistory(@Param("id") id: string, @Req() req: any) {
+    return this.service.getDispatchHistory(id, {
+      id: req.user?.id,
       permissions: req.user?.permissions || [],
     });
   }

@@ -239,9 +239,9 @@ export const constantRoutes = [
       },
       {
         path: '/content/articleManage/view',
-        component: () => import('@/views/content/articleManage/view.vue'),
+        component: () => import('@/views/content/articleManage/detail.vue'),
         name: 'ArticleViewHidden',
-        meta: { title: '查看知识' },
+        meta: { title: '知识详情' },
       },
       {
         path: '/content/articleManage/borrowApproval',

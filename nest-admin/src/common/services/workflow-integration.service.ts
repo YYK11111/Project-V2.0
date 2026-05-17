@@ -436,15 +436,9 @@ export class WorkflowIntegrationService {
     } else if (businessKey?.startsWith("ticket_")) {
       const ticketId = businessKey.replace("ticket_", "");
       await this.ticketRepository.update(ticketId, {
-        status:
-          status === "completed"
-            ? TicketStatus.inProgress
-            : TicketStatus.closed,
         approvalStatus: status === "completed" ? "2" : "3",
         currentNodeName:
-          status === "completed"
-            ? "工单审批已通过，进入处理中"
-            : "工单审批已驳回，已关闭",
+          status === "completed" ? "工单审批已通过" : "工单审批已驳回",
       } as any);
     } else if (businessKey?.startsWith("change_")) {
       const changeId = businessKey.replace("change_", "");
@@ -693,7 +687,6 @@ export class WorkflowIntegrationService {
     } else if (businessKey?.startsWith("ticket_")) {
       const ticketId = businessKey.replace("ticket_", "");
       await this.ticketRepository.update(ticketId, {
-        status: TicketStatus.closed,
         approvalStatus: "3",
         currentNodeName: "工单审批已驳回，实例已结束",
       } as any);

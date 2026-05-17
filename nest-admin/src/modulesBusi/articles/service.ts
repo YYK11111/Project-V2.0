@@ -486,18 +486,26 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
         this.getHotKeywords(),
       ]);
 
-    const topArticles = (topRes.list || [])
+    const topArticles = this.filterAccessibleHomeArticles(topRes.list || [])
       .filter((item: any) => this.isArticleTop(item))
       .slice(0, 4);
+    const hotArticles = this.filterAccessibleHomeArticles(hotRes.list || []);
+    const latestArticles = this.filterAccessibleHomeArticles(
+      latestRes.list || [],
+    );
     return {
       topArticles: topArticles.length
         ? topArticles
-        : (topRes.list || []).slice(0, 4),
-      hotArticles: (hotRes.list || []).slice(0, 6),
-      latestArticles: (latestRes.list || []).slice(0, 8),
+        : this.filterAccessibleHomeArticles(topRes.list || []).slice(0, 4),
+      hotArticles: hotArticles.slice(0, 6),
+      latestArticles: latestArticles.slice(0, 8),
       hotCatalogs,
       hotKeywords,
     };
+  }
+
+  private filterAccessibleHomeArticles(articles: Article[] = []) {
+    return (articles || []).filter((item: any) => item.hasAccess !== false);
   }
 
   async getHotKeywords() {

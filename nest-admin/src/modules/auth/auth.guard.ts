@@ -481,6 +481,36 @@ export class AuthGuard implements CanActivate {
       ],
       ["PUT", /^business\/tickets\/update$/, "business/tickets/update"],
       ["DELETE", /^business\/tickets\/del\/[^/]+$/, "business/tickets/delete"],
+      [
+        "POST",
+        /^business\/tickets\/[^/]+\/(dispatch|transfer|finish|verify-pass|verify-reject|reopen)$/,
+        "business/tickets/update",
+      ],
+      [
+        "POST",
+        /^business\/tickets\/batch-dispatch$/,
+        "business/tickets/update",
+      ],
+      [
+        "GET",
+        /^business\/tickets\/[^/]+\/(action-logs|dispatch-history)$/,
+        "business/tickets/getOne",
+      ],
+      [
+        "POST",
+        /^business\/tickets\/[^/]+\/submit-approval$/,
+        "business/tickets/update",
+      ],
+      [
+        "POST",
+        /^business\/tickets\/[^/]+\/publish-knowledge$/,
+        "business/tickets/update",
+      ],
+      [
+        "POST",
+        /^business\/tickets\/[^/]+\/convert-to-task$/,
+        "business/tickets/update",
+      ],
 
       ["GET", /^business\/stories\/list$/, "business/stories/list"],
       ["GET", /^business\/stories\/getOne\/[^/]+$/, "business/stories/getOne"],
@@ -617,7 +647,10 @@ export class AuthGuard implements CanActivate {
       [
         "GET",
         /^business\/articles\/retrieveForAi$/,
-        "business/articles/retrieveForAi",
+        (req) =>
+          (req as any)?.user?.permissions?.includes("content/articles/aiDebug")
+            ? "content/articles/aiDebug"
+            : "content/articles/viewAll",
       ],
       [
         "POST",

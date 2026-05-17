@@ -1,12 +1,13 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getList, getType, getStatus, del, publishKnowledge, submitApproval } from './api'
+import { getList, getType, getStatus, del, publishKnowledge, submitApproval, dispatchTicket, transferTicket, batchDispatchTickets } from './api'
 import TableOperation from '@/components/TableOperation.vue'
 import { checkPermi } from '@/utils/permission'
 import { downloadCsv } from '@/utils/csv'
 import { confirmRepublishIfNeeded } from '@/utils/knowledge'
 import { useProjectScopedActions } from '../projectManage/useProjectScopedActions'
+import UserSelect from '@/components/UserSelect.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,11 +23,21 @@ getStatus().then(({ data }) => (status.value = data))
 
 const rctRef = ref()
 const canTicketAdd = computed(() => checkPermi(['business/tickets/add']))
+const canTicketUpdate = computed(() => checkPermi(['business/tickets/update']))
 const canTicketDelete = computed(() => checkPermi(['business/tickets/delete']))
 const canArticleAdd = computed(() => checkPermi(['business/articles/add']))
 const { canCreateProjectScopedRecord, canBatchDeleteProjectScopedRecord, getProjectScopedCreateQuery } = useProjectScopedActions(route)
 const canTicketCreate = computed(() => canCreateProjectScopedRecord(canTicketAdd.value, 'canManageTasks'))
 const canTicketBatchDelete = computed(() => canBatchDeleteProjectScopedRecord(canTicketDelete.value, 'canManageTasks'))
+const canTicketBatchDispatch = computed(() => canBatchDeleteProjectScopedRecord(canTicketUpdate.value, 'canManageTasks'))
+const selectedRows = ref([])
+const dispatchDialogVisible = ref(false)
+const dispatchDialogLoading = ref(false)
+const dispatchDialogMode = ref('dispatch')
+const dispatchDialogRow = ref(null)
+const dispatchForm = ref({
+  handlerId: '',
+})
 
 async function handleSubmitApproval(row) {
   if (row.canEdit !== true) return $sdk.msgWarning('当前操作没有权限')
@@ -70,8 +81,66 @@ function exportTicketList() {
 
 const canSubmitTicketApproval = (row) => row.status === '1' && !['1', '2'].includes(String(row.approvalStatus || '0'))
 
+function handleSelectionChange(rows) {
+  selectedRows.value = Array.isArray(rows) ? rows : []
+}
+
+function openDispatchDialog(mode, row = null) {
+  dispatchDialogMode.value = mode
+  dispatchDialogRow.value = row
+  dispatchForm.value = {
+    handlerId: String(row?.handlerId || ''),
+  }
+  dispatchDialogVisible.value = true
+}
+
+function closeDispatchDialog() {
+  dispatchDialogVisible.value = false
+  dispatchDialogLoading.value = false
+  dispatchDialogRow.value = null
+}
+
+function getBatchDispatchableIds() {
+  return selectedRows.value
+    .filter((row) => row?.canEdit === true && String(row?.status || '') === '1')
+    .map((row) => row.id)
+}
+
+async function submitDispatchDialog() {
+  if (!dispatchForm.value.handlerId) return $sdk.msgWarning('请选择处理人')
+  dispatchDialogLoading.value = true
+  try {
+    if (dispatchDialogMode.value === 'batchDispatch') {
+      const ids = getBatchDispatchableIds()
+      if (!ids.length) return $sdk.msgWarning('选中项里没有可分派的待分派工单')
+      const res = await batchDispatchTickets(ids, { handlerId: dispatchForm.value.handlerId })
+      const successCount = Number(res?.successCount || 0)
+      const failedCount = Number(res?.failedCount || 0)
+      if (failedCount > 0 && successCount > 0) {
+        $sdk.msgWarning(`部分分派成功：成功 ${successCount} 条，失败 ${failedCount} 条`)
+      } else if (failedCount > 0) {
+        $sdk.msgError(res?.failed?.[0]?.reason || '批量分派失败')
+      } else {
+        $sdk.msgSuccess('批量分派成功')
+      }
+    } else if (dispatchDialogMode.value === 'transfer') {
+      await transferTicket(dispatchDialogRow.value.id, { handlerId: dispatchForm.value.handlerId })
+      $sdk.msgSuccess('转派成功')
+    } else {
+      await dispatchTicket(dispatchDialogRow.value.id, { handlerId: dispatchForm.value.handlerId })
+      $sdk.msgSuccess('分派成功')
+    }
+    closeDispatchDialog()
+    rctRef.value?.getList?.()
+  } finally {
+    dispatchDialogLoading.value = false
+  }
+}
+
 const getButtons = (row) => [
   { key: 'view', label: '详情', onClick: () => rctRef.value.goRoute({ id: row.id, action: 'view' }, '/ticketManage/form') },
+  row.canEdit === true && row.status === '1' ? { key: 'dispatch', label: '分派', type: 'primary', onClick: () => openDispatchDialog('dispatch', row) } : null,
+  row.canEdit === true && row.status === '2' ? { key: 'transfer', label: '转派', onClick: () => openDispatchDialog('transfer', row) } : null,
   row.canEdit === true ? { key: 'edit', label: '编辑', onClick: () => rctRef.value.goRoute(row.id, '/ticketManage/form') } : null,
   row.knowledgeArticleId
     ? { key: 'viewKnowledge', label: '查看知识', type: 'primary', onClick: () => openKnowledgeDetail(row.knowledgeArticleId) }
@@ -88,7 +157,7 @@ const getButtons = (row) => [
 
 <template>
   <div class="ticket-index-page">
-    <RequestChartTable ref="rctRef" class="ticket-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true">
+    <RequestChartTable ref="rctRef" class="ticket-index-panel business-list-panel" :params="params" :request="getList" :is-selection="true" @selectionChange="handleSelectionChange">
       <template #query="{ query }">
         <div class="query-sections">
           <div class="query-section query-section--primary">
@@ -113,6 +182,7 @@ const getButtons = (row) => [
         <div class="ticket-index-operation">
           <div class="ticket-index-operation__left">
             <el-button v-if="canTicketCreate" type="primary" @click="rctRef.goRoute(getProjectScopedCreateQuery(), '/ticketManage/form')">新增工单</el-button>
+            <el-button v-if="canTicketBatchDispatch" :disabled="!selectedIds.length" @click="openDispatchDialog('batchDispatch')">批量分派</el-button>
             <el-button @click="exportTicketList">导出</el-button>
           </div>
           <el-button v-if="canTicketBatchDelete" :disabled="!selectedIds.length" @click="rctRef.del(del)" type="danger">批量删除</el-button>
@@ -135,7 +205,7 @@ const getButtons = (row) => [
         <el-table-column label="状态" prop="status" width="100">
           <template #default="{ row }">
             <el-tag 
-              :type="row.status === '3' ? 'success' : row.status === '2' ? 'warning' : 'info'" 
+              :type="row.status === '4' ? 'success' : row.status === '3' ? 'warning' : row.status === '2' ? 'primary' : 'info'" 
               size="small">
               {{ status[row.status] }}
             </el-tag>
@@ -158,6 +228,21 @@ const getButtons = (row) => [
         <TableOperation :buttons="getButtons(row)" :row="row" :rct-ref="rctRef" />
       </template>
     </RequestChartTable>
+
+    <el-dialog v-model="dispatchDialogVisible" :title="{ dispatch: '分派工单', transfer: '转派工单', batchDispatch: '批量分派工单' }[dispatchDialogMode] || '工单分派'" width="520px" @closed="closeDispatchDialog">
+      <el-form label-width="90px">
+        <el-form-item label="处理人">
+          <UserSelect v-model="dispatchForm.handlerId" placeholder="请选择处理人" clearable />
+        </el-form-item>
+        <div v-if="dispatchDialogMode === 'batchDispatch'" class="dispatch-dialog-tip">
+          本次将处理 {{ getBatchDispatchableIds().length }} 条可分派工单，非待分派或无权限工单会自动跳过。
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeDispatchDialog">取消</el-button>
+        <el-button type="primary" :loading="dispatchDialogLoading" @click="submitDispatchDialog">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -189,6 +274,14 @@ const getButtons = (row) => [
 .ticket-index-panel :deep(.el-table__header-wrapper),
 .ticket-index-panel :deep(.el-table__body-wrapper) {
   scroll-behavior: auto;
+}
+
+.dispatch-dialog-tip {
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+  line-height: 1.6;
 }
 
 .query-sections {
