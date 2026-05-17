@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ArticleChunkEmbedding, ArticleChunkEmbeddingStatus } from "./entity";
+import { CustomAiService } from "src/modulesAi/ai/custom-ai";
 
 type ArticleChunkEmbeddingInput = {
   id?: string;
@@ -17,10 +18,16 @@ export class ArticleChunkEmbeddingsService {
   constructor(
     @InjectRepository(ArticleChunkEmbedding)
     private repository: Repository<ArticleChunkEmbedding>,
+    private readonly customAiService: CustomAiService,
   ) {}
 
   async embedTexts(texts: string[]) {
-    return texts.map((text) => this.createMockVector(text));
+    const model = this.customAiService.getDefaultEmbeddingModel();
+    return this.customAiService.embedTexts(texts, model);
+  }
+
+  getEmbeddingModel() {
+    return this.customAiService.getDefaultEmbeddingModel();
   }
 
   async rebuildArticleChunkEmbeddings(input: {
@@ -34,9 +41,10 @@ export class ArticleChunkEmbeddingsService {
       return { status: ArticleChunkEmbeddingStatus.ready, count: 0 };
     }
 
-    const vectors = await this.embedTexts(
+    const embedResult = await this.embedTexts(
       chunks.map((chunk) => chunk.text || ""),
     );
+    const vectors = embedResult.vectors || [];
     const records = chunks.map(
       (chunk, index) =>
         new ArticleChunkEmbedding({
@@ -49,8 +57,8 @@ export class ArticleChunkEmbeddingsService {
           headingPath: chunk.headingPath || [],
           chunkText: chunk.text || "",
           tokenEstimate: Number(chunk.tokenEstimate || 0),
-          embeddingProvider: "mock",
-          embeddingModel: "mock-hash-16",
+          embeddingProvider: "openai-compatible",
+          embeddingModel: embedResult.model || this.getEmbeddingModel(),
           embeddingVector: vectors[index],
           embeddingVersion: input.embeddingVersion,
           status: ArticleChunkEmbeddingStatus.ready,
@@ -61,14 +69,16 @@ export class ArticleChunkEmbeddingsService {
     return { status: ArticleChunkEmbeddingStatus.ready, count: records.length };
   }
 
-  private createMockVector(text: string) {
-    const vector = Array.from({ length: 16 }, () => 0);
-    const source = String(text || "");
-    for (let index = 0; index < source.length; index += 1) {
-      vector[index % vector.length] += source.charCodeAt(index) % 97;
+  async findByArticles(articleIds: string[]) {
+    if (!articleIds?.length) {
+      return [];
     }
-    const magnitude =
-      Math.sqrt(vector.reduce((sum, item) => sum + item * item, 0)) || 1;
-    return vector.map((item) => Number((item / magnitude).toFixed(6)));
+    return this.repository.find({
+      where: articleIds.map((articleId) => ({ articleId })) as any,
+      order: {
+        articleId: "ASC",
+        chunkOrder: "ASC",
+      },
+    });
   }
 }
