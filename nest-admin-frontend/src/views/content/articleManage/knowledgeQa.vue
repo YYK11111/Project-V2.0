@@ -26,7 +26,7 @@ async function submitQuestion() {
     answer.value = payload.answer || ''
     references.value = payload.references || []
   } catch (error) {
-    errorMessage.value = error?.response?.data?.message || '知识问答调用失败'
+    errorMessage.value = error?.response?.data?.msg || error?.response?.data?.message || '知识问答调用失败'
     answer.value = ''
     references.value = []
   } finally {
