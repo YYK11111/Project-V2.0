@@ -857,6 +857,11 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
       : [];
     if (!chunks.length) {
       const chunk = {
+        id: this.createChunkId(
+          article.id,
+          Number(article.contentVersion || DOCUMENT_SCHEMA_VERSION),
+          0,
+        ),
         order: 0,
         title: "全文",
         headingPath: [],
@@ -869,7 +874,7 @@ export class ArticlesService extends BaseService<Article, ArticleDto> {
         chunk,
         keyword,
       );
-        return [
+      return [
         {
           articleId: article.id,
           articleTitle: article.title,
