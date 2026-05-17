@@ -29,7 +29,11 @@ const ElInputStub = defineComponent({
     return () =>
       h('textarea', {
         value: props.modelValue,
-        onInput: (event) => emit('update:modelValue', event.target.value),
+        onInput: (event: Event) =>
+          emit(
+            'update:modelValue',
+            (event.target as HTMLTextAreaElement | null)?.value || '',
+          ),
       })
   },
 })
