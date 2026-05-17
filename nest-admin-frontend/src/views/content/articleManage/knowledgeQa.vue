@@ -9,7 +9,6 @@ const loading = ref(false)
 const question = ref('')
 const answer = ref('')
 const references = ref<any[]>([])
-const matchedChunks = ref<any[]>([])
 const errorMessage = ref('')
 
 async function submitQuestion() {
@@ -26,12 +25,10 @@ async function submitQuestion() {
     const payload = res?.data || {}
     answer.value = payload.answer || ''
     references.value = payload.references || []
-    matchedChunks.value = payload.matchedChunks || []
   } catch (error) {
     errorMessage.value = error?.response?.data?.message || '知识问答调用失败'
     answer.value = ''
     references.value = []
-    matchedChunks.value = []
   } finally {
     loading.value = false
   }
@@ -78,40 +75,25 @@ function goDetail(item: any) {
         <div class="knowledge-qa-answer__content">{{ answer || '暂无回答，输入问题后可在这里查看结果。' }}</div>
       </div>
 
-      <div class="knowledge-qa-side">
-        <div class="knowledge-qa-references Gcard km-panel">
-          <div class="knowledge-qa-references__title">引用来源</div>
-          <div v-if="references.length" class="knowledge-qa-reference-list">
-            <button
-              v-for="item in references"
-              :key="item.chunkId || `${item.articleId}-${item.chunkOrder}`"
-              type="button"
-              class="knowledge-qa-reference-item"
-              @click="goDetail(item)">
-              <div class="knowledge-qa-reference-item__title">{{ item.articleTitle || '-' }}</div>
-              <div class="knowledge-qa-reference-item__meta">
-                <span>{{ item.catalog?.name || '-' }}</span>
-                <span>片段 #{{ item.chunkOrder || '-' }}</span>
-                <span>score {{ item.score ?? '-' }}</span>
-              </div>
-              <div class="knowledge-qa-reference-item__summary">{{ item.chunkSummary || '暂无摘要' }}</div>
-            </button>
-          </div>
-          <el-empty v-else description="暂无引用来源" />
-        </div>
-
-        <div class="knowledge-qa-matched Gcard km-panel">
-          <div class="knowledge-qa-matched__title">命中片段</div>
-          <div v-if="matchedChunks.length" class="knowledge-qa-matched__list">
-            <div
-              v-for="item in matchedChunks"
-              :key="item.chunkId || item.score"
-              class="knowledge-qa-matched__item">
-              <div class="knowledge-qa-matched__score">score {{ item.score ?? '-' }}</div>
-              <pre class="knowledge-qa-matched__text">{{ item.chunkText || '-' }}</pre>
+      <div class="knowledge-qa-references Gcard km-panel">
+        <div class="knowledge-qa-references__title">引用来源</div>
+        <div v-if="references.length" class="knowledge-qa-reference-list">
+          <button
+            v-for="item in references"
+            :key="item.chunkId || `${item.articleId}-${item.chunkOrder}`"
+            type="button"
+            class="knowledge-qa-reference-item"
+            @click="goDetail(item)">
+            <div class="knowledge-qa-reference-item__title">{{ item.articleTitle || '-' }}</div>
+            <div class="knowledge-qa-reference-item__meta">
+              <span>{{ item.catalog?.name || '-' }}</span>
+              <span>片段 #{{ item.chunkOrder || '-' }}</span>
             </div>
-          </div>
-          <el-empty v-else description="暂无命中片段" />
+            <div class="knowledge-qa-reference-item__summary">{{ item.chunkSummary || '暂无摘要' }}</div>
+          </button>
+        </div>
+        <div v-else class="knowledge-qa-references__empty">
+          <el-empty description="暂无引用来源" />
         </div>
       </div>
     </div>
@@ -166,14 +148,7 @@ function goDetail(item: any) {
   color: var(--el-text-color-primary);
 }
 
-.knowledge-qa-side {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.knowledge-qa-reference-list,
-.knowledge-qa-matched__list {
+.knowledge-qa-reference-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -209,23 +184,11 @@ function goDetail(item: any) {
   line-height: 1.6;
 }
 
-.knowledge-qa-matched__item {
-  border-radius: 14px;
-  padding: 14px;
-  background: color-mix(in srgb, var(--el-fill-color-extra-light) 82%, var(--cardBg));
-}
-
-.knowledge-qa-matched__score {
-  margin-bottom: 8px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.knowledge-qa-matched__text {
-  margin: 0;
-  white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  line-height: 1.6;
+.knowledge-qa-references__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
 }
 
 @media (max-width: 960px) {
