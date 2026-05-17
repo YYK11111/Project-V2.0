@@ -7,5 +7,4 @@ export class KnowledgeQaAskDto {
 
 export class KnowledgeQaEmbedPreviewDto {
   text: string;
-  model?: string;
 }

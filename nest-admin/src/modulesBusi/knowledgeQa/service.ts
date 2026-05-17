@@ -151,13 +151,12 @@ export class KnowledgeQaService {
   async embedPreview(query: KnowledgeQaEmbedPreviewDto) {
     const embeddingResult = await this.customAiService.embedTexts(
       [String(query.text || "")],
-      query.model || this.customAiService.getDefaultEmbeddingModel(),
+      this.customAiService.getDefaultEmbeddingModel(),
     );
     return {
       provider: "openai-compatible",
       model:
         embeddingResult.model ||
-        query.model ||
         this.customAiService.getDefaultEmbeddingModel(),
       dimension: embeddingResult.vectors?.[0]?.length || 0,
     };
