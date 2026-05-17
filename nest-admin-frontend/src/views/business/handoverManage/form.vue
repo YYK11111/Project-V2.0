@@ -86,6 +86,7 @@ function submit() {
 
 function handleSubmitApproval() {
   if (!route.query.id) return $sdk.msgWarning('请先保存运维交接单后再提交审批')
+  $sdk.msgWarning(`提交审批前，请先确认已补齐：${handoverApprovalRequirements.join('、')}`)
   if (!form.value.handoverTo?.trim()) return $sdk.msgWarning('提交审批前，请补齐接维对象')
   if (!form.value.handoverDate) return $sdk.msgWarning('提交审批前，请补齐交接日期')
   const request = String(form.value.currentNodeName || '').includes('退回发起人') && form.value.workflowInstanceId
@@ -169,20 +170,6 @@ function scrollToWorkflowPanel() {
           </div>
 
           <div class="business-form-fields business-form-fields--content">
-            <el-alert
-              v-if="!isReadonly"
-              title="提交审批前必填"
-              type="warning"
-              :closable="false"
-              show-icon
-              class="mb-16"
-            >
-              <template #default>
-                <ul class="phase-required-list">
-                  <li v-for="item in handoverApprovalRequirements" :key="item">{{ item }}</li>
-                </ul>
-              </template>
-            </el-alert>
             <el-form-item label="服务窗口说明">
               <ViewField v-if="isReadonly" :value="form.serviceWindow" />
               <el-input v-else v-model="form.serviceWindow" type="textarea" :rows="3" placeholder="请输入服务窗口说明" />
@@ -224,13 +211,4 @@ function scrollToWorkflowPanel() {
   overflow-x: hidden;
 }
 
-.phase-required-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-}
-
-.phase-required-list li + li {
-  margin-top: 4px;
-}
 </style>

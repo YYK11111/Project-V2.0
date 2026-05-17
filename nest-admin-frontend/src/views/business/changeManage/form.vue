@@ -179,6 +179,7 @@ async function handleReject() {
 
 async function handleSubmitApproval() {
   if (!canSaveChange.value) return $sdk.msgWarning('当前操作没有权限')
+  $sdk.msgWarning(`提交审批前，请先确认已补齐：${changeApprovalRequirements.join('、')}`)
   if (canCloseReturnedInstance.value) {
     await resubmitReturnedWorkflowInstance(form.value.workflowInstanceId, { comment: '发起人重新提交审批' })
     $sdk.msgSuccess('重新提交审批成功')
@@ -468,21 +469,6 @@ function scrollToWorkflowPanel() {
           </div>
         </div>
         <div class="business-form-fields">
-      <el-alert
-        v-if="!isReadonly"
-        title="提交审批前必填"
-        type="warning"
-        :closable="false"
-        show-icon
-        class="mb-16"
-      >
-        <template #default>
-          <ul class="phase-required-list">
-            <li v-for="item in changeApprovalRequirements" :key="item">{{ item }}</li>
-          </ul>
-        </template>
-      </el-alert>
-
       <el-form-item label="变更原因">
         <ViewField v-if="isReadonly" :value="form.reason" />
         <el-input v-else v-model="form.reason" type="textarea" :rows="2" placeholder="请输入变更原因" />
@@ -700,16 +686,6 @@ function scrollToWorkflowPanel() {
   font-size: 13px;
   line-height: 1.7;
   color: var(--el-text-color-regular);
-}
-
-.phase-required-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-}
-
-.phase-required-list li + li {
-  margin-top: 4px;
 }
 
 @media (max-width: 768px) {

@@ -621,6 +621,7 @@ function submitCloseApproval() {
   if (!isEdit.value) {
     return $sdk.msgWarning('请先保存项目后再发起结项审批')
   }
+  $sdk.msgWarning(`提交结项审批前，请先确认已补齐：${projectClosureRequirements.join('、')}`)
   if (!form.value.closeSummary?.trim()) {
     return $sdk.msgWarning('发起结项审批前，请补齐验收说明')
   }
@@ -648,6 +649,7 @@ function submit() {
 }
 
 function submitProjectApproval() {
+  $sdk.msgWarning(`提交立项审批前，请先确认已补齐：${projectApprovalRequirements.join('、')}`)
   saveProject(true)
 }
 
@@ -1031,21 +1033,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <el-alert
-            v-if="!isView"
-            title="提交立项审批前必填"
-            type="warning"
-            :closable="false"
-            show-icon
-            class="phase-required-alert"
-          >
-            <template #default>
-              <ul class="phase-required-list">
-                <li v-for="item in projectApprovalRequirements" :key="item">{{ item }}</li>
-              </ul>
-            </template>
-          </el-alert>
-
           <div class="project-baseline-plan-grid">
             <el-form-item label="主要交付物" prop="baselineDeliverables" class="project-baseline-plan-grid__item project-baseline-plan-grid__item--wide">
               <ViewField v-if="isView" :value="form.baselineDeliverables" />
@@ -1243,21 +1230,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <el-alert
-            v-if="!isView"
-            title="提交结项审批前必填"
-            type="warning"
-            :closable="false"
-            show-icon
-            class="phase-required-alert"
-          >
-            <template #default>
-              <ul class="phase-required-list">
-                <li v-for="item in projectClosureRequirements" :key="item">{{ item }}</li>
-              </ul>
-            </template>
-          </el-alert>
-
           <div class="project-baseline-plan-grid">
             <el-form-item label="验收日期" class="project-baseline-plan-grid__item">
               <ViewField v-if="isView" :value="form.acceptanceDate" />
@@ -1373,20 +1345,6 @@ onBeforeUnmount(() => {
 }
 
 .section-card--table .table-wrapper {
-  margin-top: 4px;
-}
-
-.phase-required-alert {
-  margin-bottom: 18px;
-}
-
-.phase-required-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-}
-
-.phase-required-list li + li {
   margin-top: 4px;
 }
 

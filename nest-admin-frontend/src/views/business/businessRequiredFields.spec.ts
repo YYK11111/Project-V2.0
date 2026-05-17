@@ -29,28 +29,32 @@ describe('业务表单必填与对象展示守卫', () => {
     expect(source).toContain('impactedSprintName')
   })
 
-  it('变更、上线、交接、验收表单应展示提交审批前必填提示并在提审前校验', () => {
+  it('变更、上线、交接、验收表单应在提审时使用统一消息提醒并继续做前置校验', () => {
     const changeSource = readBusinessView('changeManage/form.vue')
     const goLiveSource = readBusinessView('goLiveManage/form.vue')
     const handoverSource = readBusinessView('handoverManage/form.vue')
     const acceptanceSource = readBusinessView('acceptanceManage/form.vue')
 
-    expect(changeSource).toContain('提交审批前必填')
+    expect(changeSource).not.toContain('提交审批前必填')
+    expect(changeSource).toContain("$sdk.msgWarning(`提交审批前，请先确认已补齐：${changeApprovalRequirements.join('、')}`)")
     expect(changeSource).toContain('请补齐变更原因')
     expect(changeSource).toContain('请补齐变更描述')
     expect(changeSource).toContain('请补齐影响分析')
 
-    expect(goLiveSource).toContain('提交审批前必填')
+    expect(goLiveSource).not.toContain('提交审批前必填')
+    expect(goLiveSource).toContain("$sdk.msgWarning(`提交审批前，请先确认已补齐：${goLiveApprovalRequirements.join('、')}`)")
     expect(goLiveSource).toContain('请补齐计划上线日期')
     expect(goLiveSource).toContain('请补齐负责人')
     expect(goLiveSource).toContain('请补齐检查项摘要')
     expect(goLiveSource).toContain('请补齐回退预案')
 
-    expect(handoverSource).toContain('提交审批前必填')
+    expect(handoverSource).not.toContain('提交审批前必填')
+    expect(handoverSource).toContain("$sdk.msgWarning(`提交审批前，请先确认已补齐：${handoverApprovalRequirements.join('、')}`)")
     expect(handoverSource).toContain('请补齐接维对象')
     expect(handoverSource).toContain('请补齐交接日期')
 
-    expect(acceptanceSource).toContain('提交审批前必填')
+    expect(acceptanceSource).not.toContain('提交审批前必填')
+    expect(acceptanceSource).toContain("$sdk.msgWarning(`提交审批前，请先确认已补齐：${acceptanceApprovalRequirements.join('、')}`)")
     expect(acceptanceSource).toContain('请补齐验收日期')
     expect(acceptanceSource).toContain('请补齐验收范围')
     expect(acceptanceSource).toContain('请先明确验收结果')

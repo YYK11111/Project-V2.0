@@ -286,12 +286,15 @@ describe('项目链路表单结构整改守卫', () => {
     expect(source).toContain('prop="content"')
   })
 
-  it('项目表单应显式展示立项与结项阶段性必填说明', () => {
+  it('项目表单在页面内不常驻立项必填提示，提交时使用统一消息提醒', () => {
     const source = readBusinessView('projectManage/form.vue')
 
-    expect(source).toContain('提交立项审批前必填')
-    expect(source).toContain('里程碑至少 1 条，且每条都要补齐名称和计划完成日期')
-    expect(source).toContain('提交结项审批前必填')
-    expect(source).toContain('至少新增 1 条上线记录和 1 条通过验收记录')
+    expect(source).not.toContain('提交立项审批前必填')
+    expect(source).not.toContain('提交结项审批前必填')
+    expect(source).not.toContain('title="提交立项审批前必填"')
+    expect(source).not.toContain('title="提交结项审批前必填"')
+    expect(source).toContain("$sdk.msgWarning(`提交立项审批前，请先确认已补齐：${projectApprovalRequirements.join('、')}`)")
+    expect(source).toContain("$sdk.msgWarning(`提交结项审批前，请先确认已补齐：${projectClosureRequirements.join('、')}`)")
+    expect(source).not.toContain('.confirm(')
   })
 })

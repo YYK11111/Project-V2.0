@@ -135,6 +135,7 @@ function handleConfirmRollback() {
 
 function handleSubmitApproval() {
   if (!route.query.id) return $sdk.msgWarning('请先保存上线单后再提交审批')
+  $sdk.msgWarning(`提交审批前，请先确认已补齐：${goLiveApprovalRequirements.join('、')}`)
   if (!form.value.plannedGoLiveTime) return $sdk.msgWarning('提交审批前，请补齐计划上线日期')
   if (!form.value.ownerId) return $sdk.msgWarning('提交审批前，请补齐负责人')
   if (!String(form.value.checklistSummary || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim()) return $sdk.msgWarning('提交审批前，请补齐检查项摘要')
@@ -219,20 +220,6 @@ function scrollToWorkflowPanel() {
           </div>
 
           <div class="business-form-fields business-form-fields--content">
-            <el-alert
-              v-if="!isReadonly"
-              title="提交审批前必填"
-              type="warning"
-              :closable="false"
-              show-icon
-              class="mb-16"
-            >
-              <template #default>
-                <ul class="phase-required-list">
-                  <li v-for="item in goLiveApprovalRequirements" :key="item">{{ item }}</li>
-                </ul>
-              </template>
-            </el-alert>
             <el-form-item label="检查项摘要">
               <ViewRichText v-if="isReadonly" :html="form.checklistSummary" />
               <Editor v-else v-model="form.checklistSummary" style="min-height: 220px" placeholder="请输入检查项摘要" />
@@ -273,13 +260,4 @@ function scrollToWorkflowPanel() {
   overflow-x: hidden;
 }
 
-.phase-required-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-}
-
-.phase-required-list li + li {
-  margin-top: 4px;
-}
 </style>
