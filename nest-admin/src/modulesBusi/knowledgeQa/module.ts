@@ -6,11 +6,7 @@ import { ArticleChunkEmbeddingsModule } from "../articleChunkEmbeddings/module";
 import { AiModule } from "src/modulesAi/ai/module";
 
 @Module({
-  imports: [
-    ArticlesModule,
-    ArticleChunkEmbeddingsModule,
-    AiModule,
-  ],
+  imports: [ArticlesModule, ArticleChunkEmbeddingsModule, AiModule],
   controllers: [KnowledgeQaController],
   providers: [KnowledgeQaService],
 })

@@ -106,16 +106,12 @@ export class CustomAiService {
       throw new Error("Custom AI not configured");
     }
 
-    const response = await axios.post(
-      `${this.baseUrl}/embeddings`,
-      request,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+    const response = await axios.post(`${this.baseUrl}/embeddings`, request, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
       },
-    );
+    });
 
     return response.data;
   }
