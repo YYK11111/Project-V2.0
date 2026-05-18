@@ -8,9 +8,9 @@ const envs = {
     BASE_API: 'http://localhost:3000/api', // 接口基础路径
   },
   production: {
-    DOMAIN: 'https://nestts.com',
+    DOMAIN: '',
     BASE_URL: '/',
-    BASE_API: 'https://nestts.com/api',
+    BASE_API: '/api',
   },
   test: {
     DOMAIN: 'https://47.98.205.145',
@@ -23,7 +23,7 @@ const packMode = globalThis.MODE || import.meta.env.MODE
 const runMode =
   process.env.NODE_ENV == 'development' || !globalThis.document
     ? packMode // 本地开发和vite中使用
-    : Object.keys(envs).find((e) => envs[e].DOMAIN === window?.location.origin) || 'diy' // 打包后，根据访问域名动态判断环境
+    : Object.keys(envs).find((e) => envs[e].DOMAIN === window?.location.origin) || packMode || 'diy' // 打包后，根据访问域名动态判断环境
 
 const BASE_URL = envs[packMode].BASE_URL
 const env = envs[runMode] || {}

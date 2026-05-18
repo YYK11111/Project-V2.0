@@ -14,14 +14,41 @@ export class RedisService {
     private menusService: MenusService,
     private systemConfigsService: SystenConfigsService,
   ) {
+    const host = process.env.REDIS_HOST || "127.0.0.1";
+    const port = this.getEnvNumber("REDIS_PORT", 6379);
+    const db = this.getEnvNumber("REDIS_DB", 1);
+    const password = process.env.REDIS_PASSWORD || undefined;
+
     this.redis = new Redis({
-      port: 6379, // Redis port
-      host: "127.0.0.1", // Redis host
+      port, // Redis port
+      host, // Redis host
       // username: "default", // needs Redis >= 6
-      // password: "my-top-secret",
-      db: 1, // Defaults to 0
+      password,
+      db, // Defaults to 0
     });
   }
+
+  private getEnvNumber(key: "REDIS_PORT" | "REDIS_DB", defaultValue: number) {
+    const value = process.env[key];
+    if (value === undefined) {
+      return defaultValue;
+    }
+
+    const trimmedValue = value.trim();
+    if (trimmedValue === "") {
+      return defaultValue;
+    }
+
+    if (!/^\d+$/.test(trimmedValue)) {
+      return defaultValue;
+    }
+
+    const parsedValue = Number(trimmedValue);
+    return Number.isSafeInteger(parsedValue) && parsedValue >= 0
+      ? parsedValue
+      : defaultValue;
+  }
+
   async set(key: string, value: any, time?: number) {
     if (value && typeof value === "object") {
       value = JSON.stringify(value);

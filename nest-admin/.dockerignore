@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+npm-debug.log
+Dockerfile
+.dockerignore
+test
+*.log
+config/secret.ts
+config/secret.js
+config/secret.copy.js

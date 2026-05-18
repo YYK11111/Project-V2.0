@@ -1,0 +1,44 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-crpi-oygnku9mfq22z345.cn-guangzhou.personal.cr.aliyuncs.com/yykpms/project-v2-backend:latest}
+    container_name: backend
+    restart: unless-stopped
+    environment:
+      APP_PORT: ${APP_PORT:-3000}
+      APP_DEBUG_PORT: ${APP_DEBUG_PORT:-9229}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-psd2}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-12345678}
+      MYSQL_SYNCHRONIZE: ${MYSQL_SYNCHRONIZE:-false}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      SYSTEM_MENU_SYNC_ON_BOOT: ${SYSTEM_MENU_SYNC_ON_BOOT:-false}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-1}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - upload-data:/app/upload
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    networks:
+      - app-network
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-crpi-oygnku9mfq22z345.cn-guangzhou.personal.cr.aliyuncs.com/yykpms/project-v2-frontend:latest}
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: ${EXTERNAL_NETWORK:-project-v2-network}
+
+volumes:
+  upload-data:
+    name: ${UPLOAD_VOLUME:-upload}

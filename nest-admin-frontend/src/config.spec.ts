@@ -37,4 +37,18 @@ describe('applyBrowserBranding', () => {
     expect(source).not.toContain('基于 Nestjs')
     expect(source).not.toContain('Nest Admin --')
   })
+
+  it('生产配置不再保留示例域名并使用同域 /api', () => {
+    const source = readSysConfigSource()
+
+    expect(source).not.toContain('https://nestts.com')
+    expect(source).toContain("BASE_API: '/api'")
+  })
+
+  it('运行时环境仍优先按访问域名匹配，不会直接锁死到 packMode', () => {
+    const source = readSysConfigSource()
+
+    expect(source).toContain('window?.location.origin')
+    expect(source).not.toContain('envs[packMode] ? packMode :')
+  })
 })

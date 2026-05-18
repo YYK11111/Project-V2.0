@@ -241,6 +241,8 @@ $ npm run start:prod
 
 ## 部署
 
+Docker 部署入口见根目录 [docker-compose.yml](../docker-compose.yml)、[docker-compose.prod.yml](../docker-compose.prod.yml) 和 [部署说明](../docs/docker-deployment.md)。
+
 1. 和本地运行类似，在服务器执行上面安装和配置步骤
 
 2. 执行 `npm install -g pm2` 安装 [pm2](https://pm2.io/docs/plus/overview/)，目前使用 pm2 启动和管理node项目进程。有关pm2 的更多信息，请查看 [pm2 文档](https://pm2.io/docs/plus/overview/)。国内打不开的话，可以自行搜索相关中文网站。
