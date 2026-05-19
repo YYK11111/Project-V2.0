@@ -29,6 +29,18 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_men
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '文章删除', '文章删除权限', @knowledge_manage_menu_id, '724', 'knowledge-manage-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/articles/delete'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_menu_id AND permissionKey = 'business/articles/delete' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '标签列表', '标签列表权限', @knowledge_manage_menu_id, '725', 'knowledge-manage-tag-list', '', 'button', '', '1', '1', 'system', 'system', 'business/articleTags/list'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_menu_id AND permissionKey = 'business/articleTags/list' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '新增标签', '新增标签权限', @knowledge_manage_menu_id, '726', 'knowledge-manage-tag-add', '', 'button', '', '1', '1', 'system', 'system', 'business/articleTags/add'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_menu_id AND permissionKey = 'business/articleTags/add' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '修改标签', '修改标签权限', @knowledge_manage_menu_id, '727', 'knowledge-manage-tag-update', '', 'button', '', '1', '1', 'system', 'system', 'business/articleTags/update'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_menu_id AND permissionKey = 'business/articleTags/update' AND is_delete IS NULL);
+INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
+SELECT '删除标签', '删除标签权限', @knowledge_manage_menu_id, '728', 'knowledge-manage-tag-delete', '', 'button', '', '1', '1', 'system', 'system', 'business/articleTags/delete'
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE parent_id = @knowledge_manage_menu_id AND permissionKey = 'business/articleTags/delete' AND is_delete IS NULL);
 
 INSERT INTO sys_menu (name, `desc`, parent_id, `order`, path, component, type, icon, is_hidden, is_active, create_user, update_user, permissionKey)
 SELECT '我的借阅访问', '我的借阅访问权限', @knowledge_my_borrows_menu_id, '731', 'knowledge-my-borrows-enter', '', 'button', '', '1', '1', 'system', 'system', 'content/articleManage/myBorrows'
@@ -71,5 +83,54 @@ WHERE @admin_role_id IS NOT NULL
     'business/articleBorrows/pending',
     'business/articleBorrows/approve',
     'business/articleBorrows/reject',
-    'business/articleBorrows/revoke'
+    'business/articleBorrows/revoke',
+    'business/articleTags/list',
+    'business/articleTags/add',
+    'business/articleTags/update',
+    'business/articleTags/delete'
+  );
+
+INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
+SELECT r.id, m.id
+FROM sys_role r
+JOIN sys_menu m ON m.is_delete IS NULL
+WHERE r.permissionKey = 'knowledgeEditor'
+  AND (
+    m.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows')
+    OR m.permissionKey IN (
+      'content/articleManage/home',
+      'content/articleManage/search',
+      'content/articleManage/manage',
+      'business/articles/add',
+      'business/articles/update',
+      'business/articleTags/list',
+      'business/articleTags/add',
+      'business/articleTags/update',
+      'business/articleBorrows/my'
+    )
+  );
+
+INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
+SELECT r.id, m.id
+FROM sys_role r
+JOIN sys_menu m ON m.is_delete IS NULL
+WHERE r.permissionKey = 'knowledgeCatalogAdmin'
+  AND (
+    m.path IN ('/content/articleManage/home', '/content/articleManage/search', '/content/articleManage/manage', '/content/articleManage/myBorrows', '/content/articleManage/borrowApproval')
+    OR m.permissionKey IN (
+      'content/articleManage/home',
+      'content/articleManage/search',
+      'content/articleManage/manage',
+      'business/articles/add',
+      'business/articles/update',
+      'business/articleTags/list',
+      'business/articleTags/add',
+      'business/articleTags/update',
+      'business/articleBorrows/my',
+      'business/articleBorrows/pending',
+      'business/articleBorrows/approve',
+      'business/articleBorrows/reject',
+      'business/articleBorrows/revoke',
+      'business/articleCatalogs/update'
+    )
   );
